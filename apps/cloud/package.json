@@ -1,0 +1,25 @@
+{
+  "name": "@cursebound/cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CURSEBOUND online service: accounts, friends, builds, run summaries, boards, presence/signaling and TURN credentials (Cloud Run + Postgres)",
+  "scripts": {
+    "dev": "tsx src/dev.ts",
+    "start": "node dist/main.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@cursebound/accounts": "0.1.0",
+    "@cursebound/content": "0.1.0",
+    "@cursebound/protocol": "0.1.0",
+    "pg": "8.16.3",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.7",
+    "@types/pg": "8.15.5",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.25.9"
+  }
+}

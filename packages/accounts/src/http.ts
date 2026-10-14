@@ -27,16 +27,23 @@ export function routePattern(path: string, prefix = '/api/v1'): RegExp {
   return new RegExp('^' + prefix + path.replace(/:([a-z]+)/g, '([^/]+)') + '$');
 }
 
+/**
+ * Parse a JSON body of at most `limit` bytes. An oversized body is rejected with 413 at once; the rest is discarded
+ * (not buffered) so the error response still reaches the client, and the server closes the connection after it.
+ */
 export function readBody(req: IncomingMessage, limit = MAX_BODY): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let size = 0;
+    let over = false;
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => {
+      if (over) return;
       size += c.length;
-      if (size > limit) { reject(new HttpError(413, 'TOO_LARGE', 'request body too large')); req.destroy(); return; }
+      if (size > limit) { over = true; chunks.length = 0; reject(new HttpError(413, 'TOO_LARGE', 'request body too large')); return; }
       chunks.push(c);
     });
     req.on('end', () => {
+      if (over) return;
       if (!chunks.length) return resolve({});
       try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { reject(new HttpError(400, 'INVALID_INPUT', 'invalid JSON body')); }
     });
