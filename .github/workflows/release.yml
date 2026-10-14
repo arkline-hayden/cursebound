@@ -1,0 +1,148 @@
+name: Release
+# Desktop app releases (docs/RELEASING.md). Builds Windows (NSIS), macOS (dmg + zip) and Linux (AppImage) installers,
+# uploads them with the auto-update feeds (latest*.yml, blockmaps) to a draft GitHub Release, and publishes it once
+# every platform succeeded. Installed apps pick it up on their next launch or within 30 minutes.
+#   push to main (shipped paths only)  → automatic release v<major>.<minor>.<run_number> (major.minor from
+#                                         apps/desktop/package.json), so every build is newer than the last
+#   push a tag vX.Y.Z                   → named release with exactly that version
+#   workflow_dispatch                   → as for the selected ref (a branch gets an automatic version)
+# Typecheck and tests gate everything: a red build never ships.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    # paths apply to branch pushes only (GitHub never path-filters tag pushes)
+    paths:
+      - 'apps/client/**'
+      - 'apps/server/**'
+      - 'apps/desktop/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+# one release at a time, in push order; a newer pending run replaces an older pending one (never a running one)
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (simulation, server, desktop, cloud, tools, tests)
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Typecheck (client)
+        run: npx tsc -p apps/client/tsconfig.json --noEmit
+      - name: Tests
+        run: npx vitest run
+
+  draft:
+    needs: check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Work out the version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH[-pre]"; exit 1
+            fi
+            version="${GITHUB_REF_NAME#v}"
+          else
+            base=$(node -p "require('./apps/desktop/package.json').version.split('.').slice(0, 2).join('.')")
+            version="$base.$GITHUB_RUN_NUMBER"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "release v$version"
+      - name: Release notes from commits
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_SHA}^" 2>/dev/null || true)
+          {
+            echo "## Changes${prev:+ since $prev}"
+            echo
+            if [[ -n "$prev" ]]; then git log --no-merges --pretty='- %s (%h)' "$prev..$GITHUB_SHA"; else git log --no-merges --pretty='- %s (%h)' -n 30 "$GITHUB_SHA"; fi
+            echo
+            echo "Install: download the file for your system below. Already installed? The game updates itself."
+          } > notes.md
+          cat notes.md
+      # one draft up front, so the three platform jobs upload into the same release instead of racing to create it;
+      # for automatic versions the tag is created on this commit when the release is published
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$GITHUB_SHA" \
+                 --title "CURSEBOUND $VERSION" --notes-file notes.md
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Set the app version
+        shell: bash
+        env:
+          VERSION: ${{ needs.draft.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const f = "apps/desktop/package.json";
+            const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            j.version = process.env.VERSION;
+            fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+            console.log("desktop version", j.version);
+          '
+      # static client export → bundled authority/main/preload → electron-builder for this OS, uploaded to the draft
+      - name: Build and upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLOUD_URL: ${{ vars.CLOUD_URL }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run desktop:build -- --publish always
+
+  publish:
+    needs: [draft, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.draft.outputs.tag }}
+        run: |
+          if [[ "$TAG" == *-* ]]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
+          else
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
