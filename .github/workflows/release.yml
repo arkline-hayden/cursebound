@@ -100,7 +100,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # Windows only for now; add macos-latest / ubuntu-latest back to ship those builds (configs are ready)
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
