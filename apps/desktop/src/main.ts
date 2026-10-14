@@ -23,11 +23,13 @@ const resources = app.isPackaged ? process.resourcesPath : path.resolve(app.getA
 const cloudUrl = ((!app.isPackaged && process.env.CURSEBOUND_CLOUD_URL) || __CLOUD_URL__ || '').replace(/\/+$/, '');
 /** log every renderer console line (CURSEBOUND_LOG_RENDERER=1), not just warnings and errors */
 const logAllConsole = process.env.CURSEBOUND_LOG_RENDERER === '1';
+/** longest the launch waits for the update check before showing the title menu */
+const FIRST_CHECK_WAIT_MS = 4000;
 
 let win: BrowserWindow | null = null;
 let origin = '';
 let quitting = false;
-let updates: Updates = { pending: () => null, install: () => {} };
+let updates: Updates = { pending: () => null, install: () => {}, firstCheck: Promise.resolve('none') };
 const secure = new SecureStore(path.join(userData, 'secure-store.json'));
 const crashes: number[] = [];
 
@@ -180,11 +182,15 @@ async function boot(): Promise<void> {
   }
   origin = `http://127.0.0.1:${port}`;
   log(`[shell] authority ready at ${origin}`);
-  win = createWindow();
-  await win.loadURL(`${origin}/`);
+  // co-op needs matching builds: learn about a newer build before the title menu loads (bounded, so an offline
+  // launch is not held up); its download then runs in the background and the page shows "Restart to update"
   updates = initUpdates(log, (version) => {
     for (const w of BrowserWindow.getAllWindows()) if (isLocal(w.webContents.getURL())) w.webContents.send('cursebound:update-ready', version);
   });
+  const first = await Promise.race([updates.firstCheck, new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), FIRST_CHECK_WAIT_MS))]);
+  if (first !== 'none') log(`[shell] launch update check: ${first}`);
+  win = createWindow();
+  await win.loadURL(`${origin}/`);
 }
 
 if (!app.requestSingleInstanceLock()) {

@@ -523,6 +523,7 @@ details[open] > summary::before { content: '\25BE'; }
 .update-toast-text { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
 .update-toast-title { font-family: var(--font-label); font-size: var(--fs-label-lg); line-height: var(--lh-label); text-transform: uppercase; color: var(--gold); text-shadow: var(--shadow-hard); }
 .update-toast-ver { font-family: var(--font-num); font-size: var(--fs-label-lg); color: var(--ember-hi); text-shadow: var(--shadow-hard); }
+.update-toast-note { margin: 0; font-size: var(--fs-body); line-height: var(--lh-body); color: var(--bone); text-shadow: var(--shadow-hard); }
 .update-toast-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 
 /* round intro / phase banners: display letters over an engraved rule, area name below */

@@ -25,6 +25,7 @@ export function UpdateToast() {
         <span className="update-toast-title">A new build is ready</span>
         <span className="update-toast-ver">v{version}</span>
       </div>
+      <p className="update-toast-note">Co-op needs matching builds. Restart so your friends can join you.</p>
       <div className="update-toast-actions">
         <button
           type="button"
