@@ -59,6 +59,11 @@ export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log
     },
     friendIds: (accountId) => store.friendProfileIds(accountId),
     onFriendsChanged: (subscribe) => { friendSubscribers.add(subscribe); },
+    // names for offline friends in the presence snapshot (an account is its own profile in the cloud)
+    identities: async (ids) => {
+      const accounts = await Promise.all(ids.slice(0, 500).map((id) => store.getAccount(id)));
+      return accounts.filter((a) => a !== null).map((a) => ({ accountId: a.id, username: a.username, displayName: a.displayName, favoriteClass: a.favoriteClass }));
+    },
     log,
   });
 

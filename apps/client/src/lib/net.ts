@@ -1,10 +1,14 @@
 import { contentHash, DODGE, RULES } from '@cursebound/content';
 import { BUILD_ID, PROTOCOL_VERSION, type ServerMessage } from '@cursebound/protocol';
 import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type Snapshot, type SimEvent } from '@cursebound/simulation';
+import { wsTransport, type GameTransport } from './p2p/transport';
+import { roomWsUrl } from './runtime';
 import { createStore } from './store';
 
 // Room connection (PRD §19.1): sends intentions at 60 Hz, predicts own movement with the shared movement step,
 // reconciles against acknowledged authoritative snapshots, interpolates remote entities ~100 ms in the past.
+// The room protocol rides a GameTransport: a WebSocket to the authority (local / LAN), or for a peer-to-peer guest
+// the data channel to the host's bridge (lib/p2p/guest.ts), which re-signals on every reconnect.
 
 export interface PhaseData {
   runId: string; mode: 'solo' | 'coop'; trust: string; n: number; seed: string; challengeId: string | null; tutorial: boolean;
@@ -55,8 +59,11 @@ let nextNoticeId = 1;
 interface PendingInput { seq: number; mx: number; my: number; ax: number; ay: number; dodge: boolean }
 interface TimedSnap { at: number; snap: Snapshot }
 
+/** Opens a fresh transport to the room's authority; called again on every reconnect. */
+export type TransportFactory = () => Promise<GameTransport>;
+
 export class GameConnection {
-  private ws: WebSocket | null = null;
+  private ws: GameTransport | null = null;
   private closedByUser = false;
   private retries = 0;
   snaps: TimedSnap[] = [];
@@ -79,13 +86,26 @@ export class GameConnection {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   onSnapshot: ((s: Snapshot) => void) | null = null;
 
-  constructor(public roomId: string, public token: string) {}
+  constructor(public roomId: string, public token: string, private transport: TransportFactory = async () => wsTransport(await roomWsUrl())) {}
 
   connect() {
     this.closedByUser = false;
     netStore.set({ status: this.retries ? 'reconnecting' : 'connecting', error: null });
-    const port = process.env.NEXT_PUBLIC_ROOM_PORT ?? '2567';
-    const ws = new WebSocket(`ws://${location.hostname}:${port}/rooms`);
+    this.transport().then((ws) => this.attach(ws), (err: { code?: string; message?: string }) => {
+      if (this.closedByUser) return;
+      if (err?.code === 'NO_SESSION') { netStore.set({ status: 'error', error: err.message ?? 'No seat in this tab.' }); return; }
+      this.retry();
+    });
+  }
+
+  private retry() {
+    this.retries++;
+    netStore.set({ status: 'reconnecting' });
+    setTimeout(() => { if (!this.closedByUser) this.connect(); }, Math.min(4000, 300 * this.retries));
+  }
+
+  private attach(ws: GameTransport) {
+    if (this.closedByUser) { ws.close(); return; }
     this.ws = ws;
     ws.onopen = () => {
       this.retries = 0;
@@ -94,16 +114,16 @@ export class GameConnection {
       netStore.set({ status: 'open' });
       this.pingTimer = setInterval(() => this.send({ t: 'PING', c: performance.now() }), 2000);
     };
-    ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
-    ws.onclose = (e) => {
+    ws.onmessage = (data) => this.onMessage(JSON.parse(data) as ServerMessage);
+    ws.onclose = (code, reason) => {
       if (this.pingTimer) clearInterval(this.pingTimer);
+      if (this.ws === ws) this.ws = null;
       if (this.closedByUser) { netStore.set({ status: 'closed' }); return; }
-      if (e.code >= 4001 && e.code <= 4004) { netStore.set({ status: 'error', error: e.reason || 'Connection refused by the authority.' }); return; }
-      this.retries++;
-      netStore.set({ status: 'reconnecting' });
-      setTimeout(() => this.connect(), Math.min(4000, 300 * this.retries));
+      if (code >= 4001 && code <= 4004) { netStore.set({ status: 'error', error: reason || 'Connection refused by the authority.' }); return; }
+      this.retry();
     };
-    ws.onerror = () => undefined;
+    // a peer-to-peer guest's channel arrives already open (its join handshake ran on it)
+    if (ws.readyState === 'open') ws.onopen?.();
   }
 
   close() {
@@ -112,7 +132,7 @@ export class GameConnection {
   }
 
   send(m: unknown) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
+    if (this.ws && this.ws.readyState === 'open') this.ws.send(JSON.stringify(m));
   }
 
   notice(level: Notice['level'], code: string, text: string) {

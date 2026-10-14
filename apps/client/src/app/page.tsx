@@ -11,9 +11,13 @@ import { createProfile, ensureProfile, setSeat, type Profile } from '@/lib/profi
 import { initSettings, settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
 import { score } from '@/lib/format';
+import { clearGuestSession, joinViaHost } from '@/lib/p2p/guest';
+import { markHosting, stopHostBridge } from '@/lib/p2p/host';
+import { presenceOnline, presenceStore, resolveCode, setStatus, startPresence, type PeerId } from '@/lib/p2p/presence';
 import { ClassPicker } from '@/ui/ClassPicker';
 import { EmberField } from '@/ui/EmberField';
 import { FireTitle } from '@/ui/FireTitle';
+import { FriendsPanel, InviteToasts } from '@/ui/Friends';
 import { ClassEmblem } from '@/ui/icons';
 
 // HOME (PRD §16.1) as a proper title screen over the live isometric attract-mode dungeon:
@@ -21,6 +25,8 @@ import { ClassEmblem } from '@/ui/icons';
 //   2. MENU  — the wordmark rises and a single centred column of carved plaques takes its place.
 //   3. VESSEL — choosing to play opens the character select (name + class) as its own carved dialog.
 // The account plate (top-right) shows who is signed in; the footer carries the build and authority status.
+// Online (cloud signed in), a slim friends plate sits under the account plate: who is online, what they are doing,
+// and Join for open co-op parties (peer-to-peer, lib/p2p). Party invites arrive as toasts.
 // The title stage is shown once per tab; returning from another page lands on the menu.
 
 const MenuBackdrop = dynamic(() => import('@/game/MenuBackdrop'), { ssr: false });
@@ -92,6 +98,7 @@ export default function Home() {
   const [lan, setLan] = useState<{ enabled: boolean; hosts: string[]; note: string } | null>(null);
   const settings = useStore(settingsStore, (s) => s.s);
   const auth = useStore(authStore, (s) => s);
+  const presence = useStore(presenceStore, (s) => s.conn);
   const logoScale = useLogoScale();
   const menuRef = useRef<HTMLUListElement>(null);
 
@@ -99,6 +106,10 @@ export default function Home() {
     try { if (sessionStorage.getItem(STAGE_KEY)) setStage('menu'); } catch { /* ignore */ }
     try { const v = localStorage.getItem(VESSEL_KEY); if (v && CLASS_BY_ID[v]) setClassId(v); } catch { /* ignore */ }
     initSettings();
+    // back on the title screen means out of any party this tab hosted; friends see us in the menu
+    stopHostBridge();
+    startPresence();
+    setStatus({ state: 'menu', joinable: false });
     api<{ build: string }>('GET', '/health').then((h) => { setHealth('ok'); setBuild(h.build); }).catch(() => setHealth('down'));
     api('GET', '/lan').then(setLan).catch(() => undefined);
     ensureProfile().then((p) => {
@@ -140,10 +151,23 @@ export default function Home() {
     setBusy(kind); setErr(null);
     try {
       const p = await rename();
-      const r = await api<{ roomId: string; seatToken: string; slot: number }>('POST', '/rooms', {
+      const r = await api<{ roomId: string; code: string; seatToken: string; slot: number }>('POST', '/rooms', {
         profileId: p.id, mode: kind === 'coop' ? 'coop' : 'solo', classId, challenge: kind === 'daily' ? 'daily' : 'random', tutorial: kind === 'tutorial',
       });
+      clearGuestSession();
       setSeat(r.roomId, r.seatToken, r.slot);
+      // this tab hosts the co-op room: /play starts the peer-to-peer bridge for friends who join
+      if (kind === 'coop') markHosting(r.roomId, r.code);
+      router.push('/play');
+    } catch (e) { setErr((e as Error).message); setBusy(null); }
+  };
+
+  /** Join a friend's (or a resolved code's) host over peer-to-peer. */
+  const joinPeer = async (host: PeerId, roomCode: string) => {
+    setBusy('join'); setErr(null);
+    try {
+      const seat = await joinViaHost(host, roomCode, classId);
+      setSeat(seat.roomId, seat.seatToken, seat.slot);
       router.push('/play');
     } catch (e) { setErr((e as Error).message); setBusy(null); }
   };
@@ -151,6 +175,12 @@ export default function Home() {
   const join = async (asGuest = false) => {
     setBusy('join'); setErr(null);
     try {
+      // online: a code first resolves to a host anywhere (peer-to-peer); unknown codes fall back to this authority / LAN
+      if (!asGuest && presenceOnline()) {
+        const host = await resolveCode(code);
+        if (host) { await joinPeer(host, code.trim().toUpperCase()); return; }
+      }
+      clearGuestSession();
       let p = await rename();
       if (asGuest) p = await createProfile(`${(signedIn ? auth.account!.displayName : name) || 'Guest'} ${Math.floor(Math.random() * 90 + 10)}`, true);
       const r = await api<{ roomId: string; seatToken: string; slot: number }>('POST', `/rooms/${encodeURIComponent(code.trim().toUpperCase())}/join`, { profileId: p.id, classId });
@@ -167,6 +197,7 @@ export default function Home() {
     setBusy(runId); setErr(null);
     try {
       const r = await api<{ roomId: string; seatToken: string; slot: number }>('POST', `/runs/${runId}/resume`, { profileId: profile!.id });
+      clearGuestSession();
       setSeat(r.roomId, r.seatToken, r.slot);
       router.push('/play');
     } catch (e) { setErr((e as Error).message); setBusy(null); }
@@ -218,6 +249,8 @@ export default function Home() {
           </>
         )}
       </div>
+      {stage === 'menu' && presence !== 'off' && <FriendsPanel busy={!!busy} onJoin={(host, roomCode) => { void joinPeer(host, roomCode); }} />}
+      {presence !== 'off' && <InviteToasts busy={!!busy} onJoin={(i) => { void joinPeer(i.from, i.roomCode); }} />}
 
       <main id="main" className="title-main">
         <header className="title-logo">

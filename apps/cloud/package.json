@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx src/dev.ts",
     "start": "node dist/main.mjs",
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "dev:presence": "tsx src/devPresence.ts --dev"
   },
   "dependencies": {
     "@cursebound/accounts": "0.1.0",
