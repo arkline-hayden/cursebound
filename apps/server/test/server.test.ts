@@ -212,14 +212,14 @@ describe('server integration', () => {
     expect(a.state.phase).toBe('COMBAT');
     const hpBefore = a.state.enemies[0]?.cohort.unitHp.toString();
     c2.close();
-    await tickle();
-    a.tick(); a.tick();
+    // the socket close reaches the authority asynchronously (slower on CI runners): tick until it lands
+    await until(() => { a.tick(); return !a.state.players[1].connected; });
     expect(a.state.players[1].connected).toBe(false);
     expect(a.state.n).toBe(2);
     expect(a.paused).toBe(false);   // multiplayer authority never pauses for one client
     const c2b = new Client(join.roomId, join.seatToken);
-    await c2b.open(); await tickle();
-    a.tick(); a.tick();
+    await c2b.open();
+    await until(() => { a.tick(); return a.state.players[1].connected; });
     expect(a.state.players[1].connected).toBe(true);
     expect(c2b.last('WELCOME')?.slot).toBe(1);
     if (hpBefore) expect(a.state.enemies[0]?.cohort.unitHp.toString() ?? hpBefore).toBe(hpBefore);
