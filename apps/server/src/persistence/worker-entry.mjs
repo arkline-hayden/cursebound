@@ -3,6 +3,8 @@
 // tsx ESM hooks are registered inside this thread first. `--import tsx` in Worker execArgv is not
 // reliable here (Node's built-in type stripping loads the entry before the hooks apply, and
 // extensionless relative imports then fail), so registration is done programmatically.
+// Compiled builds (the desktop app's esbuild bundle, apps/desktop/scripts/bundle.mjs) pass the sibling
+// `worker.js` and never load tsx.
 import { workerData } from 'node:worker_threads';
 
 const entry = workerData && typeof workerData.entry === 'string' ? workerData.entry : null;

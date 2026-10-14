@@ -1,8 +1,9 @@
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { WebSocketServer } from 'ws';
 import { CONTENT_VERSION, RULES_VERSION, contentHash, validateContent } from '@cursebound/content';
 import { BUILD_ID } from '@cursebound/protocol';
-import { loadConfig } from './config';
+import { allowListeningPort, loadConfig } from './config';
 import { createApi } from './http';
 import { createLogger } from './persistence/logger';
 import { openStore } from './persistence/store';
@@ -35,8 +36,10 @@ export async function startServer(env = process.env) {
     server.once('error', reject);
     server.listen(cfg.port, cfg.host, () => resolve());
   });
+  // port 0 = a random free port (desktop app); the desktop client is served by, and talks to, this same origin
+  if (cfg.port === 0 || cfg.staticDir) allowListeningPort(cfg, (server.address() as AddressInfo).port);
   rooms.start();
-  log.info('server_started', { port: cfg.port, lan: cfg.lan });
+  log.info('server_started', { port: cfg.port, lan: cfg.lan, static: !!cfg.staticDir });
   const shutdown = async () => {
     log.info('server_stopping', {});
     await rooms.shutdown();
@@ -48,10 +51,15 @@ export async function startServer(env = process.env) {
   return { cfg, server, store, rooms, shutdown };
 }
 
-const isMain = process.argv[1] && /main\.(ts|js|mjs)$/.test(process.argv[1]);
-if (isMain) {
-  startServer().then(({ cfg, shutdown }) => {
+/** Electron's utilityProcess exposes `process.parentPort` (a MessagePort-like emitter) instead of stdin. */
+interface ParentPort { on(ev: 'message', fn: (e: { data: unknown }) => void): void }
+
+/** Run as a process: start, announce the port, and shut down cleanly on request. */
+export function runMain(env = process.env): void {
+  startServer(env).then(({ cfg, shutdown }) => {
     console.log(`[cursebound] authority listening on http://${cfg.host === '0.0.0.0' ? 'localhost' : cfg.host}:${cfg.port} (LAN ${cfg.lan ? 'ON' : 'off'})`);
+    // machine-readable port report for the desktop shell (one JSON line on stdout)
+    if (env.CURSEBOUND_PORT === '0' || cfg.staticDir) console.log(JSON.stringify({ event: 'listening', port: cfg.port }));
     let stopping = false;
     const stop = () => {
       if (stopping) return;
@@ -61,8 +69,12 @@ if (isMain) {
     };
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
-    // the start script requests a clean shutdown over stdin (portable on Windows, where signals are abrupt)
-    if (!process.stdin.isTTY) {
+    const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort;
+    if (parentPort) {
+      // desktop app: the same `shutdown` request arrives as a utilityProcess message (it has no stdin)
+      parentPort.on('message', (e) => { if (e.data === 'shutdown') stop(); });
+    } else if (!process.stdin.isTTY) {
+      // the start script requests a clean shutdown over stdin (portable on Windows, where signals are abrupt)
       process.stdin.setEncoding('utf8');
       process.stdin.on('data', (d: string) => { if (d.includes('shutdown')) stop(); });
     }
@@ -74,3 +86,6 @@ if (isMain) {
     process.exit(1);
   });
 }
+
+const isMain = process.argv[1] && /main\.(ts|js|mjs)$/.test(process.argv[1]);
+if (isMain) runMain();

@@ -11,6 +11,7 @@ import type { RoomManager } from './rooms';
 import { hostAllowed, hashToken, originAllowed } from './security';
 import { SESSION_COOKIE, SESSION_TTL_MS, readCookie } from './auth';
 import { registerAccountRoutes } from './accountRoutes';
+import { createStaticHandler } from './static';
 import type { Account } from './persistence/types';
 
 /** The signed-in account behind a request, with the hash of the session token it presented. */
@@ -228,10 +229,14 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
 
   registerAccountRoutes({ route, store, log, assertId, registerPerHour: cfg.registerPerHour });
 
+  // desktop app: everything outside /api/ is the exported client, served from this same origin
+  const serveStatic = cfg.staticDir ? createStaticHandler(cfg) : null;
+
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     const requestId = crypto.randomUUID();
     try {
       if (!hostAllowed(cfg, req)) throw new HttpError(421, 'UNAUTHORIZED', 'host not allowed');
+      if (serveStatic && !(req.url ?? '/').startsWith('/api/')) return serveStatic(req, res);
       const method = req.method ?? 'GET';
       const mutating = method !== 'GET' && method !== 'HEAD';
       if (!originAllowed(cfg, req, false)) throw new HttpError(403, 'UNAUTHORIZED', 'origin not allowed');
