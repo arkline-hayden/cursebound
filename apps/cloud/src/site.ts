@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import path from 'node:path';
 import { Readable } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import type { CloudConfig } from './config';
 import type { CloudLog } from './log';
@@ -26,6 +29,25 @@ export interface Site {
   /** true when the path belongs to the public site (GET/HEAD) */
   handles(path: string): boolean;
   serve(req: IncomingMessage, res: ServerResponse, path: string, requestId: string): Promise<void>;
+}
+
+/**
+ * The wordmark script (src/siteLogo.ts → the game's fire renderer): prebuilt next to the production bundle
+ * (dist/site-logo.js), else bundled once on demand with esbuild (dev and tests run the TypeScript sources).
+ */
+let logoJs: Promise<string> | null = null;
+/** cache-buster for the script URL: changes with every deploy (process start), so browsers never run a stale wordmark */
+const LOGO_VERSION = Date.now().toString(36);
+function logoScript(): Promise<string> {
+  logoJs ??= (async () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const built = path.join(here, 'site-logo.js');
+    if (existsSync(built)) return readFileSync(built, 'utf8');
+    const { build } = await import('esbuild');
+    const out = await build({ entryPoints: [path.join(here, 'siteLogo.ts')], bundle: true, platform: 'browser', target: 'es2020', format: 'iife', minify: true, write: false, logLevel: 'silent' });
+    return out.outputFiles[0]!.text;
+  })();
+  return logoJs;
 }
 
 export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
@@ -92,8 +114,15 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
   }
 
   return {
-    handles: (path) => path === '/' || path === '/download' || path === '/favicon.ico',
+    handles: (p) => p === '/' || p === '/download' || p === '/favicon.ico' || p === '/site-logo.js',
     async serve(req, res, path, requestId) {
+      if (path === '/site-logo.js') {
+        let js: string;
+        try { js = await logoScript(); } catch (err) { log.error('site_logo_build_failed', { err: err as Error }); return plain(res, 500, '', requestId); }
+        res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff', 'x-request-id': requestId });
+        res.end(req.method === 'HEAD' ? undefined : js);
+        return;
+      }
       if (path === '/favicon.ico') { res.writeHead(204, { 'cache-control': 'public, max-age=86400' }); res.end(); return; }
       if (path === '/download') return download(req, res, requestId);
       const info = await latest();
@@ -102,7 +131,7 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': 'no-cache',
         'content-security-policy': [
-          "default-src 'none'", `script-src 'nonce-${nonce}'`, `style-src 'nonce-${nonce}' https://fonts.googleapis.com`,
+          "default-src 'none'", `script-src 'self' 'nonce-${nonce}'`, `style-src 'nonce-${nonce}' https://fonts.googleapis.com`,
           'font-src https://fonts.gstatic.com', "img-src 'self' data:", "base-uri 'none'", "form-action 'none'", "frame-ancestors 'none'",
         ].join('; '),
         'x-content-type-options': 'nosniff',
@@ -111,7 +140,7 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
         'strict-transport-security': 'max-age=31536000; includeSubDomains',
         'x-request-id': requestId,
       });
-      res.end(req.method === 'HEAD' ? undefined : landingPage(info, nonce));
+      res.end(req.method === 'HEAD' ? undefined : landingPage(info, nonce, LOGO_VERSION));
     },
   };
 }
@@ -124,7 +153,7 @@ function plain(res: ServerResponse, status: number, text: string, requestId: str
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /** The landing page: one self-contained document (inline styles and script under a per-request nonce). */
-export function landingPage(info: InstallerInfo | null, nonce: string): string {
+export function landingPage(info: InstallerInfo | null, nonce: string, logoVersion = '1'): string {
   const meta = info ? `v${esc(info.version)} · ${Math.round(info.size / 1048576)} MB · Windows 10/11` : 'Windows 10/11';
   return `<!doctype html>
 <html lang="en"><head>
@@ -140,8 +169,12 @@ html, body { margin: 0; background: var(--ink); color: var(--bone); }
 body { min-height: 100vh; font-family: 'Jersey 20', ui-monospace, monospace; font-size: 24px; line-height: 1.25; overflow-x: hidden; }
 canvas#sky { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; z-index: 0; }
 main { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 16px; text-align: center; gap: 28px; }
-h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 900; font-size: clamp(48px, 10vw, 120px); line-height: 1; letter-spacing: 2px; color: #dfe9f7;
-  text-shadow: 0 2px 0 #fff, 0 -3px 0 #8fa6c8, 4px 4px 0 var(--night), 8px 8px 0 #2a3f86; }
+h1 { margin: 0; line-height: 0; }
+#wordmark-canvas { image-rendering: pixelated; display: block; max-width: 100%; }
+#wordmark .fallback { font-family: 'Cinzel', serif; font-weight: 900; font-size: clamp(48px, 10vw, 120px); line-height: 1; color: #dfe9f7; text-shadow: 4px 4px 0 var(--night), 8px 8px 0 #2a3f86; }
+#wordmark[data-ready="true"] .fallback { display: none; }
+#wordmark:not([data-ready="true"]) #wordmark-canvas { position: absolute; visibility: hidden; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .tag { font-family: 'Jersey 10', monospace; font-size: 28px; text-transform: uppercase; color: var(--ice); text-shadow: 2px 2px 0 var(--night); display: flex; gap: 16px; align-items: center; }
 .tag::before, .tag::after { content: ''; width: 56px; height: 4px; background: var(--gold); box-shadow: 0 4px 0 #6b4a14; }
 .pitch { max-width: 640px; margin: 0; color: var(--bone2); text-shadow: 2px 2px 0 #000; }
@@ -151,28 +184,20 @@ h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 900; font-size: clamp
 .dl small { font-family: 'Jersey 20', monospace; font-size: 20px; color: var(--bone); text-shadow: 2px 2px 0 #2a0204; }
 .dl:hover, .dl:focus-visible { background: var(--blood-hi); color: #fff; outline: none; }
 .dl:active { transform: translateY(3px); box-shadow: 0 0 0 4px #1a0204, 0 0 0 8px var(--gold), 0 0 0 12px #1a0204; }
-.steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 220px)); gap: 20px; }
-.steps li { padding: 14px 16px; background: #120d0b; box-shadow: 0 0 0 4px #2a211b, 0 0 0 8px #000; text-align: left; font-size: 21px; color: var(--bone2); }
-.steps b { display: block; font-family: 'Jersey 10', monospace; font-size: 26px; color: var(--gold); font-weight: normal; margin-bottom: 4px; }
 .note { max-width: 640px; margin: 0; font-size: 19px; color: #8d8574; }
 .note kbd { font-family: inherit; color: var(--bone); background: #241b15; padding: 0 6px; box-shadow: 0 2px 0 #000; }
-@media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { canvas#sky { display: none; } }
 </style></head>
 <body>
 <canvas id="sky" aria-hidden="true"></canvas>
 <main>
-  <h1>CURSEBOUND</h1>
+  <h1 id="wordmark"><span class="sr-only">CURSEBOUND</span><canvas id="wordmark-canvas" aria-hidden="true"></canvas><span class="fallback" aria-hidden="true">CURSEBOUND</span></h1>
   <div class="tag">A cooperative descent · every fate compounds</div>
   <p class="pitch">An endless roguelike for up to five. After every round your party walks through one of three doors and binds itself to a Fate: a gift and a curse that never leave. Every choice multiplies.</p>
   <a class="dl" href="/download" download>Download for Windows<small>${meta}</small></a>
-  <ol class="steps">
-    <li><b>1 · Install</b>Run the installer. The game keeps itself up to date.</li>
-    <li><b>2 · Sign up</b>Create an account in the game, then add friends by username.</li>
-    <li><b>3 · Descend</b>Open a party and your friends click Join. No setup, no ports.</li>
-  </ol>
   <p class="note">Windows may show a SmartScreen notice because the game isn't code-signed yet: choose <kbd>More info</kbd> then <kbd>Run anyway</kbd>.</p>
 </main>
+<script src="/site-logo.js?v=${logoVersion}" defer></script>
 <script nonce="${nonce}">
 (() => {
   // pixel sky: a breathing dithered halo behind the title and spirit motes rising, drawn at 1/4 resolution
@@ -193,7 +218,7 @@ h1 { margin: 0; font-family: 'Cinzel', serif; font-weight: 900; font-size: clamp
     g.fillStyle = '#050404'; g.fillRect(0, 0, W, H);
     const title = document.querySelector('h1').getBoundingClientRect();
     const cx = (title.left + title.width / 2) / PX, cy = (title.top + title.height / 2) / PX;
-    const rx = (title.width / PX) * 0.75, ry = (title.height / PX) * 1.6, br = 1 + Math.sin(t / 90) * 0.06;
+    const rx = (title.width / PX) * 0.6, ry = (title.height / PX) * 0.7, br = 1 + Math.sin(t / 90) * 0.06;
     for (let y = Math.max(0, Math.floor(cy - ry * br)); y < Math.min(H, cy + ry * br); y++) for (let x = Math.max(0, Math.floor(cx - rx * br)); x < Math.min(W, cx + rx * br); x++) {
       const dx = (x + 0.5 - cx) / (rx * br), dy = (y + 0.5 - cy) / (ry * br), d = Math.sqrt(dx * dx + dy * dy);
       if (d >= 1) continue;

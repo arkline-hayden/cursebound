@@ -49,11 +49,14 @@ describe('download site', () => {
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toMatch(/^text\/html/);
     const csp = r.headers.get('content-security-policy')!;
-    expect(csp).toMatch(/script-src 'nonce-[A-Za-z0-9+/=]+'/);
+    expect(csp).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+'/);
     expect(csp).not.toMatch(/unsafe-inline/);
     const html = await r.text();
     expect(html).toContain('CURSEBOUND');
     expect(html).toContain('href="/download"');
+    expect(html).toContain('id="wordmark-canvas"');
+    expect(html).toMatch(/src="\/site-logo\.js\?v=[a-z0-9]+"/);
+    expect(html).not.toContain('class="steps"');
     expect(html).toContain('v0.1.9');
     expect(html).toContain('3 MB');
     expect(html.toLowerCase()).not.toContain('github');
@@ -80,6 +83,15 @@ describe('download site', () => {
     expect(r.headers.get('content-disposition')).toContain('CURSEBOUND-Setup-0.1.9.exe');
     await fetch(`${base}/`);
     expect(lookups).toBe(before);   // both served from the cached lookup
+  });
+
+  it('serves the in-game wordmark renderer as a script', async () => {
+    const r = await fetch(`${base}/site-logo.js`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toMatch(/^text\/javascript/);
+    const js = await r.text();
+    expect(js.length).toBeGreaterThan(1000);
+    expect(js).toContain('CURSEBOUND');
   });
 
   it('keeps the JSON API untouched alongside the site', async () => {

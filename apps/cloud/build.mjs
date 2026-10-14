@@ -21,3 +21,16 @@ await build({
   // CommonJS dependencies (pg, ws) call require() for Node built-ins; give the ESM bundle one
   banner: { js: "import { createRequire as __cbRequire } from 'node:module'; const require = __cbRequire(import.meta.url);" },
 });
+
+// The download site's wordmark: the game's own burning-title renderer, bundled for the browser (served at /site-logo.js).
+await build({
+  entryPoints: [path.join(here, 'src', 'siteLogo.ts')],
+  outfile: path.join(here, 'dist', 'site-logo.js'),
+  bundle: true,
+  platform: 'browser',
+  target: 'es2020',
+  format: 'iife',
+  minify: true,
+  legalComments: 'none',
+  logLevel: 'info',
+});
