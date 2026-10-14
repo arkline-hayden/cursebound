@@ -8,6 +8,9 @@ on:
       - 'apps/cloud/**'
       - 'packages/accounts/**'
       - 'packages/protocol/**'
+      # the download site renders the game's own wordmark (apps/cloud/src/siteLogo.ts)
+      - 'apps/client/src/ui/fireSim.ts'
+      - 'apps/client/src/ui/pixelSkin.ts'
       - 'package-lock.json'
       - '.github/workflows/deploy-cloud.yml'
   workflow_dispatch:
