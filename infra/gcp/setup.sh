@@ -59,6 +59,9 @@ done
 say "IAM: TURN VM reads only the TURN secret"
 gcloud secrets add-iam-policy-binding cb-turn-secret --member "serviceAccount:$TURN_SA_EMAIL" \
   --role roles/secretmanager.secretAccessor >/dev/null
+for role in roles/logging.logWriter roles/monitoring.metricWriter; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member "serviceAccount:$TURN_SA_EMAIL" --role "$role" --condition=None >/dev/null
+done
 say "IAM: deployer (GitHub Actions)"
 for role in roles/run.admin roles/artifactregistry.writer; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member "serviceAccount:$DEPLOY_SA_EMAIL" --role "$role" --condition=None >/dev/null

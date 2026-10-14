@@ -9,10 +9,13 @@ hdr='Metadata-Flavor: Google'
 PROJECT="$(curl -fsS -H "$hdr" "$MD/project/project-id")"
 EXT_IP="$(curl -fsS -H "$hdr" "$MD/instance/attributes/turn-ip")"
 INT_IP="$(curl -fsS -H "$hdr" "$MD/instance/network-interfaces/0/ip")"
-TOKEN="$(curl -fsS -H "$hdr" "$MD/instance/service-accounts/default/token" | sed -E 's/.*"access_token":"([^"]+)".*/\1/')"
+# the API replies are multi-line JSON: parse with python3 (always present on Debian images), not sed
+json() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
+TOKEN="$(curl -fsS -H "$hdr" "$MD/instance/service-accounts/default/token" | json "d['access_token']")"
 SECRET="$(curl -fsS -H "Authorization: Bearer $TOKEN" \
   "https://secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/cb-turn-secret/versions/latest:access" |
-  sed -E 's/.*"data": *"([^"]+)".*/\1/' | base64 -d)"
+  json "d['payload']['data']" | base64 -d)"
+[ -n "$SECRET" ] || { echo 'cb-turn-secret is empty or unreadable' >&2; exit 1; }
 
 if ! command -v turnserver >/dev/null; then
   apt-get update -y
