@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import crypto from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import { clientAddress, originAllowed } from '../src/http';
-import { CLOUD_SCHEMA_VERSION, migrate } from '../src/migrations';
+import { CLOUD_MIGRATIONS, CLOUD_SCHEMA_VERSION, migrate } from '../src/migrations';
 import type { PresenceDeps } from '../src/presence';
 import { startCloud, type CloudServer } from '../src/server';
 import { openPglite } from '../src/sql';
@@ -70,13 +70,36 @@ describe('cloud service', () => {
     const again = await migrate(srv.sql);
     expect(again).toEqual({ from: CLOUD_SCHEMA_VERSION, to: CLOUD_SCHEMA_VERSION, applied: [] });
     const v = await srv.sql.query('SELECT version FROM schema_version ORDER BY version');
-    expect(v.rows.map((r) => Number(r.version))).toEqual([1]);
+    expect(v.rows.map((r) => Number(r.version))).toEqual(CLOUD_MIGRATIONS.map((m) => m.version));
     const fresh = await openPglite();
     try {
       await migrate(fresh);
       await fresh.query("INSERT INTO schema_version(version, name, applied_at) VALUES (99, 'future', 0)");
       await expect(migrate(fresh)).rejects.toThrow(/newer than this build/);
     } finally { await fresh.close(); }
+  });
+
+  // Regression: v1 ordered friend pairs with the database collation while the store orders them like JavaScript
+  // (code units). On Cloud SQL's linguistic collation mixed-case ids disagreed and every such request failed as
+  // "invalid input". v2 makes the CHECK byte-wise; this upgrades a v1 database the way production did.
+  it('upgrades v1 friendships to a byte-wise pair order and befriends mixed-case ids', async () => {
+    const db = await openPglite();
+    try {
+      await migrate(db, undefined, CLOUD_MIGRATIONS.slice(0, 1));
+      await migrate(db);
+      const defs = (await db.query<{ def: string }>(
+        "SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conrelid = 'friendships'::regclass AND contype = 'c'",
+      )).rows.map((r) => r.def);
+      const order = defs.filter((d) => d.includes('account_a') && d.includes('<'));
+      expect(order).toHaveLength(1);
+      expect(order[0]).toContain('COLLATE "C"');
+    } finally { await db.close(); }
+    // ids whose JavaScript order ('Z' < 'a') differs from a case-insensitive order
+    for (const [id, name] of [['acc_Zulu00', 'Zulu_one'], ['acc_alpha0', 'alpha_two']] as const) {
+      await srv.sql.query('INSERT INTO accounts(id, username, display_name, password_hash, created_at) VALUES ($1, $2, $2, $3, $4)', [id, name, 'x', Date.now()]);
+    }
+    expect(await srv.store.requestFriend('acc_alpha0', 'acc_Zulu00')).toBe('outgoing');
+    expect(await srv.store.requestFriend('acc_Zulu00', 'acc_alpha0')).toBe('friends');
   });
 
   it('serves health with build info, security headers and a request id', async () => {

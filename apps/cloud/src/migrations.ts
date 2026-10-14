@@ -100,8 +100,27 @@ CREATE INDEX IF NOT EXISTS run_participants_account_idx ON run_participants(acco
 CREATE UNIQUE INDEX IF NOT EXISTS run_participants_one_slot ON run_participants(run_pk, account_id) WHERE account_id IS NOT NULL;
 `;
 
+// v1's CHECK (account_a < account_b) compared with the database's default collation. On Cloud SQL that is a linguistic
+// collation (case-insensitive-ish), while the store orders each pair with JavaScript's code-unit comparison, so
+// mixed-case account ids (acc_Xq… vs acc_ab…) were ordered differently and every such friend request failed the CHECK.
+// Compare byte-wise (COLLATE "C"), exactly like JavaScript does. Equality lookups are unaffected.
+const V2 = `
+DO $$
+DECLARE c record;
+BEGIN
+  FOR c IN SELECT conname FROM pg_constraint
+           WHERE conrelid = 'friendships'::regclass AND contype = 'c'
+             AND pg_get_constraintdef(oid) LIKE '%account_a < account_b%'
+  LOOP
+    EXECUTE format('ALTER TABLE friendships DROP CONSTRAINT %I', c.conname);
+  END LOOP;
+END $$;
+ALTER TABLE friendships ADD CONSTRAINT friendships_pair_order CHECK ((account_a COLLATE "C") < (account_b COLLATE "C"));
+`;
+
 export const CLOUD_MIGRATIONS: readonly CloudMigration[] = [
   { version: 1, name: 'accounts_friends_builds_runs', sql: V1 },
+  { version: 2, name: 'friendships_bytewise_pair_order', sql: V2 },
 ];
 
 export const CLOUD_SCHEMA_VERSION = CLOUD_MIGRATIONS[CLOUD_MIGRATIONS.length - 1]!.version;
