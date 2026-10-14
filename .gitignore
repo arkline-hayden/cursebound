@@ -15,6 +15,7 @@ out/
 release/
 apps/client/out/
 apps/desktop/dist/
+apps/desktop/build/
 apps/desktop/release/
 # local credentials / keys
 *.pem

@@ -23,7 +23,10 @@
     "assets:validate": "tsx tools/assets/src/validate.ts",
     "db:backup": "tsx apps/server/src/cli/backup.ts",
     "db:restore": "tsx apps/server/src/cli/restore.ts",
-    "check:boundaries": "tsx tools/assets/src/boundaries.ts"
+    "check:boundaries": "tsx tools/assets/src/boundaries.ts",
+    "client:static": "node apps/client/scripts/build-static.mjs",
+    "desktop:dev": "node apps/desktop/scripts/build.mjs --dev",
+    "desktop:build": "node apps/desktop/scripts/build.mjs"
   },
   "devDependencies": {
     "@types/node": "22.15.3",

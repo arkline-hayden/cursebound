@@ -1,0 +1,63 @@
+# electron-builder config for the CURSEBOUND desktop app (docs/RELEASING.md). The app itself is two bundles
+# (dist/main.cjs, dist/preload.cjs); the local authority and the static client ship as extra resources outside the asar
+# so the utilityProcess and its worker thread load plain files. Version = package.json version (CI sets it from the tag).
+appId: com.arkline.cursebound
+productName: CURSEBOUND
+copyright: Copyright © 2026 Arkline Solutions
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - package.json
+  - "!**/*.map"
+extraResources:
+  - from: build/server
+    to: server
+    filter: ["**/*", "!**/*.map"]
+  - from: ../client/out
+    to: client
+  - from: build/icon.png
+    to: icon.png
+# everything is pre-bundled; there are no runtime node_modules to collect or rebuild
+npmRebuild: false
+nodeGypRebuild: false
+asar: true
+electronLanguages: [en-US]
+publish:
+  provider: github
+  owner: arkline-hayden
+  repo: cursebound
+  releaseType: draft
+win:
+  target: [nsis]
+  icon: build/icon.png
+  artifactName: CURSEBOUND-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  differentialPackage: true
+  deleteAppDataOnUninstall: false
+  shortcutName: CURSEBOUND
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  runAfterFinish: true
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    # electron-updater on macOS installs from the zip; it also needs a signed + notarized app (docs/RELEASING.md)
+    - target: zip
+      arch: [arm64, x64]
+  category: public.app-category.games
+  icon: build/icon.png
+  identity: null
+  artifactName: CURSEBOUND-${version}-${arch}.${ext}
+dmg:
+  artifactName: CURSEBOUND-${version}-${arch}.${ext}
+linux:
+  target: [AppImage]
+  category: Game
+  icon: build/icon.png
+  artifactName: CURSEBOUND-${version}-${arch}.${ext}
