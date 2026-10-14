@@ -147,78 +147,9 @@ export interface FinalizeRunInput {
 }
 
 // ---------------------------------------------------------------- accounts
-export interface Account {
-  id: string;
-  username: string;
-  profileId: string;
-  displayName: string;
-  favoriteClass: string | null;
-  motto: string;
-  createdAt: number;
-  lastLoginAt: number | null;
-}
-
-/** Account row plus the credential fields; never leaves the server. */
-export interface AccountCredentials extends Account {
-  passwordHash: string;
-  failedLogins: number;
-  lockedUntil: number;
-}
-
-export interface SessionInfo {
-  tokenHash: string;
-  accountId: string;
-  createdAt: number;
-  lastSeenAt: number;
-  expiresAt: number;
-  label: string;
-}
-
-export interface SavedBuild {
-  id: string;
-  name: string;
-  classId: string;
-  ranks: Record<string, number>;
-  mastery: string | null;
-  notes: string;
-  sourceRunId: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface SavedBuildInput {
-  name: string;
-  classId: string;
-  ranks: Record<string, number>;
-  mastery: string | null;
-  notes: string;
-  sourceRunId: string | null;
-}
-
-export type FriendState = 'friends' | 'incoming' | 'outgoing';
-
-export interface FriendEntry {
-  accountId: string;
-  username: string;
-  displayName: string;
-  profileId: string;
-  favoriteClass: string | null;
-  state: FriendState;
-  since: number;
-}
-
-export interface AccountStats {
-  runs: number;
-  finished: number;
-  bestScoreText: string;
-  bestRunId: string | null;
-  deepestRound: number;
-  totalActiveTicks: number;
-  coopRuns: number;
-  dailyRuns: number;
-  byClass: { classId: string; runs: number; bestScoreText: string }[];
-  lastPlayedAt: number | null;
-}
+// Account records are shared with the cloud service (@cursebound/accounts); this Store is a superset of AccountStore.
+import type { Account, AccountCredentials, AccountStats, FriendEntry, FriendState, SavedBuild, SavedBuildInput, SessionInfo } from '@cursebound/accounts';
+export type { Account, AccountCredentials, AccountStats, FriendEntry, FriendState, SavedBuild, SavedBuildInput, SessionInfo };
 
 export interface Store {
   health(): Promise<HealthInfo>;
@@ -247,6 +178,8 @@ export interface Store {
   deleteAccount(accountId: string): Promise<void>;
   createProfile(displayName: string): Promise<Profile>;
   getProfile(id: string): Promise<Profile | null>;
+  /** The profile linked to a cloud account (online mode), created when absent; updates its display name. */
+  linkCloudProfile(accountId: string, displayName: string): Promise<Profile>;
   getSettings(profileId: string): Promise<unknown | null>;
   putSettings(profileId: string, json: unknown, schemaVersion: number): Promise<void>;
   ensureContentVersion(v: { hash: string; rulesVersion: string; manifestPath: string }): Promise<void>;

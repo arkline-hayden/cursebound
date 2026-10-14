@@ -6,7 +6,8 @@ import { CARD_BY_ID, CLASS_BY_ID, NODE_BY_ID, TUTORIAL_CARD } from '@cursebound/
 import { netStore, type GameConnection } from '@/lib/net';
 import { clearSeat } from '@/lib/profile';
 import { useStore } from '@/lib/store';
-import { api } from '@/lib/api';
+import { accountApi, api, onlineMode } from '@/lib/api';
+import { cloudSummary, submitRunOnce, type RunResults } from '@/lib/onlineRuns';
 import { authStore, refreshAuth } from '@/lib/auth';
 import { fmt, score, whole } from '@/lib/format';
 import { CardIcon, ClassEmblem } from './icons';
@@ -28,7 +29,19 @@ export function Results({ net }: { net: GameConnection }) {
   const [rank, setRank] = useState<number | null>(null);
   const [saved, setSaved] = useState<'idle' | 'saving' | 'saved' | string>('idle');
   const signedIn = useStore(authStore, (s) => s.status === 'signedIn');
-  useEffect(() => { if (authStore.get().status === 'unknown') refreshAuth().catch(() => undefined); }, []);
+  const mySlot = useStore(netStore, (s) => s.slot);
+  const [online, setOnline] = useState(false);
+  const [onlineRank, setOnlineRank] = useState<number | null>(null);
+  useEffect(() => {
+    if (authStore.get().status === 'unknown') refreshAuth().catch(() => undefined);
+    onlineMode().then(setOnline).catch(() => undefined);
+  }, []);
+  // online mode: report the finished run to the cloud boards once (any participant may; the cloud dedupes)
+  useEffect(() => {
+    const acc = authStore.get().account;
+    if (!results || !online || !signedIn || !acc) return;
+    submitRunOnce(results as RunResults, mySlot, acc.id).then((x) => { if (x) setOnlineRank(x.rank); }).catch(() => undefined);
+  }, [results, online, signedIn, mySlot]);
   useEffect(() => {
     if (!results) return;
     api<{ rows: { runId: string; rank: number }[] }>('GET', `/boards?key=${encodeURIComponent(results.boardKey)}&limit=100&practice=1`).then((b) => {
@@ -54,7 +67,13 @@ export function Results({ net }: { net: GameConnection }) {
   };
   const saveBuild = async () => {
     setSaved('saving');
-    try { await api('POST', '/builds/from-run', { runId: r.runId }); setSaved('saved'); } catch (e) { setSaved((e as Error).message); }
+    try {
+      const acc = authStore.get().account;
+      // online: the cloud has no run history of its own, so the summary rides in the body
+      if (online && acc) await accountApi('POST', '/builds/from-run', { summary: cloudSummary(r as RunResults, mySlot, acc.id) });
+      else await api('POST', '/builds/from-run', { runId: r.runId });
+      setSaved('saved');
+    } catch (e) { setSaved((e as Error).message); }
   };
   const lastRecap = (r.deathRecaps as any[]).slice(-3);
   const headline = r.endReason === 'wipe' ? 'You Have Fallen' : r.endReason === 'retired' ? 'You Withdrew' : 'The Run Ends';
@@ -75,6 +94,7 @@ export function Results({ net }: { net: GameConnection }) {
             {r.practice && <span className="chip warn">Practice attempt (not ranked)</span>}
             {r.resumed && <span className="chip info">Resumed from checkpoint</span>}
             {rank !== null && !r.practice && <span className="chip gold">Local board rank #{rank}</span>}
+            {onlineRank !== null && !r.practice && <span className="chip gold">Online board rank #{onlineRank}</span>}
           </div>
         </div>
         <div className="sheet-body"><div className="res-grid">
@@ -151,7 +171,7 @@ export function Results({ net }: { net: GameConnection }) {
             {verify && <span className={`chip ${verify.ok ? 'good' : 'bad'}`} role="status">{verify.ok ? `Replay reproduced the score exactly (${verify.ms} ms)` : `Replay check: ${verify.reason}`}</span>}
           </div>
           <div className="row">
-            <Link className="btn" href="/records">Local records</Link>
+            <Link className="btn" href="/records">{online ? 'Records' : 'Local records'}</Link>
             <Link className="btn primary big" href="/" onClick={() => { clearSeat(); net.close(); }}>Play again</Link>
           </div>
         </footer>

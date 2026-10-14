@@ -5,7 +5,7 @@ import { Big } from '@cursebound/numeric';
 import { BRANCH_TIER_POINTS, CLASS_BY_ID, MASTERY_CHOICES, NODE_BY_ID, SKILL_BY_ID, STAT_BY_ID, type ClassDef, type NodeDef } from '@cursebound/content';
 import { deadlineSeconds, netStore, type GameConnection, type PhaseData } from '@/lib/net';
 import { useStore } from '@/lib/store';
-import { api } from '@/lib/api';
+import { accountApi } from '@/lib/api';
 import { authStore, refreshAuth } from '@/lib/auth';
 import { score } from '@/lib/format';
 import { NodeIcon, ClassEmblem } from './icons';
@@ -400,7 +400,7 @@ export function SkillTree({ net }: { net: GameConnection }) {
   // saved account builds for this vessel, offered in the import popover
   useEffect(() => {
     if (!importOpen || !signedIn || myBuilds) return;
-    api<{ builds: { id: string; name: string; classId: string; ranks: Record<string, number> }[] }>('GET', '/builds').then((r) => setMyBuilds(r.builds)).catch(() => setMyBuilds([]));
+    accountApi<{ builds: { id: string; name: string; classId: string; ranks: Record<string, number> }[] }>('GET', '/builds').then((r) => setMyBuilds(r.builds)).catch(() => setMyBuilds([]));
   }, [importOpen, signedIn, myBuilds]);
   if (!phase || !me || !cls) return null;
   const loadout = phase.phase === 'LOADOUT_LOCK';
@@ -415,7 +415,7 @@ export function SkillTree({ net }: { net: GameConnection }) {
   const saveToAccount = () => {
     setSavedState('saving');
     const ranks = Object.fromEntries(Object.entries(me.ranks).filter(([id]) => !NODE_BY_ID[id]?.starting));
-    api('POST', '/builds', { name: loadout ? `${cls.name} plan` : `${cls.name} · round ${phase.round}`, classId: me.classId, ranks, mastery: me.mastery })
+    accountApi('POST', '/builds', { name: loadout ? `${cls.name} plan` : `${cls.name} · round ${phase.round}`, classId: me.classId, ranks, mastery: me.mastery })
       .then(() => { setSavedState('ok'); setMyBuilds(null); }, () => setSavedState('fail'));
   };
   const applyRanks = (ranks: Record<string, number>) => {

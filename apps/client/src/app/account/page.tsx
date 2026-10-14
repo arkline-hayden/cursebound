@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CLASSES, CLASS_BY_ID, NODE_BY_ID } from '@cursebound/content';
-import { api, ApiError } from '@/lib/api';
-import { authStore, login, logout, refreshAuth, register, updateAccount, type Account } from '@/lib/auth';
+import { accountApi, ApiError, onlineMode } from '@/lib/api';
+import { authStore, clearSession, login, logout, refreshAuth, register, updateAccount, type Account } from '@/lib/auth';
 import { forgetProfile, guestProfileId, rememberGuest } from '@/lib/profile';
 import { initSettings } from '@/lib/settings';
 import { useStore } from '@/lib/store';
@@ -45,7 +45,10 @@ function AuthForms() {
   const [claim, setClaim] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const hasGuest = typeof window !== 'undefined' && !!guestProfileId();
+  const [online, setOnline] = useState(false);
+  useEffect(() => { onlineMode().then(setOnline).catch(() => undefined); }, []);
+  // online accounts link a profile on this machine instead of claiming the guest one
+  const hasGuest = !online && typeof window !== 'undefined' && !!guestProfileId();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +91,7 @@ function AuthForms() {
                 <span className="engraved">Confirm password</span>
                 <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" minLength={8} maxLength={128} required />
               </label>
-              <p className="faint auth-hint">At least 8 characters. Passwords are salted and hashed on this machine&apos;s game service; they are never stored as written.</p>
+              <p className="faint auth-hint">At least 8 characters. Passwords are salted and hashed on {online ? 'the CURSEBOUND online service' : 'this machine’s game service'}; they are never stored as written.</p>
               {hasGuest && (
                 <label className="row check-row">
                   <input type="checkbox" checked={claim} onChange={(e) => setClaim(e.target.checked)} />
@@ -104,7 +107,7 @@ function AuthForms() {
       <div className="frame auth-why">
         <h3>Why an account?</h3>
         <ul className="why-list">
-          <li><b>Your records follow you.</b> Runs, best scores and settings belong to you on any browser that reaches this game service.</li>
+          <li><b>Your records follow you.</b> {online ? 'Your account, builds, friends and online records follow you to any machine.' : 'Runs, best scores and settings belong to you on any browser that reaches this game service.'}</li>
           <li><b>Saved builds.</b> Keep the skill paths that worked and plan the next descent.</li>
           <li><b>Friends.</b> Find each other by username and race on friends-only leaderboards.</li>
         </ul>
@@ -123,8 +126,8 @@ function ProfileTab({ account }: { account: Account }) {
   const [runs, setRuns] = useState<RunItem[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => {
-    api<{ stats: Stats }>('GET', '/account/stats').then((r) => setStats(r.stats)).catch(() => undefined);
-    api<{ runs: RunItem[] }>('GET', '/account/runs?limit=12').then((r) => setRuns(r.runs)).catch(() => undefined);
+    accountApi<{ stats: Stats }>('GET', '/account/stats').then((r) => setStats(r.stats)).catch(() => undefined);
+    accountApi<{ runs: RunItem[] }>('GET', '/account/runs?limit=12').then((r) => setRuns(r.runs)).catch(() => undefined);
   }, []);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,7 +201,7 @@ function BuildCard({ b, onChange, onDelete }: { b: Build; onChange: (b: Build) =
   const mastery = b.mastery ? (JSON.parse(b.mastery) as { damage: number; health: number; regen: number }) : null;
   const save = async () => {
     setErr(null);
-    try { onChange((await api<{ build: Build }>('PUT', `/builds/${b.id}`, { name, notes })).build); setEdit(false); } catch (e) { setErr(errText(e)); }
+    try { onChange((await accountApi<{ build: Build }>('PUT', `/builds/${b.id}`, { name, notes })).build); setEdit(false); } catch (e) { setErr(errText(e)); }
   };
   return (
     <article className="frame build-card" style={{ ['--accent' as string]: cls?.accent }}>
@@ -247,19 +250,19 @@ function BuildsTab() {
   const [busy, setBusy] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const load = useCallback(() => {
-    api<{ builds: Build[]; max: number }>('GET', '/builds').then((r) => { setBuilds(r.builds); setMax(r.max); }).catch((e) => setErr(errText(e)));
+    accountApi<{ builds: Build[]; max: number }>('GET', '/builds').then((r) => { setBuilds(r.builds); setMax(r.max); }).catch((e) => setErr(errText(e)));
   }, []);
   useEffect(() => {
     load();
-    api<{ runs: RunItem[] }>('GET', '/account/runs?status=finalized&limit=8').then((r) => setRuns(r.runs)).catch(() => undefined);
+    accountApi<{ runs: RunItem[] }>('GET', '/account/runs?status=finalized&limit=8').then((r) => setRuns(r.runs)).catch(() => undefined);
   }, [load]);
   const fromRun = async (runId: string) => {
     setBusy(runId); setErr(null);
-    try { const r = await api<{ build: Build }>('POST', '/builds/from-run', { runId }); setBuilds((bs) => [r.build, ...(bs ?? [])]); } catch (e) { setErr(errText(e)); }
+    try { const r = await accountApi<{ build: Build }>('POST', '/builds/from-run', { runId }); setBuilds((bs) => [r.build, ...(bs ?? [])]); } catch (e) { setErr(errText(e)); }
     setBusy(null);
   };
   const del = async (id: string) => {
-    try { await api('DELETE', `/builds/${id}`); setBuilds((bs) => (bs ?? []).filter((x) => x.id !== id)); } catch (e) { setErr(errText(e)); }
+    try { await accountApi('DELETE', `/builds/${id}`); setBuilds((bs) => (bs ?? []).filter((x) => x.id !== id)); } catch (e) { setErr(errText(e)); }
   };
   const shown = (builds ?? []).filter((b) => !filter || b.classId === filter);
   return (
@@ -303,7 +306,7 @@ function CardDialog({ username, onClose }: { username: string; onClose: () => vo
   const [err, setErr] = useState<string | null>(null);
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    api<PlayerCard>('GET', `/players/${encodeURIComponent(username)}`).then(setCard).catch((e) => setErr(errText(e)));
+    accountApi<PlayerCard>('GET', `/players/${encodeURIComponent(username)}`).then(setCard).catch((e) => setErr(errText(e)));
     ref.current?.focus();
     const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', on);
@@ -346,7 +349,7 @@ function FriendsTab() {
   const [name, setName] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [card, setCard] = useState<string | null>(null);
-  const load = useCallback(() => { api<{ friends: Friend[] }>('GET', '/friends').then((r) => setFriends(r.friends)).catch((e) => setMsg({ ok: false, text: errText(e) })); }, []);
+  const load = useCallback(() => { accountApi<{ friends: Friend[] }>('GET', '/friends').then((r) => setFriends(r.friends)).catch((e) => setMsg({ ok: false, text: errText(e) })); }, []);
   useEffect(() => { load(); }, [load]);
   const act = async (fn: () => Promise<unknown>, ok?: string) => {
     setMsg(null);
@@ -357,7 +360,7 @@ function FriendsTab() {
     const n = name.trim();
     if (!n) return;
     void act(async () => {
-      const r = await api<{ state: string; friend: string }>('POST', '/friends', { username: n });
+      const r = await accountApi<{ state: string; friend: string }>('POST', '/friends', { username: n });
       setName('');
       setMsg({ ok: true, text: r.state === 'friends' ? `You and ${r.friend} are now friends.` : `Request sent to ${r.friend}.` });
     });
@@ -380,8 +383,8 @@ function FriendsTab() {
             <h3>Requests for you</h3>
             <ul className="friend-list">{by('incoming').map((f) => (
               <li key={f.accountId}><Emblem classId={f.favoriteClass} /><span className="grow"><b>{f.displayName}</b> <span className="faint">@{f.username}</span></span>
-                <button className="btn small primary" onClick={() => act(() => api('POST', `/friends/${f.accountId}/accept`), `You and ${f.username} are now friends.`)}>Accept</button>
-                <button className="btn small ghost" onClick={() => act(() => api('POST', `/friends/${f.accountId}/decline`))}>Decline</button></li>
+                <button className="btn small primary" onClick={() => act(() => accountApi('POST', `/friends/${f.accountId}/accept`), `You and ${f.username} are now friends.`)}>Accept</button>
+                <button className="btn small ghost" onClick={() => act(() => accountApi('POST', `/friends/${f.accountId}/decline`))}>Decline</button></li>
             ))}</ul>
           </div>
         )}
@@ -390,7 +393,7 @@ function FriendsTab() {
             <h3>Waiting on</h3>
             <ul className="friend-list">{by('outgoing').map((f) => (
               <li key={f.accountId}><Emblem classId={f.favoriteClass} /><span className="grow"><b>{f.displayName}</b> <span className="faint">@{f.username}</span></span>
-                <button className="btn small ghost" onClick={() => act(() => api('DELETE', `/friends/${f.accountId}`))}>Cancel</button></li>
+                <button className="btn small ghost" onClick={() => act(() => accountApi('DELETE', `/friends/${f.accountId}`))}>Cancel</button></li>
             ))}</ul>
           </div>
         )}
@@ -401,7 +404,7 @@ function FriendsTab() {
           <ul className="friend-list">{by('friends').map((f) => (
             <li key={f.accountId}><Emblem classId={f.favoriteClass} /><span className="grow"><b>{f.displayName}</b> <span className="faint">@{f.username} · since {date(f.since)}</span></span>
               <button className="btn small" onClick={() => setCard(f.username)}>Card</button>
-              <button className="btn small ghost" onClick={() => act(() => api('DELETE', `/friends/${f.accountId}`))}>Remove</button></li>
+              <button className="btn small ghost" onClick={() => act(() => accountApi('DELETE', `/friends/${f.accountId}`))}>Remove</button></li>
           ))}</ul>
         )}
         <p className="faint" style={{ margin: 0 }}><Link href="/records?scope=friends">Friends leaderboard →</Link></p>
@@ -418,20 +421,20 @@ function SecurityTab() {
   const [confirm, setConfirm] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const load = useCallback(() => { api<{ sessions: Session[] }>('GET', '/auth/sessions').then((r) => setSessions(r.sessions)).catch(() => undefined); }, []);
+  const load = useCallback(() => { accountApi<{ sessions: Session[] }>('GET', '/auth/sessions').then((r) => setSessions(r.sessions)).catch(() => undefined); }, []);
   useEffect(() => { load(); }, [load]);
   const change = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
     if (next !== confirm) { setMsg({ ok: false, text: 'The new passwords do not match.' }); return; }
     try {
-      await api('POST', '/auth/password', { current, next });
+      await accountApi('POST', '/auth/password', { current, next });
       setCurrent(''); setNext(''); setConfirm('');
       setMsg({ ok: true, text: 'Password changed. Every other device has been signed out.' });
       load();
     } catch (e2) { setMsg({ ok: false, text: errText(e2) }); }
   };
-  const revoke = async () => { await api('POST', '/auth/sessions/revoke-others').catch(() => undefined); load(); };
+  const revoke = async () => { await accountApi('POST', '/auth/sessions/revoke-others').catch(() => undefined); load(); };
   const signOut = async () => { await logout(); forgetProfile(); window.location.href = '/'; };
   const [delOpen, setDelOpen] = useState(false);
   const [delPw, setDelPw] = useState('');
@@ -441,7 +444,8 @@ function SecurityTab() {
     setDelErr(null);
     const acc = authStore.get().account;
     try {
-      await api('POST', '/account/delete', { password: delPw });
+      await accountApi('POST', '/account/delete', { password: delPw });
+      await clearSession();
       if (acc) rememberGuest(acc.profileId, acc.displayName); else forgetProfile();
       window.location.href = '/';
     } catch (e2) { setDelErr(errText(e2)); }

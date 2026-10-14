@@ -135,6 +135,7 @@ class WorkerStore implements StoreHandle {
 
   createProfile: Store['createProfile'] = (displayName) => this.send('createProfile', [displayName]);
   getProfile: Store['getProfile'] = (id) => this.send('getProfile', [id]);
+  linkCloudProfile: Store['linkCloudProfile'] = (accountId, displayName) => this.send('linkCloudProfile', [accountId, displayName]);
   createAccount: Store['createAccount'] = a => this.send('createAccount', [a]);
   getAccountCredentials: Store['getAccountCredentials'] = username => this.send('getAccountCredentials', [username]);
   getAccount: Store['getAccount'] = id => this.send('getAccount', [id]);
