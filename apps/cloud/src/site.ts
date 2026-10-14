@@ -19,7 +19,7 @@ const INSTALLER_RE = /^CURSEBOUND-Setup-[0-9][0-9A-Za-z.+-]*\.exe$/;
 export interface InstallerInfo { version: string; name: string; size: number; url: string; publishedAt: string }
 
 export interface SiteDeps {
-  cfg: Pick<CloudConfig, 'releasesRepo' | 'releasesApi'>;
+  cfg: Pick<CloudConfig, 'releasesRepo' | 'releasesWeb'>;
   log: CloudLog;
   /** injectable for tests */
   fetchImpl?: typeof fetch;
@@ -58,14 +58,18 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
     if (cached && Date.now() - cached.at < RELEASE_TTL_MS) return cached.info;
     inflight ??= (async () => {
       try {
-        const r = await fetchImpl(`${cfg.releasesApi}/repos/${cfg.releasesRepo}/releases/latest`, {
-          headers: { accept: 'application/vnd.github+json', 'user-agent': 'cursebound-cloud' },
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!r.ok) throw new Error(`releases lookup ${r.status}`);
-        const j = (await r.json()) as { tag_name?: string; published_at?: string; assets?: { name: string; size: number; browser_download_url: string }[] };
-        const a = (j.assets ?? []).find((x) => INSTALLER_RE.test(x.name));
-        const info = a ? { version: String(j.tag_name ?? '').replace(/^v/, ''), name: a.name, size: a.size, url: a.browser_download_url, publishedAt: String(j.published_at ?? '') } : null;
+        // the release's update manifest (latest.yml, the file the in-game updater reads) is a plain download,
+        // so it isn't subject to the releases API's per-IP rate limit (shared across Cloud Run's egress addresses)
+        const base = `${cfg.releasesWeb}/${cfg.releasesRepo}/releases`;
+        const r = await fetchImpl(`${base}/latest/download/latest.yml`, { redirect: 'follow', headers: { 'user-agent': 'cursebound-cloud' }, signal: AbortSignal.timeout(8000) });
+        if (!r.ok) throw new Error(`release manifest ${r.status}`);
+        const yml = await r.text();
+        const field = (k: string) => new RegExp(`^${k}:\\s*'?([^'\\r\\n]+)'?\\s*$`, 'm').exec(yml)?.[1]?.trim() ?? '';
+        const version = field('version'), name = field('path');
+        const size = Number(/^\s+size:\s*(\d+)\s*$/m.exec(yml)?.[1] ?? 0);
+        const info = version && INSTALLER_RE.test(name)
+          ? { version, name, size, url: `${base}/download/v${encodeURIComponent(version)}/${encodeURIComponent(name)}`, publishedAt: field('releaseDate') }
+          : null;
         cached = { at: Date.now(), info };
         return info;
       } catch (err) {

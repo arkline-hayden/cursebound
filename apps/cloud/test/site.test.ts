@@ -13,19 +13,16 @@ let lookups = 0;
 let releaseUp = true;
 const fakeFetch: typeof fetch = async (input) => {
   const url = String(input);
-  if (url.endsWith('/repos/acme/game/releases/latest')) {
+  if (url === 'https://web.example/acme/game/releases/latest/download/latest.yml') {
     lookups++;
     if (!releaseUp) return new Response('down', { status: 503 });
-    return Response.json({
-      tag_name: 'v0.1.9', published_at: '2026-10-14T18:00:00Z',
-      assets: [
-        { name: 'latest.yml', size: 300, browser_download_url: 'https://assets.example/latest.yml' },
-        { name: 'CURSEBOUND-Setup-0.1.9.exe.blockmap', size: 100, browser_download_url: 'https://assets.example/x.blockmap' },
-        { name: 'CURSEBOUND-Setup-0.1.9.exe', size: INSTALLER.length, browser_download_url: 'https://assets.example/CURSEBOUND-Setup-0.1.9.exe' },
-      ],
-    });
+    // the electron-builder update manifest, as published with every release
+    return new Response([
+      'version: 0.1.9', 'files:', '  - url: CURSEBOUND-Setup-0.1.9.exe', '    sha512: abc==', `    size: ${INSTALLER.length}`,
+      'path: CURSEBOUND-Setup-0.1.9.exe', 'sha512: abc==', "releaseDate: '2026-10-14T18:00:00.000Z'", '',
+    ].join('\n'));
   }
-  if (url === 'https://assets.example/CURSEBOUND-Setup-0.1.9.exe') {
+  if (url === 'https://web.example/acme/game/releases/download/v0.1.9/CURSEBOUND-Setup-0.1.9.exe') {
     return new Response(INSTALLER, { headers: { 'content-length': String(INSTALLER.length), 'content-type': 'application/octet-stream' } });
   }
   return new Response('nope', { status: 404 });
@@ -36,7 +33,7 @@ describe('download site', () => {
   let base: string;
   beforeAll(async () => {
     cloud = await startCloud({
-      env: { PORT: '0', HOST: '127.0.0.1', RATE_PER_MINUTE: '100000', RELEASES_REPO: 'acme/game', RELEASES_API: 'https://api.example' },
+      env: { PORT: '0', HOST: '127.0.0.1', RATE_PER_MINUTE: '100000', RELEASES_REPO: 'acme/game', RELEASES_WEB: 'https://web.example' },
       sql: await openPglite(), log: silent, fetchImpl: fakeFetch,
       presence: () => ({ connections: () => 0, close: async () => undefined }),
     });
@@ -60,7 +57,7 @@ describe('download site', () => {
     expect(html).toContain('v0.1.9');
     expect(html).toContain('3 MB');
     expect(html.toLowerCase()).not.toContain('github');
-    expect(html).not.toContain('assets.example');
+    expect(html).not.toContain('web.example');
   });
 
   it('streams the installer from this origin as an attachment, never redirecting', async () => {
@@ -106,7 +103,7 @@ describe('download site without a reachable release', () => {
   it('still renders the page and explains a temporarily unavailable download', async () => {
     releaseUp = false;
     const cloud = await startCloud({
-      env: { PORT: '0', HOST: '127.0.0.1', RATE_PER_MINUTE: '100000', RELEASES_REPO: 'acme/game', RELEASES_API: 'https://api.example' },
+      env: { PORT: '0', HOST: '127.0.0.1', RATE_PER_MINUTE: '100000', RELEASES_REPO: 'acme/game', RELEASES_WEB: 'https://web.example' },
       sql: await openPglite(), log: silent, fetchImpl: fakeFetch,
       presence: () => ({ connections: () => 0, close: async () => undefined }),
     });

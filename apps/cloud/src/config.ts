@@ -25,8 +25,8 @@ export interface CloudConfig {
   trustProxyHops: number;
   /** owner/name of the repository whose latest release the public download site serves */
   releasesRepo: string;
-  /** releases API base (tests point it at a fake) */
-  releasesApi: string;
+  /** release download host (tests point it at a fake); the site reads `<base>/<repo>/releases/latest/download/latest.yml` */
+  releasesWeb: string;
 }
 
 const int = (v: string | undefined, d: number, min = 0) => {
@@ -49,6 +49,6 @@ export function loadCloudConfig(env: NodeJS.ProcessEnv = process.env): CloudConf
     ratePerMinute: int(env.RATE_PER_MINUTE, 600, 1),
     trustProxyHops: int(env.TRUST_PROXY_HOPS, onCloudRun ? 1 : 0),
     releasesRepo: env.RELEASES_REPO || 'arkline-hayden/cursebound',
-    releasesApi: (env.RELEASES_API || 'https://api.github.com').replace(/\/+$/, ''),
+    releasesWeb: (env.RELEASES_WEB || 'https://github.com').replace(/\/+$/, ''),
   };
 }

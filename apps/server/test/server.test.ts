@@ -38,6 +38,8 @@ class Client {
     this.ws.on('message', (d) => this.msgs.push(JSON.parse(d.toString())));
     await new Promise<void>((res, rej) => { this.ws.once('open', () => res()); this.ws.once('error', rej); });
     this.send({ t: 'HELLO', protocol: PROTOCOL_VERSION, build: BUILD_ID, contentHash: contentHash(), roomId: this.roomId, seatToken: this.token });
+    // the handshake is answered asynchronously; under a busy parallel test run a fixed delay is not enough
+    await until(() => this.msgs.some((m) => m.t === 'WELCOME' || m.t === 'ERROR'));
   }
   send(m: unknown) { this.ws.send(JSON.stringify(m)); }
   last<T extends ServerMessage['t']>(t: T) { return [...this.msgs].reverse().find((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined; }
@@ -45,6 +47,14 @@ class Client {
 }
 
 const tickle = () => new Promise((r) => setTimeout(r, 5));
+/** Wait for a condition the authority reaches asynchronously (fails loudly instead of hanging). */
+async function until(cond: () => boolean, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > end) throw new Error('condition not reached in time');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
 
 describe('server integration', () => {
   let srv: Awaited<ReturnType<typeof boot>>;
@@ -62,7 +72,7 @@ describe('server integration', () => {
     await tickle();
     expect(c.last('WELCOME')?.slot).toBe(0);
     c.send({ t: 'LOBBY', classId: 'arcanist', ready: true });
-    await tickle(); await tickle();
+    await until(() => [...srv.rooms.rooms.values()].find((x) => x.id === room.roomId)?.stage === 'RUN');
     const r = [...srv.rooms.rooms.values()].find((x) => x.id === room.roomId)!;
     expect(r.stage).toBe('RUN');
     const a = r.authority!;
@@ -192,7 +202,7 @@ describe('server integration', () => {
     const c1 = new Client(room.roomId, room.seatToken), c2 = new Client(join.roomId, join.seatToken);
     await c1.open(); await c2.open(); await tickle();
     c1.send({ t: 'LOBBY', ready: true }); c2.send({ t: 'LOBBY', ready: true });
-    await tickle(); await tickle();
+    await until(() => !!srv.rooms.rooms.get(room.roomId)?.authority);
     const r = srv.rooms.rooms.get(room.roomId)!;
     const a = r.authority!;
     expect(a.state.n).toBe(2);
