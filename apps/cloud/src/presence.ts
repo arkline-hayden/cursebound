@@ -77,8 +77,6 @@ interface Account {
   who: PresenceIdentity;
   conns: Set<Conn>;
   friends: Set<string>;
-  /** host accountId → expiry: hosts this account resolved by room code (may signal them, and they may reply) */
-  resolved: Map<string, number>;
 }
 
 const STATES = new Set<PresenceState>(['menu', 'lobby', 'run', 'away']);
@@ -96,6 +94,9 @@ export function attachPresence(server: http.Server, deps: PresenceDeps, tuning: 
   const seen = new Map<string, PresenceIdentity>();
   /** `${accountId}:${session}` → the socket of that account that took part in the session (multi-window routing) */
   const routes = new Map<string, { conn: Conn; at: number }>();
+  /** `${resolver}>${host}` → expiry: the resolver may signal that host and the host may reply. Kept apart from the
+   * live sockets so a guest reloading mid-run can re-signal; each relayed signal under the grant slides it. */
+  const grants = new Map<string, number>();
   let nextId = 1;
   let closed = false;
 
@@ -115,7 +116,7 @@ export function attachPresence(server: http.Server, deps: PresenceDeps, tuning: 
     const now = Date.now();
     for (const c of conns) if (now - c.lastSeen > T.idleMs) { c.ws.close(CLOSE.idle, 'idle'); c.ws.terminate(); drop(c); }
     for (const [k, r] of routes) if (now - r.at > T.resolveTtlMs || !conns.has(r.conn)) routes.delete(k);
-    for (const a of accounts.values()) for (const [h, exp] of a.resolved) if (exp <= now) a.resolved.delete(h);
+    for (const [k, exp] of grants) if (exp <= now) grants.delete(k);
   }, T.sweepMs);
   sweep.unref?.();
 
@@ -222,7 +223,7 @@ export function attachPresence(server: http.Server, deps: PresenceDeps, tuning: 
       try { friends = await deps.friendIds(who.accountId); } catch (err) { deps.log.warn('presence_friends_failed', { err: String(err) }); }
       if (!conns.has(c)) return;
       a = accounts.get(who.accountId);   // another socket of this account may have finished first
-      if (!a) { a = { who, conns: new Set(), friends: new Set(friends), resolved: new Map() }; accounts.set(who.accountId, a); }
+      if (!a) { a = { who, conns: new Set(), friends: new Set(friends) }; accounts.set(who.accountId, a); }
     }
     a.who = who;
     a.conns.add(c);
@@ -310,7 +311,7 @@ export function attachPresence(server: http.Server, deps: PresenceDeps, tuning: 
       const st = effectiveStatus(h);
       if (st?.joinable && st.roomCode === raw) { host = h; break; }
     }
-    if (host) a.resolved.set(host.who.accountId, Date.now() + T.resolveTtlMs);
+    if (host) grants.set(`${a.who.accountId}>${host.who.accountId}`, Date.now() + T.resolveTtlMs);
     send(c, { t: 'resolved', code: raw, host: host ? stamp(host) : null });
   }
 
@@ -318,8 +319,10 @@ export function attachPresence(server: http.Server, deps: PresenceDeps, tuning: 
   function maySignal(from: Account, to: string): boolean {
     if (from.friends.has(to)) { const t = accounts.get(to); return !t || t.friends.has(from.who.accountId); }
     const now = Date.now();
-    if ((from.resolved.get(to) ?? 0) > now) return true;
-    return (accounts.get(to)?.resolved.get(from.who.accountId) ?? 0) > now;
+    for (const k of [`${from.who.accountId}>${to}`, `${to}>${from.who.accountId}`]) {
+      if ((grants.get(k) ?? 0) > now) { grants.set(k, now + T.resolveTtlMs); return true; }
+    }
+    return false;
   }
 
   function onSignal(c: Conn, a: Account, m: Record<string, unknown>) {

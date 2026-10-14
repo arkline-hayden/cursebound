@@ -217,6 +217,13 @@ describe('presence hub', () => {
     expect((await host.next((m) => m.t === 'error')).code).toBe('FORBIDDEN');
     other.send({ t: 'signal', to: 'host', session: 'g3', data: { kind: 'offer', sdp: 'z' } });
     expect((await other.next((m) => m.t === 'error')).code).toBe('FORBIDDEN');
+    // the grant outlives the guest's socket: a reload mid-run can re-signal the host (even if no longer joinable)
+    host.send({ ...coopStatus, state: 'run', joinable: false });
+    guest.ws.close();
+    await guest.closed;
+    const back = track(await signIn('guest'));
+    back.send({ t: 'signal', to: 'host', session: 'g4', data: { kind: 'offer', sdp: 'x' } });
+    expect((await host.next((m) => m.t === 'signal' && m.session === 'g4')).from.accountId).toBe('guest');
   });
 
   it('drops a silent socket after the idle window and broadcasts offline; pings keep it alive', async () => {
