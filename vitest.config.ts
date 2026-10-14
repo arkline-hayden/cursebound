@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/test/**/*.test.ts', 'apps/server/test/**/*.test.ts', 'tests/**/*.test.ts', 'tools/*/test/**/*.test.ts'],
+    include: ['packages/*/test/**/*.test.ts', 'apps/server/test/**/*.test.ts', 'apps/cloud/test/**/*.test.ts', 'apps/client/test/**/*.test.ts', 'tests/**/*.test.ts', 'tools/*/test/**/*.test.ts'],
     testTimeout: 120000,
     hookTimeout: 60000,
     pool: 'forks',
