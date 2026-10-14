@@ -12,6 +12,7 @@ import { hostAllowed, originAllowed } from './security';
 import { SESSION_COOKIE, readCookie } from './auth';
 import { registerAccountRoutes } from './accountRoutes';
 import { HttpError, authenticateToken, cookieTransport, readBody, routePattern, type AuthState, type RouteCtx, type RouteFn } from '@cursebound/accounts';
+import { createStaticHandler } from './static';
 
 export { HttpError, readBody, type AuthState, type RouteCtx, type RouteFn } from '@cursebound/accounts';
 
@@ -198,10 +199,14 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
 
   registerAccountRoutes({ route, store, log, assertId, registerPerHour: cfg.registerPerHour });
 
+  // desktop app: everything outside /api/ is the exported client, served from this same origin
+  const serveStatic = cfg.staticDir ? createStaticHandler(cfg) : null;
+
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     const requestId = crypto.randomUUID();
     try {
       if (!hostAllowed(cfg, req)) throw new HttpError(421, 'UNAUTHORIZED', 'host not allowed');
+      if (serveStatic && !(req.url ?? '/').startsWith('/api/')) return serveStatic(req, res);
       const method = req.method ?? 'GET';
       const mutating = method !== 'GET' && method !== 'HEAD';
       if (!originAllowed(cfg, req, false)) throw new HttpError(403, 'UNAUTHORIZED', 'origin not allowed');
