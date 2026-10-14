@@ -29,7 +29,7 @@ const FIRST_CHECK_WAIT_MS = 4000;
 let win: BrowserWindow | null = null;
 let origin = '';
 let quitting = false;
-let updates: Updates = { pending: () => null, install: () => {}, firstCheck: Promise.resolve('none') };
+let updates: Updates = { pending: () => null, install: () => {}, firstCheck: Promise.resolve('none'), manual: false };
 const secure = new SecureStore(path.join(userData, 'secure-store.json'));
 const crashes: number[] = [];
 
@@ -99,6 +99,8 @@ function registerIpc(): void {
   ipcMain.handle('cursebound:update-pending', (e) => (fromGame(e) ? updates.pending() : null));
   ipcMain.on('cursebound:update-install', (e) => {
     if (!fromGame(e) || !updates.pending()) return;
+    // macOS: opens the download page; the game keeps running
+    if (updates.manual) { log('[shell] opening the download page for the update'); updates.install(); return; }
     log('[shell] installing update on request');
     quitting = true;
     // flush the authority first: the installer replaces its files
@@ -186,7 +188,7 @@ async function boot(): Promise<void> {
   // launch is not held up); its download then runs in the background and the page shows "Restart to update"
   updates = initUpdates(log, (version) => {
     for (const w of BrowserWindow.getAllWindows()) if (isLocal(w.webContents.getURL())) w.webContents.send('cursebound:update-ready', version);
-  });
+  }, cloudUrl ? `${cloudUrl}/` : '');
   const first = await Promise.race([updates.firstCheck, new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), FIRST_CHECK_WAIT_MS))]);
   if (first !== 'none') log(`[shell] launch update check: ${first}`);
   win = createWindow();

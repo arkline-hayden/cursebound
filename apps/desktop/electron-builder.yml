@@ -47,12 +47,14 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-    # electron-updater on macOS installs from the zip; it also needs a signed + notarized app (docs/RELEASING.md)
+    # the zip + latest-mac.yml let the app detect new builds; installing in place needs a Developer ID signature, so
+    # until then the Mac app runs updates in manual mode (src/updates.ts)
     - target: zip
       arch: [arm64, x64]
   category: public.app-category.games
   icon: build/icon.png
-  identity: null
+  # ad-hoc signature: unsigned arm64 apps are reported as "damaged"; ad-hoc ones open via System Settings > Open Anyway
+  identity: "-"
   artifactName: CURSEBOUND-${version}-${arch}.${ext}
 dmg:
   artifactName: CURSEBOUND-${version}-${arch}.${ext}

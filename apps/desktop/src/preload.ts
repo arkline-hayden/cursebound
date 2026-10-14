@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 // Sandboxed preload (contextIsolation on, sandbox on, nodeIntegration off). Exposes exactly the contract's bridge
 // (docs/contracts/ONLINE_CONTRACT.md "Desktop app"):
-//   window.cursebound = { desktop: true, version, secureStore: { get, set, del }, updates: { onReady(cb), install() } }
+//   window.cursebound = { desktop: true, version, secureStore: { get, set, del }, updates: { onReady(cb), install(), manual } }
+// `updates.manual` (macOS): the update is downloaded from the download page instead of installed in place.
 // Everything goes through narrow IPC channels that the main process validates (sender origin, key and value shape).
 
 const versionArg = process.argv.find((a) => a.startsWith('--cursebound-version='));
@@ -34,5 +35,6 @@ contextBridge.exposeInMainWorld('cursebound', {
       if (readyVersion) cb(readyVersion);
     },
     install(): void { ipcRenderer.send('cursebound:update-install'); },
+    manual: process.platform === 'darwin',
   },
 });

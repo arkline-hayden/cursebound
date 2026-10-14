@@ -19,21 +19,23 @@ export function UpdateToast() {
   }, []);
 
   if (!version || dismissed) return null;
+  // macOS builds can't replace themselves yet (no Developer ID signature): the button opens the download page
+  const manual = !!window.cursebound?.updates?.manual;
   return (
     <div className="update-toast frame ember" role="status" aria-live="polite">
       <div className="update-toast-text">
-        <span className="update-toast-title">A new build is ready</span>
+        <span className="update-toast-title">{manual ? 'A new build is out' : 'A new build is ready'}</span>
         <span className="update-toast-ver">v{version}</span>
       </div>
-      <p className="update-toast-note">Co-op needs matching builds. Restart so your friends can join you.</p>
+      <p className="update-toast-note">{manual ? 'Co-op needs matching builds. Download it and install over this one; your progress is kept.' : 'Co-op needs matching builds. Restart so your friends can join you.'}</p>
       <div className="update-toast-actions">
         <button
           type="button"
           className="btn ember small"
           disabled={installing}
-          onClick={() => { setInstalling(true); window.cursebound?.updates?.install(); }}
+          onClick={() => { if (!manual) setInstalling(true); window.cursebound?.updates?.install(); }}
         >
-          {installing ? 'Restarting…' : 'Restart to update'}
+          {manual ? 'Download update' : installing ? 'Restarting…' : 'Restart to update'}
         </button>
         <button type="button" className="btn ghost small" disabled={installing} onClick={() => setDismissed(true)}>Later</button>
       </div>

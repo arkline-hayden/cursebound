@@ -8,15 +8,40 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import type { CloudConfig } from './config';
 import type { CloudLog } from './log';
 
-// Public download site: a pixel-art landing page at `/` and `/download`, which streams the newest Windows installer
-// through this service. Visitors only ever talk to this origin: the installer is fetched server-side from the
-// release host and relayed byte for byte (never a redirect), so no link or hop exposes where builds are stored.
-// The newest release is looked up through the releases API and cached for a few minutes.
+// Public download site: a pixel-art landing page at `/` and `/download?os=…`, which streams the newest build for
+// Windows, macOS (Apple Silicon / Intel) or Linux through this service. Visitors only ever talk to this origin: the
+// file is fetched server-side from the release host and relayed byte for byte (never a redirect), so no link or hop
+// exposes where builds are stored. Each platform's newest build is read from that release's update manifest (the
+// file the in-game updater reads) and cached for a few minutes.
 
 const RELEASE_TTL_MS = 5 * 60_000;
-const INSTALLER_RE = /^CURSEBOUND-Setup-[0-9][0-9A-Za-z.+-]*\.exe$/;
 
-export interface InstallerInfo { version: string; name: string; size: number; url: string; publishedAt: string }
+export type Platform = 'win' | 'mac-arm64' | 'mac-x64' | 'linux';
+export const PLATFORMS: readonly Platform[] = ['win', 'mac-arm64', 'mac-x64', 'linux'];
+const MANIFEST: Record<Platform, string> = { win: 'latest.yml', 'mac-arm64': 'latest-mac.yml', 'mac-x64': 'latest-mac.yml', linux: 'latest-linux.yml' };
+const FILE_RE: Record<Platform, RegExp> = {
+  win: /^CURSEBOUND-Setup-[0-9][0-9A-Za-z.+-]*\.exe$/,
+  'mac-arm64': /^CURSEBOUND-[0-9][0-9A-Za-z.+-]*-arm64\.dmg$/,
+  'mac-x64': /^CURSEBOUND-[0-9][0-9A-Za-z.+-]*-x64\.dmg$/,
+  linux: /^CURSEBOUND-[0-9][0-9A-Za-z.+_-]*\.AppImage$/,
+};
+
+export interface InstallerInfo { platform: Platform; version: string; name: string; size: number; url: string; publishedAt: string }
+
+/** Read one platform's build out of an electron-builder update manifest (exported for tests). */
+export function parseManifest(platform: Platform, yml: string, releasesBase: string): InstallerInfo | null {
+  const field = (k: string) => new RegExp(`^${k}:\\s*'?([^'\\r\\n]+)'?\\s*$`, 'm').exec(yml)?.[1]?.trim() ?? '';
+  const version = field('version');
+  if (!version) return null;
+  // files: "  - url: <name>" followed by its sha512/size lines
+  const files = [...yml.matchAll(/^\s+-\s+url:\s*(\S+)\s*$([\s\S]*?)(?=^\s+-\s+url:|^\S|$(?![\s\S]))/gm)]
+    .map((m) => ({ name: m[1]!, size: Number(/^\s+size:\s*(\d+)/m.exec(m[2] ?? '')?.[1] ?? 0) }));
+  // Windows and Linux name their one file in `path`; the Mac manifest lists the zips, the .dmg follows the same naming
+  const name = platform.startsWith('mac') ? `CURSEBOUND-${version}-${platform.slice(4)}.dmg` : field('path');
+  if (!FILE_RE[platform].test(name)) return null;
+  const size = files.find((x) => x.name === name)?.size ?? 0;
+  return { platform, version, name, size, url: `${releasesBase}/download/v${encodeURIComponent(version)}/${encodeURIComponent(name)}`, publishedAt: field('releaseDate') };
+}
 
 export interface SiteDeps {
   cfg: Pick<CloudConfig, 'releasesRepo' | 'releasesWeb'>;
@@ -51,58 +76,67 @@ function logoScript(): Promise<string> {
 }
 
 export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
-  let cached: { at: number; info: InstallerInfo | null } | null = null;
-  let inflight: Promise<InstallerInfo | null> | null = null;
+  const base = () => `${cfg.releasesWeb}/${cfg.releasesRepo}/releases`;
+  /** per manifest file: the raw manifest text, cached; several platforms share latest-mac.yml */
+  const cache = new Map<string, { at: number; yml: string | null }>();
+  const inflight = new Map<string, Promise<string | null>>();
 
-  async function latest(): Promise<InstallerInfo | null> {
-    if (cached && Date.now() - cached.at < RELEASE_TTL_MS) return cached.info;
-    inflight ??= (async () => {
-      try {
-        // the release's update manifest (latest.yml, the file the in-game updater reads) is a plain download,
-        // so it isn't subject to the releases API's per-IP rate limit (shared across Cloud Run's egress addresses)
-        const base = `${cfg.releasesWeb}/${cfg.releasesRepo}/releases`;
-        const r = await fetchImpl(`${base}/latest/download/latest.yml`, { redirect: 'follow', headers: { 'user-agent': 'cursebound-cloud' }, signal: AbortSignal.timeout(8000) });
-        if (!r.ok) throw new Error(`release manifest ${r.status}`);
-        const yml = await r.text();
-        const field = (k: string) => new RegExp(`^${k}:\\s*'?([^'\\r\\n]+)'?\\s*$`, 'm').exec(yml)?.[1]?.trim() ?? '';
-        const version = field('version'), name = field('path');
-        const size = Number(/^\s+size:\s*(\d+)\s*$/m.exec(yml)?.[1] ?? 0);
-        const info = version && INSTALLER_RE.test(name)
-          ? { version, name, size, url: `${base}/download/v${encodeURIComponent(version)}/${encodeURIComponent(name)}`, publishedAt: field('releaseDate') }
-          : null;
-        cached = { at: Date.now(), info };
-        return info;
-      } catch (err) {
-        log.warn('site_release_lookup_failed', { err: err as Error });
-        // keep serving the last known build while the lookup is failing
-        if (cached) { cached.at = Date.now() - RELEASE_TTL_MS + 30_000; return cached.info; }
-        return null;
-      } finally {
-        inflight = null;
-      }
-    })();
-    return inflight;
+  async function manifest(file: string): Promise<string | null> {
+    const hit = cache.get(file);
+    if (hit && Date.now() - hit.at < RELEASE_TTL_MS) return hit.yml;
+    let p = inflight.get(file);
+    if (!p) {
+      p = (async () => {
+        try {
+          // a plain release download, so not subject to the releases API's per-IP rate limit (shared across Cloud Run's egress addresses)
+          const r = await fetchImpl(`${base()}/latest/download/${file}`, { redirect: 'follow', headers: { 'user-agent': 'cursebound-cloud' }, signal: AbortSignal.timeout(8000) });
+          // a platform that this release didn't build simply has no manifest
+          if (r.status === 404) { cache.set(file, { at: Date.now(), yml: null }); return null; }
+          if (!r.ok) throw new Error(`release manifest ${file} ${r.status}`);
+          const yml = await r.text();
+          cache.set(file, { at: Date.now(), yml });
+          return yml;
+        } catch (err) {
+          log.warn('site_release_lookup_failed', { file, err: err as Error });
+          // keep serving the last known build while the lookup is failing
+          if (hit) { cache.set(file, { at: Date.now() - RELEASE_TTL_MS + 30_000, yml: hit.yml }); return hit.yml; }
+          return null;
+        } finally {
+          inflight.delete(file);
+        }
+      })();
+      inflight.set(file, p);
+    }
+    return p;
   }
 
-  async function download(req: IncomingMessage, res: ServerResponse, requestId: string) {
-    const info = await latest();
-    if (!info) return plain(res, 503, 'The download is briefly unavailable. Please try again in a minute.', requestId);
+  async function latest(platform: Platform): Promise<InstallerInfo | null> {
+    const yml = await manifest(MANIFEST[platform]);
+    return yml ? parseManifest(platform, yml, base()) : null;
+  }
+
+  async function download(req: IncomingMessage, res: ServerResponse, url: URL, requestId: string) {
+    const os = url.searchParams.get('os') ?? 'win';
+    const platform = (PLATFORMS as readonly string[]).includes(os) ? (os as Platform) : null;
+    if (!platform) return plain(res, 400, 'Unknown platform.', requestId);
+    const info = await latest(platform);
+    if (!info) return plain(res, 503, 'That download is briefly unavailable. Please try again in a minute.', requestId);
     const abort = new AbortController();
     req.on('close', () => { if (!res.writableEnded) abort.abort(); });
     let up: Response;
     try {
       up = await fetchImpl(info.url, { redirect: 'follow', signal: abort.signal, headers: { 'user-agent': 'cursebound-cloud', accept: 'application/octet-stream' } });
     } catch (err) {
-      log.warn('site_download_upstream_failed', { requestId, err: err as Error });
+      log.warn('site_download_upstream_failed', { requestId, platform, err: err as Error });
       return plain(res, 502, 'The download could not be started. Please try again.', requestId);
     }
     if (!up.ok || !up.body) {
-      log.warn('site_download_upstream_status', { requestId, status: up.status });
-      cached = null;
+      log.warn('site_download_upstream_status', { requestId, platform, status: up.status });
+      cache.delete(MANIFEST[platform]);
       return plain(res, 502, 'The download could not be started. Please try again.', requestId);
     }
     // no content-length: Cloud Run caps non-streamed responses at 32 MiB, while chunked (streamed) responses are
-    // uncapped; the installer is ~100 MB. The browser shows progress without a total.
+    // uncapped; the builds are ~100 MB. The browser shows progress without a total.
     res.writeHead(200, {
       'content-type': 'application/octet-stream',
       'content-disposition': `attachment; filename="${info.name}"`,
@@ -111,7 +145,7 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
       'x-request-id': requestId,
     });
     if (req.method === 'HEAD') { abort.abort(); res.end(); return; }
-    log.info('site_download', { requestId, version: info.version });
+    log.info('site_download', { requestId, platform, version: info.version });
     const body = Readable.fromWeb(up.body as unknown as WebReadableStream<Uint8Array>);
     body.on('error', () => res.destroy());
     body.pipe(res);
@@ -128,8 +162,8 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
         return;
       }
       if (path === '/favicon.ico') { res.writeHead(204, { 'cache-control': 'public, max-age=86400' }); res.end(); return; }
-      if (path === '/download') return download(req, res, requestId);
-      const info = await latest();
+      if (path === '/download') return download(req, res, new URL(req.url ?? '/', 'http://site.invalid'), requestId);
+      const builds = Object.fromEntries(await Promise.all(PLATFORMS.map(async (p) => [p, await latest(p)] as const))) as Record<Platform, InstallerInfo | null>;
       const nonce = crypto.randomBytes(16).toString('base64');
       res.writeHead(200, {
         'content-type': 'text/html; charset=utf-8',
@@ -144,7 +178,7 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
         'strict-transport-security': 'max-age=31536000; includeSubDomains',
         'x-request-id': requestId,
       });
-      res.end(req.method === 'HEAD' ? undefined : landingPage(info, nonce, LOGO_VERSION));
+      res.end(req.method === 'HEAD' ? undefined : landingPage(builds, nonce, LOGO_VERSION));
     },
   };
 }
@@ -156,9 +190,22 @@ function plain(res: ServerResponse, status: number, text: string, requestId: str
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+const LABEL: Record<Platform, { button: string; other: string; req: string }> = {
+  win: { button: 'Download for Windows', other: 'Windows', req: 'Windows 10/11' },
+  'mac-arm64': { button: 'Download for macOS', other: 'macOS · Apple Silicon', req: 'macOS · Apple Silicon (M1 or newer)' },
+  'mac-x64': { button: 'Download for macOS', other: 'macOS · Intel', req: 'macOS · Intel' },
+  linux: { button: 'Download for Linux', other: 'Linux', req: 'Linux · x64 AppImage' },
+};
+
 /** The landing page: one self-contained document (inline styles and script under a per-request nonce). */
-export function landingPage(info: InstallerInfo | null, nonce: string, logoVersion = '1'): string {
-  const meta = info ? `v${esc(info.version)} · ${Math.round(info.size / 1048576)} MB · Windows 10/11` : 'Windows 10/11';
+export function landingPage(builds: Partial<Record<Platform, InstallerInfo | null>>, nonce: string, logoVersion = '1'): string {
+  const meta = (p: Platform) => {
+    const b = builds[p];
+    return [b ? `v${esc(b.version)}` : '', b && b.size ? `${Math.round(b.size / 1048576)} MB` : '', LABEL[p].req].filter(Boolean).join(' · ');
+  };
+  const avail = PLATFORMS.filter((p) => builds[p]);
+  // what the page script needs to pick the visitor's platform: labels and meta only, never where files are hosted
+  const data = JSON.stringify(Object.fromEntries(PLATFORMS.map((p) => [p, { ok: !!builds[p], button: LABEL[p].button, meta: meta(p) }]))).replace(/</g, '\\u003c');
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -189,6 +236,11 @@ h1 { margin: 0; line-height: 0; }
 .dl:hover, .dl:focus-visible { background: var(--blood-hi); color: #fff; outline: none; }
 .dl:active { transform: translateY(3px); box-shadow: 0 0 0 4px #1a0204, 0 0 0 8px var(--gold), 0 0 0 12px #1a0204; }
 .note { max-width: 640px; margin: 0; font-size: 19px; color: #8d8574; }
+.note[hidden] { display: none; }
+.others { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: 19px; color: #8d8574; margin-top: -8px; }
+.others a { color: var(--bone2); text-decoration: none; border-bottom: 2px solid #3a2f26; }
+.others a:hover, .others a:focus-visible { color: var(--gold-hi); border-color: var(--gold); outline: none; }
+.others a[aria-current="true"] { display: none; }
 .note kbd { font-family: inherit; color: var(--bone); background: #241b15; padding: 0 6px; box-shadow: 0 2px 0 #000; }
 @media (prefers-reduced-motion: reduce) { canvas#sky { display: none; } }
 </style></head>
@@ -198,10 +250,40 @@ h1 { margin: 0; line-height: 0; }
   <h1 id="wordmark"><span class="sr-only">CURSEBOUND</span><canvas id="wordmark-canvas" aria-hidden="true"></canvas><span class="fallback" aria-hidden="true">CURSEBOUND</span></h1>
   <div class="tag">A cooperative descent · every fate compounds</div>
   <p class="pitch">An endless roguelike for up to five. After every round your party walks through one of three doors and binds itself to a Fate: a gift and a curse that never leave. Every choice multiplies.</p>
-  <a class="dl" href="/download" download>Download for Windows<small>${meta}</small></a>
-  <p class="note">Windows may show a SmartScreen notice because the game isn't code-signed yet: choose <kbd>More info</kbd> then <kbd>Run anyway</kbd>.</p>
+  <a class="dl" id="dl-main" href="/download?os=win" download>${LABEL.win.button}<small id="dl-meta">${meta('win')}</small></a>
+  <div class="others" aria-label="Other platforms">${avail.length > 1 ? 'Also for:' : ''} ${avail.map((p) => `<a href="/download?os=${p}" data-os="${p}" download${p === 'win' ? ' aria-current="true"' : ''}>${LABEL[p].other}</a>`).join('')}</div>
+  <p class="note" data-note="win">Windows may show a SmartScreen notice because the game isn't code-signed yet: choose <kbd>More info</kbd> then <kbd>Run anyway</kbd>.</p>
+  <p class="note" data-note="mac" hidden>Open the .dmg and drag CURSEBOUND to Applications. macOS blocks the first launch of apps from unidentified developers: open <kbd>System Settings</kbd> → <kbd>Privacy &amp; Security</kbd> → <kbd>Open Anyway</kbd>. New versions are announced in the game; download them here.</p>
+  <p class="note" data-note="linux" hidden>Make the AppImage executable (<kbd>chmod +x</kbd> or Properties → Allow executing), then run it. It updates itself.</p>
+  <script type="application/json" id="builds">${data}</script>
 </main>
 <script src="/site-logo.js?v=${logoVersion}" defer></script>
+<script nonce="${nonce}">
+(() => {
+  // pick the visitor's platform for the main button; the other platforms stay one click away
+  const builds = JSON.parse(document.getElementById('builds').textContent || '{}');
+  const ua = navigator.userAgent || '', plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  let os = 'win';
+  if (/mac/i.test(plat) || /Macintosh/.test(ua)) {
+    os = 'mac-arm64';
+    // Safari and Chrome report "MacIntel" on every Mac; the GPU name tells Apple Silicon from Intel
+    try {
+      const gl = document.createElement('canvas').getContext('webgl');
+      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      const gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+      if (/Intel|AMD|Radeon/i.test(gpu) && !/Apple/i.test(gpu)) os = 'mac-x64';
+    } catch {}
+  } else if (/linux/i.test(plat) && !/android/i.test(ua)) os = 'linux';
+  if (!builds[os] || !builds[os].ok) return;
+  const main = document.getElementById('dl-main');
+  main.setAttribute('href', '/download?os=' + os);
+  main.firstChild.textContent = builds[os].button;
+  document.getElementById('dl-meta').textContent = builds[os].meta;
+  document.querySelectorAll('.others a').forEach((a) => a.setAttribute('aria-current', String(a.dataset.os === os)));
+  const family = os.startsWith('mac') ? 'mac' : os;
+  document.querySelectorAll('[data-note]').forEach((n) => { n.hidden = n.dataset.note !== family; });
+})();
+</script>
 <script nonce="${nonce}">
 (() => {
   // pixel sky: a breathing dithered halo behind the title and spirit motes rising, drawn at 1/4 resolution

@@ -6,7 +6,7 @@ const KEY = 'cursebound.cloud.token';
 
 interface SecureStore { get(key: string): Promise<string | null>; set(key: string, value: string): Promise<void>; del(key: string): Promise<void> }
 declare global {
-  interface Window { cursebound?: { desktop?: boolean; version?: string; secureStore?: SecureStore; updates?: { onReady(cb: (version: string) => void): void; install(): void } } }
+  interface Window { cursebound?: { desktop?: boolean; version?: string; secureStore?: SecureStore; updates?: { onReady(cb: (version: string) => void): void; install(): void; manual?: boolean } } }
 }
 
 let token: string | null = null;
