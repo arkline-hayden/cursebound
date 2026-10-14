@@ -518,6 +518,12 @@ details[open] > summary::before { content: '\25BE'; }
 .toast.warn { border-image-source: var(--px-frame-ember); }
 .toast.error { border-image-source: var(--px-frame-blood); }
 .net-toast { position: fixed; top: var(--sp-3); left: 50%; transform: translateX(-50%); z-index: var(--z-net); }
+/* desktop app: "Restart to update" (ui/UpdateToast.tsx), top-right so it never covers the HUD orbs or the toast stack */
+.update-toast { position: fixed; top: var(--sp-3); right: var(--sp-3); z-index: var(--z-net); display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-2); max-width: min(420px, calc(100vw - 32px)); animation: rise 0.2s steps(3); }
+.update-toast-text { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.update-toast-title { font-family: var(--font-label); font-size: var(--fs-label-lg); line-height: var(--lh-label); text-transform: uppercase; color: var(--gold); text-shadow: var(--shadow-hard); }
+.update-toast-ver { font-family: var(--font-num); font-size: var(--fs-label-lg); color: var(--ember-hi); text-shadow: var(--shadow-hard); }
+.update-toast-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
 
 /* round intro / phase banners: display letters over an engraved rule, area name below */
 .banner {
