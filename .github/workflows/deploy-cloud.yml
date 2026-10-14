@@ -1,0 +1,61 @@
+name: Deploy cloud service
+# Builds apps/cloud and deploys it to Cloud Run when it (or the shared packages it uses) changes on main.
+# Auth is keyless (Workload Identity Federation); run infra/gcp/setup.sh once and set the repository variables it prints.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/cloud/**'
+      - 'packages/accounts/**'
+      - 'packages/protocol/**'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-cloud.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: deploy-cloud
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: ${{ vars.GCP_PROJECT_ID != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      SERVICE: cursebound-cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Test cloud service
+        run: npx vitest run apps/cloud packages/accounts
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push image
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/cursebound/${SERVICE}:${GITHUB_SHA::12}"
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -f apps/cloud/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" --image "$IMAGE" --region "$REGION" \
+            --service-account "cursebound-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
+            --add-cloudsql-instances "${{ vars.GCP_PROJECT_ID }}:${REGION}:cursebound-pg" \
+            --set-secrets "DATABASE_URL=cb-database-url:latest,TURN_SECRET=cb-turn-secret:latest" \
+            --set-env-vars "TURN_HOST=${{ vars.TURN_HOST }},MIN_CLIENT_BUILD=${{ vars.MIN_CLIENT_BUILD }},NODE_ENV=production" \
+            --min-instances 0 --max-instances 1 --concurrency 1000 --cpu 1 --memory 512Mi \
+            --timeout 3600 --session-affinity --allow-unauthenticated --port 8080
+      - name: Smoke test
+        run: |
+          URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
+          curl -fsS --retry 5 --retry-delay 5 "$URL/api/v1/healthz"

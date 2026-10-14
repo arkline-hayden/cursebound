@@ -1,0 +1,82 @@
+/* In-world door vote (DoorPanel.tsx). Chrome comes from the pixel skin in globals.css (.frame, .btn, .chip, .kbd,
+   .fv-section); this module only lays the pieces out. Fonts and sizes use the type tokens only. */
+
+.layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-overlay); }
+.layer > * { pointer-events: auto; }
+
+.hint {
+  position: absolute; top: var(--sp-3); left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); text-align: center;
+  pointer-events: none;
+}
+.hint > * { pointer-events: auto; }
+.title {
+  margin: 0; font-family: var(--font-display); font-size: var(--fs-disp); line-height: 1; color: var(--gold);
+  text-shadow: 4px 4px 0 var(--black, #000), 8px 8px 0 #3a1a04;
+}
+.sub {
+  display: flex; gap: var(--sp-2); align-items: center; justify-content: center; flex-wrap: wrap;
+  font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase;
+  color: var(--bone-2); text-shadow: var(--shadow-hard);
+}
+
+.panel {
+  position: absolute; right: var(--sp-4); top: 50%; transform: translateY(-50%);
+  width: min(440px, 92vw); max-height: calc(100vh - 220px); overflow: auto;
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body);
+  animation: doorPanelIn 0.16s steps(4) both;
+}
+@keyframes doorPanelIn { from { transform: translate(24px, -50%); opacity: 0; } to { transform: translate(0, -50%); opacity: 1; } }
+
+.head { display: flex; align-items: flex-start; gap: var(--sp-2); }
+.numeral {
+  flex: none; min-width: 40px; text-align: center; font-family: var(--font-gothic); font-size: var(--fs-goth); line-height: 1;
+  color: var(--door, var(--gold)); text-shadow: var(--shadow-hard);
+}
+.names { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.dungeon {
+  font-family: var(--font-gothic); font-size: var(--fs-goth-lg); line-height: 1; color: var(--door, var(--gold));
+  text-shadow: 3px 3px 0 #000;
+}
+.desc { color: var(--bone-3); text-shadow: var(--shadow-hard); }
+.lair {
+  align-self: flex-start; font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase;
+  color: var(--blood-hi); text-shadow: var(--shadow-hard); padding: 0 var(--sp-1); box-shadow: inset 0 0 0 2px var(--blood);
+}
+.card { display: flex; align-items: center; gap: var(--sp-2); }
+.cardName { font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; color: var(--gold-hi); text-shadow: var(--shadow-hard); }
+.rarity { font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; text-shadow: var(--shadow-hard); }
+
+.who { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; color: var(--bone-2); text-shadow: var(--shadow-hard); }
+.hold { height: 8px; background: #000; box-shadow: inset 0 0 0 2px #2a2020; }
+.hold > i { display: block; height: 100%; background: var(--door, var(--gold)); }
+.warn { color: var(--warn); text-shadow: var(--shadow-hard); }
+.note { color: var(--bone-3); text-shadow: var(--shadow-hard); }
+.actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.actions > :last-child { flex: 1; }
+
+.strip {
+  position: absolute; left: 50%; bottom: var(--sp-3); transform: translateX(-50%);
+  display: flex; gap: var(--sp-2); width: min(1180px, calc(100vw - 32px));
+}
+.entry {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  cursor: pointer; color: var(--bone); font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body);
+}
+.entry[aria-current='true'] { filter: drop-shadow(0 -4px 0 var(--door, var(--gold))) drop-shadow(4px 4px 0 rgba(0, 0, 0, 0.6)); }
+.entryHead { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
+.entryName {
+  font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase;
+  color: var(--door, var(--gold)); text-shadow: var(--shadow-hard); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+.line { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: var(--shadow-hard); }
+.gift { color: var(--good); }
+.price { color: var(--bad); }
+.pips { display: flex; gap: 4px; }
+.pip { width: 10px; height: 10px; transform: rotate(45deg); box-shadow: 0 0 0 2px #000; }
+
+@media (max-width: 900px) {
+  .panel { top: auto; bottom: 168px; transform: none; right: 16px; animation: none; }
+  .strip { flex-direction: column; bottom: 8px; }
+}

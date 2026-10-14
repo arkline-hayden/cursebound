@@ -1,0 +1,23 @@
+node_modules/
+data/
+.next/
+apps/client/.next/
+apps/client/public/art-preview/
+*.log
+*.tsbuildinfo
+next-env.d.ts
+.env
+.env.*
+!.env.example
+# build outputs
+dist/
+out/
+release/
+apps/client/out/
+apps/desktop/dist/
+apps/desktop/release/
+# local credentials / keys
+*.pem
+*.key
+gcp-*.json
+.claude/settings.local.json

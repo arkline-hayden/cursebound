@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": false,
+    "baseUrl": ".",
+    "paths": {
+      "@cursebound/numeric": ["packages/numeric/src/index.ts"],
+      "@cursebound/content": ["packages/content/src/index.ts"],
+      "@cursebound/simulation": ["packages/simulation/src/index.ts"],
+      "@cursebound/protocol": ["packages/protocol/src/index.ts"]
+    }
+  }
+}

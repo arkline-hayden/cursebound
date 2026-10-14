@@ -1,0 +1,20 @@
+{
+  "name": "@cursebound/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@cursebound/content": "0.1.0",
+    "@cursebound/numeric": "0.1.0",
+    "@cursebound/protocol": "0.1.0",
+    "@cursebound/simulation": "0.1.0",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "8.18.1"
+  }
+}

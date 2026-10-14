@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (simulation, server, cloud, tools, tests)
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Typecheck (client)
+        run: npx tsc -p apps/client/tsconfig.json --noEmit
+      - name: Tests
+        run: npx vitest run

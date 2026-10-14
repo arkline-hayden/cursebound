@@ -1,0 +1,34 @@
+{
+  "name": "cursebound",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CURSEBOUND - endless cooperative Fate Card roguelike, local-first full stack web game",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "dev": "node scripts/start.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "replay:verify": "tsx tools/balance/src/replayVerify.ts",
+    "balance": "tsx tools/balance/src/harness.ts",
+    "stress": "tsx tools/balance/src/stress.ts",
+    "assets:validate": "tsx tools/assets/src/validate.ts",
+    "db:backup": "tsx apps/server/src/cli/backup.ts",
+    "db:restore": "tsx apps/server/src/cli/restore.ts",
+    "check:boundaries": "tsx tools/assets/src/boundaries.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "tsx": "4.20.3",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

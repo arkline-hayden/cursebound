@@ -1,0 +1,1125 @@
+[Title] CURSEBOUND Product Requirements Document
+[Subtitle] Full stack browser game specification
+Version 1.0October 13 2026
+CURSEBOUND is a game for one to five players who fight together, shape an endless run through shared Fate Card votes, and compete against other parties for a collective score. Its defining experience is making a powerful choice, seeing its consequences compound, and deciding whether the party can survive the reality it has created.
+Build a full stack web application, running locally first and played entirely in the browser. Recommended implementation: Next.js with React for the frontend, a Phaser canvas inside the web interface, an authoritative TypeScript backend, and SQLite persistence. Use Python optionally for balance experiments and content tools. Solo ships first with the same simulation contracts that will support multiplayer. Public web hosting is a later phase; Steam is only a future compatibility consideration, with no desktop application or packaging work in the delivery plan.
+This document is a specification for work to be built. It makes no claim that a game, repository, benchmark, multiplayer service, asset library, or leaderboard already exists. All numerical tuning targets are initial proposals requiring playtesting.
+[Heading2] Design status
+Established requirements preserve the core design. Proposed rules supply an actionable starting specification and must be validated at their phase gates. All implementation and performance work described here is planned work.
+[Heading2] Delivery scope
+Next.js frontend, browser game canvas, authoritative backend and SQLite. Local solo first, local cooperative play next, then trusted online web competition.
+[Heading1] Contents
+Select a section to navigate in the editable document. The PDF includes a matching bookmark outline.
+[Contentsitem] 1 Product intent and decision status
+[Contentsitem] 2 Experience goals and scope
+[Contentsitem] 3 Run lifecycle and round rules
+[Contentsitem] 4 Party rules and collective voting
+[Contentsitem] 5 Combat and player movement
+[Contentsitem] 6 Death revival and progression
+[Contentsitem] 7 Classes and comprehensive skill trees
+[Contentsitem] 8 Fate deck offers and effect contracts
+[Contentsitem] 9 Initial Fate content and worked consequences
+[Contentsitem] 10 Fate Ledger and Forecast
+[Contentsitem] 11 Endless scaling and numerical model
+[Contentsitem] 12 Extreme rates spatial effects and technical safeguards
+[Contentsitem] 13 Scoring fairness and leaderboards
+[Contentsitem] 14 Encounters bosses and excellent enemy AI
+[Contentsitem] 15 Art animation audio and content production
+[Contentsitem] 16 User interface accessibility and onboarding
+[Contentsitem] 17 Technical options and architecture decision
+[Contentsitem] 18 Simulation performance and browser contracts
+[Heading1] Contents continued
+[Contentsitem] 19 Networking synchronization and protocol
+[Contentsitem] 20 Persistence schemas and data ownership
+[Contentsitem] 21 API module and content contracts
+[Contentsitem] 22 Security integrity and trust boundaries
+[Contentsitem] 23 Telemetry diagnostics and player privacy
+[Contentsitem] 24 Balance process and mathematical fairness
+[Contentsitem] 25 Phased local development milestones
+[Contentsitem] 26 Implementation backlog and user stories
+[Contentsitem] 27 Acceptance matrix and test strategy
+[Contentsitem] 28 Risk register and mitigations
+[Contentsitem] 29 Web deployment and future compatibility
+[Contentsitem] 30 Open decisions and review checklist
+[Contentsitem] Appendix A Calculation and data fixtures
+[Contentsitem] Appendix B Research and source notes
+[Contentsitem] Appendix C Requirement traceability
+[Contentsitem] Appendix D Proposed MVP skill and card inventory
+[Heading1] 1 Product intent and decision status
+[Heading2] 1.1 Established product requirements
+The current product brief is authoritative. Earlier assistant suggestions in the referenced design conversation are context, not approved rules. In particular, the earlier suggestion to exclude cards that exceed mathematical, logical, or performance thresholds was explicitly corrected by the player intent described below.
+[Tablebody] ID
+[Tablebody] Established requirement
+[Tablebody] Required interpretation
+[Tablebody] F01
+[Tablebody] One to five players
+[Tablebody] Solo is a complete experience; multiplayer is cooperative within a party
+[Tablebody] F02
+[Tablebody] Endless runs
+[Tablebody] No designed final round or victory ceiling; death or voluntary retirement ends a run
+[Tablebody] F03
+[Tablebody] Shared competitive score
+[Tablebody] Parties compete through ranked leaderboards; no required player versus player combat
+[Tablebody] F04
+[Tablebody] Round structure
+[Tablebody] A boss occurs on every fifth round: 5, 10, 15 and onward
+[Tablebody] F05
+[Tablebody] Three Fate Cards per intermission
+[Tablebody] Three randomly drawn cards, each with a positive and a negative percentage effect
+[Tablebody] F06
+[Tablebody] Party voting
+[Tablebody] One card becomes the party's shared choice between every pair of rounds
+[Tablebody] F07
+[Tablebody] Multiplicative accumulation
+[Tablebody] Chosen effects persist and compound without a gameplay stack cap
+[Tablebody] F08
+[Tablebody] Player judged untenability
+[Tablebody] Dangerous, contradictory, useless or suicidal cards remain selectable
+[Tablebody] F09
+[Tablebody] Technical protection only
+[Tablebody] Prevent crashes and invalid computation; never silently reject a card because its outcome is too extreme
+[Tablebody] F10
+[Tablebody] Consequence visibility
+[Tablebody] Fate Ledger and Forecast explain the growing and cascading effects
+[Tablebody] F11
+[Tablebody] Visual and combat identity
+[Tablebody] Colorful imaginative pixel art esque sprites with fluid movement and animation
+[Tablebody] F12
+[Tablebody] Depth and intelligence
+[Tablebody] Broad classes and skill trees; excellent readable enemy AI
+[Tablebody] F13
+[Tablebody] Local first full stack web app
+[Tablebody] Web frontend, backend services and local database; played in the browser
+[Heading2] 1.2 Proposed defaults and unresolved decisions
+Every rule not listed as established above is proposed. The word MUST in the remainder of this document describes the acceptance contract if the proposal is adopted; it does not imply an already approved product decision. Proposed defaults allow implementation to proceed coherently, but the product owner can revise them before their phase gate.
+The main proposals are a top down simulation with a three quarter visual presentation, no friendly fire, six eventual classes, two playable MVP classes, finite round objectives, a seeded deck drawn with replacement across rounds, plurality voting with seeded tie resolution, capped performance bonuses in scoring, fixed starting party size divisions, and separate local and trusted leaderboards. Exact art direction, revive rules, scoring coefficients, long run persistence and literal extreme spatial effects remain decision gates.
+[Heading2] 1.3 Audience and use of this document
+The product owner uses sections 2 through 14 to review the game rules. Engineering uses sections 15 through 23 to implement the system. Production and QA use sections 24 through 30 to sequence work and decide when a milestone is complete. Requirements IDs connect the backlog, risks and release tests. Research citations support platform constraints; they do not establish gameplay balance.
+[Heading1] 2 Experience goals and scope
+[Heading2] 2.1 Player experience
+The intended player enjoys action roguelikes, build experimentation and arguing constructively with friends about risk. A new solo player should enter combat within two minutes of first launch, understand a first Fate choice without reading a manual, and encounter the first boss within approximately ten minutes. These are proposed usability targets, not measured results.
+The primary loop is move, aim, use skills, read enemy intent, complete an encounter, compare three tradeoffs, vote, and discover how the next round changes. Team success requires positioning, complementary builds and shared judgment. Competition happens outside the party through run records. Personal contribution statistics help learning but must not create a second score race that punishes support players.
+[Heading2] 2.2 Success criteria
+[Tablebody] Area
+[Tablebody] Proposed gate
+[Tablebody] Evidence
+[Tablebody] First session
+[Tablebody] 8 of 10 new testers complete round 1 unaided
+[Tablebody] Observed playtest with no coaching
+[Tablebody] Fate understanding
+[Tablebody] 8 of 10 explain that +100% means twice current value
+[Tablebody] Short comprehension check after first vote
+[Tablebody] Consequence understanding
+[Tablebody] 7 of 10 identify the main risk in a three card offer
+[Tablebody] Forecast usability exercise
+[Tablebody] Combat feel
+[Tablebody] Median movement and response rating at least 4 of 5
+[Tablebody] Blind comparison of movement prototypes
+[Tablebody] AI readability
+[Tablebody] 8 of 10 identify the cause of a boss death
+[Tablebody] Replay plus post death explanation
+[Tablebody] Replayability
+[Tablebody] At least half of a 20 person test voluntarily start a second run
+[Tablebody] Local test cohort; directional, not market proof
+[Tablebody] Technical trust
+[Tablebody] Same seed and accepted inputs reproduce score exactly
+[Tablebody] Automated reference replay suite
+[Heading2] 2.3 MVP boundary
+MVP means an endless solo run with two classes, one biome, six ordinary enemy archetypes, two boss templates, at least 24 validated Fate Cards, individual skill allocation, Ledger and Forecast, local saves, local leaderboards, keyboard and mouse plus controller support, and basic accessibility settings. Build the room interface early, but a public online service is not required for this gate. A subsequent local cooperative alpha supports two through five browsers on one machine or a LAN.
+Exclude PvP, trading, cash purchases, user scripting, matchmaking, voice chat, generative live AI, an open world, mobile touch controls and a large campaign from MVP. Do not build monetization before the core loop and score model survive playtests. Cosmetic and class unlock progression may be added later; ranked mode must offer equal combat options from the outset.
+[Heading1] 3 Run lifecycle and round rules
+[Heading2] 3.1 Authoritative state machine
+Use these states: HOME -&gt; LOBBY -&gt; LOADOUT_LOCK -&gt; ROUND_SETUP -&gt; COMBAT -&gt; ROUND_CLEAR -&gt; SKILL_ALLOCATION -&gt; FATE_OFFER -&gt; VOTING -&gt; FATE_COMMIT -&gt; ROUND_SETUP. COMBAT can transition to PARTY_WIPE or RETIRE_REQUEST; both flow to FINALIZE -&gt; RESULTS. SAFE_CHECKPOINT exists after FATE_COMMIT and before the next combat starts. RECOVERY is a separate server state, never a hidden rewind during live play.
+The party selects classes and loadouts before round 1. Round 1 starts with no Fate Card. Clearing round r grants progression, then shows a Fate offer that applies starting in round r+1. Therefore round 5 has four chosen cards at its start. Clearing the boss still leads to the normal intermission and the fifth choice. There is never an extra boss only vote or a missed vote after a boss.
+REQ RUN01: the server alone advances phase, applies progression and commits choices. An offer has a unique ID and exactly one committed result. Repeated messages and process retries cannot apply the same card twice. RESULTS cannot be entered before a final run summary is durably recorded, or clearly marked pending if storage fails.
+[Heading2] 3.2 Round objective and pacing
+Proposed MVP objective: defeat a finite encounter budget. The director can deliver several waves, but it cannot spawn infinite score bearing enemies. A clear requires all budgeted combat groups defeated and no unresolved objective enemy. Summons disappear with their summoner or remain objective enemies according to authored metadata. Boss rounds require boss defeat; adds are authored encounter content.
+Initial pacing targets are 60 to 100 seconds for ordinary rounds and 90 to 180 seconds for a boss at the corresponding balance tier. These are references for baseline tuning, not time limits. No automatic loss on a long boss fight. A party may stalemate against regeneration or an unsuitable build and can retire. Forecast should warn when modelled damage fails to exceed regeneration, without preventing the vote.
+[Heading2] 3.3 Intermission and retirement
+Casual local solo can pause, inspect the Ledger and allocate skills without a timer. Multiplayer uses a proposed 45 second vote window, extendable in casual play by unanimous consent. Trusted ranked voting has a fixed timer and a separate no simulation time clock; combat performance excludes menus, intermissions and reconnect waits. Controller and keyboard users can reach every intermission action.
+Retirement is always available from the pause/menu interface. Solo confirms once; multiplayer requires a majority of the frozen roster, with disconnected players treated as abstaining. A tie continues the run. Retirement banks cleared round score and eligible finite objective credit; it never invents a victory. Results label retirement, wipe, aborted infrastructure failure and invalidated run distinctly.
+[Heading1] 4 Party rules and collective voting
+[Heading2] 4.1 Membership and scaling
+REQ PARTY01: freeze the starting roster and party size N at LOADOUT_LOCK. N is 1 through 5. Same classes are permitted. Initial multiplayer uses invite rooms, not matchmaking. New players cannot enter a ranked run mid combat or replace departed members. Reconnection restores the same seat and identity. Casual spectator access can be added later without voting or combat permissions.
+Proposed party scaling is enemy health multiplier P_H(N) = 1 + 0.65(N-1) and encounter budget multiplier P_B(N) = 1 + 0.25(N-1). This yields five player enemy health x3.6 and budget x2.0. Enemy base damage is unchanged by N. Keep the divisional scores separate; these coefficients are encounter feel proposals, not a claim that solo and five players are mathematically equivalent.
+Roster scaling remains fixed after disconnects or deaths. Reducing health immediately when someone leaves would enable difficulty manipulation. Casual parties can start a new run at a different N. A resigned member's vote is absent, but their slot remains in the original division.
+[Heading2] 4.2 Vote protocol
+Each roster member gets one vote for slot A, B or C, may change it until they lock or the window closes, and can inspect all forecasts. Counts are visible; no host override. Resolve early when every connected eligible member locks and no reconnect seat remains in its grace period. Otherwise resolve at the deadline. A downed or dead member still votes because the choice affects the shared run.
+Resolve by plurality among submitted votes. A 2/2/1 split is a tie between the two leading slots, not a requirement for unanimity. Break ties with a deterministic vote PRNG stream scoped to run ID and offer ID. With zero votes, use that stream to choose uniformly among all three. Log abstentions and the tie draw. Host has no extra vote. Solo still sees three cards and explicitly selects one; local untimed solo has no automatic timeout selection.
+REQ VOTE01: an accepted vote references offer ID, voter ID, slot and monotonically increasing vote sequence. Reject stale offers and duplicate sequences without changing counts. Serialize deadline and final input ordering by authoritative receipt tick. The forecast shown with the offer identifies the immutable pre choice state version.
+[Heading2] 4.3 Disconnect defaults
+Propose a 60 second reconnect seat hold. During combat the disconnected avatar remains vulnerable, with zero new inputs; do not grant AI damage, invulnerability or teleport to safety. In solo, local authority can pause for client loss. Ranked multiplayer continues while any participant is connected; all disconnected starts a 60 second suspension, then infrastructure termination. Log pauses and exclude suspended time from performance calculations.
+A disconnect during voting preserves their most recent accepted vote. At deadline, resolve with available votes; do not permanently block a run waiting for an absent member. Reconnection delivers phase, offer, vote state, full combat snapshot and current input acknowledgement. Initial release has no host migration: the server is the authority, and a server crash follows checkpoint recovery policy.
+[Heading1] 5 Combat and player movement
+[Heading2] 5.1 Controls and readable action
+Propose normalized eight direction movement, independent aiming, a basic attack, three equipped active skills, one signature skill, and dodge. Keyboard defaults: WASD, pointer aim, mouse attack, Q/E/R for skills, Space for dodge and Tab for Ledger. All mappings can change, including mouse actions. Controller uses left stick movement, right stick aim, triggers attack, face/shoulder buttons skills and dodge. Aim assist is a declared input accessibility option, with the same rules in every ranked division where allowed.
+Movement uses ground coordinates, with rendering projected separately. Diagonal movement has no speed advantage. Initial speed 4 world units per second, collision radius 0.3 units, dodge travel 2 units over 0.2 seconds and dodge cooldown 1.2 seconds. Dodge invulnerability is a proposed 0.12 second window. Tunable constants are versioned. Acceleration and stopping are short enough to preserve precise avoidance; visual easing must never delay authoritative control.
+[Heading2] 5.2 Damage pipeline
+REQ COMBAT01: process accepted inputs -&gt; movement and collision -&gt; ability readiness -&gt; attack event generation -&gt; target intersections -&gt; damage -&gt; status application -&gt; deaths -&gt; progression -&gt; clear checks. All events within a tick have deterministic timestamps and entity ID tie order. A death at an earlier sub tick prevents a later attack from that actor; exactly simultaneous lethal player and boss damage is a trade, with boss objective credit awarded before wipe finalization.
+Proposed damage expression: D = base skill damage x skill coefficient x elemental modifier x global Fate damage multiplier x crit factor x vulnerability factor x mitigation factor. Independent multiplicative modifiers are never collapsed into an additive percentage. Damage type can be physical, ember, frost, storm, decay or astral. Type rules are content data; resistances use a smooth positive armor model rather than subtracting an unbounded percentage from damage.
+Healing, shields, damage over time and life steal use the same number representation as health. Healing cannot exceed maximum health; an overheal node may explicitly turn excess into shield. Effective damage statistics exclude overkill. Kill ownership never changes shared score. No friendly fire is proposed, and ally collision is soft separation so a teammate cannot permanently trap another in a doorway.
+[Heading2] 5.3 Status and resource rules
+Base resources are per class and regenerate through explicit rules. Repeated casts require resource payment; lower cooldown alone does not create free casts. Burn and poison create source indexed damage rate aggregates with duration, not unbounded individual status objects. Refresh, additive rate and independent duration policies are declared per effect. Stun and knockback are authored combat states. Ordinary enemies have temporary control resistance after repeated crowd control; bosses convert control into a stagger meter. Those are base rules, not Fate stack restrictions.
+Any card targeting control strength affects the stagger or displacement quantities declared in its definition. Do not promise +200% stun duration and silently convert it to a different effect. Impact visuals, sound and floating numbers are presentation events; dropping cosmetic events never removes their authoritative damage.
+[Heading1] 6 Death revival and progression
+[Heading2] 6.1 Proposed death model
+At zero health a player enters DOWNED for 15 combat seconds. An ally within 1.2 units can channel a three second revive; taking damage interrupts the channel. A successful revive returns 25% maximum health. Every player has one down per round; the next lethal hit that round means DEAD. Solo receives one self revive per five round block, using a five second vulnerable channel triggered automatically after downing; interruption means death. This asymmetry must be tested within separate size divisions.
+If all players are dead, or all are downed with no available self revive, the party wipes. Clearing a round returns dead players with 50% health and resets per round down eligibility. Intermission restores a proposed 25% maximum health, not necessarily full healing. Max health Fate effects preserve health fraction at commit to avoid surprise deaths from stat conversion alone. Resource fractions are preserved; shield uses its own declared scale policy.
+REQ LIFE01: Forecast displays resulting maximum health and current health, revive implications and healing changes for each player. Down timers and revive channels use simulation time. Disconnects do not reset counters. Reviving repeatedly produces no score; enemy summons and revive loops cannot farm contribution rewards.
+[Heading2] 6.2 Skill growth and endless continuation
+Grant one skill point per cleared ordinary round and two per boss round. Allocation happens before the next Fate offer. A class tree has a finite set of distinct nodes, with ranks and prerequisites; a fully allocated tree does not end a run. Once a player cannot spend within the tree, grant a recurring mastery choice: +5% skill damage, +5% maximum health or +5% resource regeneration, compounded independently. Mastery is a proposed rule, visible in Ledger and Forecast and never described as a Fate Card.
+No permanent combat stats carry between ranked runs. Account progression can unlock cosmetics, tutorials or presets. Casual progression unlocks are optional but must have a separate leaderboard key if they change available power. Initial local version can offer every class and skill immediately for testing.
+[Heading1] 7 Classes and comprehensive skill trees
+[Heading2] 7.1 Class roster and role flexibility
+Target six distinct classes, each capable of solo damage, avoidance and recovery. Roles are affinities rather than mandatory tank, healer and DPS slots. Do not require a healer for a boss mechanic. MVP contains Vanguard and Arcanist, each with 18 nodes across three branches, including three branch capstones. Full roster expands toward 36 to 45 nodes per class only after the Fate interaction matrix is stable.
+[Tablebody] Class
+[Tablebody] Branches
+[Tablebody] Signature and Fate relationships
+[Tablebody] Vanguard
+[Tablebody] Bulwark, Cleaver, Rally
+[Tablebody] Guard conversion, melee cleave, team buff; benefits from health and retaliation
+[Tablebody] Arcanist
+[Tablebody] Ember, Storm, Rift
+[Tablebody] Area spell, chain strike, reposition; trades resource pressure for projectile power
+[Tablebody] Warden
+[Tablebody] Grove, Beast, Thorns
+[Tablebody] Healing field, companion pack, retaliation; health and regeneration cascades
+[Tablebody] Duelist
+[Tablebody] Edge, Shadow, Tempo
+[Tablebody] Mark, dash strike, rhythm attacks; speed, crit potency and positional damage
+[Tablebody] Hexbinder
+[Tablebody] Decay, Blood, Spirits
+[Tablebody] Damage over time, sacrifice, summons; enemy regeneration exposes damage deficits
+[Tablebody] Artificer
+[Tablebody] Turrets, Ordnance, Clockwork
+[Tablebody] Placement, explosives, cooldown engine; structured projectile and proc aggregates
+[Heading2] 7.2 Node contract
+Every node has immutable ID, class, branch, rank limit, point cost, prerequisites, unlock tier, numeric modifiers, active skill grants, description template, icon and mechanic tags. Avoid prerequisites based on hidden run statistics. Tree validation detects cycles and unreachable nodes. Respec is free in local developer mode, costs nothing but is permitted only before round 1 in proposed ranked mode. Mid run respec is deferred because it can erase a Fate disadvantage without a meaningful cost.
+Example Arcanist Ember branch: Spark grants basic ember attack; Kindling rank 1 through 3 grants +10% burn rate per rank as separate x1.1 factors; Heat Sink lowers cost by multiplying cost by 0.95 per rank; Fireline changes area geometry; Ash Recovery restores resource on authored burn kills; Inferno capstone converts a portion of direct damage into an area burn. Exact values are initial content proposals. Forecast must distinguish geometric changes from stat multipliers and recompute all affected player outputs.
+[Heading2] 7.3 Synergy requirements
+At least three viable build paths per MVP class must clear the first boss with the same reference skill budget. Evaluate damage, survival, control and support, not only training dummy DPS. Each active skill has at least two meaningful tree interactions. No prerequisite branch is mandatory for basic movement or damage functionality. Duplicate classes can coordinate without multiplying the same buff unintentionally: a named aura takes the strongest source unless explicitly authored as source additive.
+REQ CLASS01: inspect any node before purchase; show cost, prerequisite and before/after numbers. A click cannot spend a point twice. Share/export a build by versioned node IDs and ranks. Imported builds are data only, never executable scripts. Local developer builds are visibly unranked.
+[Heading1] 8 Fate deck offers and effect contracts
+[Heading2] 8.1 Draw policy
+REQ FATE01: between every two rounds draw three distinct card IDs uniformly without replacement within that offer, from the versioned run deck. Return them to eligibility next round, so the same card may stack indefinitely. No reroll, skip, cleanse or host veto in MVP. No filtering based on health, attack speed, card history, class compatibility, future crash risk or Forecast danger.
+The deck is fixed at run creation. Card families are metadata for browsing and visual identity only in MVP. Weighted families or escalating card tiers are optional later modes with their own content version and published draw rules. They must not be introduced as hidden safety systems. RNG streams for offers, encounters, combat procs and tie votes are independent; moving or delaying a shot cannot manipulate the next Fate offer.
+[Heading2] 8.2 Percentage semantics
+For a positive scalar X and a percentage p, the effect is X_new = X_old x (1 + p/100). +75% is x1.75; +300% is x4; -30% is x0.7. Two +100% choices make x4, not x3. Three -50% choices retain 0.5^3 = 12.5% of starting value. Each occurrence is applied once and the Ledger retains its source.
+MVP content uses finite factors greater than zero. This is a definition of the initial authored cards, not an eligibility check against a run. If later cards introduce zero health, disabled healing or a lethal sacrifice, implement an explicit zero state and consequence, and keep later multipliers on that zero meaningful as zero. Never introduce negative maximum health or negative probability as accidental numeric states. Invalid content is rejected during authoring, not silently removed from an active offer.
+Multiplicative factors within the same scalar family commute. Structural effects, conversions and temporary statuses follow a declared pipeline order: base -&gt; tree and mastery -&gt; persistent Fate factors -&gt; temporary factors -&gt; conversions -&gt; damage event resolution. Snapshot persistent factors at attack creation; target mitigation applies at impact. Damage over time snapshots source potency at application, with target mitigation recomputed each rate interval.
+[Heading2] 8.3 Dimension specific rules
+[Tablebody] Stat type
+[Tablebody] Proposed representation
+[Tablebody] Avoided ambiguity
+[Tablebody] Damage, health, healing, shields
+[Tablebody] Positive large number with zero state
+[Tablebody] No finite damage ceiling
+[Tablebody] Attack frequency and regeneration
+[Tablebody] Logical rate with accumulated work
+[Tablebody] No silent minimum cooldown
+[Tablebody] Cooldown recovery
+[Tablebody] Multiply recovery rate
+[Tablebody] +100% recovery means half the cooldown
+[Tablebody] Critical tendency
+[Tablebody] Nonnegative intensity converted to probability
+[Tablebody] Cards do not multiply a probability above 100%
+[Tablebody] Mitigation
+[Tablebody] Armor A, damage factor K/(K+A)
+[Tablebody] +100% armor doubles armor, not immunity
+[Tablebody] Movement and projectile speed
+[Tablebody] Positive velocity; swept collision
+[Tablebody] Large speed can cause overshooting and danger
+[Tablebody] Projectile count and spawn quantity
+[Tablebody] Logical weighted count
+[Tablebody] Rendering budget never described as the count
+[Tablebody] Score pressure
+[Tablebody] Prospective score factor for later rounds
+[Tablebody] No retroactive multiplication of banked score
+Use critical intensity C with probability q = C/(1+C); a Fate Card says '+100% critical tendency' and doubles C. With C=0.25, q=20%; doubling C yields q=33.333%. This is a proposed base stat definition that preserves multiplicative growth without invalid probabilities. Do not advertise it as '+100% critical chance'. Crit damage potency is separately multiplicative. Finite C never reaches guaranteed crit, though a dedicated guaranteed crit skill may be authored.
+[Heading1] 9 Initial Fate content and worked consequences
+[Heading2] 9.1 Starter deck candidates
+All rows are proposals, not balanced content. The final MVP requires at least 24 cards with valid effect contracts. These twelve anchor themes; produce a second distinct card per theme with different percentages or affected stats after early playtests. A positive effect can be useless for the current party and a negative can become catastrophic; that never changes eligibility.
+[Tablebody] Card
+[Tablebody] Positive effect
+[Tablebody] Negative effect
+[Tablebody] Blood Pact
+[Tablebody] Player damage +75%
+[Tablebody] Player maximum health -30%
+[Tablebody] Glass Cathedral
+[Tablebody] Critical damage potency +200%
+[Tablebody] Enemy damage +100%
+[Tablebody] Rapid Evolution
+[Tablebody] Player attack frequency +40%
+[Tablebody] Enemy movement speed +60%
+[Tablebody] Immortal Ambition
+[Tablebody] Player healing +150%
+[Tablebody] Enemy maximum health +300%
+[Tablebody] Endless Horde
+[Tablebody] Player attack frequency +150%
+[Tablebody] Encounter spawn quantity +400%
+[Tablebody] Golden Catastrophe
+[Tablebody] Prospective score pressure +100%
+[Tablebody] Enemy damage +300%
+[Tablebody] Colossal Bargain
+[Tablebody] Player maximum health +500%
+[Tablebody] Enemy maximum health +1000%
+[Tablebody] Temporal Collapse
+[Tablebody] Player recovery rate +200%
+[Tablebody] Enemy attack frequency +200%
+[Tablebody] Mirrorstorm
+[Tablebody] Player projectile count +100%
+[Tablebody] Enemy projectile count +100%
+[Tablebody] Plague Bloom
+[Tablebody] Player decay damage +200%
+[Tablebody] Enemy regeneration rate +100%
+[Tablebody] Wild Transit
+[Tablebody] Player movement speed +100%
+[Tablebody] Enemy attack damage +75%
+[Tablebody] Thorn Covenant
+[Tablebody] Player shield capacity +150%
+[Tablebody] Enemy armor +100%
+For Plague Bloom, enemies have a nonzero baseline regeneration intensity in the applicable mode, otherwise multiplying zero stays zero. MVP can establish base regeneration at 0.05% maximum health per second for regeneration tagged enemies only; show applicability in the card. Unaffected enemies do not secretly gain a new rate. If all party decay damage is zero, its positive effect is zero; the card still appears.
+[Heading2] 9.2 Compound example
+Start with 100 damage per hit, 1 attack per second, 1,000 player maximum health, 10,000 enemy health and 25 enemy damage. Assume no crits, armor, regeneration or downtime. Blood Pact produces 175 damage, 700 health. Rapid Evolution then produces 1.4 attacks per second and x1.6 enemy movement. Immortal Ambition produces x2.5 healing and 40,000 enemy health. Logical DPS is 175 x 1.4 = 245. Enemy time to kill becomes 40,000 / 245 = 163.265 seconds, versus 100 seconds initially. The party became stronger while its damage relative to enemy health worsened.
+Repeated Blood Pact three times yields damage 100 x 1.75^3 = 535.9375 and health 1,000 x 0.7^3 = 343. With base enemy damage 25, the next hit consumes 7.289% of health instead of 2.5%. This is the kind of compounding risk players must understand themselves.
+[Heading2] 9.3 Comparing a late run offer
+Illustrative pre choice state: party effective DPS 850 million, representative player health 2.4 million, enemy DPS 1.8 million and boss health 140 billion. Blood Frenzy, a later deck candidate, gives +300% player damage and +200% enemy frequency: party DPS becomes 3.4 billion, enemy DPS 5.4 million, idealized boss kill time 41.176 seconds and survival time 0.444 seconds without healing or avoidance.
+Colossal Bargain changes health to 14.4 million and boss health to 1.54 trillion, giving survival time 8 seconds and boss kill time 1,811.765 seconds at the unchanged 850 million DPS. A crit potency card cannot be assigned a universal party DPS increase without each build's critical probability and crit coefficient. Forecast must calculate the weighted effect per player. These scenarios are simplified calculations, not evidence of playable balance.
+[Heading1] 10 Fate Ledger and Forecast
+[Heading2] 10.1 Ledger information architecture
+REQ LEDGER01: show current round, seed/mode, party size, active Fate sequence, tree/mastery sources, current and baseline values, cumulative factor and effect applicability. Provide party overview and per player tabs. Compare offensive, defensive, recovery, enemy and score quantities. Explain whether a value is a current measured rate, a static calculation or a future scenario estimate.
+The first view has six readable groups: party damage capacity, health and recovery, enemy health and regeneration, enemy offense, mobility and projectile pressure, and score growth. Expand a stat to show base value, ordered calculation nodes, source cards, temporary states and result. A graph connects '+enemy health' to 'regeneration per second' to 'net damage requirement' to 'kill time'. A timeline shows when each source entered the run. Search by card, effect or class.
+Show scientific notation beyond familiar suffixes. Preserve exact canonical values in expandable detail; do not display Infinity, NaN, '-0', or an unexplained integer rollover. Include a normalized health bar alongside the absolute value. Graphs use a log scale when required and explicitly label it. Color reinforces direction, while icons and words carry the meaning.
+[Heading2] 10.2 Forecast contract
+For each offered card, calculate a counterfactual from the immutable authoritative pre choice snapshot. Display old -&gt; new -&gt; relative change, both effects and all material downstream changes. Show per player effects for mixed builds; do not average away the player who becomes unable to survive a single hit. The offer remains selectable while expanded, and warning text never disables the selection control.
+Separate exact static results from estimated combat outcomes. Static results include maximum health, attack frequency, factor changes and expected damage per cast. Estimated results use a reference target, recent ten second combat window and the announced next encounter archetype. Label sample duration, assumptions, regeneration model, mitigation, target uptime and confidence. If the window has no valid observations, show 'insufficient combat sample' and the static model; never a fabricated confidence percentage.
+Forecast exposes effective DPS, raw output, regeneration, representative incoming hit, survival without healing, and idealized kill time. Average damage uses q: E[hit] = D x ((1-q) + q x critMultiplier). Net damage against a regenerating target is DPS_effective - regenRate x maxHealth. If this is &lt;=0, display 'model predicts no net progress'; do not divide by zero or claim the fight is impossible under every skill interaction.
+[Heading2] 10.3 Cascades and prediction limits
+Use a versioned directed acyclic calculation graph. A health -&gt; regeneration -&gt; health loop must resolve through an explicit time step rather than recursively evaluating forever. A reactive trigger cycle such as damage -&gt; retaliation -&gt; damage needs finite causal semantics defined in section 12. List unmodelled geometry, invulnerability phases and multiplayer positioning below the estimates.
+Provide a compact consequence sentence, for example 'Boss health grows elevenfold; your damage stays unchanged.' The tool never labels one card objectively safe or recommends a forced choice. Optional scenario controls can compare current uptime with 50%, 75% and 100% uptime; they do not alter actual run rules. Before commit the server hashes the source snapshot and chosen factor set; after commit Ledger must match the exact static forecast.
+[Heading1] 11 Endless scaling and numerical model
+[Heading2] 11.1 Baseline scaling
+Propose enemy health H_r = H_1 x 1.18^(r-1) x P_H(N) x bossFactor x M_enemyHealth. Enemy damage D_r = D_1 x 1.12^(r-1) x M_enemyDamage. Ordinary encounter budget B_r = B_1 x (1 + 0.08(r-1)) x P_B(N) x M_spawnQuantity. BossFactor is 8 for an initial boss template relative to its ordinary reference unit, not an automatic extra factor on every boss add.
+Do not baseline scale movement, reaction time, arena size and telegraph duration exponentially. Difficulty evolves through enemy composition, formations, hazards and boss remix modules as well as health and damage. Fate speed or frequency multipliers still apply literally according to their authored semantics and may erase practical reaction windows. Show that danger; do not rescue players with a hidden minimum windup.
+These curves are starting knobs. Tune them against builds and offers. Endless means there is no intended finish; it does not promise every seed has a survivable card choice, equal infinite viability for all builds, or infinite content novelty. Mathematically unbounded play cannot be physically simulated with infinite precision and memory; representation limits must be declared rather than disguised as design balance.
+[Heading2] 11.2 Canonical quantities
+REQ NUM01: persistent large positive quantities use a normalized decimal mantissa with 34 significant digits and an arbitrary size signed exponent stored as a decimal string; zero has an explicit tag. Example wire value: {m:'1.2345', e:'450', zero:false}. Normalization keeps 1 &lt;= m &lt; 10 for nonzero values. Use deterministic ties to even rounding and compare exponent before mantissa. Do not represent health or score as a JavaScript Number or SQLite REAL.
+Implement multiply, divide, compare, add, subtract to zero floor, integer powers, serialization and log10 approximation. Add/subtract must quantify loss of a tiny value against a huge one; accumulate small rates before applying them when feasible. Exponents are BigInt internally, strings on the wire. Pin the arithmetic implementation and test results across client, Node server and Python reference calculations. Python Decimal is a test oracle with explicitly enlarged exponent limits, not an assumed production match.
+Positions, aim and collision use bounded world coordinates and deterministic fixed point or specified quantized floats. Time uses integer ticks plus fixed precision sub tick offsets. The server uses authoritative timestamps; rendering uses browser delta only for interpolation. A health display ratio may be a float, but its source comparison and damage calculation remain canonical.
+[Heading2] 11.3 Boundaries and safe failure
+Logical growth is not clamped to a largest exponent or maximum damage. Protocols impose finite message sizes, so use shared factor-expression references when an exponent string would exceed limits. Any inability to continue evaluating a valid run is an explicit technical incident: checkpoint, retain score evidence, stop without applying a substitute card, and mark verification pending. A number-system failure is not a party defeat.
+Initial validation horizon: simulated round 10,000 with ordinary factors and quantities above 1e10000, plus stress cases with factors producing 1e1000000. Passing this gate supports the implementation's tested range; it is not proof of physically infinite computation. Forecast and Ledger must retain meaningful ratios when absolute quantities are huge.
+[Heading1] 12 Extreme rates spatial effects and technical safeguards
+[Heading2] 12.1 Event compression rather than hidden caps
+REQ EXTREME01: separate logical work from rendered objects. A player with one million attacks per second does not require one million sprite instances. Accumulate logical attack work over simulation intervals, evaluate equivalent groups and render representative events. Group only attacks that share target, source, timing semantics and effect outcome. Maintain resource spending, kill timing and proc behavior; damage multiplication alone is insufficient for arbitrary on hit builds.
+For independent crit trials on k identical hits use a deterministic binomial count or equivalent versioned sampling algorithm; its expectation alone is not the same stochastic outcome. Exact reference equivalence is required in the feasible test range. If status or target switching prevents grouping, use timestamped event segments. Effects unsupported by the compressor do not enter the authored release deck until their semantics are implemented. This is content readiness, not filtering the offered cards after a player's choices.
+[Heading2] 12.2 Projectile and enemy multiplicity
+An authored projectile burst becomes a weighted packet with a declared spatial distribution and logical multiplicity. Rendering samples that packet. Authoritative hit evaluation integrates the packet against swept target geometry, with per target multiplicity and deterministic discrete residue. Identical co-located enemy cohorts can share archetype/state and carry a logical count; health and deaths still represent that multiplicity. Nonidentical AI agents cannot simply merge without changing combat.
+This is a proposed foundational abstraction, not a proved solution for every imaginable projectile or swarm. A Fate spawn card multiplies logical cohort quantity under this declared model from the first round. It must not mean individual independent enemies at low values but turn into extra health at high values without disclosure. The P1 extreme semantics spike must decide whether cohorts preserve enough tactical interest. If literal independently positioned armies are essential, unrestricted spawn growth conflicts with finite compute and needs an explicit product decision before implementation.
+[Heading2] 12.3 Movement and cooldown extremes
+High movement uses analytic sweeps, time of impact and wall contact rather than tunnelling through geometry. Facing and travel remain visible through trails and endpoints. If a distance exceeds the arena diameter within one tick, resolve earliest collisions and remaining tangential movement deterministically. Avoid unbounded wall bounce loops; define sliding to settle contact, not arbitrary reduction of the velocity stat. Teleports are separate skill operations with their own targeting rules.
+Recovery rate accumulates readiness work; charge and resource constraints remain active. Enemy attack frequency scales windup, recovery and idle cadence under the card contract. No late run safety clamp on telegraphs. Multiple identical hit windows can be integrated, but avoidance outcomes must use actual overlap time. Screen readability may degrade as a chosen consequence; the performance layer still displays a stable threat envelope.
+[Heading2] 12.4 Trigger cycles and overload policy
+Define reactive effects as generation based work: initial hit generation 0; authored reactions can schedule for the next simulation slice and cannot recursively execute in the same call stack. Finite aggregate systems must expose an analytic recurrence. A supercritical feedback system that implies infinite damage at one instant is not a valid accidental rule. Content authoring must define elapsed time or finite resource consumption for it, preserving the choices available at runtime.
+Degrade particles, lights, floating text, decorative animations and distant cosmetic detail first. Never skip damage, erase enemies, change selected factors or silently lower logical attack rate. Overload pauses and checkpoints the authority with a visible technical recovery message. Trusted ranked incidents are quarantined for replay review rather than rejected merely because a selected card is powerful. There is no silent 'performance balanced' mode on the same leaderboard.
+[Heading1] 13 Scoring fairness and leaderboards
+[Heading2] 13.1 Proposed score equation
+REQ SCORE01: award collective score from cleared objectives, not damage numbers. Let b_r = 100 x r, with a boss addend of 500 when r is divisible by 5. Let T_r be the published reference active combat time for that encounter; t_r is actual active time. Speed bonus v_r = 0.25 x max(0, 1 - t_r/T_r). Score pressure M_r is the product of chosen score factors active at round start. Cleared round points s_r = floor(b_r x M_r x (1+v_r)). Run score S = sum(s_r) plus eligible partial objective credit on the final uncleared round.
+Partial credit = floor(b_r x M_r x completedObjectiveWeight/totalObjectiveWeight), without speed bonus. Each finite objective weight can be credited only once; clearing replaces partial credit with the clear award, it never adds both. A boss can have fixed phase weights for partial credit; regeneration or repeated adds cannot generate new weights. No passive score for time alive, raw healing, endless summons, friendly damage or repeated revives.
+Store score as a nonnegative arbitrary precision integer encoded as decimal text, with canonical digit count and binary collation. The proposed pressure factor grows without a cap but applies prospectively only. A Golden Catastrophe selected after round 9 affects round 10 onward; it cannot reprice rounds 1 through 9. Score growth can become absurd along with combat stats.
+[Heading2] 13.2 Worked score fixture
+For round 5, b_5 = 100 x 5 + 500 = 1,000. With M_5 = 2, reference time T_5 = 120 seconds and active time t_5 = 90 seconds, v_5 = 0.25 x (1-0.75) = 0.0625. The round contributes floor(1,000 x 2 x 1.0625) = 2,125. A wipe after completing 40% of round 6 with M_6 = 2 adds floor(600 x 2 x 0.4) = 480. UI shows each component and the cumulative total.
+Do not multiply the entire total by a post hoc 'actual danger' coefficient. Danger is build dependent and difficult to estimate honestly. Explicit score pressure cards create declared risk/reward choices; validate their downside against many builds. A weak synergy can legitimately outperform other strategies, but an exploit or scoring loop requires a content/scoring version change and transparent leaderboard treatment.
+[Heading2] 13.3 Ranked comparison policy
+Leaderboard keys include rules version, content hash, score version, starting N, mode, season/challenge ID and trust tier. Solo through five player divisions are distinct. Random seed endless scores form an open division; daily or weekly shared seeds form fairer comparison divisions with the same deck and encounter streams. Proposed shared seed policy allows one ranked attempt per roster identity per challenge; subsequent attempts are practice. Decide repeat attempt policy before public launch.
+Order by S descending, then deepest cleared round descending, active combat time ascending, completed timestamp ascending and run ID ascending. Support arbitrary precision exact sorting by digit count then lexical score text, with the remaining sort fields. Paginate using the entire last sort tuple, not offset for mutable public boards. Team rows list participants and classes; no individual support penalty.
+[Heading2] 13.4 Local and public trust
+Local scores are editable by a machine owner and must be labelled Local, regardless of a local server signature. Never present them as verified global competition. A public ranked service runs trusted authority, validates accounts, reconstructs scoring from objective events and rejects client supplied results. Moderation can mark a record pending, verified, invalid or archived with an audit reason and appeal path.
+Trusted mode pins content and mechanics; developer tools, arbitrary mods and stat imports are disabled. Accessibility visual options never invalidate scores. Options changing targeting or combat rules are disclosed in mode keys if materially different. Balance patches archive old boards instead of pretending scores across incompatible math are comparable.
+[Heading1] 14 Encounters bosses and excellent enemy AI
+[Heading2] 14.1 Procedural director
+Generate encounters from authored, tagged modules rather than random noise. The seed selects biome palette, arena topology, enemy archetypes, formations, wave order, hazard locations and reward presentation. Validate navigable connectivity, reachable objectives and spawn separation before combat. Retry invalid geometry deterministically, then use an authored fallback map; this does not change the Fate offer stream.
+The director spends the finite B_r budget on archetype costs. Keep a composition contract: at least one readable pressure pattern, no initial spawn directly overlapping a player, no permanently unreachable required enemy, and no arena requiring two players to open a gate. These base generation constraints apply before Fate effects; Fate choices can still make an otherwise valid encounter practically unmanageable.
+Target biomes: Prismwood Canopy with luminous foliage and glass beasts; Clockwork Reef with mechanical tides and coral engines; Candyglass Ruins with stained sugar architecture and aggressive crystalline wildlife; Astral Orchard with floating fruit, comet roots and gravity motifs. MVP ships only Prismwood. Each later biome needs distinct silhouettes, hazards, music and encounter modules, not only a palette swap.
+[Heading2] 14.2 AI architecture and behaviors
+Use deterministic utility selection above finite state actions. Perception contains line of sight, heard events, nearby ally roles, target threat, available path and dangerous ground. Utility scores choose pursue, flank, retreat, cast, guard, rescue or reposition. A blackboard coordinates squad spacing and target reservations. Stagger expensive perception/path updates across ticks; immediate hit avoidance and attack phase transitions remain at simulation rate.
+Ordinary archetypes: Pursuer pressures close range; Skirmisher strafes and avoids predictable fire lanes; Artillery aims at a sampled player trajectory with visible targeting; Guardian shields allies but exposes a flank; Hexer places area denial away from redundant hazards; Broodcaller summons finite encounter linked cohorts. AI cannot read future inputs, invisible private loadouts or client cursor position. It may react to visible projectiles with an authored reaction delay.
+Use nav grids or nav meshes with A* for initial maps, local avoidance for collision and cached paths. Replan on obstacle change, target movement beyond a threshold or stuck detection. AI stuck detection after two seconds of no path progress attempts deterministic alternative movement; never teleports a required enemy into a player. A developer overlay shows utility scores, path, target and attack phase.
+[Heading2] 14.3 Boss design
+Every fifth round selects a boss template and later applies remix modules. Proposed MVP bosses: the Prism Stag, with lane charge, antler sweep and splitting light pools; the Bellroot Colossus, with ring pulses, root walls and a vulnerable core. Each has three health phases with distinct patterns, readable windup/release/recovery, and solo compatible objectives. Avoid fixed real time unskippable invulnerability that makes extreme player damage irrelevant.
+Boss attacks expose shape, damage type, estimated impact time and counterplay through visual and audio cues. Base timing can be learned. Fate attack speed may make it untenable; that is permitted. Late bosses combine authored pattern modules, not random attacks fired simultaneously without any causality. No personalized secret rubber banding based on player's success. Adaptive practice difficulty can be a separate casual mode.
+REQ AI01: in baseline benchmark arenas, at least 99% of required enemies reach an actionable state or a valid ranged attack within five seconds; zero unreachable boss phases across the seeded map suite. Human tests must recognize at least four archetypes by behavior without labels. Test AI under speed, quantity, regeneration and armor multipliers, not only round 1.
+[Heading1] 15 Art animation audio and content production
+[Heading2] 15.1 Visual direction
+Propose a three quarter top down camera on a flat simulation plane. Characters use eight direction sprites and grounded shadows. Isometric diamonds are optional environment presentation, not a second movement system. Prototype true isometric and top down scenes in P0, then freeze projection before producing full sprite sets. The default recommendation favors simpler collision, targeting and procedural maps.
+Use saturated jewel palettes, playful impossible architecture and clear material contrast. Keep the action plane less visually noisy than backgrounds. Player silhouettes, enemy roles and damaging shapes should remain identifiable when five classes share an arena. Each character has a neutral core silhouette plus restrained cosmetic variation. Damage shapes cannot be reskinned into ambiguous decorative effects.
+Proposed working assets: 48 by 48 character frames, 32 by 32 environment tiles, bosses assembled from larger authored sheets, and logical 960 by 540 presentation scaled to the viewport. These are production starting points, not a pixel purity requirement. Use nearest texture sampling for sprites, consistent virtual pixel scale, subpixel world movement and camera interpolation. Evaluate whether camera snapping introduces shimmer before choosing integer render positioning.
+[Heading2] 15.2 Animation contract
+Each class requires idle, run, attack, skill cast, dodge, hit, downed, revive and death states. Aim/facing transitions preserve silhouette and weapon attachment. Author an eight frame run loop and six to ten attack frames initially, with per frame durations rather than assuming all actions share a frame rate. Fluidity comes from low latency movement, interpolation, anticipation, recovery, trails and responsive transitions as well as frame count.
+The simulation emits action timing and impact events; animation follows them. Damage must never wait for a dropped animation frame. High rate actions switch to a clearly authored rapid action loop or beam/trail visualization while logical events continue. Hit stop is local camera/visual emphasis only and cannot freeze multiplayer authority. Disable shake, flashes, chromatic distortion and hit stop individually.
+[Heading2] 15.3 Asset pipeline and content governance
+Keep source assets in editable Aseprite or equivalent layered files, export tagged atlas PNG/JSON, validate pivots, frame dimensions, transparent edges, event markers and animation names, then hash the artifact manifest. Pack atlases by biome or common actor group; avoid loading every biome at boot. Aseprite and Tiled are proposed authoring tools; confirm licensing and workflow in P0. Generated concept art, if used later, requires review for coherence and provenance and is not a substitute for final sprite animation.
+Every asset has ID, source path, author/provenance, license, export recipe, tags, version and review status. Content builds reject missing icons, invalid factor values, unresolvable skill references and absent animation states. Hot reload applies between runs; active ranked rooms pin their content hash. Preserve older manifests and simulation versions required for replay review.
+[Heading2] 15.4 Audio and content budget
+Audio conveys attacks, danger, class identity and vote commit. Mixer groups: music, combat, UI and ambience, with independent sliders. Limit simultaneous cosmetic voices by priority and distance without suppressing unique boss telegraph cues. Unlock browser audio after an explicit player gesture. Avoid information available only through sound.
+MVP production inventory: two class sets, six enemy sets, two bosses, one biome tile kit, at least 24 card illustrations or icons, 36 node icons that can share family motifs, approximately 12 core combat effect families, one gameplay music loop with intensity layers, one boss track and a concise UI sound kit. Scope expands only after the pipeline can regenerate all exports reproducibly.
+[Heading1] 16 User interface accessibility and onboarding
+[Heading2] 16.1 Essential screens
+HOME shows play, continue local run, local leaderboard, settings and tutorial. LOBBY shows invite code, roster, classes, readiness and trust mode. LOADOUT shows skills, branches and point rules. COMBAT prioritizes own health/resource, dodge readiness, skill cooldowns, party state, objective, boss phase and a compact round/Fate indicator. RESULTS shows collective score, clear depth, end reason, build, selected Fate timeline and score breakdown.
+The Fate screen presents three equal size cards, with positive and negative lines equally legible. Every card exposes before/after values and per player differences, not only an exciting positive headline. Keyboard focus returns predictably after expanding a forecast. A large 'Lock vote' action follows selection; the UI confirms when the server has accepted it. A technical error cannot look like a lost vote.
+[Heading2] 16.2 Accessibility acceptance
+REQ ACCESS01: menus, voting, Ledger, results and settings are accessible semantic DOM, with headings, focus order, labelled controls and screen reader announcements for phase and vote changes. Combat remains canvas rendered; provide text objective/status summaries and audio/visual alternatives, while acknowledging that full nonvisual action gameplay is not an MVP promise.
+Target 4.5:1 contrast for ordinary UI text and 3:1 for large text and meaningful interface elements. Provide font size scaling from 100% to 150%, readable nonpixel UI fonts, shape coded damage telegraphs, ally/enemy outline options, color vision palettes, reduced motion, photosensitivity settings, captioned critical audio cues, separate sound volumes, hold/toggle alternatives and complete input remapping. These are product targets, not certification claims.
+Reduced effects can remove particles and bloom but must retain boss hit geometry, timing and projectile envelopes. No option changes stat multipliers without an explicit mode distinction. Offer auto attack and simplified skill assistance as proposed casual options; decide ranked treatment based on actual impact, not assumptions about a disability. Pause and uncapped reading time remain available in local solo.
+[Heading2] 16.3 Teaching the mechanic
+First run tutorial teaches movement and one enemy attack, then presents a controlled sample showing +100% damage = x2. The tutorial preview is separate from ranked random offers. Explain that a choice may benefit only certain builds and that every negative compounds. A short Ledger task asks the player to find why enemy health increased. Advanced help describes expected damage, scientific notation and predicted versus exact values.
+Never require players to dismiss several instructions while enemies attack. Contextual help opens in safe intermission. A death recap names the lethal attack, damage relative to health, contributing Fate factors and whether the player was downed/disconnected; it should not blame the player for an infrastructure fault.
+[Heading1] 17 Technical options and architecture decision
+[Heading2] 17.1 Stack evaluation
+[Tablebody] Option
+[Tablebody] Advantages
+[Tablebody] Costs and limits
+[Tablebody] Recommendation
+[Tablebody] Next.js plus Python/FastAPI plus SQLite
+[Tablebody] Familiar web shell, Python tools, simple local storage
+[Tablebody] Two language simulation contracts; Next rendering is not a game loop; CPU work needs profiling
+[Tablebody] Viable, but avoid as the default real time core
+[Tablebody] Next.js plus Phaser plus TypeScript backend plus SQLite
+[Tablebody] Full stack web application, browser 2D rendering, shared rules, no mandatory cloud
+[Tablebody] Requires custom authoritative collision and extreme effect model
+[Tablebody] Recommended local MVP
+[Tablebody] PixiJS plus custom ECS/server
+[Tablebody] Rendering control and a small tailored runtime
+[Tablebody] More animation, scene, input and tooling work
+[Tablebody] Reconsider if Phaser renderer is the measured bottleneck
+[Tablebody] Godot browser export plus web services
+[Tablebody] Strong game editor
+[Tablebody] Web export constraints and a less direct fit for the requested web stack
+[Tablebody] Evaluated alternative; not selected
+[Tablebody] Unity Web build
+[Tablebody] Mature editor and asset ecosystem
+[Tablebody] Larger runtime and workflow overhead for this scope
+[Tablebody] Do not select without a specific team advantage
+Phaser provides animated sprites and scenes, making it a better fit than rendering combat through React components [R1, R2]. The recommendation is an engineering judgment about shared TypeScript contracts and browser development, not a benchmark claim. FastAPI supports concurrent I/O, but CPU heavy simulation still needs separate parallelism or isolation; using async does not itself make collision or AI faster [R5].
+Next.js is the selected frontend framework for the game, lobby, loadouts, Ledger, settings and records. Instantiate Phaser in a client only component, dispose it on route changes, isolate high frequency state from React and avoid routing each tick through server actions. SQLite is appropriate for local persistence; its WAL mode still has one writer and requires same host storage [R6]. Godot was evaluated, but its export and toolchain are less aligned with this full stack web application; its documented browser constraints remain a comparison reference [R7].
+[Heading2] 17.2 Selected proposed topology
+One TypeScript monorepo contains the Next.js frontend, backend, shared simulation, shared protocol, content and developer tools. The frontend uses Phaser for scene/render/input/audio and React DOM for interfaces. The backend uses Node LTS with one room authority, initially one process plus an isolated SQLite writer. Colyseus is the preferred room transport candidate for admission, state snapshots and reconnect seats; benchmark its installed version and avoid relying on version specific prediction APIs until pinned [R3, R4]. Next.js and the room backend may run as two managed development processes, started by one command; they are parts of one web application.
+The simulation package has no Phaser, React, browser API or database dependencies. It accepts seed, versioned content, previous state and accepted inputs and produces next state plus domain events. Ground collision is a shared custom swept circle/grid implementation; server authority does not depend on a rendering engine's physics. Local MVP uses the same Node backend even for one player. A browser worker adapter is optional later for offline web play, not a separate desktop product.
+Local topology in words: Browser -&gt; Next.js pages, interface and assets; Browser -&gt; HTTP API and WebSocket room -&gt; Node backend -&gt; shared simulation -&gt; domain event queue -&gt; SQLite writer. Next.js forwards /api requests to the backend; the configured room URL handles WebSocket connections. The backend owns all gameplay persistence. A Python balance runner consumes exported content and replay fixtures, not live player input. No cloud account is required to play local solo.
+[Heading2] 17.3 Evolution path
+P0 tests the chosen engine and math contracts. P1 through P3 ship local solo. P4 adds multiple clients and LAN rooms. P5 adds trusted remote rooms, account identity, challenge boards and durable replay verification. Replace SQLite with PostgreSQL when multi host room servers need shared write access or measured transaction latency and queue pressure exceed budget. Do not place the SQLite file on a shared drive.
+Later scale one authority per room and multiple room workers per host. Keep control, score verification and content publication separate from combat work. Consider Rust/WASM only after a profile identifies math or collision hotspots; WASM is not assumed to fix poor event growth. Public deployment serves the same web frontend and backend over HTTPS/WSS. No desktop wrapper or engine migration is scheduled.
+[Heading1] 18 Simulation performance and browser contracts
+[Heading2] 18.1 Proposed performance budgets
+Define the reference machine during P0: a four or more core desktop CPU, 16 GB RAM and an integrated GPU capable of the required WebGL path. Record exact hardware, OS, browser and power mode with every benchmark; the user's development computer alone is not a minimum specification. Initial target is 1080p output with 960 by 540 logical presentation and dynamic cosmetic quality.
+[Tablebody] Metric
+[Tablebody] Proposed target
+[Tablebody] Test scenario
+[Tablebody] Render cadence
+[Tablebody] At least 60 FPS; p95 frame &lt;=16.7 ms
+[Tablebody] Five players, 200 active AI representatives and 1,000 projectile visual representatives
+[Tablebody] Authority tick
+[Tablebody] 60 Hz; p95 compute &lt;=8 ms, p99 &lt;=12 ms
+[Tablebody] Same fixture with AI, numbers and events
+[Tablebody] Movement input response
+[Tablebody] Local visual p95 &lt;=50 ms
+[Tablebody] Keyboard and controller, warm assets
+[Tablebody] Interface response
+[Tablebody] Forecast p95 &lt;=150 ms
+[Tablebody] 500 Fate sources, five diverse builds
+[Tablebody] Local first load
+[Tablebody] &lt;=5 seconds after service ready
+[Tablebody] Warm local storage, initial compressed assets &lt;=25 MB
+[Tablebody] Client memory
+[Tablebody] Stable under 512 MB game heap target
+[Tablebody] 30 minute soak, no monotonic entity leak
+[Tablebody] Server memory
+[Tablebody] &lt;=256 MB per active room target
+[Tablebody] Replay spill enabled, ten thousand round stress
+[Tablebody] Reconnect
+[Tablebody] Correct state visible &lt;=3 seconds after healthy socket
+[Tablebody] LAN reconnect within held seat window
+Representative counts are resource budgets for the proposed grouping model, not caps on logical effects. These targets must be accepted or revised after measured P0 prototypes; none has been tested for CURSEBOUND. If 60 Hz authority is too costly, evaluate 30 Hz with identical time semantics and interpolation, but changing tick rules changes replay version and must be intentional.
+[Heading2] 18.2 Optimization requirements
+Use spatial indexing for collision/perception, contiguous component storage or a modest ECS, pooling for frequently recycled render objects, atlas batching, cached static terrain and constrained dynamic lights. Avoid allocation in tight per entity loops. Animation and UI should subscribe to events or bounded snapshots, not clone the whole world on every frame. Ledger holds summarized factors plus paginated source history so memory does not grow with the entire run.
+Maintain profiling counters for logical multiplicity, representative count, broad/narrow collision work, AI updates, queue sizes, frame/tick percentiles, math operation time and snapshot bytes. Reduce decorative costs when GPU pressure rises. Record authority stalls rather than dropping simulation ticks. A catchup backlog above 250 ms enters visible recovery and checkpoint handling rather than a silent speed change.
+[Heading2] 18.3 Browser operating conditions
+Initial support targets current stable Chrome and Edge on Windows, then Firefox; macOS Safari is an expansion gate. Require the selected graphics features and show a useful incompatibility screen if unavailable. Browser focus loss does not stop remote authority. Clear held input on blur to avoid stuck movement; online users are reminded that combat continues. Audio starts after a gesture, fullscreen is optional and escape reliably releases pointer capture.
+On WebGL context loss, suspend local presentation, preserve network state, rebuild assets and resynchronize. Do not treat a renderer crash as authoritative death, though multiplayer combat can continue. Workers are optional optimizations; use transferable messages before adopting SharedArrayBuffer and cross origin isolation requirements. Versioned service worker caches, if added, must not mix assets and code from different builds.
+[Heading1] 19 Networking synchronization and protocol
+[Heading2] 19.1 Authority and responsiveness
+REQ NET01: clients send intentions, never position, health, damage, loot, card application or final score as trusted facts. Authority validates phase, ownership, skill readiness, resource use, aim range and input rate. Solo uses the same API contract. Movement prediction runs the shared movement step locally; server acknowledges accepted input sequence and authoritative tick, then client reconciles pending input.
+Remote avatars interpolate snapshots initially at 20 Hz with a proposed 100 ms buffer, adjustable for measured jitter. Local client predicts movement and cosmetic attacks but does not independently confirm damage/deaths. Correct small errors smoothly, snap when necessary for collision integrity, and instrument correction distance. The same actor cannot attack twice because an input is resent. Entity IDs include generation so reused IDs cannot attach old effects to a new enemy.
+Use WebSocket initially for compatibility and modest parties. Its reliable ordered delivery can create latency under packet loss, so do not promise shooter grade performance. If tests fail the target envelope, evaluate another transport as a later measured change. Monitor queued outbound bytes; the browser API exposes bufferedAmount as pending send data [R8]. Bound pending snapshots, replace obsolete snapshots and preserve acknowledged critical events.
+[Heading2] 19.2 Message contracts
+[Tablebody] Message
+[Tablebody] Key fields
+[Tablebody] Authority behavior
+[Tablebody] HELLO
+[Tablebody] protocol, build, contentHash, roomToken
+[Tablebody] Verify compatibility and seat access
+[Tablebody] INPUT
+[Tablebody] seq, clientTick, moveX/Y, aimX/Y, actionBits
+[Tablebody] Normalize ranges, rate limit and queue
+[Tablebody] SNAPSHOT
+[Tablebody] tick, ackSeq, stateVersion, entities, phase
+[Tablebody] Delta or full state; stable schema
+[Tablebody] ABILITY_EVENT
+[Tablebody] eventId, tick/subTick, actor, effect, targets
+[Tablebody] Presentation and confirmed outcome
+[Tablebody] OFFER
+[Tablebody] offerId, round, cardIds, snapshotHash, deadline
+[Tablebody] Immutable authoritative choice basis
+[Tablebody] VOTE
+[Tablebody] offerId, seq, slot, locked
+[Tablebody] Verify roster and current offer
+[Tablebody] COMMIT
+[Tablebody] eventId, offerId, cardId, tieEvidence, newStateHash
+[Tablebody] Idempotent exactly once application
+[Tablebody] RESUME
+[Tablebody] seatToken, lastAck, lastEvent
+[Tablebody] Verify expiry and send complete snapshot
+[Tablebody] ERROR
+[Tablebody] code, recoverable, requestId
+[Tablebody] Explicit UI state and safe retry
+Protocol schemas impose size, count, string length and nesting limits. Initial input rate limit is 60 accepted movement inputs per second plus a small burst allowance; input payload &lt;=256 bytes, ordinary control message &lt;=8 KB and chunked snapshots &lt;=256 KB per chunk. These are transport safeguards, not Fate stat limits. Discard stale inputs beyond a measured 250 ms combat window without granting extra actions; resync instead of processing an unlimited backlog.
+[Heading2] 19.3 Lag handling and multiplayer tests
+Baseline server hit detection uses current authoritative collision for enemy attacks. Display tells in the interpolation time domain. Explore bounded rewind up to 150 ms for player aimed attacks only after the basic model is stable; do not retroactively kill a player before their displayed dodge without an explicit tested rule. Publish supported network envelope: initial gate 100 ms RTT, 30 ms jitter and 1% packet loss with responsive local movement and no divergent score.
+Test 0/50/100/200 ms RTT, 0/1/5% loss, reordering at transport boundaries, slow peers, refresh and interrupted votes. No host client can change another player. A slow peer cannot block all room broadcasts. Colyseus can provide server owned state and reconnection primitives, but correct combat, prediction and security remain application responsibilities [R3, R4].
+[Heading1] 20 Persistence schemas and data ownership
+[Heading2] 20.1 Database responsibilities
+REQ DATA01: SQLite persists profiles, settings, runs, roster, objective score events, Fate offers/votes/commits, checkpoints, replay chunks, content manifests and local leaderboard records. It is not the live world state queried every frame. Use WAL, foreign keys ON, a busy timeout, short transactions and one controlled writer queue. Measure queue age, checkpoint duration and WAL size. Choose durable synchronous settings for committed score/checkpoint transactions; do not claim durability from an asynchronous queue alone [R6].
+Use migrations with a monotonic schema version, automatic pre migration backup and rollback instructions. Never copy only a live database file while ignoring WAL state. Use the SQLite backup API or coordinated checkpoint/closed connections. Browser clients never receive direct database file access.
+[Heading2] 20.2 Core relational schema
+[Tablebody] Table
+[Tablebody] Main fields
+[Tablebody] Constraints and indexes
+[Tablebody] profiles
+[Tablebody] id TEXT, display_name TEXT, created_at INTEGER
+[Tablebody] PK id; local identity is not verified account identity
+[Tablebody] settings
+[Tablebody] profile_id, schema_version, json TEXT
+[Tablebody] PK profile_id; FK profile; bounded validated JSON
+[Tablebody] content_versions
+[Tablebody] hash, rules_version, manifest_path, created_at
+[Tablebody] PK hash; immutable manifest
+[Tablebody] runs
+[Tablebody] id, seed, content_hash, score_version, mode, trust, N, status, round, ticks, score_text, score_digits
+[Tablebody] PK id; N between 1 and 5; FK content; board composite index
+[Tablebody] run_members
+[Tablebody] run_id, slot, profile_id, class_id, build_json
+[Tablebody] PK run_id/slot; unique run/profile; immutable initial roster
+[Tablebody] round_results
+[Tablebody] run_id, round_no, objective_total, completed_weight, active_ticks, score_text
+[Tablebody] PK run/round; finalized once
+[Tablebody] fate_offers
+[Tablebody] id, run_id, after_round, cards_json, snapshot_hash, deadline_tick
+[Tablebody] unique run/after_round; exactly three IDs checked in app
+[Tablebody] fate_votes
+[Tablebody] offer_id, member_slot, seq, card_slot, locked
+[Tablebody] PK offer/member; slot in A/B/C; monotonic upsert
+[Tablebody] fate_commits
+[Tablebody] offer_id, card_id, event_seq, tie_json, state_hash
+[Tablebody] PK offer_id; unique run event sequence via event FK
+[Tablebody] run_events
+[Tablebody] run_id, seq, tick, type, payload_json, prev_hash, hash
+[Tablebody] PK run/seq; ordered append and hash chain
+[Tablebody] checkpoints
+[Tablebody] run_id, seq, schema_version, state_blob, checksum
+[Tablebody] PK run/seq; immutable; latest index
+[Tablebody] replay_chunks
+[Tablebody] run_id, chunk_no, first_tick, last_tick, path, checksum, byte_count
+[Tablebody] PK run/chunk; file verified before publish
+[Tablebody] board_entries
+[Tablebody] board_key, run_id, score_text, score_digits, depth, active_ticks, verified_at
+[Tablebody] unique board/run; sort index
+[Tablebody] verification
+[Tablebody] run_id, status, reason_code, reviewer, updated_at
+[Tablebody] PK run; audit changes in separate events
+Store epoch timestamps in UTC and display in the user's locale. Tick counters and round counters are decimal integer strings if they outgrow safe integer range. SQLite INTEGER is appropriate for bounded practical timestamps/byte counts, not unbounded score or health. A score string must match canonical digits, with no leading zeros except '0'; score_digits must equal its length. Schema enforcement and domain validation both matter.
+[Heading2] 20.3 Atomicity and crash recovery
+Commit Fate result, appended event, run phase and safe checkpoint pointer in one transaction. The room prepares the effect and hashes the post choice state, persists, then broadcasts COMMIT; retries query the existing commit. Score finalization writes final score, results and board entry idempotently by run ID. A database failure leaves the run pending with a visible error, not a second card application.
+Write replay chunks to a temporary file, flush, verify checksum, atomically rename, then publish the database reference. Collect unreferenced temporary chunks after recovery. A resume restores content hash, RNG streams, roster, tree, Fate factors, exact stats, phase, objectives and event sequence. Client cosmetic state can rebuild from scratch.
+Proposed local solo resumes the most recent safe intermission checkpoint, labelled resumed. Active combat recovery is deferred until input journaling can reconstruct it without advantage. Trusted competition never allows unlimited checkpoint retry after seeing a bad outcome; server incidents have explicit recovery audit and review. Export/import local runs are casual and cannot become trusted by attaching a local signature.
+[Heading1] 21 API module and content contracts
+[Heading2] 21.1 HTTP API
+Use /api/v1. GET /health reports service and persistence readiness without secrets. GET /content/:hash returns immutable manifest. POST /local/profiles creates bounded display identity. POST /rooms creates an invite room; POST /rooms/:id/join issues a seat scoped token. GET /runs/:id returns authorized summaries; POST /runs/:id/retire records a request. GET /boards accepts validated board key and cursor. POST /local/import validates casual exports with file limits. GET /runs/:id/replay exports authorized local evidence.
+Mutating requests carry an idempotency key when retriable and return request ID, result version and errors such as INCOMPATIBLE_BUILD, STALE_PHASE, INVALID_INPUT, SEAT_EXPIRED, STORAGE_PENDING and RUN_FINALIZED. Public APIs later require account authentication and rate limits. Do not expose an endpoint that accepts arbitrary damage or a client score to insert into a verified board.
+[Heading2] 21.2 Content and simulation types
+Card definition fields: id, version, name, family, positive effect, negative effect, percentage value as decimal string, target scope, stat ID, applicability tags, description template, icon and authored score factor if applicable. One positive and one negative are required in MVP. Dependencies in the calculation graph derive from stat definitions, not free form description parsing.
+An encounter definition includes biome, topology seed rules, budget costs, wave modules, archetype lists, objective weights, reference time and boss module rules. An AI definition includes perception ranges, reaction delays, utility coefficients, action state transitions and animation references. A skill definition includes input mode, cast/resource rules, hit geometry, damage pipeline, status policies and extreme compression support.
+Runtime validation prohibits unknown stat IDs, nonfinite factors, executable expressions, cyclic prerequisites and undeclared structural conversions. A signed published manifest is optional for local work, required for trusted content delivery. The application evaluates a bounded domain expression format, never eval on user provided content.
+[Heading2] 21.3 Repository modules and ownership
+Proposed directories: apps/client; apps/server; packages/simulation; packages/protocol; packages/numeric; packages/content; tools/balance; tools/assets; tests/fixtures; docs. Simulation owns combat and score truth; protocol owns wire compatibility; content owns authored definitions; client owns presentation; server owns room lifecycle, permissions and persistence.
+Dependency boundaries are tested in CI. React/Phaser cannot import database modules; simulation cannot import UI modules; Python tooling consumes exported schemas rather than independently changing production formulas. Each release publishes build ID, content hash, numeric version, protocol version and score version. Pin exact package versions in lockfiles after P0, rather than relying on the word 'latest'.
+[Heading1] 22 Security integrity and trust boundaries
+[Heading2] 22.1 Local and LAN threats
+REQ SEC01: local development binds to loopback by default. LAN sharing is an explicit setting with an expiring room code and seat token. Validate HTTP Origin/Host and WebSocket origins to reduce cross site access to the local service. Use strict CORS allowlists, bounded payloads, parameterized SQL, sanitized display names, safe file paths and a restrictive content security policy. No arbitrary filesystem path supplied by a client becomes a database or replay destination.
+Keep tokens out of URLs, telemetry and crash dumps. Local developer admin tools require a distinct enabled flag and loopback authentication; every resulting run is unranked. Importers validate archive paths, decompressed size, nesting and content hashes. Dependency updates follow a lockfile review; remove unused packages and check licenses before distribution.
+[Heading2] 22.2 Trusted online threats
+Public ranked threats include forged results, speed hacks, replayed votes, duplicate input sequences, modified content, denial of service, account boosting, identity impersonation and database tampering. Mitigations are server authority, fixed input budgets, content pinning, replay evidence, authenticated roster, rate limiting, isolated room workers and score verification. A hash chain detects accidental changes and supports auditing; without a protected trusted origin it cannot prove a local player was honest.
+Maintain least privilege service accounts, server side signing keys, encrypted transport, secret rotation and authenticated admin actions. Score moderation records actor, reason, prior value and decision. Do not put service credentials or API secrets into the browser. Anti cheat must not become invasive client surveillance; trusted simulation should be the first line of defense.
+[Heading2] 22.3 Web frontend safeguards
+Keep server secrets out of Next.js public environment variables and browser bundles. Render display names and imported descriptions as escaped text; do not inject untrusted HTML. Protect cookie authenticated mutations against CSRF, validate WebSocket Origin as well as tokens, and use a restrictive content security policy. Development and production error pages must not leak database paths, signing keys or account tokens. Gameplay authority remains on the backend even when the frontend predicts motion.
+[Heading1] 23 Telemetry diagnostics and player privacy
+[Heading2] 23.1 Local observability first
+REQ TEL01: write structured local logs and developer metrics with opt in export. No remote analytics dependency in MVP. Default logs contain build/run IDs, event type, time, phase and bounded diagnostic fields. Avoid personal chat, secrets, IP addresses retained unnecessarily and full raw input streams outside replay/debug storage.
+Domain events include run_started, round_started, objective_completed, player_downed, player_revived, round_cleared, fate_offered, forecast_opened, vote_changed, fate_committed, checkpoint_saved, run_finalized, reconnect_started, reconnect_completed and technical_recovery. Each has schema version, event ID, run ID, tick, content version and appropriate entity/offer IDs. Log forecast assumptions/version for debugging mismatches without storing unlimited expanded graphs.
+[Heading2] 23.2 Balance measurements
+Measure round clear/wipe/retire rates by N, class/build family, seed and active Fate factors; boss attack death share; offer pick rates; forecast inspection rate; net DPS versus regeneration; survival windows; round times; score concentration; and fraction of runs requiring technical recovery. Pick rate alone is not power: conditioning on offer and party build is required. Track support outcomes such as prevented damage and successful revives as diagnostics, never unbounded score sources.
+Collect frame/tick percentiles, allocation pressure, logical/representative ratio, path retries, queue ages, DB lock incidents and snapshot size. The key extreme systems indicator is whether optimization changes results or just representation. Store reference replay diffs as engineering evidence, not a player performance metric.
+[Heading2] 23.3 Retention and online rollout
+Proposed local retention: rolling logs 100 MB, complete replays 1 GB, checkpoints until their run is finalized or user deletes it. Prompt before deleting a record explicitly marked favorite; rotating diagnostics can evict old nonfavorite data. A running replay spills to bounded chunks so memory remains stable. Long runs may exhaust disk; stop cleanly at a checkpoint with an explicit capacity message, never corrupt saves or delete active evidence silently.
+Before public telemetry, define consent, disclosure, retention periods, deletion/export behavior and access roles. Separate optional product analytics from operational data needed to operate trusted competition. These are requirements for a later launch review, not claims of compliance with a particular jurisdiction.
+[Heading1] 24 Balance process and mathematical fairness
+[Heading2] 24.1 Reference harness
+Build a headless runner with a content manifest, seed, build configuration, scripted inputs and deterministic output. Python tooling sweeps factors and plots kill time, healing balance, health fraction lost per hit, resource duty cycle, round score and technical work. Actual combat success depends on position and AI, so training dummy results do not substitute for full encounter simulations.
+Initial experiment grid covers N=1 through 5, each class archetype, rounds 1/5/10/25/100/1000, repeated same card stacks, mixed card combinations, no heal/no crit/no decay builds, resource starvation and regeneration stalemate. Include adversarial sequences that maximize score pressure or minimize player health. Store seed, versions, assumptions and confidence intervals where sampling is involved.
+[Heading2] 24.2 Tuning boundaries
+Balance changes card percentages, baseline curves, class node interactions, encounter compositions and declared score pressure. It does not introduce eligibility filters, undocumented damage caps or adaptive card rescue. A card can be intentionally poor for a party. A deterministic losing seed is permitted, but early game offer quality should be tested so failure teaches a consequence rather than relying on unexplained noise.
+Initial playtest targets: at least three distinct viable MVP builds per class; no single card selected over 80% whenever offered across diverse builds without investigation; first boss experienced by most new testers; median skillful solo survival roughly round 10 through 20 after learning. These are proposed tuning hypotheses, not guaranteed player outcomes. Extreme combinations may dominate; address them by content/version changes before public ranking rather than retroactive hidden scaling.
+[Heading2] 24.3 Fairness review
+Review score reward per unit of encounter progress, pressure card benefit under synergistic builds, party size divisions, seeded versus random comparisons, input assistance and pause policies. A support contribution must improve team survival without requiring a personal kill score. A score exploiting infinite adds or regeneration loops is a correctness defect, not emergent mastery. Genuine build synergy is an intended discovery and should be described positively in patch notes.
+Before a scoring version is frozen, replay at least 1,000 seeded offers with reference builds and 100 full scripted runs per party size. Human cohorts validate the top simulated strategies because automated agents may exploit behavior no player can perform. Do not assert win rate confidence from tiny convenience samples.
+[Heading1] 25 Phased local development milestones
+[Heading2] 25.1 Planning assumptions
+Use gate based delivery, not a promised launch date. The rough effort bands below assume one experienced full time developer with part time art support. They are planning placeholders, can overlap after dependencies are satisfied, exclude large content expansion and must be reestimated after P0. Core solo delivery may require approximately 10 to 18 developer weeks; multiplayer and extreme semantics can materially increase that. A broad finished game and Steam launch need separate estimates.
+[Tablebody] Phase
+[Tablebody] Scope and dependency
+[Tablebody] Initial effort band
+[Tablebody] Exit evidence
+[Tablebody] P0 Foundations
+[Tablebody] Engine/projection, movement feel, math and render/network spikes
+[Tablebody] 1 to 2 weeks
+[Tablebody] Recorded stack decision, benchmark fixture, number tests
+[Tablebody] P1 Simulation and extremes
+[Tablebody] Shared movement/combat, big quantities, event/cohort semantics
+[Tablebody] 2 to 4 weeks
+[Tablebody] Reference equivalence and 10,000 round stress
+[Tablebody] P2 Solo loop
+[Tablebody] Round states, vote, trees, boss cadence, score, local persistence
+[Tablebody] 3 to 4 weeks
+[Tablebody] Automated end to end run and crash recovery
+[Tablebody] P3 Playable solo MVP
+[Tablebody] Two classes, art/audio, 24 cards, Ledger, accessibility
+[Tablebody] 4 to 6 weeks
+[Tablebody] Observed usability and visual/performance QA
+[Tablebody] P4 Local cooperative alpha
+[Tablebody] 2 to 5 clients, prediction, votes, reconnect and LAN auth
+[Tablebody] 3 to 5 weeks
+[Tablebody] Network matrix and five client full run
+[Tablebody] P5 Trusted competitive beta
+[Tablebody] Accounts, remote authority, seed challenges, verification
+[Tablebody] 4 to 8 weeks
+[Tablebody] Integrity/load/recovery gates; distinct public boards
+[Tablebody] P6 Web content expansion
+[Tablebody] Additional classes/biomes, web deployment and cross browser refinement
+[Tablebody] Separately scoped
+[Tablebody] Broader content, browser and web service gates
+[Heading2] 25.2 P0 and P1 must settle feasibility
+Deliver a representative scene with a player, six enemy roles, a boss telegraph, bright effects and UI text. Compare top down and true isometric targeting. Measure movement latency and render cost on the reference hardware. Prototype shared collision, numeric operations above float range, and grouped attack/projectile behavior. Pin Phaser and transport versions only after the prototype passes.
+P1 cannot exit on a demo showing only huge floating damage labels. It needs a complete stat/health calculation, finite objective score, explicit extreme packet semantics, and equivalence between grouped and ungrouped combat in the feasible domain. If independently simulated swarms are still required, resolve D06 before expanding content. Proving this early avoids rewriting every skill later.
+[Heading2] 25.3 Local developer workflow
+Provide one documented start command that checks Node version, creates the local data directory, runs migrations, starts the backend and Next.js frontend, and prints a loopback URL. Proposed development ports are 3000 for Next.js and 2567 for rooms/API. Detect occupied ports and explain how to reuse or stop the existing service; do not blindly launch duplicates. Windows is the first supported development environment.
+Fresh checkout requires no cloud credentials, remote database, account registration or Docker. Seed fixtures and sample content are included. The workflow supports clean shutdown with pending transactions flushed, deterministic test run, backup/restore, and developer overlay. Multiplayer LAN opt in explains the host address and required firewall permission; never automatically expose the development service to the internet.
+[Heading2] 25.4 Release gates and rollback
+Each phase has a versioned artifact, test report, known issues and an explicit go/no go decision by the product owner. Keep the previous local binary/build and database backup during migration. Public servers drain rooms before upgrades, preserve active room versions and roll back control releases independently. Content changes start new run versions; do not mutate a running party's deck.
+[Heading1] 26 Implementation backlog and user stories
+Each epic has a concrete exit gate. Priorities P0, P1 and P2 mean required for the next foundation gate, required for solo MVP, and later expansion respectively; they are not severity ratings. Owners below are responsibility roles, not assigned people.
+[Heading2] E01 Movement and combat foundation
+As a player, I can move, aim, dodge and cast with immediate feedback, so positioning determines survival. Priority P0; owner gameplay engineer; depends on projection decision D01. Acceptance: normalized diagonal speed, swept wall/projectile collision, resource validation, deterministic input sequence, animation independent damage timing and local response target. Test fixtures include simultaneous boss/player deaths and repeated cast messages. Covers COMBAT01, NUM01 and NET01.
+[Heading2] E02 Fate system and voting
+As a party member, I can compare three tradeoffs and submit a vote, so our shared run reflects the collective choice. Priority P1; owner gameplay plus network engineer; depends on E01 and E03 numeric core. Acceptance: three distinct IDs, replacement across rounds, no stat based filtering, plurality/tie/no vote handling, stale vote rejection and exactly once commit even after a crash. Covers FATE01 and VOTE01; fixed requirements F05 through F09 are release blocking.
+[Heading2] E03 Numbers and extreme effects
+As a player, I can keep stacking choices while numbers become absurd, so the game never silently rewrites my decisions. Priority P0; owner simulation engineer. Acceptance: canonical arithmetic, overflow free serialization, positive/negative compounding fixtures, grouped/ungrouped equivalence, disclosed packet rules, trigger cycle safety and tested horizon beyond ordinary floats. Depends on D06 for spatial semantics. Covers NUM01 and EXTREME01.
+[Heading2] E04 Fate Ledger and Forecast
+As a player, I can trace why a stat changed and inspect each offered card's consequences, so I can judge whether its risk is acceptable. Priority P1; owner UI/gameplay engineer; depends on E02/E03. Acceptance: per player static values, dependency provenance, exact post commit equality, measured/estimated labels, regeneration stalemate handling, scientific notation and accessible focus. Covers LEDGER01 and ACCESS01.
+[Heading2] E05 Classes and skill progression
+As a solo player, I can choose a class and develop different builds, so repeat runs create meaningful decisions. Priority P1; owner game designer/gameplay engineer. Acceptance: two classes with 18 nodes each, acyclic prerequisites, validated point spending, three viable first boss builds per class, mastery after tree exhaustion and build import validation. Covers CLASS01 and LIFE01. Remaining four classes are P2 and require the same contracts.
+[Heading2] E06 Enemy AI and encounters
+As a player, I can recognize enemy intent and respond, so difficulty feels purposeful. Priority P1; owner AI engineer/designer; depends on movement/collision. Acceptance: six archetypes, deterministic seeded composition, reachable objectives, utility/path debug tools, no future input knowledge, boss every fifth round, two boss templates and extreme multiplier test coverage. Covers AI01 and RUN01.
+[Heading2] E07 Scores results and leaderboards
+As a party, we can compare our collective run with compatible records, so competition rewards objective progress and declared risk. Priority P1 local/P2 online; owner gameplay/backend engineer. Acceptance: worked score fixture 2,125, partial credit once, no summon farming, arbitrary integer sort, size/version divisions, deterministic ties and local trust labels. Covers SCORE01; depends on E02, E06 and E08.
+[Heading2] E08 Saves and recovery
+As a local player, I can resume a safe checkpoint and retain a run record, so closing the game does not erase intentional progress. Priority P1; owner backend engineer. Acceptance: migration backup, atomic Fate/score commit, content hash pinning, checksum verification, interrupted write tests, bounded replay chunks and explicit pending storage state. Covers DATA01. Trusted recovery policies are P2 and depend on E11 verification.
+[Heading2] E09 Art animation audio and accessibility
+As a player, I can read colorful combat clearly and adjust presentation/input to my needs. Priority P1; owner artist/UI engineer. Acceptance: complete MVP asset inventory, tagged export pipeline, consistent pivots, responsive eight direction animation, reduced effects preserving tells, remapping, controller, readable UI scaling and semantic voting/Ledger. Covers ACCESS01; depends on E01, E04 and projection D01.
+[Heading2] E10 Multiplayer rooms and reconnection
+As a group of up to five friends, we can play the same authoritative run and reconnect to our seat. Priority P2 for playable alpha, with P0 interfaces; owner network engineer. Acceptance: roster lock, server owned damage/score, predicted movement, interpolation, deadline vote rules, five client network matrix and no duplicate events after reconnect. Covers PARTY01 and NET01; depends on E01/E02/E08.
+[Heading2] E11 Trusted competition and integrity
+As a competitive player, I can distinguish verified scores from editable local scores. Priority P2; owner backend/security engineer. Acceptance: authenticated identity, trusted authority, pinned content, objective replay verification, challenge attempt policy, abuse controls, moderation audit and archived version boards. Covers SEC01 and SCORE01; depends on E07/E10 and decisions D04/D05.
+[Heading2] E12 Developer tooling telemetry and release
+As a developer, I can reproduce a run, inspect an AI decision and measure stalls, so changes are diagnosable. Priority P0/P1; owner tools engineer. Acceptance: one local web app start workflow, seeded harness, numeric oracle, benchmark reports, structured events, privacy controls, replay viewer and migration rollback rehearsal. Covers TEL01, DATA01 and AI01. Public web deployment is a later extension of this epic.
+[Heading1] 27 Acceptance matrix and test strategy
+[Heading2] 27.1 Release blocking rule tests
+[Tablebody] Test ID
+[Tablebody] Scenario
+[Tablebody] Required result
+[Tablebody] A01
+[Tablebody] Complete rounds 1 through 11
+[Tablebody] Bosses at 5 and 10; exactly one offer after each clear
+[Tablebody] A02
+[Tablebody] Three +100% damage cards
+[Tablebody] Base damage x8; no additive interpretation
+[Tablebody] A03
+[Tablebody] Three -50% maximum health cards
+[Tablebody] Remaining maximum health 12.5% of base
+[Tablebody] A04
+[Tablebody] Offer would imply near instant death
+[Tablebody] All three selection controls remain enabled
+[Tablebody] A05
+[Tablebody] Decay card for party with no decay damage
+[Tablebody] Card remains in deck; positive applicability shown as zero
+[Tablebody] A06
+[Tablebody] Votes 2/2/1, then reconnect/retry
+[Tablebody] Seeded tie result stable; one commit only
+[Tablebody] A07
+[Tablebody] Vote arrives for old offer
+[Tablebody] Rejected; current counts unchanged
+[Tablebody] A08
+[Tablebody] Forecast then commit
+[Tablebody] Every exact static value matches; estimates remain labelled
+[Tablebody] A09
+[Tablebody] Enemy regen &gt;= modelled effective DPS
+[Tablebody] No divide error; no net progress estimate; vote permitted
+[Tablebody] A10
+[Tablebody] Round 5 score fixture
+[Tablebody] Exactly 2,125 points under section 13 assumptions
+[Tablebody] A11
+[Tablebody] Infinite summon or regen kill loop
+[Tablebody] Finite objective score; no repeat credit
+[Tablebody] A12
+[Tablebody] One of five players disconnects
+[Tablebody] Roster size/scaling unchanged; same seat can reconnect
+[Tablebody] A13
+[Tablebody] Values exceed float and safe integer limits
+[Tablebody] Serialize, compare and rank without Infinity or rollover
+[Tablebody] A14
+[Tablebody] Crash after persistence before COMMIT broadcast
+[Tablebody] Restore same committed card; do not reapply
+[Tablebody] A15
+[Tablebody] Browser refresh during vote/combat
+[Tablebody] Correct phase/seat snapshot; no duplicate skill/vote events
+[Tablebody] A16
+[Tablebody] Modified client sends health/score
+[Tablebody] Authority ignores/rejects; trusted board unchanged
+[Tablebody] A17
+[Tablebody] Reduced effects and UI 150% scale
+[Tablebody] Damaging geometry visible; no blocked vote controls
+[Tablebody] A18
+[Tablebody] Round 10,000 stress
+[Tablebody] Stable tested numeric model, bounded memory and spill files
+[Heading2] 27.2 Automated layers
+Unit tests cover number operations, effect pipeline, resource constraints, score awards, vote ordering and state transitions. Property tests check commutation of pure factors, roundtrip serialization, monotonic score comparisons and health nonnegativity. Use exact simple rational fixtures plus high precision reference values. Fuzz invalid imports, messages, stale IDs, extreme percentages and malformed numeric encodings within resource limits.
+Integration tests start an authority with temporary SQLite, simulate a full seeded run, force failures at each transaction boundary and verify exactly once writes. Replay determinism tests compare state/score hashes across clean starts and approved runtime versions. Differential tests compare uncompressed combat with compressed combat for random feasible inputs; both damage and timing/status/kill outcomes must match under declared tolerances.
+Network tests use multiple real browser clients, not only bots. UI automation covers navigation, class selection, node spending, Forecast expansion, vote submission, resume and results. Visual regression targets telegraph shapes, fonts, pivots, color palettes and three card layout at 1280 by 720, 1920 by 1080 and ultrawide, plus 150% UI scaling. Asset build validation catches missing or malformed exports before runtime.
+[Heading2] 27.3 Soak performance and human tests
+Run 30 minute combat soaks, overnight headless progression, five client sessions and deep round snapshot/restore. Track high water memory, replay disk growth, event queue age and representative count. Adversarial fixtures choose all quantity/speed cards rather than an average build. A lower quality renderer must produce the same authoritative run result for the same inputs.
+Human QA checks movement feel, readable deaths, coordination, Forecast comprehension, controller aiming, first boss pacing and build variety. Accessibility review includes keyboard only intermissions, screen reader menus, color vision simulation and reduced motion. Automated pass does not establish that a boss is fun or AI feels intelligent. Record what was tested, exact versions and remaining gaps at every gate.
+[Heading2] 27.4 Done criteria
+A story is done when its behavior is implemented, documented, versioned, appropriately tested and observable; no unhandled crash, hidden cap or misleading trust label remains. A phase is done only when all blocking requirements pass, required human review occurs and critical/high risks are resolved or explicitly accepted by the owner. Technical constraints cannot be accepted by quietly changing established Fate eligibility rules.
+[Heading1] 28 Risk register and mitigations
+[Tablebody] ID
+[Tablebody] Risk and impact
+[Tablebody] Likelihood / severity
+[Tablebody] Mitigation and trigger
+[Tablebody] Owner
+[Tablebody] K01
+[Tablebody] Unlimited distinct effects exceed finite compute
+[Tablebody] High / Critical
+[Tablebody] P1 packet/cohort proof; resolve literal spatial semantics before more content
+[Tablebody] Simulation
+[Tablebody] K02
+[Tablebody] Numeric overflow or precision changes outcomes
+[Tablebody] Medium / Critical
+[Tablebody] Canonical arithmetic, reference tests, explicit technical failure and checkpoints
+[Tablebody] Simulation
+[Tablebody] K03
+[Tablebody] Damage grouping loses proc or kill timing
+[Tablebody] High / High
+[Tablebody] Differential replay tests; declare supported effect algebra
+[Tablebody] Simulation
+[Tablebody] K04
+[Tablebody] Score pressure produces trivial best strategy
+[Tablebody] High / High
+[Tablebody] Multi build sweeps, prospective credit, versioned boards
+[Tablebody] Design
+[Tablebody] K05
+[Tablebody] AI becomes unreadable under speed multipliers
+[Tablebody] High / Medium
+[Tablebody] Forecast cadence warning; baseline readable AI; permit player chosen danger
+[Tablebody] Design/AI
+[Tablebody] K06
+[Tablebody] Art and six large trees overwhelm scope
+[Tablebody] High / High
+[Tablebody] Two class one biome MVP; atlas/animation pipeline before expansion
+[Tablebody] Production
+[Tablebody] K07
+[Tablebody] Host/local records mistaken for verified ranks
+[Tablebody] Medium / High
+[Tablebody] Distinct trust labels and trusted public authority
+[Tablebody] Backend
+[Tablebody] K08
+[Tablebody] Multiplayer response feels delayed
+[Tablebody] Medium / High
+[Tablebody] Prediction, interpolation, network envelope benchmarks
+[Tablebody] Network
+[Tablebody] K09
+[Tablebody] SQLite writer contention stalls room
+[Tablebody] Medium / High
+[Tablebody] Isolated writer, short transactions, queue monitoring, Postgres threshold
+[Tablebody] Backend
+[Tablebody] K10
+[Tablebody] Endless history grows memory/disk
+[Tablebody] High / High
+[Tablebody] Aggregated stat view, chunked replays, paginated history, capacity recovery
+[Tablebody] Backend
+[Tablebody] K11
+[Tablebody] Seed or vote manipulability harms fairness
+[Tablebody] Medium / High
+[Tablebody] Independent RNG streams, immutable offers, deterministic recorded ties
+[Tablebody] Backend
+[Tablebody] K12
+[Tablebody] Regeneration or geometry stalls a run
+[Tablebody] Medium / Medium
+[Tablebody] Clear forecast, valid map generation, retirement; no forced safe card
+[Tablebody] Design
+[Tablebody] K13
+[Tablebody] Web frontend leaks secrets or permits injected content
+[Tablebody] Medium / High
+[Tablebody] Bundle review, escaped text, CSP and validated imports
+[Tablebody] Web
+[Tablebody] K14
+[Tablebody] Steam score integer range conflicts with huge totals
+[Tablebody] High / High
+[Tablebody] External canonical board; explicit projection/ordering review
+[Tablebody] Platform
+[Tablebody] K15
+[Tablebody] Replays change after patches
+[Tablebody] Medium / High
+[Tablebody] Pin engine/math/content versions and archive reference executables
+[Tablebody] Release
+[Tablebody] K16
+[Tablebody] Bright effects obscure threats or cause discomfort
+[Tablebody] High / High
+[Tablebody] Shape cues, reduced effects, flash controls, accessibility review
+[Tablebody] Art/UI
+[Tablebody] K17
+[Tablebody] Large PRD mistaken for fixed tuning or implemented work
+[Tablebody] Medium / Medium
+[Tablebody] Established/proposed distinction, phase gates and evidence reports
+[Tablebody] Product
+Do not downgrade K01 by imposing an undocumented projectile cap. The acceptable mitigation is a declared equivalent model, an explicit change approved by the product owner, or postponing unsupported authored effects before release. Since existing offered cards must remain selectable, solving a runtime overload by removing the card violates F08/F09.
+[Heading1] 29 Web deployment and future compatibility
+[Heading2] 29.1 Local and hosted web application
+The deliverable is a full stack web application. Local play opens a Next.js URL in the browser while the backend and SQLite run on the local machine. Public web hosting later serves Next.js and the API/WebSocket authority behind HTTPS/WSS, with deployment health checks, graceful room draining, database backups and versioned content. The browser is the gameplay interface in both cases.
+Public web authentication and trusted global records are later features; local solo remains usable without an account or remote service. If cloud saves are added, synchronize safe checkpoints with conflict detection by run ID and checkpoint lineage, never silently merge two divergent runs. Keep platform identity separate from game rules so a future distribution decision does not change Fate math.
+[Heading2] 29.2 Optional Steam consideration
+Steam is a future possibility only, outside the web app delivery milestones. If revisited, Steam's documented UploadLeaderboardScore signature uses an int32 score [R11], so CURSEBOUND's exact endless scores cannot be copied to it without an explicit representation decision. Preserve the canonical web leaderboard; do not clamp huge scores and create misleading ties. Steam supports trusted writes through its Web API [R10], but that does not replace authoritative run verification. Packaging and Steam integration are outside this specification's delivery scope.
+Any later platform integration needs its own feasibility review, distribution rights check and test plan. Until then, design and implement for the browser and full stack web services.
+[Heading2] 29.3 Commercial decisions deferred
+Price, monetization, target age rating, localization coverage, launch regions, matchmaking, account linkage and public marketing claims are open. No microtransactions are required by this PRD. Decide ongoing server cost responsibilities before promising persistent global rankings. Research notes reflect October 13 2026; recheck platform rules if a later distribution project is commissioned.
+[Heading1] 30 Open decisions and review checklist
+[Tablebody] Decision
+[Tablebody] Proposed default
+[Tablebody] Required before
+[Tablebody] Evidence to resolve
+[Tablebody] D01 Projection
+[Tablebody] Top down ground simulation, three quarter visuals
+[Tablebody] P0 exit
+[Tablebody] Aiming/collision/art cost comparison
+[Tablebody] D02 Engine/transport versions
+[Tablebody] Phaser plus TypeScript; Colyseus candidate
+[Tablebody] P0 exit
+[Tablebody] Measured scene, prediction and dependency review
+[Tablebody] D03 Death/revive asymmetry
+[Tablebody] Section 6 solo self revive and co op channels
+[Tablebody] P2 tuning
+[Tablebody] Solo/co op survival and clarity tests
+[Tablebody] D04 Score pressure coefficients
+[Tablebody] Prospective factors with objective awards
+[Tablebody] P5 boards
+[Tablebody] Exploit sweeps and full run comparisons
+[Tablebody] D05 Seed attempts
+[Tablebody] One ranked attempt per challenge identity
+[Tablebody] P5 launch
+[Tablebody] Replayability, fairness and identity abuse review
+[Tablebody] D06 Extreme spatial semantics
+[Tablebody] Weighted projectiles and enemy cohorts from baseline
+[Tablebody] P1 exit
+[Tablebody] Equivalence tests and tactile feel demo
+[Tablebody] D07 Health change policy
+[Tablebody] Preserve current health fraction at Fate commit
+[Tablebody] P2 exit
+[Tablebody] Sacrifice exploits and forecast usability
+[Tablebody] D08 Assistance modes
+[Tablebody] Casual assist first; ranked rules explicit
+[Tablebody] P3/P5
+[Tablebody] Controller/accessibility impact tests
+[Tablebody] D09 Persistence/resume
+[Tablebody] Safe intermission local checkpoints
+[Tablebody] P2 exit
+[Tablebody] Crash/retry advantage analysis
+[Tablebody] D10 Full class breadth
+[Tablebody] Six classes, 36 to 45 nodes eventually
+[Tablebody] Content expansion
+[Tablebody] Asset/workload and build diversity review
+[Tablebody] D11 Public DB migration
+[Tablebody] PostgreSQL when multi host writers are needed
+[Tablebody] P5 scaling
+[Tablebody] DB queue/latency and host topology
+[Tablebody] D12 Public web topology
+[Tablebody] Next.js plus API/room backend behind HTTPS/WSS
+[Tablebody] P5 entry
+[Tablebody] Room draining, proxy, persistence and operational tests
+[Tablebody] D13 Vote pacing
+[Tablebody] Untimed local solo, 45 second ranked window
+[Tablebody] P4/P5
+[Tablebody] Group deliberation and accessibility tests
+[Tablebody] D14 Regeneration baseline
+[Tablebody] Small nonzero rate for tagged enemies
+[Tablebody] P2 content freeze
+[Tablebody] Stalemate frequency and card applicability
+Review in this order: confirm established requirements; approve P0 scope and reference hardware; settle D01/D02; require the D06 prototype; review score/death proposals; freeze MVP content and acceptance fixtures; then commit to multiplayer/online milestones. Keep tuning revisions in a versioned decision log with date, rationale, affected requirements and tests to rerun.
+[Heading1] Appendix A Calculation and data fixtures
+[Heading2] A1 Effect sequence fixture
+Run seed example CURSEBOUND_TEST_001, solo, base attack 100, attack rate 1, health 1,000. Choose Blood Pact, Rapid Evolution and Immortal Ambition. Expected persistent factors: player damage 1.75; health 0.7; rate 1.4; enemy movement 1.6; healing 2.5; enemy health 4.0. Expected raw DPS 245. These exact values form a unit test; encounter timing also depends on mitigation, geometry and behavior.
+[Heading2] A2 Forecast fixture
+Two players have noncrit D=100 each, with q1=0 and q2=0.5, and crit multiplier c=2. Expected hits: player 1=100; player 2=150; combined=250 at one attack per second each. A +200% crit damage potency card multiplies the entire c by 3, giving c=6; player 1 stays 100, player 2 becomes 350 and combined becomes 450. Team expected output increases x1.8, not x3. The card definition must say whether it multiplies total crit multiplier or only bonus potency; proposed MVP uses the total multiplier as in this fixture.
+[Heading2] A3 Regeneration fixture
+Target health 1,000,000, regen fraction 0.01 per second, effective player DPS 8,000. Regen is 10,000 per second, so net=-2,000 and the static model reports no progress. Add x4 player damage: DPS=32,000, net=22,000, idealized kill time=45.455 seconds assuming full health, constant uptime and regeneration throughout. Boss invulnerability and changing health phases are outside this simple estimate.
+[Heading2] A4 Persistence and ordering fixture
+Canonical score strings '9', '10', '999', '1000' and '1000000000000000000000000' sort first by digit length descending, then binary lexicographic text descending. A matching numeric representation roundtrips mantissa/exponent strings without coercing them to float. Offer UUID examples are illustrative IDs; production IDs must be collision resistant and server issued.
+[Heading2] A5 Representative domain events
+FATE_COMMITTED contains runId, seq, tick, offerId, cardId, factors, priorStateHash, resultingStateHash and tieEvidence. ROUND_CLEARED contains round, objectiveWeight, activeTicks, referenceTicks, basePoints, pressureFactor, speedFactor and awardedScoreText. These event schemas allow a verifier to recompute every score contribution and audit each card application.
+[Heading1] Appendix B Research and source notes
+Official documentation was reviewed on October 13 2026. Platform claims below support architectural constraints and proposed choices. No external source validates CURSEBOUND's balance coefficients, user response targets or performance benchmarks.
+R1  Phaser Sprite documentation
+Sprite animation, texture and render capabilities. Open official documentation
+R2  Phaser Scenes documentation
+Game scene organization and engine responsibilities. Open official documentation
+R3  Colyseus State Synchronization
+Server owned state and delta synchronization. Open official documentation
+R4  Colyseus Reconnection
+Held seats, manual/automatic reconnect and full snapshots. Open official documentation
+R5  FastAPI Concurrency and async
+I/O concurrency versus CPU parallelism. Open official documentation
+R6  SQLite Write Ahead Logging
+One writer, same host requirement and checkpoint concerns. Open official documentation
+R7  Godot stable Web Export
+Browser export and threading requirements to verify in engine spike. Open official documentation
+R8  MDN WebSocket bufferedAmount
+Outgoing queue monitoring. Open official documentation
+R10  Steam Leaderboards
+Trusted writes and leaderboard configuration. Open official documentation
+R11  Steam ISteamUserStats
+int32 score contract and leaderboard upload API. Open official documentation
+R12  Colyseus Netcode
+Version sensitive fixed step/prediction APIs. Open official documentation
+The referenced Design AI RPG Mechanic conversation establishes the party vote, percentage growth, endless run and player judged danger intent. The current brief also fixes one through five players, boss cadence and local first scope. Earlier illustrative values and earlier assistant suggestions remain proposals; especially, automatic card exclusion is superseded by the user's explicit correction.
+[Heading1] Appendix C Requirement traceability
+[Tablebody] Requirement group
+[Tablebody] Specification
+[Tablebody] Backlog
+[Tablebody] Main verification
+[Tablebody] F01 and PARTY01
+[Tablebody] Sections 4, 19
+[Tablebody] E10
+[Tablebody] A12/A15, five client run
+[Tablebody] F02 and NUM01
+[Tablebody] Sections 11, 12
+[Tablebody] E03
+[Tablebody] A13/A18, reference arithmetic
+[Tablebody] F03 and SCORE01
+[Tablebody] Section 13
+[Tablebody] E07/E11
+[Tablebody] A10/A11/A16
+[Tablebody] F04 and RUN01
+[Tablebody] Sections 3, 14
+[Tablebody] E06
+[Tablebody] A01 and seeded encounter suite
+[Tablebody] F05 through F09
+[Tablebody] Sections 4, 8, 12
+[Tablebody] E02/E03
+[Tablebody] A02 through A07/A14
+[Tablebody] F10 and LEDGER01
+[Tablebody] Section 10
+[Tablebody] E04
+[Tablebody] A08/A09 and comprehension tests
+[Tablebody] F11 and ACCESS01
+[Tablebody] Sections 15, 16, 18
+[Tablebody] E09
+[Tablebody] A17 and visual/controller QA
+[Tablebody] F12 and CLASS01/AI01
+[Tablebody] Sections 7, 14
+[Tablebody] E05/E06
+[Tablebody] Tree validation, build and AI tests
+[Tablebody] F13 and DATA01
+[Tablebody] Sections 17, 20, 25, 29
+[Tablebody] E08/E12
+[Tablebody] Fresh local web start, backup/recovery and hosted web tests
+[Tablebody] SEC01/TEL01/NET01
+[Tablebody] Sections 19, 22, 23
+[Tablebody] E10/E11/E12
+[Tablebody] Protocol fuzz, security and network matrix
+[Heading1] Appendix D Proposed MVP skill and card inventory
+[Heading2] D1 Vanguard tree
+Each branch has six nodes. Proposed tiers require one, three and five spent points in that branch; capstones require the named prerequisite. Rank factors multiply independently. All percentages below are first tuning values. The tree provides breadth without requiring the full six class roster before a playable web MVP.
+[Tablebody] Branch
+[Tablebody] Node and ranks
+[Tablebody] Initial mechanic
+[Tablebody] Bulwark
+[Tablebody] Guard stance, 1
+[Tablebody] Equipped active; spend resource to absorb frontal damage
+[Tablebody] Bulwark
+[Tablebody] Reinforced, 3
+[Tablebody] Armor x1.1 per rank
+[Tablebody] Bulwark
+[Tablebody] Recovery pulse, 2
+[Tablebody] Healing after completed guard x1.15 per rank
+[Tablebody] Bulwark
+[Tablebody] Shield reach, 1
+[Tablebody] Guard coverage widens from 90 to 120 degrees
+[Tablebody] Bulwark
+[Tablebody] Shared shelter, 1
+[Tablebody] Nearby ally receives 20% of guard shield generation
+[Tablebody] Bulwark
+[Tablebody] Bastion, 1
+[Tablebody] Capstone after Shared shelter; stationary guard creates an ally shelter field
+[Tablebody] Cleaver
+[Tablebody] Sweeping strike, 1
+[Tablebody] Equipped active; resource paid melee arc
+[Tablebody] Cleaver
+[Tablebody] Heavy edge, 3
+[Tablebody] Sweeping strike damage x1.1 per rank
+[Tablebody] Cleaver
+[Tablebody] Deep cut, 2
+[Tablebody] Adds bleed at 10% direct damage per second per rank for three seconds
+[Tablebody] Cleaver
+[Tablebody] Follow through, 1
+[Tablebody] A kill restores one authored strike charge; once per cast
+[Tablebody] Cleaver
+[Tablebody] Fracture, 1
+[Tablebody] Strike applies x1.1 incoming damage vulnerability for two seconds
+[Tablebody] Cleaver
+[Tablebody] Sundering path, 1
+[Tablebody] Capstone after Fracture; strike projects a short directional wave
+[Tablebody] Rally
+[Tablebody] Rally cry, 1
+[Tablebody] Equipped active; timed team resource recovery aura
+[Tablebody] Rally
+[Tablebody] Endurance, 3
+[Tablebody] Maximum health x1.1 per rank
+[Tablebody] Rally
+[Tablebody] Second wind, 2
+[Tablebody] Self healing after dodge x1.1 per rank
+[Tablebody] Rally
+[Tablebody] Rescue pace, 1
+[Tablebody] Revive channel speed x1.2
+[Tablebody] Rally
+[Tablebody] Unbroken rhythm, 1
+[Tablebody] Completing a revive resets one basic dodge charge
+[Tablebody] Rally
+[Tablebody] Standard bearer, 1
+[Tablebody] Capstone after Unbroken rhythm; Rally adds an authored team shield
+[Heading2] D2 Arcanist tree
+[Tablebody] Branch
+[Tablebody] Node and ranks
+[Tablebody] Initial mechanic
+[Tablebody] Ember
+[Tablebody] Spark, 1
+[Tablebody] Basic ember attack; class starting grant
+[Tablebody] Ember
+[Tablebody] Kindling, 3
+[Tablebody] Burn rate x1.1 per rank
+[Tablebody] Ember
+[Tablebody] Heat sink, 2
+[Tablebody] Ember resource cost x0.95 per rank
+[Tablebody] Ember
+[Tablebody] Fireline, 1
+[Tablebody] Equipped active; directional ground flame
+[Tablebody] Ember
+[Tablebody] Ash recovery, 1
+[Tablebody] Burning objective enemy kills restore an authored resource amount
+[Tablebody] Ember
+[Tablebody] Inferno, 1
+[Tablebody] Capstone after Fireline; 20% of direct ember damage becomes area burn
+[Tablebody] Storm
+[Tablebody] Arc bolt, 1
+[Tablebody] Equipped active; chain attack with source indexed hit list
+[Tablebody] Storm
+[Tablebody] Conductivity, 3
+[Tablebody] Storm damage x1.1 per rank
+[Tablebody] Storm
+[Tablebody] Charged reserve, 2
+[Tablebody] Maximum resource x1.1 per rank
+[Tablebody] Storm
+[Tablebody] Fork, 1
+[Tablebody] One extra logical chain endpoint under packet rules
+[Tablebody] Storm
+[Tablebody] Static shell, 1
+[Tablebody] Casting a storm skill adds a short authored shield
+[Tablebody] Storm
+[Tablebody] Tempest, 1
+[Tablebody] Capstone after Fork; repeated casts build a finite resource paid storm field
+[Tablebody] Rift
+[Tablebody] Phase step, 1
+[Tablebody] Equipped active; aimed short teleport to valid ground
+[Tablebody] Rift
+[Tablebody] Rift focus, 3
+[Tablebody] Astral damage x1.1 per rank
+[Tablebody] Rift
+[Tablebody] Quickening, 2
+[Tablebody] Recovery rate x1.1 per rank
+[Tablebody] Rift
+[Tablebody] Return mark, 1
+[Tablebody] Phase step leaves a temporary manually activated return point
+[Tablebody] Rift
+[Tablebody] Temporal reserve, 1
+[Tablebody] One stored charge for an equipped movement skill
+[Tablebody] Rift
+[Tablebody] Event horizon, 1
+[Tablebody] Capstone after Return mark; resource paid pull field and astral damage
+Starting grants do not cost points. Lock the exact prerequisite graph and ability base values in the content manifest during P2; these proposed tables are the production inventory and mechanic brief. Both classes also have an innate dodge, basic attack and class signature so an unspent tree never prevents basic combat. Each node requires an icon, tooltip, applicability tags, numeric fixture and interaction review before release.
+[Heading2] D3 Twelve additional Fate candidates
+Together with section 9 these make 24 distinct MVP candidate IDs. They have no runtime eligibility requirements. The positive line can be inactive for a build; Forecast states that directly.
+[Tablebody] Card
+[Tablebody] Positive effect
+[Tablebody] Negative effect
+[Tablebody] Red Horizon
+[Tablebody] Player damage +100%
+[Tablebody] Player maximum health -40%
+[Tablebody] Shattered Crown
+[Tablebody] Critical tendency +100%
+[Tablebody] Enemy damage +80%
+[Tablebody] Chasing Thunder
+[Tablebody] Player attack frequency +75%
+[Tablebody] Enemy movement speed +100%
+[Tablebody] Deep Renewal
+[Tablebody] Player healing +200%
+[Tablebody] Enemy maximum health +400%
+[Tablebody] Thousand Footsteps
+[Tablebody] Player resource regeneration +100%
+[Tablebody] Encounter spawn quantity +200%
+[Tablebody] Gilded Ruin
+[Tablebody] Prospective score pressure +150%
+[Tablebody] Enemy damage +500%
+[Tablebody] Titan Offering
+[Tablebody] Player maximum health +300%
+[Tablebody] Enemy maximum health +600%
+[Tablebody] Borrowed Tomorrow
+[Tablebody] Player recovery rate +100%
+[Tablebody] Enemy attack frequency +100%
+[Tablebody] Prism Rain
+[Tablebody] Player projectile count +200%
+[Tablebody] Enemy projectile count +200%
+[Tablebody] Rotting Garden
+[Tablebody] Player decay damage +100%
+[Tablebody] Tagged enemy regeneration +200%
+[Tablebody] Comet Walk
+[Tablebody] Player movement speed +75%
+[Tablebody] Enemy projectile speed +100%
+[Tablebody] Iron Orchard
+[Tablebody] Player armor +100%
+[Tablebody] Enemy armor +150%
+Each candidate needs card copy that uses exactly the canonical stat name, clear affected scope, icon/art, authored factor data, Forecast fixture, stacking fixture and extreme simulation support. Score pressure cards in particular must pass anti farming and build synergy reviews. Do not ship a candidate whose effect is merely a displayed label without simulation semantics.

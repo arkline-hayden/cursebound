@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CURSEBOUND art viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #120c26; color: #e8e0ff; font: 13px/1.4 system-ui, sans-serif; }
+  header { padding: 10px 16px; background: #1c1338; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 2; }
+  header h1 { font-size: 15px; margin: 0 12px 0 0; }
+  select, button, input { background: #2a1f50; color: #e8e0ff; border: 1px solid #4a3a80; border-radius: 4px; padding: 3px 6px; }
+  main { padding: 12px 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 14px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cell span { font-size: 11px; opacity: .7; }
+  canvas { image-rendering: pixelated; background: #1a2040; }
+  canvas.checker { background: repeating-conic-gradient(#202848 0 25%, #1a2040 0 50%) 0 0 / 16px 16px; }
+  h2 { font-size: 14px; margin: 18px 0 6px; color: #b8a8ff; }
+  #err { color: #ff8a8a; white-space: pre-wrap; }
+  .stat { opacity: .75; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CURSEBOUND art viewer</h1>
+  <label>Section <select id="section"></select></label>
+  <label>Zoom <select id="zoom"><option>2</option><option selected>3</option><option>4</option><option>6</option></select></label>
+  <label><input type="checkbox" id="animate" checked /> animate</label>
+  <label><input type="checkbox" id="ground" checked /> ground shadow</label>
+  <span class="stat" id="stat"></span>
+</header>
+<main>
+  <div id="err"></div>
+  <div id="out"></div>
+</main>
+<script type="module">
+const err = document.getElementById('err');
+window.addEventListener('error', (e) => { err.textContent += String(e.message) + '\n'; });
+window.addEventListener('unhandledrejection', (e) => { err.textContent += String(e.reason && e.reason.stack || e.reason) + '\n'; });
+const v = Date.now();
+const actors = await import('./art-preview/game/art/actors.js?v=' + v);
+const tiles = await import('./art-preview/game/art/tiles.js?v=' + v).catch(() => null);
+const effects = await import('./art-preview/game/art/effects.js?v=' + v).catch(() => null);
+const dungeon = await import('./art-preview/game/art/dungeonData.js?v=' + v).catch(() => null);
+const themes = await import('./art-preview/game/art/dungeonThemes.js?v=' + v).catch(() => null);
+const isoMod = await import('./art-preview/game/art/isoTerrain.js?v=' + v).catch(() => null);
+const icons = await import('./art-preview/ui/icons/iconData.js?v=' + v).catch(() => null);
+// content snapshot written by buildArtPreview.ts so data-driven node / card icons render here too
+const iconContent = await fetch('./art-preview/iconContent.json?v=' + v).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+if (icons && iconContent && icons.registerIconContent) icons.registerIconContent(iconContent);
+const audio = await import('./art-preview/game/audio/AudioEngine.js?v=' + v).catch(() => null);
+
+const out = document.getElementById('out');
+const sectionSel = document.getElementById('section');
+const zoomSel = document.getElementById('zoom');
+const animChk = document.getElementById('animate');
+const groundChk = document.getElementById('ground');
+const sections = [...actors.ACTOR_IDS.map((a) => 'actor:' + a), ...actors.ACTOR_IDS.map((a) => 'strips:' + a), 'iso@catacombs', 'iso@flooded', 'iso@ossuary', 'iso@sanctum', 'iso@fungal', 'iso@forge', 'iso@frost', 'iso:sheets', 'dungeon', 'dungeon@flooded', 'dungeon@ossuary', 'dungeon@sanctum', 'dungeon@fungal', 'dungeon@forge', 'dungeon@frost', 'dungeon:sheets', 'actors:all-idle', 'tiles', 'effects', 'icons', 'audio'];
+for (const s of sections) { const o = document.createElement('option'); o.textContent = s; sectionSel.appendChild(o); }
+const params = new URLSearchParams(location.search);
+if (params.get('s')) sectionSel.value = params.get('s');
+if (params.get('z')) zoomSel.value = params.get('z');
+
+function bufToCanvas(rgba, w, h, zoom, checker) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.style.width = w * zoom + 'px'; c.style.height = h * zoom + 'px';
+  if (checker) c.className = 'checker';
+  c.getContext('2d').putImageData(new ImageData(rgba, w, h), 0, 0);
+  return c;
+}
+
+let timers = [];
+function clearTimers() { for (const t of timers) clearTimeout(t); timers = []; }
+
+/** Animated frame player drawing from a sheet canvas. */
+function player(sheetCanvas, frames, fw, fh, zoom, loop, meta) {
+  const c = document.createElement('canvas');
+  c.width = fw; c.height = fh;
+  c.style.width = fw * zoom + 'px'; c.style.height = fh * zoom + 'px';
+  const ctx = c.getContext('2d');
+  const cols = Math.floor(sheetCanvas.width / fw);
+  let k = 0;
+  const draw = () => {
+    const f = frames[k];
+    ctx.clearRect(0, 0, fw, fh);
+    if (meta && groundChk.checked) {
+      ctx.fillStyle = 'rgba(8,4,24,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(meta.originX * fw, meta.originY * fh, meta.shadowRadius, meta.shadowRadius * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.drawImage(sheetCanvas, (f.frame % cols) * fw, Math.floor(f.frame / cols) * fh, fw, fh, 0, 0, fw, fh);
+  };
+  const step = () => {
+    draw();
+    if (!animChk.checked) { timers.push(setTimeout(step, 200)); return; }
+    const d = frames[k].duration;
+    k++;
+    if (k >= frames.length) k = loop ? 0 : (timers.push(setTimeout(() => { k = 0; }, 500)), frames.length - 1);
+    timers.push(setTimeout(step, d));
+  };
+  step();
+  return c;
+}
+
+function cell(label, el) {
+  const d = document.createElement('div'); d.className = 'cell';
+  d.appendChild(el);
+  const s = document.createElement('span'); s.textContent = label; d.appendChild(s);
+  return d;
+}
+
+const sheetCache = new Map();
+function actorSheet(id) {
+  if (sheetCache.has(id)) return sheetCache.get(id);
+  const t0 = performance.now();
+  const s = actors.buildActorSheet(id);
+  const dt = performance.now() - t0;
+  const canvas = bufToCanvas(s.rgba, s.width, s.height, 1, false);
+  const r = { s, canvas, dt };
+  sheetCache.set(id, r);
+  return r;
+}
+
+function renderActor(id, zoom) {
+  const { s, canvas, dt } = actorSheet(id);
+  const meta = actors.ACTOR_META[id];
+  document.getElementById('stat').textContent = `${id}: ${s.frameCount} frames, ${s.width}x${s.height}, ${dt.toFixed(1)} ms`;
+  for (const anim of s.anims) {
+    if (!anim.byDir) continue;
+  }
+  const byState = new Map();
+  for (const a of s.anims) {
+    if (!byState.has(a.state)) byState.set(a.state, []);
+    byState.get(a.state).push(a);
+  }
+  for (const [state, list] of byState) {
+    const h = document.createElement('h2'); h.textContent = state; out.appendChild(h);
+    const row = document.createElement('div'); row.className = 'row';
+    for (const a of list) row.appendChild(cell(a.dir, player(canvas, a.frames, s.frameW, s.frameH, zoom, a.repeat, meta)));
+    // frame strip of the first dir
+    const strip = document.createElement('canvas');
+    const a0 = list[0];
+    strip.width = s.frameW * a0.frames.length; strip.height = s.frameH;
+    strip.style.width = strip.width * Math.max(2, zoom - 1) + 'px'; strip.style.height = strip.height * Math.max(2, zoom - 1) + 'px';
+    strip.className = 'checker';
+    const cols = Math.floor(canvas.width / s.frameW);
+    a0.frames.forEach((f, k) => strip.getContext('2d').drawImage(canvas, (f.frame % cols) * s.frameW, Math.floor(f.frame / cols) * s.frameH, s.frameW, s.frameH, k * s.frameW, 0, s.frameW, s.frameH));
+    row.appendChild(cell(a0.dir + ' frames', strip));
+    out.appendChild(row);
+  }
+}
+
+function renderStrips(id, zoom) {
+  const { s, canvas, dt } = actorSheet(id);
+  document.getElementById('stat').textContent = `${id}: ${s.frameCount} frames, ${s.width}x${s.height}, ${dt.toFixed(1)} ms`;
+  const cols = Math.floor(canvas.width / s.frameW);
+  const only = params.get('st') ? params.get('st').split(',') : null;
+  const states = [...new Set(s.anims.map((a) => a.state))].filter((st) => !only || only.includes(st));
+  for (const st of states) {
+    const row = document.createElement('div'); row.className = 'row'; row.style.marginBottom = '4px';
+    for (const a of s.anims.filter((a) => a.state === st)) {
+      const strip = document.createElement('canvas');
+      strip.width = s.frameW * a.frames.length; strip.height = s.frameH;
+      strip.style.width = strip.width * zoom + 'px'; strip.style.height = strip.height * zoom + 'px';
+      strip.className = 'checker';
+      a.frames.forEach((f, k) => strip.getContext('2d').drawImage(canvas, (f.frame % cols) * s.frameW, Math.floor(f.frame / cols) * s.frameH, s.frameW, s.frameH, k * s.frameW, 0, s.frameW, s.frameH));
+      row.appendChild(cell(st + ' ' + a.dir, strip));
+    }
+    out.appendChild(row);
+  }
+}
+
+function renderAllIdle(zoom) {
+  let total = 0;
+  const row = document.createElement('div'); row.className = 'row';
+  for (const id of actors.ACTOR_IDS) {
+    const { s, canvas, dt } = actorSheet(id);
+    total += dt;
+    const meta = actors.ACTOR_META[id];
+    for (const a of s.anims.filter((a) => a.state === 'idle' || a.state === 'run')) {
+      row.appendChild(cell(`${id} ${a.state} ${a.dir}`, player(canvas, a.frames, s.frameW, s.frameH, zoom, true, meta)));
+    }
+  }
+  out.appendChild(row);
+  document.getElementById('stat').textContent = `all actors built in ${total.toFixed(0)} ms`;
+}
+
+/** Sunken Catacombs room: floors, 2.5D walls (cap one tile up + south face), props, decals, actors and an emulated light pass. */
+function renderDungeon(zoom, lit, theme) {
+  if (!dungeon) { out.textContent = 'dungeon module missing'; return; }
+  const t0 = performance.now();
+  const sheets = dungeon.buildDungeonSheets();
+  const dt = performance.now() - t0;
+  const themeSheets = dungeon.buildThemeSheets(theme);
+  const S = Object.fromEntries([...sheets, ...themeSheets].map((sh) => [sh.key, { ...sh, canvas: bufToCanvas(sh.rgba, sh.width, sh.height, 1, false) }]));
+  const TA = themes.THEME_ART[theme];
+  const grid = ['###############', '#.............#', '#.....###.....#', '#.............#', '#..#.......#..#', '#.............#', '#.............#', '#.............#', '###############'];
+  const mw = 15, mh = 9, T = 32, oy = 34;
+  const W = mw * T, H = mh * T + oy;
+  const isWall = (x, y) => x < 0 || y < 0 || x >= mw || y >= mh || grid[y][x] === '#';
+  const hsh = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  c.style.width = (W * zoom) / 1.5 + 'px'; c.style.height = (H * zoom) / 1.5 + 'px';
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  const draw = (key, frame, dx, dy) => {
+    const sh = S[key]; const cols = Math.floor(sh.width / sh.frameW);
+    ctx.drawImage(sh.canvas, (frame % cols) * sh.frameW, Math.floor(frame / cols) * sh.frameH, sh.frameW, sh.frameH, Math.round(dx), Math.round(dy), sh.frameW, sh.frameH);
+  };
+  for (let y = 0; y < H; y += T) for (let x = 0; x < W; x += T) draw(TA.voidKey, 0, x, y);
+  for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) if (!isWall(x, y)) draw(TA.floorKey, dungeon.pickFloor(x, y, hsh(x, y)), x * T, oy + y * T);
+  draw('decal:scorch', 0, 210, oy + 120); draw('decal:puddle', 0, 60, oy + 200); draw('decal:moss', 1, 380, oy + 60); draw('decal:slime', 1, 360, oy + 220); draw('decal:blood', 1, 150, oy + 170);
+  const items = [];
+  for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) if (isWall(x, y)) {
+    const { frame } = dungeon.pickWall(isWall, x, y, hsh(x, y));
+    items.push({ y: oy + (y + 1) * T - 0.5, f: () => draw(TA.wallKey, frame, x * T, oy + (y + 1) * T - 64) });
+  }
+  const lights = [];
+  const prop = (name, x, y, frame = 0) => {
+    const p = dungeon.PROPS[name]; const sh = S[p.key];
+    const sortY = p.placement === 'wallFace' ? Math.floor((y - oy) / T + 1) * T + oy + 0.1 : y + 0.2;
+    items.push({ y: sortY, f: () => draw(p.key, frame, x - p.originX * sh.frameW, y - p.originY * sh.frameH) });
+    if (p.light) lights.push({ x, y: y - sh.frameH * p.originY * 0.7, ...p.light });
+  };
+  prop(TA.torchProp, 3 * T + 16, oy + T - 4, 1); prop(TA.torchProp, 11 * T + 16, oy + T - 4, 2); prop(TA.torchProp, 7 * T + 16, oy + 3 * T - 4, 0);
+  TA.props.slice(0, 4).forEach((pp, k) => prop(pp.id, (5 + k * 2) * T, oy + 4 * T + 10, k));
+  prop('banner', 5 * T + 16, oy + 4); prop('chains', 9 * T + 16, oy + 2); prop('cobweb', T, oy + T);
+  prop('brazier', 7 * T + 16, oy + 6 * T + 16, 1); prop('candles', 2 * T + 10, oy + 7 * T + 20); prop('skullpile', 13 * T, oy + 7 * T + 20);
+  prop('barrel', T + 18, oy + 2 * T + 20); prop('crate', 2 * T + 14, oy + 2 * T + 22); prop('bones', 10 * T, oy + 5 * T + 10); prop('rubble', 12 * T + 10, oy + 2 * T + 20); prop('grate', 9 * T + 16, oy + 7 * T + 16);
+  prop(TA.pillarProp, 3 * T + 16, oy + 5 * T); prop(TA.pillarProp, 11 * T + 16, oy + 5 * T);
+  const actor = (id, state, dir8, frame, x, y) => {
+    const { s, canvas } = actorSheet(id); const m = actors.ACTOR_META[id];
+    const { key, flipX } = actors.animFor(id, state, dir8);
+    const an = s.anims.find((a) => a.key === key); const f = an.frames[frame % an.frames.length].frame;
+    const cols = Math.floor(canvas.width / s.frameW);
+    items.push({ y, f: () => {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(x, y, m.shadowRadius, m.shadowRadius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y)); if (flipX) ctx.scale(-1, 1);
+      ctx.drawImage(canvas, (f % cols) * s.frameW, Math.floor(f / cols) * s.frameH, s.frameW, s.frameH, -Math.round(m.originX * s.frameW), -Math.round(m.originY * s.frameH), s.frameW, s.frameH);
+      ctx.restore();
+    } });
+  };
+  actor('vanguard', 'attack', 0, 3, 150, oy + 165); actor('arcanist', 'cast', 1, 2, 100, oy + 215); actor('pursuer', 'run', 4, 1, 215, oy + 160);
+  actor('skirmisher', 'idle', 3, 0, 260, oy + 110); actor('artillery', 'windup', 2, 3, 330, oy + 120); actor('guardian', 'idle', 4, 0, 300, oy + 210);
+  actor('hexer', 'attack', 2, 0, 400, oy + 150); actor('broodcaller', 'idle', 2, 1, 395, oy + 240); actor('mite', 'run', 0, 1, 250, oy + 245);
+  items.sort((a, b) => a.y - b.y); for (const it of items) it.f();
+  if (lit) {
+    const lc = document.createElement('canvas'); lc.width = W; lc.height = H; const l = lc.getContext('2d');
+    const amb = TA.ambient; l.fillStyle = 'rgb(' + ((amb >> 16) & 255) + ',' + ((amb >> 8) & 255) + ',' + (amb & 255) + ')'; l.fillRect(0, 0, W, H); l.globalCompositeOperation = 'lighter';
+    for (const L of lights) {
+      const g = l.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.radius);
+      const r = (L.color >> 16) & 255, gg = (L.color >> 8) & 255, b = L.color & 255;
+      g.addColorStop(0, 'rgba(' + r + ',' + gg + ',' + b + ',' + L.intensity + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      l.fillStyle = g; l.fillRect(L.x - L.radius, L.y - L.radius, L.radius * 2, L.radius * 2);
+    }
+    ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(lc, 0, 0); ctx.globalCompositeOperation = 'source-over';
+  }
+  out.appendChild(c);
+  document.getElementById('stat').textContent = 'dungeon: ' + sheets.length + ' sheets built in ' + dt.toFixed(1) + ' ms (light pass is a viewer emulation)';
+}
+
+/** 2:1 isometric room built from iso:floor/wall/stub/void:<theme> (front walls drawn as cut-down stubs). */
+function renderIso(zoom, theme) {
+  if (!isoMod || !dungeon || !themes) { out.textContent = 'iso modules missing'; return; }
+  const t0 = performance.now();
+  const isoSheets = isoMod.buildIsoSheets(theme);
+  const dt = performance.now() - t0;
+  const shared = dungeon.buildDungeonSheets();
+  const S = Object.fromEntries([...shared, ...isoSheets].map((sh) => [sh.key, { ...sh, canvas: bufToCanvas(sh.rgba, sh.width, sh.height, 1, false) }]));
+  const K = isoMod.isoKeys(theme);
+  const TA = themes.THEME_ART[theme];
+  const grid = ['##########', '#........#', '#..##....#', '#..##....#', '#........#', '#.....#..#', '#........#', '#........#', '#........#', '##########'];
+  const mw = 10, mh = 10;
+  const isWall = (x, y) => x < 0 || y < 0 || x >= mw || y >= mh || grid[y][x] === '#';
+  const isFront = (x, y) => isWall(x, y) && (y === mh - 1 || x === mw - 1);
+  const hsh = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+  const W = 680, H = 470, OX = W / 2 - 32, OY = 80;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  c.style.width = (W * zoom) / 2 + 'px'; c.style.height = (H * zoom) / 2 + 'px';
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  const draw = (key, frame, dx, dy, flip) => {
+    const sh = S[key]; const cols = Math.floor(sh.width / sh.frameW); const f = frame % sh.frames;
+    ctx.save(); ctx.translate(Math.round(dx), Math.round(dy)); if (flip) { ctx.translate(sh.frameW, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(sh.canvas, (f % cols) * sh.frameW, Math.floor(f / cols) * sh.frameH, sh.frameW, sh.frameH, 0, 0, sh.frameW, sh.frameH);
+    ctx.restore();
+  };
+  const tile = (x, y) => [OX + (x - y) * 32, OY + (x + y) * 16];
+  for (let y = -6; y < mh + 6; y++) for (let x = -6; x < mw + 6; x++) { const [sx, sy] = tile(x, y); draw(K.voidKey, 0, sx, sy); }
+  // seamless macro floor, then tile-aligned overlays (dais, slab, centrepiece, runner, grit along the back walls)
+  for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) if (!isWall(x, y)) { const [sx, sy] = tile(x, y); draw(K.floorKey, isoMod.isoFloorFrame ? isoMod.isoFloorFrame(x, y) : dungeon.pickFloor(x, y, hsh(x, y)), sx, sy); }
+  const D = isoMod.DECO || {};
+  const deco = [['edgeNW', 1, 1], ['edgeN0', 2, 1], ['edgeN1', 5, 1], ['edgeW0', 1, 4], ['edgeW1', 1, 6], ['slabX0', 5, 3], ['slabX1', 6, 3], ['cp0', 6, 6], ['cp1', 7, 6], ['cp2', 6, 7], ['cp3', 7, 7], ['runY0', 3, 5], ['runY', 3, 6], ['runY1', 3, 7], ['crack1', 7, 2], ['grate', 2, 8], ['dais', 4, 7], ['daisE', 5, 7], ['daisS', 4, 8], ['daisSE', 5, 8]];
+  if (S[K.decoKey]) for (const [n, x, y] of deco) { const [sx, sy] = tile(x, y); draw(K.decoKey, D[n] ?? 0, sx, sy - 8); }
+  const glowLayer = [];
+  if (S[K.floorGlowKey]) for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) if (!isWall(x, y)) { const [sx, sy] = tile(x, y); glowLayer.push(() => draw(K.floorGlowKey, isoMod.isoFloorFrame(x, y), sx, sy)); }
+  if (S[K.decoGlowKey]) for (const [n, x, y] of deco) { const [sx, sy] = tile(x, y); glowLayer.push(() => draw(K.decoGlowKey, D[n] ?? 0, sx, sy - 8)); }
+  const items = [];
+  for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) if (isWall(x, y)) {
+    const [sx, sy] = tile(x, y); const h = hsh(x, y);
+    if (isFront(x, y)) {
+      items.push({ d: x + y, f: () => draw(K.stubKey, h % 4, sx, sy - 16) });
+      // the slab's side face hanging into the chasm under the cut front walls
+      if (S[K.cliffKey]) { if (y === mh - 1) items.push({ d: -1, f: () => draw(K.cliffKey, h % 3, sx, sy) }); if (x === mw - 1) items.push({ d: -1, f: () => draw(K.cliffKey, 3 + (h % 3), sx, sy) }); }
+    } else {
+      const frame = isoMod.pickIsoWall ? isoMod.pickIsoWall(theme, isWall, x, y, 3) : (h % 4 === 0 ? 8 + ((h >>> 3) % 8) : (h >>> 5) % 8);
+      items.push({ d: x + y, f: () => draw(K.wallKey, frame, sx, sy - 64) });
+    }
+  }
+  const lights = [];
+  const prop = (id, tx, ty, frame = 0) => {
+    const p = dungeon.PROPS[id]; const sh = S[p.key]; const [sx, sy] = tile(tx, ty); const fx = sx + 32, fy = sy + 16;
+    items.push({ d: tx + ty + 0.01, f: () => draw(p.key, frame, fx - p.originX * sh.frameW, fy - p.originY * sh.frameH) });
+    if (p.light) lights.push({ x: fx, y: fy - sh.frameH * p.originY * 0.6, radius: p.light.radius * 1.3, color: p.light.color, intensity: p.light.intensity });
+  };
+  const actor = (id, state, dir8, tx, ty) => {
+    const { s, canvas } = actorSheet(id); const m = actors.ACTOR_META[id];
+    const { key, flipX } = actors.animFor(id, state, dir8);
+    const an = s.anims.find((a) => a.key === key); const f = an.frames[1 % an.frames.length].frame;
+    const cols = Math.floor(canvas.width / s.frameW); const [sx, sy] = tile(tx, ty); const fx = sx + 32, fy = sy + 16;
+    items.push({ d: tx + ty + 0.02, f: () => {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(fx, fy, m.shadowRadius, m.shadowRadius * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(Math.round(fx), Math.round(fy)); if (flipX) ctx.scale(-1, 1);
+      ctx.drawImage(canvas, (f % cols) * s.frameW, Math.floor(f / cols) * s.frameH, s.frameW, s.frameH, -Math.round(m.originX * s.frameW), -Math.round(m.originY * s.frameH), s.frameW, s.frameH);
+      ctx.restore();
+    } });
+  };
+  prop('brazier', 6.5, 2.5, 1); prop(TA.props[0].id, 2.5, 6.5); prop(TA.props[1].id, 7.5, 7.2, 1); prop(TA.props[2].id, 1.6, 1.6, 2);
+  const enemy = { catacombs: 'gaoler', flooded: 'artillery', ossuary: 'guardian', sanctum: 'gloomshade', fungal: 'webweaver', forge: 'pursuer', frost: 'rimewraith' }[theme] || 'pursuer';
+  actor('vanguard', 'idle', 1, 4.5, 5.5); actor('arcanist', 'idle', 0, 3.2, 7.4); actor(enemy, 'idle', 3, 6.6, 4.0);
+  items.sort((a, b) => a.d - b.d); for (const it of items) it.f();
+  lights.push({ x: OX + 3 * 32 + 32, y: OY + 3 * 16 - 40, radius: 190, color: TA.torchColor, intensity: 1 });
+  lights.push({ x: OX - 5 * 32 + 32, y: OY + 5 * 16 - 40, radius: 190, color: TA.torchColor, intensity: 1 });
+  const lc = document.createElement('canvas'); lc.width = W; lc.height = H; const l = lc.getContext('2d');
+  const amb = TA.ambient; l.fillStyle = 'rgb(' + ((amb >> 16) & 255) + ',' + ((amb >> 8) & 255) + ',' + (amb & 255) + ')'; l.fillRect(0, 0, W, H); l.globalCompositeOperation = 'lighter';
+  for (const L of lights) {
+    const g = l.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.radius);
+    g.addColorStop(0, 'rgba(' + ((L.color >> 16) & 255) + ',' + ((L.color >> 8) & 255) + ',' + (L.color & 255) + ',' + L.intensity + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    l.fillStyle = g; l.fillRect(L.x - L.radius, L.y - L.radius, L.radius * 2, L.radius * 2);
+  }
+  ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(lc, 0, 0);
+  // unlit emissive layers (lava seams, mycelium, sigils) add on top of the lit scene
+  ctx.globalCompositeOperation = 'lighter'; for (const g of glowLayer) g(); ctx.globalCompositeOperation = 'source-over';
+  out.appendChild(c);
+  document.getElementById('stat').textContent = 'iso ' + theme + ': terrain built in ' + dt.toFixed(1) + ' ms (light pass is a viewer emulation)';
+}
+
+function renderIsoSheets(zoom) {
+  if (!isoMod) { out.textContent = 'iso module missing'; return; }
+  for (const theme of themes.THEME_IDS) {
+    for (const sh of isoMod.buildIsoSheets(theme)) {
+      const h = document.createElement('h2'); h.textContent = sh.key + ' (' + sh.frameW + 'x' + sh.frameH + ' x' + sh.frames + ')'; out.appendChild(h);
+      out.appendChild(bufToCanvas(sh.rgba, sh.width, sh.height, Math.max(1, zoom - 1), true));
+      if (sh.normal) {
+        const hn = document.createElement('h2'); hn.textContent = sh.key + ':n (Light2D normal map)'; out.appendChild(hn);
+        out.appendChild(bufToCanvas(sh.normal, sh.width, sh.height, Math.max(1, zoom - 1), true));
+      }
+    }
+  }
+}
+
+function renderDungeonSheets(zoom) {
+  if (!dungeon) { out.textContent = 'dungeon module missing'; return; }
+  for (const sh of dungeon.buildDungeonSheets()) {
+    const h = document.createElement('h2'); h.textContent = sh.key + ' (' + sh.frameW + 'x' + sh.frameH + ' x' + sh.frames + ')'; out.appendChild(h);
+    out.appendChild(bufToCanvas(sh.rgba, sh.width, sh.height, Math.max(1, zoom - 1), true));
+  }
+}
+
+function renderTiles(zoom) {
+  if (!tiles) { out.textContent = 'tiles module missing'; return; }
+  const t0 = performance.now();
+  const ts = tiles.buildTileset();
+  const bg = tiles.buildBackdrop();
+  const dt = performance.now() - t0;
+  document.getElementById('stat').textContent = `tiles ${ts.frameCount} frames + backdrop in ${dt.toFixed(1)} ms`;
+  const h = document.createElement('h2'); h.textContent = 'tileset (frame index order)'; out.appendChild(h);
+  out.appendChild(bufToCanvas(ts.rgba, ts.width, ts.height, zoom, true));
+  // sample map
+  const h2 = document.createElement('h2'); h2.textContent = 'sample map with pickTile + decor over backdrop'; out.appendChild(h2);
+  const W = 30, H = 17, T = tiles.TILE_SIZE;
+  const map = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const edge = x === 0 || y === 0 || x === W - 1 || y === H - 1;
+    const blob = (x > 6 && x < 10 && y > 4 && y < 8) || (x > 18 && x < 23 && y > 8 && y < 12) || (x === 14 && y > 2 && y < 6) || (x > 24 && y < 4);
+    map.push(edge || blob);
+  }
+  const isWall = (x, y) => x < 0 || y < 0 || x >= W || y >= H || map[y * W + x];
+  const c = document.createElement('canvas'); c.width = W * T; c.height = H * T;
+  c.style.width = W * T * Math.min(zoom, 2) / 2 * 2 + 'px';
+  const ctx = c.getContext('2d');
+  const bgc = bufToCanvas(bg.rgba, bg.width, bg.height, 1, false);
+  ctx.drawImage(bgc, 0, 0, bg.width * 2, bg.height * 2);
+  const tc = bufToCanvas(ts.rgba, ts.width, ts.height, 1, false);
+  const cols = Math.floor(ts.width / T);
+  const decor = tiles.decorFrames();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const hsh = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+    const f = tiles.pickTile(isWall, x, y, hsh);
+    ctx.drawImage(tc, (f % cols) * T, Math.floor(f / cols) * T, T, T, x * T, y * T, T, T);
+    if (!isWall(x, y) && hsh % 9 === 0) {
+      const d = decor[hsh % decor.length];
+      ctx.drawImage(tc, (d % cols) * T, Math.floor(d / cols) * T, T, T, x * T, y * T, T, T);
+    }
+  }
+  c.style.width = W * T + 'px'; c.style.height = H * T + 'px';
+  out.appendChild(c);
+  const h3 = document.createElement('h2'); h3.textContent = 'backdrop 480x270'; out.appendChild(h3);
+  out.appendChild(bufToCanvas(bg.rgba, bg.width, bg.height, 2, false));
+}
+
+function renderEffects(zoom) {
+  if (!effects) { out.textContent = 'effects module missing'; return; }
+  const t0 = performance.now();
+  const list = effects.buildEffects();
+  const dt = performance.now() - t0;
+  document.getElementById('stat').textContent = `${list.length} effect sheets in ${dt.toFixed(1)} ms`;
+  const row = document.createElement('div'); row.className = 'row';
+  for (const e of list) {
+    const canvas = bufToCanvas(e.rgba, e.width, e.height, 1, false);
+    const frames = Array.from({ length: e.frames }, (_, k) => ({ frame: k, duration: e.durations[k] ?? 80 }));
+    const p = player(canvas, frames, e.frameW, e.frameH, zoom, true, null);
+    p.className = 'checker';
+    row.appendChild(cell(e.key, p));
+    const strip = bufToCanvas(e.rgba, e.width, e.height, Math.max(2, zoom - 1), true);
+    row.appendChild(cell(e.key + ' sheet', strip));
+  }
+  out.appendChild(row);
+}
+
+function renderIcons(zoom) {
+  if (!icons) { out.textContent = 'icons module missing'; return; }
+  const z = zoom * 1.5;
+  const draw = (pixels, label) => {
+    const c = document.createElement('canvas'); c.width = 16; c.height = 16;
+    c.style.width = 16 * z + 'px'; c.style.height = 16 * z + 'px';
+    const ctx = c.getContext('2d');
+    for (const [x, y, w, h, col] of pixels) { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
+    return cell(label, c);
+  };
+  const groups = [
+    ['cards', (iconContent ? iconContent.cards.map((c) => c.id) : icons.CARD_IDS).map((id) => [id, icons.cardIconPixels(id)])],
+    ['nodes (hand-made catalog)', icons.NODE_IDS.map((id) => [id, icons.nodeIconPixels(id)])],
+    ...(iconContent ? iconContent.classes.flatMap((cl) => cl.branches.map((b) => [`nodes: ${cl.id} / ${b.id}`, iconContent.nodes.filter((n) => n.classId === cl.id && n.branch === b.id).sort((a, z) => a.tier - z.tier).map((n) => [`${n.id} t${n.tier}`, icons.nodeIconPixels(n.id)])])) : []),
+    ['class emblems', icons.CLASS_IDS.map((id) => [id, icons.classEmblemPixels(id)])],
+    ['stats', icons.STAT_NAMES.map((id) => [id, icons.statIconPixels(id)])],
+    ['unknown', [['???', icons.cardIconPixels('nope')]]],
+  ];
+  for (const [title, list] of groups) {
+    const h = document.createElement('h2'); h.textContent = title; out.appendChild(h);
+    const row = document.createElement('div'); row.className = 'row';
+    for (const [id, px] of list) row.appendChild(draw(px, id));
+    out.appendChild(row);
+  }
+}
+
+let engine = null;
+function renderAudio() {
+  if (!audio) { out.textContent = 'audio module missing'; return; }
+  const cap = document.createElement('div'); cap.style.margin = '8px 0'; cap.textContent = 'captions appear here';
+  const mk = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; b.style.margin = '3px'; return b; };
+  if (!engine) engine = new audio.AudioEngine((text, id) => { cap.textContent = `[${id}] ${text}`; });
+  const h = document.createElement('h2'); h.textContent = 'Music'; out.appendChild(h);
+  for (const t of ['menu', 'combat', 'boss', null]) out.appendChild(mk(String(t), async () => { await engine.unlock(); engine.setMusic(t); }));
+  const lab = document.createElement('label'); lab.textContent = ' intensity ';
+  const rng = document.createElement('input'); rng.type = 'range'; rng.min = '0'; rng.max = '1'; rng.step = '0.05'; rng.value = '0.3';
+  rng.oninput = () => engine.setIntensity(Number(rng.value));
+  lab.appendChild(rng); out.appendChild(lab);
+  const h2 = document.createElement('h2'); h2.textContent = 'SFX'; out.appendChild(h2);
+  for (const id of audio.SFX_IDS) out.appendChild(mk(id, async () => { await engine.unlock(); engine.play(id, { pan: (Math.random() - 0.5) * 0.6 }); }));
+  out.appendChild(cap);
+}
+
+function render() {
+  clearTimers();
+  out.innerHTML = '';
+  const zoom = Number(zoomSel.value);
+  const s = sectionSel.value;
+  history.replaceState(null, '', `?s=${encodeURIComponent(s)}&z=${zoom}${params.get('st') ? '&st=' + params.get('st') : ''}`);
+  try {
+    if (s.startsWith('actor:')) renderActor(s.slice(6), zoom);
+    else if (s.startsWith('strips:')) renderStrips(s.slice(7), zoom);
+    else if (s === 'actors:all-idle') renderAllIdle(zoom);
+    else if (s === 'tiles') renderTiles(zoom);
+    else if (s === 'dungeon') renderDungeon(zoom, true, 'catacombs');
+    else if (s.startsWith('dungeon@')) renderDungeon(zoom, true, s.slice(8));
+    else if (s.startsWith('iso@')) renderIso(zoom, s.slice(4));
+    else if (s === 'iso:sheets') renderIsoSheets(zoom);
+    else if (s === 'dungeon:sheets') renderDungeonSheets(zoom);
+    else if (s === 'effects') renderEffects(zoom);
+    else if (s === 'icons') renderIcons(zoom);
+    else if (s === 'audio') renderAudio();
+  } catch (e) { err.textContent += String(e && e.stack || e) + '\n'; }
+}
+sectionSel.onchange = render; zoomSel.onchange = render;
+render();
+</script>
+</body>
+</html>
