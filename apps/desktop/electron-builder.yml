@@ -57,6 +57,8 @@ mac:
 dmg:
   artifactName: CURSEBOUND-${version}-${arch}.${ext}
 linux:
+  # the default comes from the package name (@cursebound/desktop), which is not a valid file name
+  executableName: cursebound
   target: [AppImage]
   category: Game
   icon: build/icon.png
