@@ -66,7 +66,9 @@ describe('download site', () => {
     expect(r.headers.get('location')).toBeNull();
     expect(r.headers.get('content-disposition')).toBe('attachment; filename="CURSEBOUND-Setup-0.1.9.exe"');
     expect(r.headers.get('content-type')).toBe('application/octet-stream');
-    expect(r.headers.get('content-length')).toBe(String(INSTALLER.length));
+    // streamed (chunked): Cloud Run rejects non-streamed responses over 32 MiB
+    expect(r.headers.get('content-length')).toBeNull();
+    expect(r.headers.get('transfer-encoding')).toBe('chunked');
     const body = Buffer.from(await r.arrayBuffer());
     expect(body.equals(INSTALLER)).toBe(true);
   });

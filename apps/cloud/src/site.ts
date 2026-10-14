@@ -75,11 +75,11 @@ export function createSite({ cfg, log, fetchImpl = fetch }: SiteDeps): Site {
       cached = null;
       return plain(res, 502, 'The download could not be started. Please try again.', requestId);
     }
-    const length = up.headers.get('content-length');
+    // no content-length: Cloud Run caps non-streamed responses at 32 MiB, while chunked (streamed) responses are
+    // uncapped; the installer is ~100 MB. The browser shows progress without a total.
     res.writeHead(200, {
       'content-type': 'application/octet-stream',
       'content-disposition': `attachment; filename="${info.name}"`,
-      ...(length ? { 'content-length': length } : {}),
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
       'x-request-id': requestId,
