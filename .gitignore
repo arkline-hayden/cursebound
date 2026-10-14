@@ -21,3 +21,4 @@ apps/desktop/release/
 *.key
 gcp-*.json
 .claude/settings.local.json
+.claude/worktrees/
