@@ -8,6 +8,7 @@ import { RULES_VERSION, SCORE_VERSION, contentHash } from '@cursebound/content';
 import type { CloudConfig } from './config';
 import type { CloudLog } from './log';
 import type { PgAccountStore, RunSubmission } from './store';
+import { createSite } from './site';
 import { iceServers } from './turn';
 
 // Cloud HTTP API (docs/contracts/ONLINE_CONTRACT.md, base /api/v1): the shared account routes with bearer sessions,
@@ -114,9 +115,12 @@ export interface CloudApiDeps {
   friendsChanged: (accountIds: string[]) => void;
   /** live presence sockets, reported by /healthz */
   connections: () => number;
+  /** injectable for tests (the download site fetches the latest installer) */
+  fetchImpl?: typeof fetch;
 }
 
-export function createCloudApi({ cfg, store, log, friendsChanged, connections }: CloudApiDeps) {
+export function createCloudApi({ cfg, store, log, friendsChanged, connections, fetchImpl }: CloudApiDeps) {
+  const site = createSite({ cfg, log, fetchImpl });
   const idem = new Map<string, { at: number; status: number; body: unknown }>();
   setInterval(() => { const now = Date.now(); for (const [k, v] of idem) if (now - v.at > 10 * 60000) idem.delete(k); }, 60000).unref();
   const rate = new Throttle(cfg.ratePerMinute, 60_000);
@@ -245,6 +249,8 @@ export function createCloudApi({ cfg, store, log, friendsChanged, connections }:
       const ip = clientAddress(cfg, req);
       if (rate.blocked(ip)) throw new HttpError(429, 'RATE_LIMITED', 'too many requests — slow down');
       rate.hit(ip);
+      // the public download site (landing page + streamed installer) lives outside the JSON API
+      if ((method === 'GET' || method === 'HEAD') && site.handles(path)) { await site.serve(req, res, path, requestId); status = res.statusCode; return; }
       const mutating = method !== 'GET' && method !== 'HEAD';
       if (mutating && req.headers['content-type'] && !String(req.headers['content-type']).startsWith('application/json')) throw new HttpError(415, 'INVALID_INPUT', 'JSON required');
       // replayed responses are scoped to the presented token so one account never receives another's cached reply;

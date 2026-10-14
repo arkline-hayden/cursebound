@@ -23,6 +23,10 @@ export interface CloudConfig {
    * so the right-most entry is trustworthy (1). Behind an extra load balancer use 2. 0 = use the socket peer.
    */
   trustProxyHops: number;
+  /** owner/name of the repository whose latest release the public download site serves */
+  releasesRepo: string;
+  /** releases API base (tests point it at a fake) */
+  releasesApi: string;
 }
 
 const int = (v: string | undefined, d: number, min = 0) => {
@@ -44,5 +48,7 @@ export function loadCloudConfig(env: NodeJS.ProcessEnv = process.env): CloudConf
     registerPerHour: int(env.REGISTER_PER_HOUR, 20, 1),
     ratePerMinute: int(env.RATE_PER_MINUTE, 600, 1),
     trustProxyHops: int(env.TRUST_PROXY_HOPS, onCloudRun ? 1 : 0),
+    releasesRepo: env.RELEASES_REPO || 'arkline-hayden/cursebound',
+    releasesApi: (env.RELEASES_API || 'https://api.github.com').replace(/\/+$/, ''),
   };
 }

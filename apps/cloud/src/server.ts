@@ -24,7 +24,7 @@ export interface CloudServer {
   close(): Promise<void>;
 }
 
-export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log?: CloudLog; presence?: typeof attachPresence } = {}): Promise<CloudServer> {
+export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log?: CloudLog; presence?: typeof attachPresence; fetchImpl?: typeof fetch } = {}): Promise<CloudServer> {
   const env = opts.env ?? process.env;
   const cfg = loadCloudConfig(env);
   const log = opts.log ?? createCloudLogger({ build: cfg.build, level: env.LOG_LEVEL });
@@ -45,7 +45,7 @@ export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log
   };
 
   let presence: PresenceHandle | null = null;
-  const api = createCloudApi({ cfg, store, log, friendsChanged, connections: () => presence?.connections() ?? 0 });
+  const api = createCloudApi({ cfg, store, log, friendsChanged, connections: () => presence?.connections() ?? 0, fetchImpl: opts.fetchImpl });
   const server = http.createServer((req, res) => { void api(req, res); });
   server.requestTimeout = 30_000;
   server.headersTimeout = 20_000;
