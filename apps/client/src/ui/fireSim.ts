@@ -4,18 +4,22 @@
 
 import { dither, type RGB } from './pixelSkin';
 
-export type FirePaletteId = 'ember' | 'blood' | 'arcane';
-export type MetalId = 'bronze' | 'bone' | 'blood';
+export type FirePaletteId = 'ember' | 'blood' | 'arcane' | 'spirit';
+export type MetalId = 'bronze' | 'bone' | 'blood' | 'moon';
 
 const FIRE: Record<FirePaletteId, RGB[]> = {
   ember: [0x2a0503, 0x4a0805, 0x701008, 0x9c1a0a, 0xc8340c, 0xe85e12, 0xf6901e, 0xffbe3a, 0xffe07a, 0xfff6c8],
   blood: [0x1c0204, 0x360408, 0x56070e, 0x7a0b14, 0xa0121c, 0xc81e24, 0xe83a2e, 0xff6a48, 0xff9c78, 0xffd2b8],
   arcane: [0x0e0620, 0x1c0b3c, 0x2c1260, 0x40208a, 0x5a32b8, 0x7646e0, 0x8e6af6, 0xa894ff, 0xccc0ff, 0xf0ecff],
+  // ghost fire for the title: violet roots cooling into spectral cyan, white-hot tips
+  spirit: [0x0a0618, 0x160c34, 0x241656, 0x30287a, 0x2c4c9c, 0x2a78bc, 0x3aa6d6, 0x6ad2ea, 0xaef0fa, 0xeefeff],
 };
 const METAL: Record<MetalId, { hi: RGB; top: RGB[]; low: RGB[]; shade: RGB }> = {
   bronze: { hi: 0xfff1c2, top: [0xf0cf78, 0xd29d3e, 0xa46f24], low: [0x764916, 0xa46f24, 0xd29d3e], shade: 0x2a1606 },
   bone: { hi: 0xffffff, top: [0xfffaee, 0xebe0c8, 0xc6b698], low: [0x998a71, 0xc6b698, 0xebe0c8], shade: 0x3a3226 },
   blood: { hi: 0xffb8a0, top: [0xff8a6a, 0xdc3f3b, 0xac1d29], low: [0x4a0910, 0x78101a, 0xac1d29], shade: 0x160204 },
+  // moonlit silver with a cold blue undertone (title wordmark)
+  moon: { hi: 0xffffff, top: [0xf2f8ff, 0xc8d8ee, 0x96aed0], low: [0x4e5f86, 0x7088b0, 0xa8bedc], shade: 0x0c1028 },
 };
 
 export class FireTitleSim {

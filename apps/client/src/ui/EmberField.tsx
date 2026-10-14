@@ -10,10 +10,13 @@ import { runLoop, useReducedMotion } from './motion';
 
 const PX = 4;
 const COLORS = ['#fff4c8', '#ffd36a', '#f39a2a', '#d8581c', '#9c2a14', '#5a140c'];
+// spirit motes: pale ghost-light cooling through spectral cyan into violet
+const SPIRIT = ['#f4feff', '#bff4fc', '#7ad8ee', '#4a9ad4', '#4c5cb4', '#3a2c7a'];
 
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; big: boolean }
+interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; big: boolean; spirit: boolean }
 
-export function EmberField({ intensity = 1 }: { intensity?: number }) {
+/** `spirit`: share (0..1) of particles that are drifting spirit motes instead of embers. */
+export function EmberField({ intensity = 1, spirit = 0 }: { intensity?: number; spirit?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const reduced = useReducedMotion();
   useEffect(() => {
@@ -28,11 +31,14 @@ export function EmberField({ intensity = 1 }: { intensity?: number }) {
     const sparks: Spark[] = [];
     const target = () => Math.round((W * H) / 900 * gfx().particles * intensity);
     const spawn = (anywhere: boolean): Spark => {
-      const max = 90 + Math.random() * 160;
+      const isSpirit = Math.random() < spirit;
+      // spirits live longer, rise slowly and may start anywhere in the lower half (they seep up, not shoot up)
+      const max = isSpirit ? 220 + Math.random() * 260 : 90 + Math.random() * 160;
       return {
-        x: Math.random() * W, y: anywhere ? Math.random() * H : H + Math.random() * 6,
-        vx: (Math.random() - 0.35) * 0.18, vy: -(0.12 + Math.random() * 0.35),
-        life: anywhere ? Math.random() * max : 0, max, big: Math.random() < 0.12,
+        x: Math.random() * W, y: anywhere ? Math.random() * H : isSpirit ? H * (0.5 + Math.random() * 0.5) : H + Math.random() * 6,
+        vx: isSpirit ? (Math.random() - 0.5) * 0.06 : (Math.random() - 0.35) * 0.18,
+        vy: isSpirit ? -(0.04 + Math.random() * 0.1) : -(0.12 + Math.random() * 0.35),
+        life: anywhere ? Math.random() * max : 0, max, big: Math.random() < (isSpirit ? 0.3 : 0.12), spirit: isSpirit,
       };
     };
     for (let i = 0; i < target(); i++) sparks.push(spawn(true));
@@ -46,13 +52,14 @@ export function EmberField({ intensity = 1 }: { intensity?: number }) {
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i]!;
         s.life++;
-        s.x += s.vx + wind + Math.sin((s.life + i * 13) / 9) * 0.06;
+        s.x += s.vx + (s.spirit ? Math.sin((s.life + i * 29) / 40) * 0.12 : wind + Math.sin((s.life + i * 13) / 9) * 0.06);
         s.y += s.vy;
         if (s.life > s.max || s.y < -2) { if (sparks.length > want) sparks.splice(i, 1); else sparks[i] = spawn(false); continue; }
         const k = s.life / s.max;
-        const c = COLORS[Math.min(COLORS.length - 1, Math.floor(k * COLORS.length))]!;
-        // flicker: occasionally skip a frame late in life
-        if (k > 0.7 && ((s.life + i) & 3) === 0) continue;
+        const ramp = s.spirit ? SPIRIT : COLORS;
+        const c = ramp[Math.min(ramp.length - 1, Math.floor(k * ramp.length))]!;
+        // flicker: embers skip frames late in life; spirits twinkle (fade in, slow on/off pulse, fade out)
+        if (s.spirit ? (k < 0.08 && ((s.life + i) & 1) === 0) || Math.sin((s.life + i * 17) / 11) < -0.75 : k > 0.7 && ((s.life + i) & 3) === 0) continue;
         g.fillStyle = c;
         const x = Math.round(s.x), y = Math.round(s.y);
         g.fillRect(x, y, 1, 1);
@@ -60,7 +67,7 @@ export function EmberField({ intensity = 1 }: { intensity?: number }) {
       }
     }, 30);
     return () => { stop(); window.removeEventListener('resize', size); };
-  }, [reduced, intensity]);
+  }, [reduced, intensity, spirit]);
   if (reduced) return null;
   return <canvas ref={ref} className="ember-field" aria-hidden="true" />;
 }

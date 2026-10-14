@@ -17,6 +17,7 @@ import { presenceOnline, presenceStore, resolveCode, setStatus, startPresence, t
 import { ClassPicker } from '@/ui/ClassPicker';
 import { EmberField } from '@/ui/EmberField';
 import { FireTitle } from '@/ui/FireTitle';
+import { SpectralHalo } from '@/ui/SpectralHalo';
 import { FriendsPanel, InviteToasts } from '@/ui/Friends';
 import { ClassEmblem } from '@/ui/icons';
 
@@ -231,7 +232,7 @@ export default function Home() {
     <div className={`menu-root title-root stage-${stage}`}>
       <MenuBackdrop classId={classId} />
       <div className="vignette-screen" aria-hidden="true" />
-      <EmberField intensity={stage === 'title' ? 1.4 : 0.8} />
+      <EmberField intensity={stage === 'title' ? 1.4 : 0.8} spirit={stage === 'title' ? 0.65 : 0.5} />
       <div className="title-letterbox top" aria-hidden="true" />
       <div className="title-letterbox bottom" aria-hidden="true" />
 
@@ -254,11 +255,12 @@ export default function Home() {
 
       <main id="main" className="title-main">
         <header className="title-logo">
+          <SpectralHalo />
           <div className="menu-logo-row">
             <span className="torch" aria-hidden="true" />
             <h1>
               <span className="sr-only">Cursebound</span>
-              <FireTitle text="CURSEBOUND" family='"Cinzel"' weight={900} fontPx={40} scale={stage === 'title' ? Math.min(4, logoScale + 1) : logoScale} fire="ember" metal="bronze" fallbackClassName="fire-fallback" />
+              <FireTitle text="CURSEBOUND" family='"Cinzel"' weight={900} fontPx={40} scale={stage === 'title' ? Math.min(4, logoScale + 1) : logoScale} fire="spirit" metal="moon" fallbackClassName="fire-fallback" />
             </h1>
             <span className="torch" aria-hidden="true" />
           </div>
