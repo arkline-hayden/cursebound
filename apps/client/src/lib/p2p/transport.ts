@@ -7,6 +7,8 @@ export type TransportState = 'connecting' | 'open' | 'closed';
 export interface GameTransport {
   readonly readyState: TransportState;
   send(data: string): void;
+  /** fires on the transition to open only: a transport handed over already open (a guest's channel after the join
+   * handshake) does not fire it, so attach handlers, then check readyState */
   onopen: (() => void) | null;
   onmessage: ((data: string) => void) | null;
   /** code/reason follow WebSocket close semantics (4001-4004 = refused by the authority) */
@@ -81,7 +83,6 @@ export function channelTransport(ch: ChannelLike, onDispose?: () => void): GameT
     t.onmessage?.(s);
   };
   ch.onclose = () => finish(1006, 'peer connection lost');
-  // already open (the join handshake ran on it): announce once the caller has attached its handlers
-  if (state === 'open') queueMicrotask(() => { if (state === 'open') t.onopen?.(); });
+  // usually already open (the join handshake ran on it): no onopen event follows, see GameTransport.onopen
   return t;
 }

@@ -3,7 +3,11 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { LIMITS } from '@cursebound/protocol';
 import { GameConnection, netStore } from '@/lib/net';
+import { guestSession, guestTransport } from '@/lib/p2p/guest';
+import { MID_RUN_JOIN, hostStore, hostingRecord, startHostBridge } from '@/lib/p2p/host';
+import { setStatus, startPresence } from '@/lib/p2p/presence';
 import { getSeat, cachedProfile } from '@/lib/profile';
 import { initSettings, settingsStore, updateSettings } from '@/lib/settings';
 import { useStore } from '@/lib/store';
@@ -41,18 +45,38 @@ export default function Play() {
   const serverPaused = useStore(netStore, (s) => s.paused);
   const welcome = useStore(netStore, (s) => s.welcome);
   const settings = useStore(settingsStore, (s) => s.s);
+  const hosting = useStore(hostStore, (s) => s.room);
   const audioRef = useRef<AudioEngine | null>(null);
 
   useEffect(() => {
     const seat = getSeat();
     const p = cachedProfile();
     initSettings(p?.id);
+    startPresence();
     if (!seat) { setMissing(true); return; }
-    const c = new GameConnection(seat.roomId, seat.token);
+    // a peer-to-peer guest reaches the room through the host's bridge; everyone else talks to their own authority
+    const g = guestSession();
+    const c = new GameConnection(seat.roomId, seat.token, g?.roomId === seat.roomId ? () => guestTransport(seat.roomId) : undefined);
     c.connect();
     setNet(c);
+    // the tab that opened this co-op room hosts it for friends (the bridge outlives route changes)
+    const h = hostingRecord();
+    if (h?.roomId === seat.roomId) startHostBridge({ roomId: h.roomId, code: h.code, maxSeats: LIMITS.maxSeats });
     return () => { c.close(); };
   }, []);
+
+  // presence: friends see the party, and Join while a co-op room this tab hosts has an open seat
+  useEffect(() => {
+    if (!room) return;
+    const maxSeats = room.mode === 'solo' ? 1 : LIMITS.maxSeats;
+    const state = room.stage === 'LOBBY' ? 'lobby' : 'run';
+    const open = room.mode === 'coop' && room.seats.length < maxSeats && (state === 'lobby' || MID_RUN_JOIN);
+    setStatus({
+      state, joinable: open && hosting?.roomId === room.roomId, mode: room.mode, seats: room.seats.length, maxSeats,
+      ...(room.mode === 'coop' ? { roomCode: room.code } : {}),
+      ...(phase && state === 'run' ? { round: phase.round, ...(phase.map?.theme ? { theme: phase.map.theme } : {}) } : {}),
+    });
+  }, [room, hosting, phase?.round, phase?.map?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // audio engine: created lazily, unlocked by the first explicit gesture (browser autoplay policy)
   useEffect(() => {

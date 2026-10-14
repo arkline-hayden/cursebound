@@ -157,7 +157,8 @@ describe('peer-to-peer guest ⇄ host bridge', () => {
     const t = channelTransport(open.channel, open.dispose);
     const got: string[] = [];
     t.onmessage = (d) => got.push(d);
-    await new Promise<void>((r) => { t.onopen = () => r(); });
+    // handed over already open: no onopen event follows (GameTransport contract)
+    expect(t.readyState).toBe('open');
     const hello = JSON.stringify({ t: 'HELLO', protocol: 1, roomId: 'room-1', seatToken: 'tok-p-guest' });
     t.send(hello);
     t.send('{"t":"PING","c":1}');
@@ -253,6 +254,31 @@ describe('GameConnection over a transport', () => {
     expect(JSON.parse(made[1].sent[0]).seatToken).toBe('seat-tok');
     made[1].serverClose(4004, 'seat not found');
     expect(netStore.get()).toMatchObject({ status: 'error', error: 'seat not found' });
+    c.close();
+  });
+
+  it('runs a guest end to end: join through the bridge, then HELLO over the already-open channel, then rejoin', async () => {
+    const s = setup(); bridges.push(s.bridge);
+    const first = await openGuestLink(s.guestDeps(GUEST), HOST, { rpc: 'join', classId: 'vanguard', code: 'ABC123' });
+    let claimed = false;
+    // like guest.ts: the join's channel on first use, a re-signalled rejoin afterwards
+    const factory = async () => {
+      if (!claimed) { claimed = true; return channelTransport(first.channel, first.dispose); }
+      const again = await openGuestLink(s.guestDeps(GUEST), HOST, { rpc: 'rejoin', roomId: 'room-1', code: 'ABC123' });
+      return channelTransport(again.channel, again.dispose);
+    };
+    const c = new GameConnection('room-1', first.reply.seatToken!, factory);
+    c.connect();
+    await until(() => s.sockets[0]?.sent.length === 1);
+    expect(JSON.parse(s.sockets[0].sent[0])).toMatchObject({ t: 'HELLO', roomId: 'room-1', seatToken: 'tok-p-guest' });
+    expect(netStore.get().status).toBe('open');
+    s.sockets[0].onmessage!(JSON.stringify({ t: 'PAUSED', paused: true, reason: 'test' }));
+    await until(() => netStore.get().paused.paused);
+    // the host's authority drops the socket (not a refusal): the guest re-signals and says HELLO again
+    s.sockets[0].serverClose(1006, 'lost');
+    await until(() => s.sockets.length === 2 && s.sockets[1].sent.length === 1, 3000);
+    expect(JSON.parse(s.sockets[1].sent[0]).seatToken).toBe('tok-p-guest');
+    expect(s.joins).toHaveLength(1);
     c.close();
   });
 });

@@ -8,6 +8,9 @@ import { attachPresence, type PresenceIdentity } from './presence';
 // Refuses to start when NODE_ENV=production or without the explicit flag (`--dev` or CURSEBOUND_DEV_PRESENCE=1).
 //
 //   npm run dev:presence -w @cursebound/cloud      (CURSEBOUND_PRESENCE_HOST / CURSEBOUND_PRESENCE_PORT, default 127.0.0.1:8788)
+//
+// For the full two-tab demo (hub + authority + client wired together) run `node scripts/p2p-demo.mjs`; its header
+// has the steps.
 
 const devFlag = process.argv.includes('--dev') || process.env.CURSEBOUND_DEV_PRESENCE === '1';
 if (process.env.NODE_ENV === 'production' || !devFlag) {

@@ -3,17 +3,21 @@
 import Link from 'next/link';
 import { CLASSES, CLASS_BY_ID } from '@cursebound/content';
 import { netStore, type GameConnection } from '@/lib/net';
+import { presenceStore } from '@/lib/p2p/presence';
 import { useStore } from '@/lib/store';
 import { ActorPortrait, actorFor } from './ClassPortrait';
 import { ClassPicker } from './ClassPicker';
+import { InviteFriends } from './Friends';
 
 // LOBBY (PRD §16.1): invite code, roster, classes, readiness and trust mode. No host privileges.
 // A gothic character-select hall sized to fit 1280x720: header with the code tablet, the shared vessel picker beside
 // the gathered roster, and a pinned footer so Leave and Ready are always on screen.
+// Online, the host of a co-op room also gets "Invite friends" beside the code (friends join peer-to-peer).
 
 export function Lobby({ net }: { net: GameConnection }) {
   const room = useStore(netStore, (s) => s.room);
   const slot = useStore(netStore, (s) => s.slot);
+  const online = useStore(presenceStore, (s) => s.conn === 'online');
   if (!room) return null;
   const me = room.seats.find((s) => s.you);
   const solo = room.mode === 'solo';
@@ -38,6 +42,7 @@ export function Lobby({ net }: { net: GameConnection }) {
               <span className="engraved">Invite code</span>
               <span className="code" aria-label={`Invite code ${room.code.split('').join(' ')}`}>{room.code}</span>
               <button className="btn small" onClick={() => navigator.clipboard?.writeText(room.code)}>Copy</button>
+              <InviteFriends />
             </div>
           )}
         </header>
@@ -67,7 +72,7 @@ export function Lobby({ net }: { net: GameConnection }) {
             </ul>
             {!solo && (
               <p className="faint lobby-note">
-                {room.lan.enabled ? <>Others on your network open {room.lan.hosts.join(' or ')} and join with the code.</> : <>Open another browser window here and join with the code. LAN sharing is off unless started with --lan.</>}
+                {online ? <>Friends join from their friends list, or anywhere with the code.</> : room.lan.enabled ? <>Others on your network open {room.lan.hosts.join(' or ')} and join with the code.</> : <>Open another browser window here and join with the code. LAN sharing is off unless started with --lan.</>}
                 {' '}The party size locks when everyone is ready.
               </p>
             )}

@@ -122,6 +122,8 @@ export class GameConnection {
       if (code >= 4001 && code <= 4004) { netStore.set({ status: 'error', error: reason || 'Connection refused by the authority.' }); return; }
       this.retry();
     };
+    // a peer-to-peer guest's channel arrives already open (its join handshake ran on it)
+    if (ws.readyState === 'open') ws.onopen?.();
   }
 
   close() {

@@ -348,6 +348,28 @@ code { font-family: var(--font-label); font-size: var(--fs-label); color: var(--
 .dialog-panel.wide { width: min(1120px, 100%); }
 @media (max-height: 820px) { .title-menu { margin-top: var(--sp-2); } .title-menu .menu-list { gap: 4px; } }
 @media (max-width: 720px) { .account-plate.frame { position: static; margin: var(--sp-2) auto 0; width: fit-content; } .title-foot { justify-content: center; } }
+/* friends plate (online mode): under the account plate, clear of the centred menu column */
+.friends-panel.frame { position: fixed; top: 96px; right: var(--sp-3); z-index: 3; width: 300px; max-height: calc(100vh - 220px); display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-1) var(--sp-2) var(--sp-2); animation: fadeIn 0.3s steps(3); }
+.friends-panel .fp-head { display: flex; align-items: center; gap: var(--sp-2); }
+.friends-panel .fp-title { flex: 1; margin: 0; }
+.friends-panel .fp-title small { font-size: var(--fs-small); }
+.fp-note { margin: 0; font-size: var(--fs-small); line-height: var(--lh-small); }
+.friends-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.friend-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 2px 0; border-top: 2px solid var(--stone-3); }
+.friend-row:first-child { border-top: none; }
+.friend-row.offline { opacity: 0.5; }
+.friend-row .fr-emblem { display: inline-flex; filter: drop-shadow(2px 2px 0 #000); }
+.friend-row .fr-who { display: flex; flex-direction: column; min-width: 0; line-height: 1.05; }
+.friend-row .fr-name { font-family: var(--font-gothic); font-size: var(--fs-goth-sm); font-weight: normal; color: var(--gold-hi); text-shadow: var(--shadow-hard); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-row .fr-state { font-family: var(--font-label); font-size: var(--fs-small); text-transform: uppercase; color: var(--bone-3); text-shadow: var(--shadow-hard); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-row .fr-state.joinable { color: var(--good); }
+.friend-row .fr-tag { min-height: 28px; font-size: var(--fs-small); }
+.invite-toasts { position: fixed; right: var(--sp-3); bottom: var(--sp-4); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--sp-2); max-width: min(480px, calc(100vw - 32px)); }
+.invite-toast { display: flex; align-items: center; gap: var(--sp-2); }
+.invite-toast .it-text { flex: 1; }
+.invite-friends { position: relative; }
+.invite-pop.frame { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; width: 300px; max-height: 320px; display: flex; flex-direction: column; padding: var(--sp-1) var(--sp-2); }
+@media (max-width: 1100px) { .friends-panel.frame { position: static; width: min(400px, calc(100% - 32px)); margin: var(--sp-2) auto 0; max-height: 220px; } }
 .menu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
 .menu-item {
   all: unset; box-sizing: border-box; position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); width: 100%; white-space: nowrap;

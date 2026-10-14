@@ -42,6 +42,10 @@ interface GuestPipe {
   outQueue: string[];
 }
 
+/** The authority locks a room's roster when the run starts (rooms.ts addSeat → ROSTER_LOCKED), so a co-op run is
+ * advertised as joinable only while gathering. Flip once the authority seats players mid-run. */
+export const MID_RUN_JOIN = false;
+
 /** at most this many unanswered/handshaking sessions at once (guards the host against offer floods) */
 const MAX_PENDING = 6;
 
@@ -194,7 +198,7 @@ export class HostBridge {
         p.sock = null;
         setTimeout(() => this.close(p), 200);
       };
-      if (sock.readyState === 'open') sock.onopen();
+      if (sock.readyState === 'open') sock.onopen?.();
     }).catch(() => this.close(p));
   }
 

@@ -1,3 +1,4 @@
+import { getSeat } from '../profile';
 import { CHANNEL_LABEL, P2PError, browserPeer, iceServers, newSessionId, type PeerLike } from './peer';
 import { presenceSignaling, whenPresenceOnline, type PeerId, type Signaling, type SignalIn } from './presence';
 import { RPC_PREFIX, channelTransport, type ChannelLike, type GameTransport } from './transport';
@@ -115,13 +116,25 @@ export function clearGuestSession(): void {
 
 /** Join a host's room over WebRTC. Returns the seat to store with setSeat(); the open channel waits for /play. */
 export async function joinViaHost(host: PeerId, code: string, classId: string): Promise<GuestSeat> {
+  // back to a party this tab already sits in (left the lobby, came back): reuse the seat, the authority keeps it
+  const prev = guestSession();
+  const seat = getSeat();
+  if (prev && seat && prev.roomId === seat.roomId && prev.host.accountId === host.accountId && prev.code === code.toUpperCase()) {
+    live?.open.dispose();
+    live = null;
+    if (!(await whenPresenceOnline(8000))) throw new P2PError('OFFLINE', 'Not connected to the online service.');
+    const open = await openGuestLink(browserDeps(), host, { rpc: 'rejoin', roomId: seat.roomId, code: prev.code });
+    live = { roomId: seat.roomId, open, claimed: false };
+    return { roomId: seat.roomId, seatToken: seat.token, slot: seat.slot, code: prev.code };
+  }
   clearGuestSession();
   if (!(await whenPresenceOnline(8000))) throw new P2PError('OFFLINE', 'Not connected to the online service.');
   const open = await openGuestLink(browserDeps(), host, { rpc: 'join', classId, code: code.toUpperCase() });
   const r = open.reply;
   if (!r.seatToken || r.slot === undefined) { open.dispose(); throw new P2PError('JOIN_FAILED', 'The host sent an incomplete seat.'); }
   live = { roomId: r.roomId, open, claimed: false };
-  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ host, code: r.code, roomId: r.roomId } satisfies GuestSession)); } catch { /* ignore */ }
+  const who: PeerId = { accountId: host.accountId, username: host.username, displayName: host.displayName };
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ host: who, code: r.code, roomId: r.roomId } satisfies GuestSession)); } catch { /* ignore */ }
   return { roomId: r.roomId, seatToken: r.seatToken, slot: r.slot, code: r.code };
 }
 
