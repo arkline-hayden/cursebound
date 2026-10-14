@@ -1,7 +1,8 @@
 import { api } from './api';
 import { refreshAuth } from './auth';
 
-// The profile a player plays as. Signed in, it is the account's profile (lib/auth.ts). Signed out, it is a local
+// The profile a player plays as. Signed in, it is the account's profile (lib/auth.ts): in local mode the profile the
+// account owns, in online mode the local profile linked to the cloud account (refreshAuth links it). Signed out, it is a local
 // guest identity stored per browser; a per-tab guest can be created for local co-op. A guest profile that has since
 // been claimed by an account is never reused while signed out — a fresh guest takes its place.
 export interface Profile { id: string; displayName: string; account?: string | null }
