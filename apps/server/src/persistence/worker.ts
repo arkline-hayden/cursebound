@@ -23,6 +23,7 @@ const OPS = new Set<string>([
   'health',
   'createProfile',
   'getProfile',
+  'linkCloudProfile',
   'createAccount',
   'getAccountCredentials',
   'getAccount',

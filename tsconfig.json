@@ -9,6 +9,8 @@
     "packages/*/test/**/*.ts",
     "apps/server/src/**/*.ts",
     "apps/server/test/**/*.ts",
+    "apps/cloud/src/**/*.ts",
+    "apps/cloud/test/**/*.ts",
     "tools/*/src/**/*.ts",
     "tests/**/*.ts"
   ]

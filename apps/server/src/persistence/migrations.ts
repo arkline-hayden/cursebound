@@ -243,9 +243,17 @@ CREATE TABLE friendships(
 CREATE INDEX friendships_b_idx ON friendships(account_b);
 `;
 
+// Online mode (docs/contracts/ONLINE_CONTRACT.md): a cloud account plays as one local profile, linked by its cloud
+// account id. SQLite cannot add a UNIQUE column in place, so uniqueness is a unique index (NULLs stay distinct).
+const V3 = `
+ALTER TABLE profiles ADD COLUMN cloud_account_id TEXT NULL;
+CREATE UNIQUE INDEX profiles_cloud_account_idx ON profiles(cloud_account_id);
+`;
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial_schema', sql: V1 },
   { version: 2, name: 'accounts_builds_friends', sql: V2 },
+  { version: 3, name: 'profiles_cloud_account', sql: V3 },
 ];
 
 export const LATEST_SCHEMA_VERSION: number = MIGRATIONS[MIGRATIONS.length - 1]!.version;

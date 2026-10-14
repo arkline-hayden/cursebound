@@ -344,6 +344,22 @@ export class PersistenceDb {
     return r ? { id: str(r.id), displayName: str(r.display_name), createdAt: num(r.created_at) } : null;
   }
 
+  /** The profile linked to a cloud account (created when absent); its display name follows the account's. */
+  linkCloudProfile(accountId: string, displayName: string): Profile {
+    assertId(accountId, 'accountId');
+    const name = sanitizeDisplayName(displayName);
+    return this.tx(() => {
+      const r = this.get('SELECT id, created_at FROM profiles WHERE cloud_account_id = ?', accountId);
+      if (r) {
+        this.run('UPDATE profiles SET display_name = ? WHERE id = ?', name, str(r.id));
+        return { id: str(r.id), displayName: name, createdAt: num(r.created_at) };
+      }
+      const p: Profile = { id: randomUUID(), displayName: name, createdAt: Date.now() };
+      this.run('INSERT INTO profiles(id, display_name, created_at, cloud_account_id) VALUES (?, ?, ?, ?)', p.id, p.displayName, p.createdAt, accountId);
+      return p;
+    });
+  }
+
   getSettings(profileId: string): unknown | null {
     assertId(profileId, 'profileId');
     const r = this.get('SELECT json FROM settings WHERE profile_id = ?', profileId);

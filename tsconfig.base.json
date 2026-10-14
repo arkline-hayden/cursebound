@@ -18,7 +18,8 @@
       "@cursebound/numeric": ["packages/numeric/src/index.ts"],
       "@cursebound/content": ["packages/content/src/index.ts"],
       "@cursebound/simulation": ["packages/simulation/src/index.ts"],
-      "@cursebound/protocol": ["packages/protocol/src/index.ts"]
+      "@cursebound/protocol": ["packages/protocol/src/index.ts"],
+      "@cursebound/accounts": ["packages/accounts/src/index.ts"]
     }
   }
 }

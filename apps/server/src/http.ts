@@ -8,47 +8,18 @@ import type { Logger } from './persistence/logger';
 import type { Store } from './persistence/store';
 import { replayJournals } from './replay';
 import type { RoomManager } from './rooms';
-import { hostAllowed, hashToken, originAllowed } from './security';
-import { SESSION_COOKIE, SESSION_TTL_MS, readCookie } from './auth';
+import { hostAllowed, originAllowed } from './security';
+import { SESSION_COOKIE, readCookie } from './auth';
 import { registerAccountRoutes } from './accountRoutes';
-import type { Account } from './persistence/types';
+import { HttpError, authenticateToken, cookieTransport, readBody, routePattern, type AuthState, type RouteCtx, type RouteFn } from '@cursebound/accounts';
 
-/** The signed-in account behind a request, with the hash of the session token it presented. */
-export interface AuthState { account: Account; sessionHash: string }
+export { HttpError, readBody, type AuthState, type RouteCtx, type RouteFn } from '@cursebound/accounts';
 
 // HTTP API /api/v1 (PRD §21.1). Mutations accept an Idempotency-Key; errors use explicit codes and never leak
 // paths, tokens or stack traces. There is no endpoint that accepts damage or a client score.
 
-const MAX_BODY = 64 * 1024;
 const MAX_IMPORT = 8 * 1024 * 1024;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-
-export class HttpError extends Error { constructor(public status: number, public code: string, message: string) { super(message); } }
-
-/** Per-request context: response headers to add (Set-Cookie) and the lazily resolved signed-in account. */
-export interface RouteCtx {
-  headers: Record<string, string | string[]>;
-  auth(): Promise<AuthState | null>;
-  requireAuth(): Promise<AuthState>;
-}
-export type RouteFn = (m: RegExpMatchArray, req: IncomingMessage, url: URL, ctx: RouteCtx) => Promise<unknown>;
-
-export function readBody(req: IncomingMessage, limit = MAX_BODY): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => {
-      size += c.length;
-      if (size > limit) { reject(new HttpError(413, 'TOO_LARGE', 'request body too large')); req.destroy(); return; }
-      chunks.push(c);
-    });
-    req.on('end', () => {
-      if (!chunks.length) return resolve({});
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { reject(new HttpError(400, 'INVALID_INPUT', 'invalid JSON body')); }
-    });
-    req.on('error', reject);
-  });
-}
 
 export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, log: Logger) {
   const idem = new Map<string, { at: number; status: number; body: unknown }>();
@@ -66,20 +37,11 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
 
   const routes: { method: string; re: RegExp; fn: RouteFn }[] = [];
   const route = (method: string, path: string, fn: RouteFn) =>
-    routes.push({ method, re: new RegExp('^/api/v1' + path.replace(/:([a-z]+)/g, '([^/]+)') + '$'), fn });
+    routes.push({ method, re: routePattern(path), fn });
 
   const assertId = (v: string, what: string) => { if (!ID_RE.test(v)) throw new HttpError(400, 'INVALID_INPUT', `invalid ${what}`); return v; };
 
-  const resolveAuth = async (req: IncomingMessage): Promise<AuthState | null> => {
-    const token = readCookie(req, SESSION_COOKIE);
-    if (!token) return null;
-    const sessionHash = hashToken(token);
-    const now = Date.now();
-    const session = await store.getSession(sessionHash, now, now + SESSION_TTL_MS);
-    if (!session) return null;
-    const account = await store.getAccount(session.accountId);
-    return account ? { account, sessionHash } : null;
-  };
+  const resolveAuth = (req: IncomingMessage): Promise<AuthState | null> => authenticateToken(store, cookieTransport.read(req));
 
   /** A profile that belongs to an account can only be played, resumed or configured by that account's session. */
   const assertProfileUse = async (profileId: string, ctx: RouteCtx) => {
@@ -107,6 +69,14 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     if (!p) throw new HttpError(404, 'NOT_FOUND', 'profile not found');
     const owner = await store.getAccountByProfile(p.id);
     return { ...p, account: owner?.username ?? null };
+  });
+  // online mode (docs/contracts/ONLINE_CONTRACT.md): the local profile a cloud account plays as, created on first
+  // use; the display name follows the account. The client links itself after sign-in, the host bridge its guests.
+  route('POST', '/local/profiles/link', async (_m, req) => {
+    const b = (await readBody(req)) as { accountId?: unknown; displayName?: unknown };
+    const accountId = assertId(typeof b.accountId === 'string' ? b.accountId : '', 'account');
+    const p = await store.linkCloudProfile(accountId, sanitizeName(typeof b.displayName === 'string' ? b.displayName : 'Wanderer'));
+    return { id: p.id, displayName: p.displayName };
   });
   route('GET', '/local/settings/:id', async (m, _req, _url, ctx) => {
     const id = assertId(m[1], 'profile');

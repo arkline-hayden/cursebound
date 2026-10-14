@@ -8,6 +8,7 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
+    "@cursebound/accounts": "0.1.0",
     "@cursebound/content": "0.1.0",
     "@cursebound/numeric": "0.1.0",
     "@cursebound/protocol": "0.1.0",

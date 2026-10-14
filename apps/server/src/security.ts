@@ -1,17 +1,12 @@
 import crypto from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
+import { hashToken } from '@cursebound/accounts';
 import type { ServerConfig } from './config';
 
 // Trust boundaries (REQ SEC01, PRD §22): Host/Origin validation against DNS rebinding and cross-site access,
 // unguessable seat tokens kept out of URLs, constant-time token comparison.
 
-export function newToken(bytes = 32): string {
-  return crypto.randomBytes(bytes).toString('base64url');
-}
-
-export function newId(prefix: string): string {
-  return `${prefix}_${crypto.randomBytes(9).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x')}`;
-}
+export { hashToken, newId, newToken } from '@cursebound/accounts';
 
 export function newRoomCode(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -19,10 +14,6 @@ export function newRoomCode(): string {
   let s = '';
   for (let i = 0; i < 6; i++) s += alphabet[b[i] % alphabet.length];
   return s;
-}
-
-export function hashToken(t: string): string {
-  return crypto.createHash('sha256').update(t).digest('hex');
 }
 
 export function tokenMatches(token: string, hash: string): boolean {
