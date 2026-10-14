@@ -5,6 +5,9 @@
 const API_PORT = process.env.CURSEBOUND_PORT ?? '2567';
 const dev = process.env.NODE_ENV !== 'production';
 const staticExport = process.env.CURSEBOUND_STATIC_EXPORT === '1';
+// online mode (docs/contracts/ONLINE_CONTRACT.md): the cloud's HTTPS API and its presence WebSocket
+const CLOUD = (process.env.CURSEBOUND_CLOUD_URL ?? '').replace(/\/+$/, '');
+const cloudSrc = CLOUD ? ` ${CLOUD} ${CLOUD.replace(/^http/, 'ws')}` : '';
 
 const csp = [
   "default-src 'self'",
@@ -12,7 +15,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   "img-src 'self' data: blob:",
-  `connect-src 'self' ws://localhost:${API_PORT} ws://127.0.0.1:${API_PORT} ws://*:${API_PORT}${dev ? ' ws://localhost:3000 ws://127.0.0.1:3000' : ''}`,
+  `connect-src 'self' ws://localhost:${API_PORT} ws://127.0.0.1:${API_PORT} ws://*:${API_PORT}${dev ? ' ws://localhost:3000 ws://127.0.0.1:3000' : ''}${cloudSrc}`,
   "media-src 'self' blob: data:",
   "worker-src 'self' blob:",
   "object-src 'none'",

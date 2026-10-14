@@ -22,7 +22,7 @@ gcloud run deploy "$SERVICE" --image "$IMAGE" --region "$REGION" \
   --set-secrets "DATABASE_URL=cb-database-url:latest,TURN_SECRET=cb-turn-secret:latest" \
   --set-env-vars "TURN_HOST=${TURN_HOST},MIN_CLIENT_BUILD=${MIN_CLIENT_BUILD},NODE_ENV=production" \
   --min-instances 0 --max-instances 1 --concurrency 1000 --cpu 1 --memory 512Mi \
-  --timeout 3600 --session-affinity --allow-unauthenticated --port 8080
+  --timeout 3600 --session-affinity --no-invoker-iam-check --port 8080
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 echo "[deploy] live at $URL"

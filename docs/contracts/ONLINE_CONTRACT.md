@@ -119,3 +119,15 @@ GCP region `us-central1`; Cloud Run service `cursebound-cloud`; Artifact Registr
 `cursebound-pg` (Postgres 16, db-f1-micro), database `cursebound`; secrets `cb-database-url`, `cb-turn-secret`; coturn VM
 `cursebound-turn` (e2-micro, static IP, UDP/TCP 3478 + 49160-49200). GitHub → GCP deploys use Workload Identity Federation
 (no keys).
+
+## As built (deviations recorded at integration)
+- **Desktop port:** the first launch uses `CURSEBOUND_PORT=0`; later launches request the remembered port and fall back to
+  0 when it is taken, keeping the page origin stable (local profile ids and settings live in that origin's storage).
+- **Desktop shutdown:** a `utilityProcess` has no stdin, so the desktop main process sends `shutdown` as a process
+  message; the server handles both forms.
+- **Joinable = lobby only:** the authority locks the roster when a run starts, so hosts advertise coop rooms as joinable
+  only in LOBBY (`MID_RUN_JOIN = false` in `lib/p2p/host.ts`). Flip it when the authority can seat players mid-run.
+- **Cloud identity:** in the cloud an account is its own profile (`profileId == accountId`).
+- **Public access:** Cloud Run runs with `--no-invoker-iam-check` (public without an `allUsers` IAM binding), because the
+  Workspace organization's domain-restricted sharing forbids `allUsers`.
+- **Presence deps** include optional `identities(ids)` so offline friends are listed by name.
