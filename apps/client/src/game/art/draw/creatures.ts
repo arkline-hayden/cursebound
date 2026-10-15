@@ -6,6 +6,8 @@
 import { MATERIALS, PALETTES } from '../palette';
 import { Painter, PixelBuffer, flash, mix, rimTopLeft, rng, shatter, smear, sparkle, type FillOpts, type Ramp } from './pixel';
 import { Proj, VIEW_ANGLE, drawParts, hull, lerp, type Part, type Pt, type View } from './rig';
+// theme foes (sky / moon / server rosters, themeFoes.ts) are posed on this same rig and merged into the tables below
+import { THEME_FOE_DEATH, THEME_FOE_DRAW, THEME_FOE_GROUND, THEME_FOE_OUTLINE, THEME_FOE_POST, THEME_FOE_RANGED, THEME_FOE_SMEAR, THEME_FOE_WINDUP, isThemeFoe, type ThemeFoeId } from './themeFoes';
 
 export type CreatureId =
   | 'pursuer'
@@ -21,9 +23,10 @@ export type CreatureId =
   | 'gaoler'
   | 'rimewraith'
   | 'gloomshade'
-  | 'webweaver';
+  | 'webweaver'
+  | ThemeFoeId;
 
-interface CPose {
+export interface CPose {
   /** cycle phase (radians) */
   ph: number;
   bob: number;
@@ -41,7 +44,7 @@ interface CPose {
   lunge: number;
 }
 
-interface CC {
+export interface CC {
   p: Painter;
   P: Proj;
   pose: CPose;
@@ -67,6 +70,7 @@ const GROUND: Record<CreatureId, number> = {
   rimewraith: 42,
   gloomshade: 42,
   webweaver: 41,
+  ...THEME_FOE_GROUND,
 };
 
 function poseFor(state: string, i: number, n: number): CPose {
@@ -1808,7 +1812,7 @@ function webweaver(c: CC): Part[] {
   return parts;
 }
 
-const DRAW: Record<CreatureId, (c: CC) => Part[]> = { pursuer, skirmisher, artillery, guardian, hexer, broodcaller, mite, spiritwolf, spiritbear, spiritelk, gaoler, rimewraith, gloomshade, webweaver };
+const DRAW: Record<CreatureId, (c: CC) => Part[]> = { pursuer, skirmisher, artillery, guardian, hexer, broodcaller, mite, spiritwolf, spiritbear, spiritelk, gaoler, rimewraith, gloomshade, webweaver, ...THEME_FOE_DRAW };
 
 /** Death burst style per creature: chunk tint, shard glint (bone/stone) and droplet color (gore/ichor). */
 const DEATH: Record<CreatureId, { tint: number; glint: boolean; drop: number; drops: number }> = {
@@ -1826,6 +1830,7 @@ const DEATH: Record<CreatureId, { tint: number; glint: boolean; drop: number; dr
   rimewraith: { tint: 0x8cbede, glint: true, drop: 0xdaf2ff, drops: 18 },
   gloomshade: { tint: 0x150d22, glint: false, drop: 0x5418aa, drops: 20 },
   webweaver: { tint: 0x766852, glint: false, drop: 0xb4c84a, drops: 22 },
+  ...THEME_FOE_DEATH,
 };
 
 /** Lunge smear colour per creature (attack strike frames). */
@@ -1844,6 +1849,7 @@ const SMEAR: Record<CreatureId, number> = {
   rimewraith: MATERIALS.glassCyan[3]!,
   gloomshade: MATERIALS.hexViolet[1]!,
   webweaver: 0xe8e8f0,
+  ...THEME_FOE_SMEAR,
 };
 
 function renderPose(painter: Painter, id: CreatureId, view: View, pose: CPose): void {
@@ -1867,12 +1873,13 @@ export function renderCreatureFrame(id: CreatureId, state: string, view: View, i
   }
   painter.reset();
   renderPose(painter, id, view, pose);
-  painter.finish(ghost ? 0x062a20 : id === 'rimewraith' ? 0x0a1a34 : undefined);
+  painter.finish(ghost ? 0x062a20 : id === 'rimewraith' ? 0x0a1a34 : isThemeFoe(id) ? THEME_FOE_OUTLINE[id] : undefined);
   const base = painter.buf.clone();
   rimTopLeft(base, 0.32);
   if (ghost) ghostify(base, i, seed, GROUND[id]);
   if (id === 'rimewraith') frostify(base, i, seed, GROUND[id]);
   if (id === 'gloomshade') smokify(base, i, seed, GROUND[id]);
+  if (isThemeFoe(id)) THEME_FOE_POST[id]?.(base, i, seed);   // theme foe finishes (glitch wraith)
   if (state === 'death') {
     if (i === 0) {
       flash(base, 0.6);
@@ -1897,11 +1904,15 @@ export function renderCreatureFrame(id: CreatureId, state: string, view: View, i
   if (state === 'attack' && pose.strike > 0.4) {
     // lunge smear (strong on the strike frame, a faint trailing echo on the next)
     const P = new Proj(base.w / 2, GROUND[id], VIEW_ANGLE[view]);
-    const ranged = id === 'artillery' || id === 'hexer' || id === 'broodcaller' || id === 'rimewraith' || id === 'webweaver' || id === 'gloomshade';
+    const ranged = id === 'artillery' || id === 'hexer' || id === 'broodcaller' || id === 'rimewraith' || id === 'webweaver' || id === 'gloomshade' || (isThemeFoe(id) && THEME_FOE_RANGED.has(id));
     const k = (pose.strike > 0.8 ? 1 : 0.5) * (ranged ? 0.5 : 1);
     smear(base, -P.fx * 6 * k, -P.fy * 3 * k, SMEAR[id], pose.strike > 0.8 ? 2 : 1, Math.round(120 * k + 20));
   }
-  if (state === 'windup' && (id === 'hexer' || id === 'artillery' || id === 'broodcaller' || id === 'guardian' || id === 'rimewraith' || id === 'gloomshade')) {
+  if (state === 'windup' && isThemeFoe(id) && THEME_FOE_WINDUP[id] !== undefined) {
+    // theme foe casters and heavy hitters gather sparks in their own colour
+    const r = rng(seed);
+    for (let k = 0; k < 1 + i; k++) sparkle(base, Math.round(base.w / 2 + (r() - 0.5) * 30), Math.round(GROUND[id] - 6 - r() * 26), THEME_FOE_WINDUP[id]!, 1, 220);
+  } else if (state === 'windup' && (id === 'hexer' || id === 'artillery' || id === 'broodcaller' || id === 'guardian' || id === 'rimewraith' || id === 'gloomshade')) {
     const r = rng(seed);
     const col = id === 'hexer' || id === 'gloomshade' ? MATERIALS.hexViolet[3]! : id === 'artillery' ? MATERIALS.bile[3]! : id === 'guardian' ? MATERIALS.soulBlue[3]! : id === 'rimewraith' ? MATERIALS.glassCyan[3]! : MATERIALS.broodEgg[3]!;
     for (let k = 0; k < 1 + i; k++) sparkle(base, Math.round(base.w / 2 + (r() - 0.5) * 30), Math.round(GROUND[id] - 6 - r() * 26), col, 1, 220);

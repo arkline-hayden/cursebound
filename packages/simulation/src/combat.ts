@@ -148,7 +148,7 @@ export function hitEnemy(state: SimState, ev: SimEvent[], e: EnemyState, perHit:
   if (weak) factor = factor.mul(B(weak));
   if (e.vulnUntil > state.tick) factor = factor.mul(B(e.vulnFactor));
   if (e.boss && e.staggerUntil > state.tick) factor = factor.mul(B(BOSS_BY_ID[e.kind].vulnerableMultiplier));
-  if (e.kind === 'guardian') {
+  if (e.kind === 'guardian' || def?.tags.includes('frontal')) {   // 'frontal': theme foes with a shield wall (Firewall Sentinel)
     // frontal plate: hits from the front are reduced; the flank and back are exposed
     const vx = o.fromX - e.x, vy = o.fromY - e.y;
     const l = Math.sqrt(vx * vx + vy * vy) || 1;

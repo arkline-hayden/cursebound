@@ -29,3 +29,4 @@ export * from './bounty';
 export * from './bountyRules';
 export * from './coins';
 export * from './roomEvents';
+export * from './minibosses';

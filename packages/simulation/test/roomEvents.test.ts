@@ -219,6 +219,7 @@ describe('room events: wandering merchant and coins', () => {
     const s = drive(newRun(['vanguard'], 'MERCHANT_BUY'), 2, 'VOTING');
     const p = s.players[0];
     const m = shelf(s, p.x + 0.6, p.y);
+    p.coins = 0;   // whatever the first rounds dropped (mini-bosses included), start the shop test broke
     expect(use(s, 'buy', m.id, 0).outcomes[0]).toMatchObject({ ok: false, code: 'NO_FUNDS' });
     p.coins = 500;
     expect(use(s, 'buy', m.id, 7).outcomes[0]).toMatchObject({ ok: false, code: 'INVALID_INPUT' });

@@ -245,6 +245,17 @@ export interface EnemyState {
   pack?: number;
   /** Idle until heroes come close (director.ts activation): no AI beyond a periodic aggro check. */
   dormant?: boolean;
+  /** Named mini-boss (minibosses.ts): generated name, signature mechanic ids and their timers. Absent = not one. */
+  mini?: MiniBossState;
+}
+
+/** A named mini-boss's identity and mechanic bookkeeping (minibosses.ts). Plain data, deterministic. */
+export interface MiniBossState {
+  name: string;
+  /** signature mechanic ids (content MINIBOSS_MECHANICS), 1-2 */
+  mechs: string[];
+  /** timers in ticks and once-only flags (plain numbers) */
+  v: Record<string, number>;
 }
 
 export interface Projectile {
@@ -379,6 +390,8 @@ export interface EncounterGroup {
   x?: number; y?: number;
   /** spawns idle (population packs) */
   dormant?: boolean;
+  /** the pack's lead is the round's named mini-boss (minibosses.ts) */
+  mini?: boolean;
 }
 
 export interface EncounterState {
@@ -651,4 +664,7 @@ export type SimEvent =
   | { t: 'training'; op: string; slot: number; x: number; y: number }
   /** Room events (roomEvents.ts): a hero used shrine / altar / merchant `id` (k = shrine type, pact id or ware id); the
    *  merchant or a treasure imp appeared (imp: id = enemy id); the imp started its portal, escaped, or burst into loot */
-  | { t: 'room_event'; op: 'shrine' | 'altar' | 'buy' | 'merchant' | 'runner' | 'portal' | 'escape' | 'shower'; id: number; slot: number; x: number; y: number; k?: string };
+  | { t: 'room_event'; op: 'shrine' | 'altar' | 'buy' | 'merchant' | 'runner' | 'portal' | 'escape' | 'shower'; id: number; slot: number; x: number; y: number; k?: string }
+  /** Named mini-bosses (minibosses.ts): 'spawn' (placed on the floor), 'awake' (the heroes found it: announcement),
+   *  'slain' (pts = score burst text), and mechanic cues ('slam_warn', 'slam', 'summon', 'enrage', 'shield') */
+  | { t: 'miniboss'; id: number; op: string; name: string; x: number; y: number; k?: string; pts?: string; r?: number };

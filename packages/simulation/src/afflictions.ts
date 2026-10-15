@@ -1,7 +1,8 @@
 import { Big } from '@cursebound/numeric';
-import { AFFLICTION_RULES as R, ATTACK_INFLICT, TICK_RATE, type AfflictionId, type EnemyAttackDef } from '@cursebound/content';
+import { AFFLICTION_RULES as R, ATTACK_INFLICT, RULES, TICK_RATE, type AfflictionId, type EnemyAttackDef } from '@cursebound/content';
 import { inCinematic } from './cinematic';
 import { hitPlayer } from './combat';
+import { moveCircle } from './geometry';
 import { registerGlobalHooks } from './hooks';
 import { B } from './stats';
 import type { Hazard, PlayerAfflictions, PlayerState, SimEvent, SimState } from './types';
@@ -154,6 +155,24 @@ export function addChill(state: SimState, ev: SimEvent[], p: PlayerState, slow: 
   } else {
     ev.push({ t: 'afflict', slot: p.slot, s: 'chill', sec: n.chS, x: p.x, y: p.y });
   }
+}
+
+/**
+ * Knockback (theme foes: the Gale Wisp's gust, the mini-boss ground slam): shove a living hero up to `dist` world
+ * units away from (fromX, fromY), wall-safe. Not a status: no diminishing returns, i-frames avoid it, and a chained
+ * hero stays inside the chain's leash (the movement helpers clamp it next step). Client prediction reconciles the
+ * displacement like any other correction (short shoves glide, they never teleport the camera).
+ */
+export function pushPlayer(state: SimState, ev: SimEvent[], p: PlayerState, fromX: number, fromY: number, dist: number, srcId?: number) {
+  if (p.lifeState !== 'alive' || p.iframes > 0 || !(dist > 0) || !state.map || cinematicFrozen(state)) return;
+  let dx = p.x - fromX, dy = p.y - fromY;
+  const l = Math.sqrt(dx * dx + dy * dy);
+  if (l < 1e-6) { dx = -p.aimX || 1; dy = -p.aimY; } else { dx /= l; dy /= l; }
+  const n = Math.sqrt(dx * dx + dy * dy) || 1;
+  const r = moveCircle(state.map, p.x, p.y, (dx / n) * dist, (dy / n) * dist, RULES.playerRadius);
+  const fx = p.x, fy = p.y;
+  p.x = r.x; p.y = r.y;
+  ev.push({ t: 'foe_fx', id: srcId ?? -1, fx: 'push', x: p.x, y: p.y, tx: fx, ty: fy });
 }
 
 /** End a chain early (a dash breaks it). */

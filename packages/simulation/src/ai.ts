@@ -1,6 +1,6 @@
 import { Big } from '@cursebound/numeric';
 import { AFFLICTION_RULES, BOSS_BY_ID, ENEMY_BY_ID, RULES, TICK_SEC, type EnemyAttackDef } from '@cursebound/content';
-import { dropPatch, inflictHit } from './afflictions';
+import { dropPatch, inflictHit, pushPlayer } from './afflictions';
 import { enemyAttackDamage, hitPlayer, tickDots } from './combat';
 import { inCone, inLine, lineOfSight, moveCircle, norm, rayDistance, dist2 } from './geometry';
 import { findPath, nearestFloor, tileCenter } from './map';
@@ -38,9 +38,14 @@ const AI = {
   evadeMinTicks: 30,
 };
 /** Roles that break off and regroup when badly hurt (ranged casters and skirmishers; melee bruisers never do). */
-const COWARDS = new Set(['skirmisher', 'artillery', 'hexer', 'broodcaller', 'wraith', 'shade', 'weaver']);
+const COWARDS = new Set(['skirmisher', 'artillery', 'hexer', 'broodcaller', 'wraith', 'shade', 'weaver', /* theme foes */ 'gale', 'blinker']);
 /** Roles that keep a melee ally between themselves and the hero. */
-const BACKLINE = new Set(['artillery', 'hexer', 'broodcaller', 'weaver']);
+const BACKLINE = new Set(['artillery', 'hexer', 'broodcaller', 'weaver', /* theme foes */ 'gale', 'sentry']);
+
+/** Display name of an enemy for recaps and hit sources (a named mini-boss goes by its own name, minibosses.ts). */
+function foeName(e: EnemyState): string {
+  return e.mini?.name ?? (e.boss ? BOSS_BY_ID[e.kind].name : ENEMY_BY_ID[e.kind].name);
+}
 
 function attackDefs(e: EnemyState): EnemyAttackDef[] {
   return e.boss ? BOSS_BY_ID[e.kind].attacks : ENEMY_BY_ID[e.kind].attacks;
@@ -119,10 +124,24 @@ function readyAttack(state: SimState, e: EnemyState, target: PlayerState | null)
       return a;
     }
     if (d > a.range + 0.3) continue;
+    if (a.minRange !== undefined && d < a.minRange) continue;   // leaps want a gap to close (theme foes)
     if (a.kind !== 'lob' && !lineOfSight(state.map!, e.x, e.y, target.x, target.y)) continue;
     return a;
   }
   return null;
+}
+
+/** Glitch Wraith blink: a floor point at its preferred range from the target, off to one side, in sight of it. */
+function blinkSpot(state: SimState, e: EnemyState, target: PlayerState): [number, number] {
+  const def = ENEMY_BY_ID[e.kind];
+  const want = def ? (def.preferredRange[0] + def.preferredRange[1]) / 2 : 5;
+  const base = Math.atan2(e.y - target.y, e.x - target.x);
+  for (let k = 0; k < 6; k++) {
+    const off = (0.9 + nextFloat(state.rng.ai) * 0.9) * (nextInt(state.rng.ai, 2) ? 1 : -1);
+    const [x, y] = nearestFloor(state.map!, target.x + Math.cos(base + off) * want, target.y + Math.sin(base + off) * want);
+    if (dist2(x, y, target.x, target.y) > 4 && lineOfSight(state.map!, x, y, target.x, target.y)) return [x, y];
+  }
+  return [e.x, e.y];
 }
 
 function wardCandidate(state: SimState, e: EnemyState, range: number): EnemyState | null {
@@ -362,13 +381,18 @@ function startAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAtt
     const ally = wardCandidate(state, e, a.range);
     if (ally) { tx = ally.x; ty = ally.y; }
   }
+  // theme foes: a blink marks where it will reappear; a leap marks where it will land (on open floor)
+  if (a.kind === 'blink' && target) [tx, ty] = blinkSpot(state, e, target);
+  else if (a.kind === 'leap') [tx, ty] = nearestFloor(state.map!, tx, ty);
   let [dx, dy] = norm(tx - e.x, ty - e.y);
   if (dx === 0 && dy === 0) { dx = e.fx; dy = e.fy; }
   e.fx = dx; e.fy = dy;
   const windup = a.windupSec / f;
   const releaseTick = state.tick + Math.max(0, Math.round(windup / DT));
-  const ox = (a.telegraph.kind === 'circle' && a.kind !== 'slam' && a.kind !== 'summon' && a.kind !== 'shield') ? tx : e.x;
-  const oy = (a.telegraph.kind === 'circle' && a.kind !== 'slam' && a.kind !== 'summon' && a.kind !== 'shield') ? ty : e.y;
+  // circles sit on the target point, except self-centred ones (slam, summon, shield and the theme foes' quake)
+  const selfCentred = a.kind === 'slam' || a.kind === 'summon' || a.kind === 'shield' || a.kind === 'quake';
+  const ox = (a.telegraph.kind === 'circle' && !selfCentred) ? tx : e.x;
+  const oy = (a.telegraph.kind === 'circle' && !selfCentred) ? ty : e.y;
   let telegraphId = -1;
   if (a.kind !== 'lightpool' && a.kind !== 'rootwall') telegraphId = addTelegraph(state, e, a, ox, oy, dx, dy, releaseTick);
   else {
@@ -426,12 +450,14 @@ function releaseAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyA
   const at = e.attack!;
   const dmgDirect = enemyAttackDamage(state, e, a.damageCoef, true).mul(mult);
   const dmgHazard = enemyAttackDamage(state, e, a.damageCoef, false).mul(mult);
-  const src = e.boss ? BOSS_BY_ID[e.kind].name : ENEMY_BY_ID[e.kind].name;
+  const src = foeName(e);
   const hit = (p: PlayerState, amount: Big, hazard = false) => {
     const iframed = p.iframes > 0;
     const dealt = hitPlayer(state, ev, p, amount, { attack: a.name, source: src, fromX: e.x, fromY: e.y, dtype: a.damageType, hazard, srcId: e.id });
     // authored affliction (afflictions.ts): dodge i-frames avoid it along with the damage
     if (a.inflict && !iframed) inflictHit(state, ev, p, a.id, { srcId: e.id, source: src, attack: a.name, damage: amount });
+    // knockback (theme foes: the Gale Wisp's gust shoves heroes out of its circle); i-frames avoid it too
+    if (a.push && !iframed) pushPlayer(state, ev, p, at.ox, at.oy, a.push, e.id);
     return dealt;
   };
   ev.push({ t: 'enemy_attack', id: e.id, attack: a.id, stage: 'release' });
@@ -486,6 +512,30 @@ function releaseAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyA
       ev.push({ t: 'foe_fx', id: e.id, fx: a.id, x: at.ox, y: at.oy, r: R });
       break;
     }
+    // ---- theme foes (sim 1.5) ----
+    case 'quake': {
+      // telegraphed circle around the attacker detonates (Cloud Golem hail slam): damage + affliction, i-frames avoid
+      const R = a.telegraph.kind === 'circle' ? a.telegraph.radius : 2;
+      for (const p of alivePlayers(state)) if (p.iframes <= 0 && dist2(p.x, p.y, e.x, e.y) <= (R + 0.3) ** 2) hit(p, dmgDirect);
+      ev.push({ t: 'foe_fx', id: e.id, fx: a.id, x: e.x, y: e.y, r: R });
+      break;
+    }
+    case 'leap':
+      // airborne for the release window (stepAttack moves it onto the marked circle and lands it); the landing circle
+      // stays marked until it comes down
+      at.hitSlots = [];
+      state.telegraphs.push({ id: state.nextId++, ownerId: e.id, shape: a.telegraph, x: at.tx, y: at.ty, dx: at.dx, dy: at.dy, startTick: state.tick, releaseTick: state.tick + Math.max(1, Math.round(a.releaseSec / freq(e) / DT)), attack: 'leap_land' });
+      ev.push({ t: 'foe_fx', id: e.id, fx: 'leap_off', x: e.x, y: e.y, tx: at.tx, ty: at.ty });
+      break;
+    case 'blink': {
+      // reappear on the marked point (Glitch Wraith); a beat before it may strike again
+      const fx0 = e.x, fy0 = e.y;
+      const [bx, by] = nearestFloor(state.map!, at.tx, at.ty);
+      e.x = bx; e.y = by; e.vx = 0; e.vy = 0; e.path = [];
+      for (const k of Object.keys(e.cooldowns)) if (k !== a.id && k !== '_pause') e.cooldowns[k] = Math.max(e.cooldowns[k], 0.5);
+      ev.push({ t: 'foe_fx', id: e.id, fx: 'blink', x: fx0, y: fy0, tx: bx, ty: by });
+      break;
+    }
     case 'ring':
       state.hazards.push(makeHazard(state, {
         kind: 'ring', owner: 'enemy', ownerId: e.id, x: e.x, y: e.y, inner: 0.6, outer: 1.4, speed: (a.projectileSpeed ?? 5) * toFloatClamped(fateFactor(state, 'enemy.projectileSpeed'), MAX_PROJECTILE_SPEED),
@@ -497,7 +547,7 @@ function releaseAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyA
         const len = rayDistance(state.map!, e.x, e.y, t.dx, t.dy, a.range);
         for (const p of alivePlayers(state)) if (inLine(e.x, e.y, t.dx, t.dy, len, 0.45, p.x, p.y, 0.3)) hit(p, dmgDirect);
         state.hazards.push(makeHazard(state, {
-          kind: 'rootwall', owner: 'enemy', ownerId: e.id, x: e.x, y: e.y, dx: t.dx, dy: t.dy, length: len, width: 0.9,
+          kind: a.hazardKind ?? 'rootwall', owner: 'enemy', ownerId: e.id, x: e.x, y: e.y, dx: t.dx, dy: t.dy, length: len, width: 0.9,
           untilTick: state.tick + Math.round((a.duration ?? 3) / DT), interval: 30, nextTick: state.tick + 30, damage: dmgHazard.mul(B('0.5')), dtype: a.damageType,
         }));
       }
@@ -520,6 +570,33 @@ function releaseAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyA
     }
   }
   state.telegraphs = state.telegraphs.filter((t) => !(t.ownerId === e.id && (t.id === at.telegraphId || t.attack === a.id)));
+}
+
+/** Leap (theme foes, Lunar Leaper): glide onto the marked point over the release window, wall-safe. */
+function stepLeap(state: SimState, e: EnemyState, at: NonNullable<EnemyState['attack']>) {
+  const dx = at.tx - e.x, dy = at.ty - e.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 1e-4) return;
+  const k = Math.min(1, DT / Math.max(DT, at.timer + DT));
+  const r = moveCircle(state.map!, e.x, e.y, dx * k, dy * k, Math.min(e.radius, 0.6));
+  e.vx = (r.x - e.x) / DT; e.vy = (r.y - e.y) / DT;
+  e.x = r.x; e.y = r.y;
+  e.fx = dx / d; e.fy = dy / d;
+}
+
+/** Leap landing: a burst where it came down (damage + affliction; i-frames avoid both). */
+function landLeap(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef) {
+  const R = a.telegraph.kind === 'circle' ? a.telegraph.radius : 1.2;
+  const src = foeName(e);
+  const dmg = enemyAttackDamage(state, e, a.damageCoef, true);
+  for (const p of alivePlayers(state)) {
+    if (p.iframes > 0 || dist2(p.x, p.y, e.x, e.y) > (R + 0.3) ** 2) continue;
+    hitPlayer(state, ev, p, dmg, { attack: a.name, source: src, fromX: e.x, fromY: e.y, dtype: a.damageType, srcId: e.id });
+    if (a.inflict) inflictHit(state, ev, p, a.id, { srcId: e.id, source: src, attack: a.name, damage: dmg });
+  }
+  e.vx = 0; e.vy = 0;
+  state.telegraphs = state.telegraphs.filter((t) => !(t.ownerId === e.id && t.attack === 'leap_land'));
+  ev.push({ t: 'foe_fx', id: e.id, fx: 'leap_land', x: e.x, y: e.y, r: R });
 }
 
 function stepAttack(state: SimState, ev: SimEvent[], e: EnemyState) {
@@ -550,8 +627,7 @@ function stepAttack(state: SimState, ev: SimEvent[], e: EnemyState) {
         if (along < -e.radius || along > seg + e.radius) continue;
         if (Math.abs(-vx * at.dy + vy * at.dx) > e.radius + 0.3) continue;
         at.hitSlots.push(p.slot);
-        const src = e.boss ? BOSS_BY_ID[e.kind].name : ENEMY_BY_ID[e.kind].name;
-        hitPlayer(state, ev, p, enemyAttackDamage(state, e, a.damageCoef, true), { attack: a.name, source: src, fromX: e.x, fromY: e.y, dtype: a.damageType, srcId: e.id });
+        hitPlayer(state, ev, p, enemyAttackDamage(state, e, a.damageCoef, true), { attack: a.name, source: foeName(e), fromX: e.x, fromY: e.y, dtype: a.damageType, srcId: e.id });
       }
       if (r.hitWall && e.boss) {
         // charging into a wall staggers the Prism Stag (readable punish window)
@@ -561,7 +637,9 @@ function stepAttack(state: SimState, ev: SimEvent[], e: EnemyState) {
         at.timer = 0;
       } else if (r.hitWall) at.timer = 0;
     }
+    if (a.kind === 'leap') stepLeap(state, e, at);   // theme foes: airborne toward the marked circle
     if (at.timer > 0) return;
+    if (a.kind === 'leap') landLeap(state, ev, e, a);
     at.stage = 'recovery';
     at.timer += a.recoverySec / f;
     e.state = 'recovery';
@@ -585,6 +663,12 @@ function rapidAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAtt
   e.rapidWork = e.rapidWork.sub(Big.from(k));
   startAttack(state, ev, e, a, target);
   releaseAttack(state, ev, e, a, Big.from(k));
+  if (a.kind === 'leap' && e.attack) {
+    // theme foes: at a sub-tick cadence the leap lands at once (no airborne window to glide through)
+    const r = moveCircle(state.map!, e.x, e.y, e.attack.tx - e.x, e.attack.ty - e.y, Math.min(e.radius, 0.6));
+    e.x = r.x; e.y = r.y;
+    landLeap(state, ev, e, a);
+  }
   e.attack = null;
   e.state = 'attack';
   // keep a one-tick telegraph envelope visible
@@ -744,9 +828,12 @@ function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
 
 // ---------------- Enemy projectiles & hazards ----------------
 
+/** Theme foe projectiles with an impact cue ('<kind>_hit' foe_fx): tractor beam, static bolt, glitch bolt. */
+const THEME_SHOT_HITS = new Set(['tractor', 'staticbolt', 'glitchbolt']);
+
 export function stepEnemyProjectile(state: SimState, ev: SimEvent[], pr: Projectile): boolean {
   const owner = state.enemies.find((x) => x.id === pr.ownerId);
-  const src = owner ? (owner.boss ? BOSS_BY_ID[owner.kind].name : ENEMY_BY_ID[owner.kind].name) : 'Enemy';
+  const src = owner ? foeName(owner) : 'Enemy';
   const attackName = owner ? (attackDefs(owner).find((a) => a.id === pr.skillId)?.name ?? pr.skillId) : pr.skillId;
   if (pr.lobTarget) {
     // lobbed: flies over walls, lands on the telegraphed circle
@@ -792,7 +879,7 @@ export function stepEnemyProjectile(state: SimState, ev: SimEvent[], pr: Project
     hitPlayer(state, ev, best, dmg, { attack: attackName, source: src, fromX: pr.x - dx, fromY: pr.y - dy, dtype: pr.dtype, srcId: pr.ownerId });
     // hooks chain the hero where they stood; frost bolts chill; curse orbs silence (afflictions.ts)
     inflictHit(state, ev, best, pr.skillId, { srcId: pr.ownerId, source: src, attack: attackName, damage: dmg, anchorX: best.x, anchorY: best.y });
-    if (pr.kind === 'hook' || pr.kind === 'frostbolt') ev.push({ t: 'foe_fx', id: pr.ownerId, fx: pr.kind + '_hit', x: best.x, y: best.y, tx: pr.x - dx * 6, ty: pr.y - dy * 6 });
+    if (pr.kind === 'hook' || pr.kind === 'frostbolt' || THEME_SHOT_HITS.has(pr.kind)) ev.push({ t: 'foe_fx', id: pr.ownerId, fx: pr.kind + '_hit', x: best.x, y: best.y, tx: pr.x - dx * 6, ty: pr.y - dy * 6 });
     return false;
   }
   pr.x += dx * segLen; pr.y += dy * segLen;
@@ -804,7 +891,7 @@ export function stepEnemyProjectile(state: SimState, ev: SimEvent[], pr: Project
 export function stepEnemyHazard(state: SimState, ev: SimEvent[], h: Hazard) {
   if (hooks.hazardTick(state, ev, h)) return;   // affix hazards (elites.ts) and other module-owned kinds
   const owner = state.enemies.find((x) => x.id === h.ownerId);
-  const src = owner ? (owner.boss ? BOSS_BY_ID[owner.kind].name : ENEMY_BY_ID[owner.kind].name) : 'Hazard';
+  const src = owner ? foeName(owner) : 'Hazard';
   const hit = (p: PlayerState, amount: Big, attack: string) => hitPlayer(state, ev, p, amount, { attack, source: src, fromX: h.x, fromY: h.y, dtype: h.dtype, hazard: true, srcId: h.ownerId });
   if (h.kind === 'ring') {
     const age = (state.tick - h.bornTick) * DT;
@@ -845,8 +932,9 @@ export function stepEnemyHazard(state: SimState, ev: SimEvent[], h: Hazard) {
   for (const p of alivePlayers(state)) {
     let inside = false;
     if (h.kind === 'pool') inside = dist2(p.x, p.y, h.x, h.y) <= (h.radius + 0.2) ** 2;
-    else if (h.kind === 'rootwall') inside = inLine(h.x, h.y, h.dx, h.dy, h.length, h.width / 2, p.x, p.y, 0.2);
-    if (inside) hit(p, h.damage, h.kind === 'pool' ? 'Thorn Pool' : 'Root Wall');
+    // 'firewall': the Firewall Sentinel's lingering quarantine line (theme foes), a line like the Chain Lash's
+    else if (h.kind === 'rootwall' || h.kind === 'firewall') inside = inLine(h.x, h.y, h.dx, h.dy, h.length, h.width / 2, p.x, p.y, 0.2);
+    if (inside) hit(p, h.damage, h.kind === 'pool' ? 'Thorn Pool' : h.kind === 'firewall' ? 'Firewall' : 'Root Wall');
   }
 }
 

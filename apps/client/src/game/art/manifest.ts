@@ -65,6 +65,19 @@ const ACTOR_SOURCE: Record<ActorId, string> = {
   rimewraith: 'apps/client/src/game/art/draw/creatures.ts',
   gloomshade: 'apps/client/src/game/art/draw/creatures.ts',
   webweaver: 'apps/client/src/game/art/draw/creatures.ts',
+  // theme foes (content 1.5)
+  harpy: 'apps/client/src/game/art/draw/themeFoes.ts',
+  galewisp: 'apps/client/src/game/art/draw/themeFoes.ts',
+  stormhawk: 'apps/client/src/game/art/draw/themeFoes.ts',
+  cloudgolem: 'apps/client/src/game/art/draw/themeFoes.ts',
+  mooncrawler: 'apps/client/src/game/art/draw/themeFoes.ts',
+  moonleaper: 'apps/client/src/game/art/draw/themeFoes.ts',
+  lunarsentry: 'apps/client/src/game/art/draw/themeFoes.ts',
+  voidshambler: 'apps/client/src/game/art/draw/themeFoes.ts',
+  maintdrone: 'apps/client/src/game/art/draw/themeFoes.ts',
+  firewall: 'apps/client/src/game/art/draw/themeFoes.ts',
+  glitchwraith: 'apps/client/src/game/art/draw/themeFoes.ts',
+  malware: 'apps/client/src/game/art/draw/themeFoes.ts',
 };
 
 /** Display names in the Sunken Catacombs theme (ids are stable). */
@@ -95,6 +108,19 @@ export const ACTOR_DISPLAY_NAME: Record<ActorId, string> = {
   rimewraith: 'Rime Wraith',
   gloomshade: 'Gloom Shade',
   webweaver: 'Web Weaver',
+  // theme foes (content 1.5)
+  harpy: 'Harpy Diver',
+  galewisp: 'Gale Wisp',
+  stormhawk: 'Storm-Hawk',
+  cloudgolem: 'Cloud Golem',
+  mooncrawler: 'Moon-spawn Crawler',
+  moonleaper: 'Lunar Leaper',
+  lunarsentry: 'Lunar Sentry',
+  voidshambler: 'Void-Eyed Shambler',
+  maintdrone: 'Maintenance Drone',
+  firewall: 'Firewall Sentinel',
+  glitchwraith: 'Glitch Wraith',
+  malware: 'Malware Swarm',
 };
 
 const ACTOR_ROLE: Record<ActorId, string> = {
@@ -124,6 +150,18 @@ const ACTOR_ROLE: Record<ActorId, string> = {
   rimewraith: 'enemy',
   gloomshade: 'enemy',
   webweaver: 'enemy',
+  harpy: 'enemy',
+  galewisp: 'enemy',
+  stormhawk: 'enemy',
+  cloudgolem: 'enemy',
+  mooncrawler: 'enemy',
+  moonleaper: 'enemy',
+  lunarsentry: 'enemy',
+  voidshambler: 'enemy',
+  maintdrone: 'enemy',
+  firewall: 'enemy',
+  glitchwraith: 'enemy',
+  malware: 'enemy',
 };
 
 function buildManifest(): AssetEntry[] {
@@ -263,6 +301,18 @@ const REQUIRED_STATES: Record<ActorId, string[]> = {
   rimewraith: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
   gloomshade: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
   webweaver: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  harpy: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  galewisp: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  stormhawk: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  cloudgolem: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  mooncrawler: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  moonleaper: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  lunarsentry: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  voidshambler: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  maintdrone: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  firewall: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  glitchwraith: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  malware: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
 };
 
 /** Minimum frame counts from the art contract. */

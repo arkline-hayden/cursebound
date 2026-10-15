@@ -48,7 +48,7 @@ export const EVENT_OPS = ['shrine', 'altar', 'buy'] as const;
 export type EventOp = typeof EVENT_OPS[number];
 
 /** Training-grounds tools (simulation training.ts TRAINING_OPS). */
-export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level', 'event'] as const;
+export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level', 'event', /* named mini-boss (minibosses.ts) */ 'miniboss'] as const;
 export type TrainOp = typeof TRAIN_OPS[number];
 
 // ---------------- Server -> client ----------------

@@ -9,7 +9,7 @@ import { ClassEmblem } from './icons';
 import { SkillTree } from './SkillTree';
 
 // Training grounds tool drawer (training rooms only; simulation training.ts validates every tool). A slim carved tab
-// on the left edge opens a compact pixel-art drawer: spawn any pack (ordinary / champion / rare), either boss, the foe
+// on the left edge opens a compact pixel-art drawer: spawn any pack (ordinary / champion / rare), a named mini-boss, either boss, the foe
 // level that scales new spawns, clear the yard, switch foe AI off, reset cooldowns, heal, swap class, and open the
 // skill tree (free ranks and refunds while training). Room events (shrines, altar, merchant, imp, coins) spawn ahead
 // of the hero for testing. Keys: T toggles the drawer, K the skill tree.
@@ -32,6 +32,13 @@ const ROOM_EVENT_TOOLS = [
 /** Short pack label: the lead foe's name ("Ghoul Hound" pack). */
 function packName(lead: string): string {
   return ENEMY_BY_ID[lead]?.name ?? lead;
+}
+
+/** Button label: long foe names (the theme foes' 'Moon-spawn Crawler', 'Maintenance Drone') keep their last word so the
+ *  two-column grid never clips them; the tooltip keeps the full name. */
+function packLabel(lead: string): string {
+  const n = packName(lead);
+  return n.length > 14 ? n.split(/[\s-]+/).pop() ?? n : n;
 }
 
 export function TrainingPanel({ net }: { net: GameConnection }) {
@@ -78,8 +85,14 @@ export function TrainingPanel({ net }: { net: GameConnection }) {
           </div>
           <div style={grid(2)}>
             {PACK_TEMPLATES.map((p) => (
-              <button key={p.id} className="btn small" style={tight} title={`${packName(p.lead)} pack`} onClick={() => net.train('spawn', p.id, tier)}>{packName(p.lead)}</button>
+              <button key={p.id} className="btn small" style={tight} title={`${packName(p.lead)} pack`} onClick={() => net.train('spawn', p.id, tier)}>{packLabel(p.lead)}</button>
             ))}
+          </div>
+
+          {/* named mini-boss (simulation minibosses.ts): a random theme foe, crowned, with 1-2 signature mechanics */}
+          <span style={lab}>Mini-boss</span>
+          <div style={grid(1)}>
+            <button className="btn small" style={{ ...tight, color: '#ff9a3c' }} title="A named mini-boss and its escorts (one at a time)" onClick={() => net.train('miniboss')}>Spawn a named mini-boss</button>
           </div>
 
           <span style={lab}>Bosses</span>

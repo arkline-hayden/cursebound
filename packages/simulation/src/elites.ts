@@ -103,7 +103,7 @@ function applyRadius(e: EnemyState) {
 /** Roll a spawned ordinary wave group (deterministic per seed/round/wave/group). */
 export function rollElite(state: SimState, ev: SimEvent[], e: EnemyState) {
   const enc = state.encounter;
-  if (!enc || enc.isBoss || e.boss || !e.objective || isElite(e) || !ENEMY_BY_ID[e.kind]) return;
+  if (!enc || enc.isBoss || e.boss || !e.objective || isElite(e) || !ENEMY_BY_ID[e.kind] || e.mini) return;   // named mini-bosses never roll (minibosses.ts)
   // population packs (director.ts): only the pack's lead (its first group) may become a champion or rare
   if (e.pack !== undefined) {
     const lead = enc.groups.find((g) => g.pack === e.pack);

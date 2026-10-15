@@ -10,6 +10,7 @@ import { AFFLICTION_RULES, CONTENT_VERSION, RULES, RULES_VERSION, SCORE_VERSION,
 import { STATS } from './stats';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { ALTAR_PACTS, COIN_RULES, MERCHANT_WARES, RELIC_AMPLIFY, ROOM_EVENT_RULES, SHRINES, SHRINE_TUNING } from './roomEvents';
+import { MINIBOSS_MECHANICS, MINIBOSS_NAMES } from './minibosses';
 
 export * from './types';
 export * from './stats';
@@ -26,6 +27,7 @@ export * from './validate';
 export * from './progression';
 export * from './bounties';
 export * from './roomEvents';
+export * from './minibosses';
 
 /** The immutable content manifest (PRD §15.3, §21.2). Its hash pins runs, rooms and leaderboards. */
 export const CONTENT_MANIFEST = {
@@ -60,6 +62,8 @@ export const CONTENT_MANIFEST = {
   bounties: BOUNTY_MODIFIERS,
   // room events (roomEvents.ts): shrines, cursed altar pacts, merchant wares, treasure imp and cursed coin tuning
   roomEvents: { rules: ROOM_EVENT_RULES, coins: COIN_RULES, shrines: SHRINES, shrineTuning: SHRINE_TUNING, pacts: ALTAR_PACTS, relicAmplify: RELIC_AMPLIFY, wares: MERCHANT_WARES },
+  // named mini-bosses (minibosses.ts): name parts and signature mechanics (spawn, health and loot tunables are RULES)
+  miniBosses: { names: MINIBOSS_NAMES, mechanics: MINIBOSS_MECHANICS },
 };
 
 let cachedHash: string | null = null;
