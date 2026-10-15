@@ -10,48 +10,48 @@ const n = (id: string, branch: string, name: string, rankLimit: number, tier: No
 const sk = (s: Omit<SkillDef, 'classId' | 'compressionSupport' | 'icon'> & { icon?: string }): SkillDef => ({ classId: 'hexbinder', compressionSupport: true, icon: `node:${s.id}`, ...s });
 
 export const SKILLS: SkillDef[] = [
-  sk({ id: 'h_hex_bolt', name: 'Hex Bolt', slot: 'basic', damageType: 'decay', damageCoef: '1', resourceCost: 0, cooldownSec: 0, charges: 1,
+  sk({ id: 'h_hex_bolt', name: 'Hex Bolt', slot: 'basic', damageType: 'decay', damageCoef: '1', cooldownSec: 0, charges: 1,
     shape: { kind: 'projectile', speed: 10, radius: 0.28, range: 8.5, pierce: 0, spreadDeg: 12 },
     dot: { type: 'decay', fractionPerSec: '0.25', durationSec: 4 },
     description: 'A bolt of hexfire that rots its target: 25% of the hit as decay damage per second for 4s. Every bolt adds a rot stack.' }),
-  sk({ id: 'h_grave_tide', name: 'Grave Tide', slot: 'signature', damageType: 'decay', damageCoef: '3', resourceCost: 35, cooldownSec: 12, charges: 1,
+  sk({ id: 'h_grave_tide', name: 'Grave Tide', slot: 'signature', damageType: 'decay', damageCoef: '3', cooldownSec: 8.5, charges: 1,
     shape: { kind: 'line', length: 8, width: 3, duration: 1.15, tickInterval: 0 }, knockback: 0.9,
     description: 'Unleash a rolling wave of rot 3 units wide that surges 8 units forward: 3x decay damage to everything it washes over, rot (30%/s for 4s) and a 0.9 unit shove. Up to 6 enemies slain by the tide rise as homing spirits (0.8x decay damage). Builds boss stagger.' }),
   // ---- Pestilence ----
-  sk({ id: 'h_plague_cloud', name: 'Plague Cloud', slot: 'active', damageType: 'decay', damageCoef: '0.4', resourceCost: 22, cooldownSec: 6, charges: 1,
+  sk({ id: 'h_plague_cloud', name: 'Plague Cloud', slot: 'active', damageType: 'decay', damageCoef: '0.4', cooldownSec: 4, charges: 1,
     shape: { kind: 'circle', radius: 2.2, selfCentered: false, range: 7 }, dot: { type: 'decay', fractionPerSec: '0.2', durationSec: 3 },
     description: 'Hurl a plague flask up to 7 units: a 2.2 radius cloud lingers for 4s, pulsing every 0.5s for 0.4x decay damage and rot (20%/s for 3s).' }),
-  sk({ id: 'h_blightbloom', name: 'Blightbloom', slot: 'active', damageType: 'decay', damageCoef: '0.7', resourceCost: 28, cooldownSec: 8, charges: 1,
+  sk({ id: 'h_blightbloom', name: 'Blightbloom', slot: 'active', damageType: 'decay', damageCoef: '0.7', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'circle', radius: 6, selfCentered: false, range: 7 }, dot: { type: 'decay', fractionPerSec: '0.2', durationSec: 3 },
     description: 'Plant a blight flower up to 7 units away for 6s. Every 0.75s it spits homing rot seeds at up to 3 enemies within 6 units (0.7x decay damage + rot); when it withers it bursts for 2.1x decay damage in a 2.5 radius.' }),
-  sk({ id: 'h_locust_swarm', name: 'Locust Swarm', slot: 'active', damageType: 'decay', damageCoef: '0.35', resourceCost: 25, cooldownSec: 7, charges: 1,
+  sk({ id: 'h_locust_swarm', name: 'Locust Swarm', slot: 'active', damageType: 'decay', damageCoef: '0.35', cooldownSec: 5, charges: 1,
     shape: { kind: 'aura', radius: 1.6, duration: 5 }, dot: { type: 'decay', fractionPerSec: '0.15', durationSec: 3 },
     description: 'Release a plague swarm that sweeps to the aimed point (up to 8 units) and then hunts the nearest enemy for 5s. Enemies inside the 1.6 radius swarm take 0.35x decay damage every 0.25s and gain rot (15%/s for 3s).' }),
   // ---- Sanguine ----
-  sk({ id: 'h_blood_tether', name: 'Blood Tether', slot: 'active', damageType: 'decay', damageCoef: '0.3', resourceCost: 15, cooldownSec: 5, charges: 1,
+  sk({ id: 'h_blood_tether', name: 'Blood Tether', slot: 'active', damageType: 'decay', damageCoef: '0.3', cooldownSec: 3.5, charges: 1,
     shape: { kind: 'line', length: 6, width: 0.6, duration: 3, tickInterval: 0.25 },
     description: 'Latch a blood tether onto the enemy nearest your aim (range 6) for 3s: every 0.25s it deals 0.3x decay damage and heals you for 30% of the damage dealt. It snaps beyond 8 units.' }),
-  sk({ id: 'h_hemorrhage', name: 'Hemorrhage', slot: 'active', damageType: 'decay', damageCoef: '1.4', resourceCost: 20, cooldownSec: 6, charges: 1,
+  sk({ id: 'h_hemorrhage', name: 'Hemorrhage', slot: 'active', damageType: 'decay', damageCoef: '1.4', cooldownSec: 4, charges: 1,
     shape: { kind: 'circle', radius: 4, selfCentered: true, range: 0 },
     description: 'Blood tendrils rip into the 6 nearest enemies within 4 units: 1.4x decay damage each, dragging them 1.2 units toward you. You heal for 20% of the total damage dealt.' }),
-  sk({ id: 'h_sanguine_lance', name: 'Sanguine Lance', slot: 'active', damageType: 'decay', damageCoef: '2.2', resourceCost: 20, cooldownSec: 5, charges: 1,
+  sk({ id: 'h_sanguine_lance', name: 'Sanguine Lance', slot: 'active', damageType: 'decay', damageCoef: '2.2', cooldownSec: 3.5, charges: 1,
     shape: { kind: 'projectile', speed: 16, radius: 0.4, range: 10, pierce: 99, spreadDeg: 0 },
     description: 'Hurl a lance of coagulated blood that pierces everything in a 10 unit line: 2.2x decay damage. Every enemy pierced heals you 2% maximum health and restores 3 Blood.' }),
   // ---- Wraithcall ----
-  sk({ id: 'h_summon_wraith', name: 'Summon Wraith', slot: 'active', damageType: 'decay', damageCoef: '0.8', resourceCost: 30, cooldownSec: 10, charges: 1,
+  sk({ id: 'h_summon_wraith', name: 'Summon Wraith', slot: 'active', damageType: 'decay', damageCoef: '0.8', cooldownSec: 7, charges: 1,
     shape: { kind: 'aura', radius: 1.2, duration: 8 },
     description: 'Summon a wraith for 8s that hunts the nearest enemy (5.5 units/s) and slashes every 0.6s for 0.8x decay damage in a 1.2 radius, leaving rot (15%/s for 3s). Up to 2 wraiths; a third replaces the oldest.' }),
-  sk({ id: 'h_banshee', name: 'Banshee', slot: 'active', damageType: 'decay', damageCoef: '1', resourceCost: 30, cooldownSec: 10, charges: 1,
+  sk({ id: 'h_banshee', name: 'Banshee', slot: 'active', damageType: 'decay', damageCoef: '1', cooldownSec: 7, charges: 1,
     shape: { kind: 'aura', radius: 3, duration: 7 },
     description: 'Summon a wailing banshee for 7s. Every 1.5s she shrieks: 1x decay damage within 3 units and a 1.2 unit knockback (40 boss stagger). Between shrieks she claws for 0.5x every 0.6s.' }),
-  sk({ id: 'h_grave_legion', name: 'Grave Legion', slot: 'active', damageType: 'decay', damageCoef: '0.55', resourceCost: 35, cooldownSec: 12, charges: 1,
+  sk({ id: 'h_grave_legion', name: 'Grave Legion', slot: 'active', damageType: 'decay', damageCoef: '0.55', cooldownSec: 8.5, charges: 1,
     shape: { kind: 'aura', radius: 1, duration: 6 },
     description: 'Raise 3 skeletal wraiths around you for 6s. Each hunts at 6.5 units/s and slashes every 0.5s for 0.55x decay damage with rot. Recasting replaces the legion.' }),
 ];
 
 export const NODES: NodeDef[] = [
   // ---- Pestilence: plagues, rot stacks and corpse bursts ----
-  n('h_plague_cloud', 'pestilence', 'Plague Cloud', 1, 0, { grantsSkill: 'h_plague_cloud', description: 'Equip Plague Cloud: a lobbed 2.2 radius cloud that pulses 0.4x decay damage and rot every 0.5s for 4s.' }),
+  n('h_plague_cloud', 'pestilence', 'Plague Cloud', 1, 0, { starting: true, grantsSkill: 'h_plague_cloud', description: 'Equip Plague Cloud: a lobbed 2.2 radius cloud that pulses 0.4x decay damage and rot every 0.5s for 4s.' }),
   n('h_virulence', 'pestilence', 'Virulence', 3, 1, { modifiers: [{ stat: 'player.decayDamage', factorPerRank: '1.1' }], description: 'Decay damage (hits and rot) x1.1 per rank.' }),
   n('h_lingering_rot', 'pestilence', 'Lingering Rot', 2, 1, { mechanics: ['lingering_rot'], description: 'All rot you apply lasts 1 second longer per rank (Hex Bolt rot: 4s -> 6s at rank 2).' }),
   n('h_fetid_reach', 'pestilence', 'Fetid Reach', 2, 1, { prereqs: [{ node: 'h_plague_cloud', rank: 1 }], modifiers: [{ stat: 'skill.h_plague_cloud.radius', factorPerRank: '1.12' }], description: 'Radius of Plague Cloud, the Blightbloom burst and the Locust Swarm x1.12 per rank.' }),
@@ -70,7 +70,7 @@ export const NODES: NodeDef[] = [
     description: 'Keystone: your direct hits on an enemy with 5+ rot stacks rupture it, instantly dealing 120% of all your remaining rot on it as decay damage and consuming the rot. Choice: excludes Black Death.' }),
 
   // ---- Sanguine: life drain, blood price and blood shields ----
-  n('h_blood_tether', 'sanguine', 'Blood Tether', 1, 0, { grantsSkill: 'h_blood_tether', description: 'Equip Blood Tether: a 3s life-draining tether (0.3x decay every 0.25s, heals 30% of damage dealt).' }),
+  n('h_blood_tether', 'sanguine', 'Blood Tether', 1, 0, { starting: true, grantsSkill: 'h_blood_tether', description: 'Equip Blood Tether: a 3s life-draining tether (0.3x decay every 0.25s, heals 30% of damage dealt).' }),
   n('h_crimson_vigor', 'sanguine', 'Crimson Vigor', 3, 1, { modifiers: [{ stat: 'player.maxHealth', factorPerRank: '1.1' }], description: 'Maximum health x1.1 per rank.' }),
   n('h_thirst', 'sanguine', 'Thirst', 2, 1, { modifiers: [{ stat: 'player.healing', factorPerRank: '1.1' }], description: 'All healing you receive x1.1 per rank.' }),
   n('h_blood_price', 'sanguine', 'Blood Price', 1, 1, { mechanics: ['blood_price'],
@@ -90,7 +90,7 @@ export const NODES: NodeDef[] = [
     description: 'Keystone: shield capacity x1.5. Your Blood skills convert 40% of the damage they deal into a blood shield, and deal x1.3 damage while you are shielded. Choice: excludes Blood Sacrament.' }),
 
   // ---- Wraithcall: spirits, wraiths and soul harvest ----
-  n('h_summon_wraith', 'wraithcall', 'Summon Wraith', 1, 0, { grantsSkill: 'h_summon_wraith', description: 'Equip Summon Wraith: an 8s hunting wraith that slashes for 0.8x decay damage every 0.6s.' }),
+  n('h_summon_wraith', 'wraithcall', 'Summon Wraith', 1, 0, { starting: true, grantsSkill: 'h_summon_wraith', description: 'Equip Summon Wraith: an 8s hunting wraith that slashes for 0.8x decay damage every 0.6s.' }),
   n('h_grave_strength', 'wraithcall', 'Grave Strength', 3, 1, { modifiers: [{ stat: 'skill.h_summon_wraith.damage', factorPerRank: '1.1' }],
     description: 'Spirit damage x1.1 per rank: wraiths, the banshee, the legion, souls and homing spirits.' }),
   n('h_soul_harvest', 'wraithcall', 'Soul Harvest', 2, 1, { mechanics: ['soul_harvest'],
@@ -119,8 +119,7 @@ export const CLASS: ClassDef = {
     { id: 'sanguine', name: 'Sanguine', theme: 'Life drain, blood price and blood shields' },
     { id: 'wraithcall', name: 'Wraithcall', theme: 'Wraiths, homing spirits and soul harvest' },
   ],
-  accent: '#8fd14f', role: 'Ranged caster · plague & summons',
-  resource: { name: 'Blood', max: 100, regenPerSec: 9 },
+  accent: '#8fd14f', role: 'Ranged caster · plague & summons',
   base: { maxHealth: 850, armor: 15, damage: 82, attackFrequency: 2.0, moveSpeed: 4.6, critTendency: '0.25', critMultiplier: '2', shieldCapacity: 0.6 },
   basicSkill: 'h_hex_bolt', signatureSkill: 'h_grave_tide',
   nodes: NODES.map((x) => x.id),

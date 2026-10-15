@@ -4,7 +4,7 @@ import { addStagger, healPlayer, hitEnemy, shieldPlayer } from '../combat';
 import { inCone, lineOfSight, moveCircle, norm, q, rayDistance } from '../geometry';
 import { registerClassHooks } from '../hooks';
 import { nearestFloor } from '../map';
-import { areaCoverage, cosHalf, flinch, knockback, livingEnemies, makeHazard, newProjectileId, spawnPlayerProjectiles } from '../players';
+import { areaCoverage, cosHalf, cutCooldowns, flinch, knockback, livingEnemies, makeHazard, newProjectileId, spawnPlayerProjectiles } from '../players';
 import { nextFloat } from '../rng';
 import { B, ONE, hitDamage, playerDerived, toFloatClamped, treeFactor } from '../stats';
 import { ACTION, type EnemyState, type Hazard, type PlayerState, type SimEvent, type SimState } from '../types';
@@ -31,6 +31,8 @@ const ZERO = Big.ZERO;
 const T = (sec: number) => Math.round(sec / DT);
 const rank = (p: PlayerState, id: string) => p.ranks[id] ?? 0;
 const has = (p: PlayerState, id: string) => (p.ranks[id] ?? 0) > 0;
+/** Steam Engine: seconds cut from every recharging skill per kill while overclocked. */
+const STEAM_ENGINE_CUT = 0.3;
 
 const FAMILY: Record<string, 'af_turret' | 'af_grenade' | 'af_overclock'> = {
   af_turret: 'af_turret', af_flame_turret: 'af_turret', af_tesla_coil: 'af_turret',
@@ -373,7 +375,7 @@ function droneTick(state: SimState, ev: SimEvent[], p: PlayerState, h: Hazard) {
 
 function killSteam(state: SimState, p: PlayerState) {
   if (has(p, 'af_steam_engine') && overclocked(state, p)) {
-    p.resource = Math.min(playerDerived(state, p).resourceMax, p.resource + 4);
+    cutCooldowns(p, STEAM_ENGINE_CUT);   // no resource: overclocked kills speed every recharging skill
   }
 }
 
@@ -570,7 +572,7 @@ registerClassHooks('artificer', {
     return 0;
   },
 
-  costFactor(_state, p, skillId) {
+  cooldownFactor(_state, p, skillId) {
     const fam = FAMILY[skillId];
     if (fam === 'af_grenade') { let f = 1; for (let i = 0; i < rank(p, 'af_quick_fuse'); i++) f *= 0.9; return f; }
     if (fam === 'af_overclock' && has(p, 'af_perpetual_engine')) return 1.5;

@@ -43,8 +43,6 @@ export function playerBase(p: PlayerState, stat: string): Big {
     case 'player.movementSpeed': return B(cls.base.moveSpeed);
     case 'player.shieldCapacity': return B(cls.base.shieldCapacity);
     case 'player.armor': return B(cls.base.armor);
-    case 'player.resourceRegen': return B(cls.resource.regenPerSec);
-    case 'player.maxResource': return B(cls.resource.max);
     case 'player.guardHeal': return B('0.04');
     case 'player.dodgeHeal': return B('0.03');
     default: return ONE;
@@ -72,7 +70,7 @@ export function masteryFactor(p: PlayerState, stat: string): Big {
   const f = B(RULES.masteryFactor);
   if (stat === 'player.skillDamage' && p.mastery.damage) return f.powInt(p.mastery.damage);
   if (stat === 'player.maxHealth' && p.mastery.health) return f.powInt(p.mastery.health);
-  if (stat === 'player.resourceRegen' && p.mastery.regen) return f.powInt(p.mastery.regen);
+  if (stat === 'player.recoveryRate' && p.mastery.recovery) return f.powInt(p.mastery.recovery);
   return ONE;
 }
 
@@ -129,10 +127,7 @@ export interface PlayerDerived {
   moveSpeed: Big;
   shieldCapFrac: Big;
   healing: Big;
-  resourceMax: number;
-  resourceRegen: Big;
   burnRate: Big;
-  emberCost: Big;
   reviveSpeed: number;
   guardHeal: Big;
   dodgeHeal: Big;
@@ -167,10 +162,7 @@ export function derivePlayer(state: SimState, p: PlayerState, fateOverride?: Rec
     moveSpeed: r('player.movementSpeed').mul(B(RULES.playerMoveSpeedMult)),   // global hero speed (dodge distance unaffected)
     shieldCapFrac: r('player.shieldCapacity'),
     healing: r('player.healing'),
-    resourceMax: r('player.maxResource').toNumber(),
-    resourceRegen: r('player.resourceRegen'),
     burnRate: r('player.burnRate'),
-    emberCost: r('player.emberCost'),
     reviveSpeed: Math.min(1e9, r('player.reviveSpeed').toNumber()),
     guardHeal: r('player.guardHeal'),
     dodgeHeal: r('player.dodgeHeal'),

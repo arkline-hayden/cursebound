@@ -149,7 +149,7 @@ function beastAfterHit(state: SimState, p: PlayerState, ev: SimEvent[], e: Enemy
   if (res.dealt.isZero()) return;
   if (has(p, 'w_spirit_bond')) healPlayer(state, ev, p, res.dealt.mul(B('0.04')));
   if (!isLive(e) || !res.kills.isZero()) {
-    if (has(p, 'w_spirit_bond') && p.lifeState === 'alive') p.resource = Math.min(playerDerived(state, p).resourceMax, p.resource + 3);
+    if (has(p, 'w_spirit_bond') && p.lifeState === 'alive') cutCooldowns(p, 0.3);   // beast kills speed the hotbar (no resource)
     if (has(p, 'w_pack_frenzy')) p.vars.w_frenzyUntil = state.tick + ticks(4);
   }
 }

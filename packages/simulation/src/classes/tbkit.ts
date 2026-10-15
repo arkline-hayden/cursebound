@@ -59,13 +59,13 @@ const TEMP_DAMAGE: Record<string, (state: SimState, p: PlayerState) => Big> = {}
 export function registerTempDamage(classId: string, fn: (state: SimState, p: PlayerState) => Big) { TEMP_DAMAGE[classId] = fn; }
 export function tempDamage(state: SimState, p: PlayerState): Big { return TEMP_DAMAGE[p.classId]?.(state, p) ?? ONE; }
 
-/** Evolved skills inherit the base skill's skill-scoped tree modifiers (damage, radius, cost, cooldown). */
+/** Evolved skills inherit the base skill's skill-scoped tree modifiers (damage, radius, cooldown). */
 const FAMILY: Record<string, string> = {};
 export function registerFamily(map: Record<string, string>) { Object.assign(FAMILY, map); }
 export function familyOf(skillId: string): string { return FAMILY[skillId] ?? skillId; }
 
 /** Product of the skill's own and its family base's tree factor for a skill-scoped stat kind. */
-export function familyFactor(p: PlayerState, skillId: string, kind: 'damage' | 'radius' | 'cost' | 'cooldown'): Big {
+export function familyFactor(p: PlayerState, skillId: string, kind: 'damage' | 'radius' | 'cooldown'): Big {
   let f = treeFactor(p, `skill.${skillId}.${kind}`).factor;
   const base = FAMILY[skillId];
   if (base && base !== skillId) f = f.mul(treeFactor(p, `skill.${base}.${kind}`).factor);
@@ -287,19 +287,7 @@ export function stepMove(state: SimState, p: PlayerState): 'land' | 'end' | 'mov
   return 'moving';
 }
 
-// ---------------- resource & misc ----------------
-
-export function gainResource(state: SimState, p: PlayerState, amount: number) {
-  if (amount <= 0 || p.lifeState !== 'alive') return;
-  const max = playerDerived(state, p).resourceMax;
-  p.resource = Math.min(max, p.resource + amount);
-}
-
-/** The resource cost the core will charge for a skill right now. */
-export function costOf(state: SimState, p: PlayerState, skillId: string): number {
-  const c = SKILL_BY_ID[skillId].resourceCost;
-  return c > 0 ? c * hooks.costFactor(state, p, skillId) : 0;
-}
+// ---------------- cooldowns & misc ----------------
 
 export function slotOf(p: PlayerState, skillId: string): number {
   return p.skills.findIndex((s) => s.skillId === skillId);

@@ -100,8 +100,8 @@ export interface MechanicDef {
   description: string;
   /** What the mechanic touches (shown as applicability). */
   applicability: string;
-  /** Party requirement for the gift to do anything (Forecast applicability): 'projectile' | 'resource' | 'skills' | 'any'. */
-  requires: 'any' | 'projectile' | 'resource' | 'skills';
+  /** Party requirement for the gift to do anything (Forecast applicability): 'projectile' | 'skills' | 'any'. */
+  requires: 'any' | 'projectile' | 'skills';
   /** Fixed tunables read by the simulation (radius, seconds, hit counts); `{name}` placeholders in the copy. */
   params: Record<string, number>;
   /** Chip accent colour (#rrggbb). */
@@ -129,7 +129,7 @@ export interface SkillDef {
   damageType: DamageType;
   /** Multiplier on the class base damage. 0 for non-damaging skills. */
   damageCoef: string;
-  resourceCost: number;
+  /** Seconds between casts (scaled by recovery rate). Skills are purely cooldown-gated: there is no resource. */
   cooldownSec: number;
   charges: number;
   shape: HitShape;
@@ -174,7 +174,6 @@ export interface ClassDef {
   accent: string;
   role: string;
   branches: { id: string; name: string; theme: string }[];
-  resource: { name: string; max: number; regenPerSec: number };
   base: {
     maxHealth: number;
     armor: number;

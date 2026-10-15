@@ -175,11 +175,15 @@ function onUnitsSlain(state: SimState, ev: SimEvent[], e: EnemyState, p: PlayerS
     // Soul Harvest
     const soul = mechNum(state, 'soul_harvest');
     if (soul > 0) {
-      const pd = playerDerived(state, p);
+      // each kill cuts soul x the full cooldown from every recharging skill (no resource: cooldowns are the gate)
       const n = kills.gte(B(param('soul_harvest', 'maxKills'))) ? param('soul_harvest', 'maxKills') : kills.toNumber();
-      const before = p.resource;
-      p.resource = Math.min(pd.resourceMax, p.resource + pd.resourceMax * soul * n);
-      if (p.resource - before > 1e-6) cast(ev, p.slot, 'boon_soul_harvest', e.x, e.y, p.x, p.y);
+      let cut = false;
+      for (const s of p.skills) {
+        if (!s.skillId || s.charges >= s.maxCharges) continue;
+        s.cooldown -= (s.full ?? SKILL_BY_ID[s.skillId]?.cooldownSec ?? 0) * Math.min(1, soul * n);
+        cut = true;
+      }
+      if (cut) cast(ev, p.slot, 'boon_soul_harvest', e.x, e.y, p.x, p.y);
     }
   }
   // Chain Reaction: a pending blast; detonated by hazardTick a heartbeat later

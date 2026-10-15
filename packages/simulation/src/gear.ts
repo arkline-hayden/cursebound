@@ -237,14 +237,12 @@ export function equipLegendary(state: SimState, ev: SimEvent[], p: PlayerState, 
   const old = gear[def.slot];
   const oldDef = old ? LEGENDARY_BY_ID[old] : undefined;
   const beforeMax = p.maxHp;
-  const beforeRes = derivePlayer(state, p).resourceMax;
   p.gear = { ...gear, [def.slot]: itemId };     // new object: equips never mutate a shared map in place
   if (oldDef && oldDef.perk.id !== def.perk.id) clearPerkVars(p, oldDef.perk.id);
   bumpDyn(p);
   state.stateVersion++;
   const after = derivePlayer(state, p);
   refreshMaxHp(p, beforeMax, after.maxHp);
-  if (beforeRes > 0) p.resource = Math.min(after.resourceMax, p.resource * (after.resourceMax / beforeRes));
   rebuildSkills(p);
   for (const s of p.skills) if (s.charges < 0) s.charges = 0;
   if (def.perk.id === 'empowered_skill') p.vars['lg.emp'] = 1;
@@ -602,8 +600,6 @@ registerGlobalHooks({
       const refresh = m.get('signature_refresh')?.[0];
       if (refresh) {
         for (const s of p.skills) if (s.skillId && s.skillId !== skillId) advanceCooldown(s, magN(refresh));
-        const max = playerDerived(state, p).resourceMax;
-        p.resource = Math.min(max, p.resource + max * perkParam(refresh, 'resource', 0.15));
         ev.push({ t: 'perk', slot: p.slot, perk: 'signature_refresh', x: p.x, y: p.y });
       }
     }

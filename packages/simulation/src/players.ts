@@ -6,7 +6,7 @@ import { hooks } from './hooks';
 import { dir8, inCone, inLine, isWallAt, moveCircle, norm, q, rayDistance } from './geometry';
 import { nearestFloor } from './map';
 import { nextFloat } from './rng';
-import { B, ONE, hitDamage, playerDerived, toFloatClamped } from './stats';
+import { B, ONE, hitDamage, playerDerived, toFloatClamped, treeFactor } from './stats';
 import { ACTION, type EnemyState, type Hazard, type PlayerInput, type PlayerState, type Projectile, type SimEvent, type SimState } from './types';
 
 // Player movement, abilities and life states (PRD §5, §6.1, §7). Inputs are intentions only (REQ NET01).
@@ -203,11 +203,29 @@ export function newProjectileId(state: SimState): number {
   return state.nextId++;
 }
 
-function resourceCost(state: SimState, p: PlayerState, skill: SkillDef): number {
-  let c = skill.resourceCost;
-  if (skill.damageType === 'ember' && c > 0) c *= toFloatClamped(playerDerived(state, p).emberCost, 1e9);
-  if (c > 0) c *= hooks.costFactor(state, p, skill.id);
-  return c;
+/**
+ * Full cooldown of a skill for this hero right now (skills are purely cooldown-gated; there is no resource): the
+ * authored cooldownSec x skill-scoped tree modifiers (skill.<id>.cooldown) x class-kit factors (hooks.cooldownFactor).
+ * Recovery rate is applied while it ticks, not here.
+ */
+export function cooldownOf(state: SimState, p: PlayerState, skillId: string): number {
+  const base = SKILL_BY_ID[skillId]?.cooldownSec ?? 0;
+  if (!(base > 0)) return 0;
+  const f = toFloatClamped(treeFactor(p, `skill.${skillId}.cooldown`).factor, 1e6) * hooks.cooldownFactor(state, p, skillId);
+  return Math.max(0.25, base * f);
+}
+
+/**
+ * Cut `sec` seconds from the remaining cooldown of every recharging skill on the hotbar (the kill / hit / pickup
+ * rewards that used to restore resource). `exceptSlot`: leave that hotbar slot alone (usually the triggering skill).
+ */
+export function cutCooldowns(p: PlayerState, sec: number, exceptSlot = -1) {
+  if (!(sec > 0)) return;
+  for (let i = 0; i < p.skills.length; i++) {
+    const s = p.skills[i];
+    if (i === exceptSlot || !s.skillId || s.charges >= s.maxCharges) continue;
+    s.cooldown -= sec;
+  }
 }
 
 // ---------------- Basic attacks ----------------
@@ -378,7 +396,7 @@ function castSkill(state: SimState, ev: SimEvent[], p: PlayerState, skillId: str
         if (a.lifeState !== 'alive') continue;
         if ((a.x - p.x) ** 2 + (a.y - p.y) ** 2 > 16) continue;
         a.buffs = a.buffs.filter((b) => b.id !== 'rally');
-        a.buffs.push({ id: 'rally', until, value: 2 });
+        a.buffs.push({ id: 'rally', until, value: RULES.rallyRecovery });
         if (bearer) shieldPlayer(state, ev, a, a.maxHp.mul(B('0.15')));
       }
       push();
@@ -441,8 +459,8 @@ function castSkill(state: SimState, ev: SimEvent[], p: PlayerState, skillId: str
       }
       p.x = q(nx); p.y = q(ny);
       ev.push({ t: 'teleport', slot: p.slot, fx, fy, x: p.x, y: p.y });
-      if ((p.ranks['a_event_horizon'] ?? 0) > 0 && p.resource >= 15) {
-        p.resource -= 15;
+      if ((p.ranks['a_event_horizon'] ?? 0) > 0 && (p.vars.a_ehReady ?? 0) <= state.tick) {
+        p.vars.a_ehReady = state.tick + Math.round(RULES.eventHorizonGapSec / DT);   // at most one pull field per gap
         state.hazards.push(makeHazard(state, {
           kind: 'horizon', owner: 'player', ownerId: p.slot, x: p.x, y: p.y, radius: 3, untilTick: state.tick + Math.round(2 / DT),
           interval: Math.round(0.25 / DT), damage: hitDamage(state, p, 'a_event_horizon_field', 'astral'), dtype: 'astral',
@@ -462,8 +480,7 @@ export function stormCast(state: SimState, ev: SimEvent[], p: PlayerState, tx: n
     const window = Math.round(4 / DT);
     p.stormCasts = p.stormCasts.filter((t) => state.tick - t <= window);
     p.stormCasts.push(state.tick);
-    if (p.stormCasts.length >= 3 && p.resource >= 10) {
-      p.resource -= 10;
+    if (p.stormCasts.length >= 3) {
       p.stormCasts = [];
       state.hazards.push(makeHazard(state, {
         kind: 'tempest', owner: 'player', ownerId: p.slot, x: tx, y: ty, radius: 2, untilTick: state.tick + Math.round(3 / DT),
@@ -539,24 +556,20 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
   const rec = toFloatClamped(pd.recovery, 1e12);
   rechargeDodge(p, DT * rec);
   p.iframes = Math.max(0, p.iframes - DT);
+  // Skill cooldowns (the only cast gate). Rally (Vanguard) speeds skill recovery by RULES.rallyRecovery.
+  const skillRec = rec * (p.buffs.some((b) => b.id === 'rally') ? RULES.rallyRecovery : 1);
   for (const s of p.skills) {
     if (!s.skillId) continue;
     if (s.charges >= s.maxCharges) { s.cooldown = 0; continue; }
-    const base = SKILL_BY_ID[s.skillId].cooldownSec;
-    s.cooldown -= DT * rec;
+    s.cooldown -= DT * skillRec;
+    if (s.cooldown > 0) continue;
+    const full = cooldownOf(state, p, s.skillId);
     while (s.cooldown <= 0 && s.charges < s.maxCharges) {
       s.charges++;
-      if (s.charges < s.maxCharges) s.cooldown += base; else s.cooldown = 0;
-      if (base <= 0) { s.charges = s.maxCharges; s.cooldown = 0; }
+      if (s.charges < s.maxCharges) { s.cooldown += full; s.full = full; } else s.cooldown = 0;
+      if (full <= 0) { s.charges = s.maxCharges; s.cooldown = 0; }
     }
   }
-
-  // Resource regeneration (Rally doubles)
-  const rally = p.buffs.some((b) => b.id === 'rally') ? 2 : 1;
-  const gain = pd.resourceRegen.mul(DT_B).mul(B(rally));
-  const room = pd.resourceMax - p.resource;
-  if (room > 0) p.resource = gain.gte(B(Math.max(room, 1e-9))) ? pd.resourceMax : Math.min(pd.resourceMax, p.resource + gain.toNumber());
-  else p.resource = Math.min(p.resource, pd.resourceMax);
 
   // Shield decay
   if (!p.shield.isZero()) {
@@ -619,17 +632,13 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
     const bit = i === p.skills.length - 1 ? ACTION.SIGNATURE : bits[i];
     if (!(pressed & bit) || (p.prevButtons & bit && s.skillId === 'a_phase_step')) continue;
     if (p.dodgeTimer > 0 || frozen || silenced) continue;   // afflictions: frozen / silenced heroes cannot cast
-    const skill = SKILL_BY_ID[s.skillId];
     const returning = s.skillId === 'a_phase_step' && s.mark && s.mark.until > state.tick;
     if (!returning && s.charges <= 0) continue;
-    const cost = returning ? 0 : resourceCost(state, p, skill);
-    if (p.resource < cost) continue;
     if (s.skillId === 'v_guard_stance' && p.guardTimer > 0) continue;
     if (castSkill(state, ev, p, s.skillId)) {
-      p.resource -= cost;
       if (!returning) {
         s.charges--;
-        if (s.cooldown <= 0) s.cooldown = skill.cooldownSec;
+        if (s.cooldown <= 0) { s.cooldown = cooldownOf(state, p, s.skillId); s.full = s.cooldown; }
       }
       hooks.onCast(state, ev, p, s.skillId);
     }

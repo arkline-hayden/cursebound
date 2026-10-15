@@ -36,7 +36,7 @@ export interface PlayerForecast {
   healing: FValue;
   moveSpeed: FValue;
   cooldownSec: FValue;      // signature cooldown
-  resourceRegen: FValue;
+  recoveryRate: FValue;     // cooldown recovery multiplier
   measuredDps: { value: string; sampleSec: number } | null;
   estimatedDps: FValue | null;
   warnings: string[];
@@ -206,10 +206,6 @@ function mechanicApplicability(state: SimState, def: MechanicDef): { applicable:
     const any = state.players.some(firesProjectiles);
     return { applicable: any, text: any ? def.applicability : 'No party member fires projectiles yet: this boon currently does nothing.' };
   }
-  if (def.requires === 'resource') {
-    const any = state.players.some((p) => (CLASS_BY_ID[p.classId]?.resource.max ?? 0) > 0);
-    return { applicable: any, text: any ? def.applicability : 'No party member uses a resource: this boon currently does nothing.' };
-  }
   if (def.requires === 'skills') {
     const any = state.players.some((p) => p.skills.some((s) => s.skillId && s.maxCharges > 0));
     return { applicable: any, text: any ? def.applicability : 'No party member has a skill with charges: this boon currently does nothing.' };
@@ -312,7 +308,7 @@ function mechanicDetails(def: MechanicDef, v: Big, c: MechCtx): string[] {
     case 'bloodrush':
       return each(({ p, d }) => `${p.name}: attack speed ${N(d.attackFreq)}/s → ${N(d.attackFreq.mul(onePlus))}/s, movement ${N(d.moveSpeed)} → ${N(d.moveSpeed.mul(onePlus))} for ${P.durationSec}s after a kill.`);
     case 'soul_harvest':
-      return each(({ p, d }) => `${p.name}: +${N(Big.min(B(d.resourceMax), B(d.resourceMax).mul(v)))} ${CLASS_BY_ID[p.classId]?.resource.name ?? 'resource'} per kill (max ${d.resourceMax}).`);
+      return each(({ p }) => { const s = p.skills.find((x) => x.skillId && SKILL_BY_ID[x.skillId]?.cooldownSec > 0); const cd = s ? SKILL_BY_ID[s.skillId].cooldownSec : 0; return s ? `${p.name}: each kill cuts about ${N(B(cd).mul(v))}s from ${SKILL_BY_ID[s.skillId].name} (${cd}s cooldown) and every other recharging skill by ${N(v.mul(B(100)))}% of its cooldown.` : `${p.name}: no skill on cooldown to cut yet.`; });
     case 'echo': {
       const miss = ONE.sub(v);
       return [`On average each charge casts ${N(ONE.div(miss.isZero() ? B('1e-9') : miss))} times.`];
@@ -435,7 +431,7 @@ export function computeForecast(state: SimState): OfferForecast | null {
         armor: fv(dB.armor, dA.armor), incomingHit: fv(inB, inA), hitsToDown: fv(hitsB, hitsA), survivalSec: fv(survB, survA, 'estimate'),
         healing: fv(dB.healing, dA.healing), moveSpeed: fv(dB.moveSpeed, dA.moveSpeed),
         cooldownSec: fv(B(sig.cooldownSec).div(dB.recovery), B(sig.cooldownSec).div(dA.recovery)),
-        resourceRegen: fv(dB.resourceRegen, dA.resourceRegen), measuredDps: measured, estimatedDps: estimated, warnings,
+        recoveryRate: fv(dB.recovery, dA.recovery), measuredDps: measured, estimatedDps: estimated, warnings,
       });
     }
     const K = B(RULES.armorK);
@@ -540,7 +536,7 @@ export interface LedgerView {
   timeline: { seq: number; round: number; cardId: string; stat: string; percent: string; factor: string }[];
   timelineTotal: number;
   measured: { slot: number; dps: string; sampleSec: number }[];
-  mastery: { slot: number; damage: number; health: number; regen: number }[];
+  mastery: { slot: number; damage: number; health: number; recovery: number }[];
   graph: { from: string; to: string }[];
   /** Bound boons and banes: copies and effective magnitude (stacked multiplicatively). */
   mechanics: LedgerMechanic[];

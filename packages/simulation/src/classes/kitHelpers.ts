@@ -136,7 +136,7 @@ export function addShieldQuiet(state: SimState, p: PlayerState, amount: Big): Bi
 export function grantRally(p: PlayerState, untilTick: number) {
   const cur = p.buffs.find((b) => b.id === 'rally');
   if (cur) { if (cur.until < untilTick) cur.until = untilTick; }
-  else p.buffs.push({ id: 'rally', until: untilTick, value: 2 });
+  else p.buffs.push({ id: 'rally', until: untilTick, value: RULES.rallyRecovery });
 }
 
 /** Refill dodge charges and clear the recharge clock. */

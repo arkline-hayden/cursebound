@@ -38,6 +38,8 @@ export interface SkillRuntime {
   cooldown: number;     // seconds remaining (scaled by recovery rate as it ticks)
   charges: number;
   maxCharges: number;
+  /** full length of the cooldown now recharging (cooldownOf at cast; snapshot fraction). Absent = the authored cooldown. */
+  full?: number;
   /** Return mark position (Arcanist) */
   mark?: { x: number; y: number; until: number } | null;
 }
@@ -77,7 +79,7 @@ export interface PlayerState {
   ranks: Record<string, number>;   // node id -> rank
   skillPoints: number;
   spentByBranch: Record<string, number>;
-  mastery: { damage: number; health: number; regen: number };
+  mastery: { damage: number; health: number; recovery: number };
   ready: boolean;
   // Body
   x: number; y: number;
@@ -88,7 +90,6 @@ export interface PlayerState {
   hp: Big;
   maxHp: Big;
   shield: Big;
-  resource: number;
   lifeState: 'alive' | 'downed' | 'dead';
   downTimer: number;               // seconds left while downed
   downsThisRound: number;
@@ -270,7 +271,7 @@ export interface Hazard {
   vars?: Record<string, number>;
 }
 
-/** Ground pickup (pickups.ts). Generic: `kind` 'potion' heals, 'orb' restores resource; other modules may add kinds. */
+/** Ground pickup (pickups.ts). Generic: `kind` 'potion' heals, 'orb' (haste orb) cuts skill cooldowns; other modules may add kinds. */
 /** A legendary item lying on the ground (gear.ts). Persists until picked up; unclaimed items settle at round clear. */
 export interface GroundLoot {
   id: number;
@@ -481,7 +482,7 @@ export interface SimState {
   reactions: Reaction[];
   pendingSpawns: PendingSpawn[];
   bossPhaseEvents: number[];
-  /** Ground pickups (potions, resource orbs). */
+  /** Ground pickups (potions, haste orbs). */
   pickups: Pickup[];
   /** Legendary items on the ground (gear.ts). Absent in pre-gear checkpoints. */
   loot?: GroundLoot[];
@@ -518,7 +519,7 @@ export interface DeathRecap {
 export type Command =
   | { type: 'ALLOCATE'; slot: number; nodeId: string }
   | { type: 'REFUND_ALL'; slot: number }
-  | { type: 'MASTERY'; slot: number; choice: 'damage' | 'health' | 'regen' }
+  | { type: 'MASTERY'; slot: number; choice: 'damage' | 'health' | 'recovery' }
   | { type: 'READY'; slot: number; ready: boolean }
   | { type: 'VOTE'; slot: number; offerId: string; seq: number; cardSlot: number | null; locked: boolean }
   | { type: 'RETIRE_VOTE'; slot: number; yes: boolean }

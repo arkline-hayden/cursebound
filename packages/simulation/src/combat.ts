@@ -10,6 +10,8 @@ import { hooks, type HitMod } from './hooks';
 // hits use a deterministic binomial sample (exact Bernoulli trials for k <= 64).
 
 const ZERO = Big.ZERO;
+/** Ash Recovery (Arcanist): seconds cut from every recharging skill when a burning objective enemy dies. */
+const ASH_RECOVERY_SEC = 0.5;
 
 function ceilDiv(x: Big, d: Big): bigint {
   const qv = x.div(d);
@@ -266,11 +268,10 @@ export function killEnemy(state: SimState, ev: SimEvent[], e: EnemyState, bySlot
   e.attack = null;
   e.cohort.count = ZERO;
   ev.push({ t: 'death', id: e.id, kind: e.kind, x: e.x, y: e.y, by: bySlot });
-  // Ash recovery: burning objective kills restore resource
+  // Ash Recovery (Arcanist): burning objective kills cut every recharging skill cooldown
   const p = state.players[bySlot];
   if (p && e.burning && e.objective && (p.ranks['a_ash_recovery'] ?? 0) > 0 && p.lifeState === 'alive') {
-    const pd = playerDerived(state, p);
-    p.resource = Math.min(pd.resourceMax, p.resource + 8);
+    for (const s of p.skills) if (s.skillId && s.charges < s.maxCharges) s.cooldown -= ASH_RECOVERY_SEC;
   }
   // Follow through: a Sweeping Strike kill restores its charge once per cast
   if (p && p.lastSkill === 'v_sweeping_strike' && (p.ranks['v_follow_through'] ?? 0) > 0) {

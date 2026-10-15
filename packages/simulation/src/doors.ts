@@ -284,7 +284,7 @@ function reconnectGrace(state: SimState): boolean {
 
 /**
  * Intermission movement: exactly the shared movement rules (predictMoveTick: dash charges, chained dashes, surge,
- * momentum) so client prediction matches; aim and facing follow the input; no attacks, casts, resource or cooldowns.
+ * momentum) so client prediction matches; aim and facing follow the input; no attacks, casts or cooldowns.
  */
 export function stepIntermissionPlayer(state: SimState, ev: SimEvent[], p: PlayerState, input: PlayerInput | null) {
   p.attackAnim = Math.max(0, p.attackAnim - DT);

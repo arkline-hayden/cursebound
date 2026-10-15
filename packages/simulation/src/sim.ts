@@ -47,9 +47,9 @@ function newPlayer(e: RosterEntry): PlayerState {
   for (const id of cls.nodes) if (NODE_BY_ID[id].starting) ranks[id] = NODE_BY_ID[id].rankLimit;
   const p: PlayerState = {
     slot: e.slot, profileId: e.profileId, name: e.name, classId: e.classId, connected: true, disconnectedAtTick: null,
-    ranks, skillPoints: RULES.startingSkillPoints, spentByBranch: {}, mastery: { damage: 0, health: 0, regen: 0 }, ready: false,
+    ranks, skillPoints: RULES.startingSkillPoints, spentByBranch: {}, mastery: { damage: 0, health: 0, recovery: 0 }, ready: false,
     x: 0, y: 0, vx: 0, vy: 0, aimX: 1, aimY: 0, aimDist: 3, facing: 0,
-    hp: B(cls.base.maxHealth), maxHp: B(cls.base.maxHealth), shield: ZERO, resource: cls.resource.max,
+    hp: B(cls.base.maxHealth), maxHp: B(cls.base.maxHealth), shield: ZERO,
     lifeState: 'alive', downTimer: 0, downsThisRound: 0, selfReviveBlock: -1, selfReviveChannel: 0, reviveProgress: 0, reviverSlot: null,
     dodgeTimer: 0, dodgeCooldown: 0, dodgeCharges: DODGE.charges, surgeTimer: 0, dodgeDirX: 1, dodgeDirY: 0, iframes: 0, guardTimer: 0, guardMoved: false, guardAbsorbed: ZERO,
     attackWork: 0, attackAnim: 0, castAnim: 0, lastSkill: null, skills: [], buffs: [], vulnerability: 0, stormCasts: [], vars: {}, gear: {},
