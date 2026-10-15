@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { DODGE, ENEMY_BY_ID, affixNames, eliteName, CLASS_BY_ID } from '@cursebound/content';
+import { DODGE, BOSS_BY_ID, ENEMY_BY_ID, affixNames, eliteName, CLASS_BY_ID } from '@cursebound/content';
 import { formatBig, Big } from '@cursebound/numeric';
 import type { Snapshot, SnapEnemy, SnapPlayer, SimEvent } from '@cursebound/simulation';
 import { buildArt, ensureActor } from '../art/generate';
@@ -26,7 +26,8 @@ import { basicReach, pickEnemy, pickGround, type GroundThing } from '../input/ta
 import { ClickFx } from '../render/ClickFx';
 import { gameCursor, type GameCursor } from '@/ui/pixelCursors';
 import { cinematicHeld, movesIn, netStore, type GameConnection } from '@/lib/net';
-import { settingsStore } from '@/lib/settings';
+import { settingsStore, updateSettings } from '@/lib/settings';
+import { CAM, CameraRig, edgePanVelocity, type Pt } from '../cameraRig';
 import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 import { gfx, particleBudget, reportSlowFrames } from '../gfx';
 import { spectateStore } from '@/ui/Spectate';
@@ -54,6 +55,8 @@ function hpNum(compact: string): string {
 }
 
 const BOSS_KINDS = new Set(['prismstag', 'bellroot']);
+/** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
+const CAM_LIFT = 22;
 /** Kill-streak milestones and their colours (escalating). */
 const STREAKS: [number, number][] = [[5, 0xffd890], [10, 0xffa040], [15, 0xff6a3a], [25, 0xff3a5a], [40, 0xd06aff], [60, 0xffffff]];
 const ELITE_HAZARD_LIGHT: Record<string, number> = { moltenBlast: 0xff7a2a, frostOrb: 0x8fd8ff, plague: 0x6ab03a, thunder: 0xc8e8ff };
@@ -123,7 +126,16 @@ export class CombatScene extends Phaser.Scene {
   private lastHitSfx = 0;
   /** last time a connecting melee swing of ours hit-stopped (throttle: one stop per swing, not per foe) */
   private lastMeleeStop = 0;
+  /** world point a locked camera follows: the hero plus a slight aim look-ahead, or the spectated teammate */
   private camTarget = { x: 0, y: 0 };
+  /** League of Legends camera (game/cameraRig.ts); a cut / ease back to the hero waits for the next camera step */
+  private rig = new CameraRig();
+  private camSnap: 'none' | 'cut' | 'ease' = 'none';
+  private lastLife: string | null = null;
+  /** enemy nameplates: requests gathered while drawing foes this frame, live tags by actor key, and a free pool */
+  private nameReq: { key: string; text: string; color: string; x: number; y: number; prio: number; hurt: boolean; hitAt: number; badge?: Phaser.GameObjects.Text }[] = [];
+  private nameTags = new Map<string, Phaser.GameObjects.Text>();
+  private namePool: Phaser.GameObjects.Text[] = [];
   /** cutscene director (game/cinematic): door walk-through, round intro, boss grand entrance */
   cine: CinematicDirector | null = null;
   private renderSelf = { x: 0, y: 0, init: false };
@@ -211,7 +223,7 @@ export class CombatScene extends Phaser.Scene {
       scene: this, juice: this.juice, dungeon: this.dungeon, net: this.net,
       sfx: (id, x, y, priority = 2) => this.sfx(id as SfxId, x, priority, y),
       stinger: (kind) => { (getAudio() ?? this.audio)?.stinger(kind as StingerKind); },
-      follow: () => { const c = this.P(this.camTarget.x, this.camTarget.y); return { x: c.x, y: c.y - 22 }; },
+      follow: () => { const c = this.P(this.camTarget.x, this.camTarget.y); return { x: c.x, y: c.y - CAM_LIFT }; },
       heroActor: (classId) => this.heroActor(classId),
     });
     const endCine = () => { this.cine?.destroy(); this.cine = null; };
@@ -737,6 +749,8 @@ export class CombatScene extends Phaser.Scene {
         for (const k of [...this.actors.keys()]) this.destroyView(k);
         this.renderSelf.init = false; this.combo = 0; this.lastHit.clear(); this.pickupsR.clear(); this.pendingBanners = [];
         this.clickFx?.clear();
+        this.camSnap = 'cut';   // a new round starts the camera on the hero
+        this.releaseNames();
       }
     }
     this.sendInputs(delta, latest);
@@ -786,6 +800,10 @@ export class CombatScene extends Phaser.Scene {
     const watched = spectateTarget(latest.players, me, spectateStore.get().slot);
     const wp = watched === null ? undefined : drawnAt.get(watched);
     if (wp) this.camTarget = { x: wp.x, y: wp.y };
+    // back on your feet (revived, or respawned after spectating): the camera eases back to you
+    const myLife = latest.players[me]?.life ?? null;
+    if (this.lastLife && this.lastLife !== 'alive' && myLife === 'alive' && this.camSnap === 'none') this.camSnap = 'ease';
+    this.lastLife = myLife;
     for (const eb of b.enemies) {
       const ea = a.enemies.find((x) => x.i === eb.i && x.g === eb.g) ?? eb;
       const x = ea.x + (eb.x - ea.x) * t, y = ea.y + (eb.y - ea.y) * t;
@@ -818,6 +836,7 @@ export class CombatScene extends Phaser.Scene {
     }
     this.flushBanners(latest);
     this.updateHover(latest);
+    this.placeNames();
     this.drawClickFx(latest);
     if ((this.frameCount++ & 63) === 0) this.applyPostFx();
     this.drawProjectiles(latest);
@@ -838,14 +857,98 @@ export class CombatScene extends Phaser.Scene {
       if (cam.zoom !== cc.zoom) cam.setZoom(cc.zoom);
       cam.scrollX = Math.round(cc.x - this.W / 2);
       cam.scrollY = Math.round(cc.y - this.H / 2);
+      this.stepCamera(delta, latest, me, watched, drawnAt, { x: cc.x, y: cc.y + CAM_LIFT });   // play resumes from here
       return;
     }
     if (cam.zoom !== 1) cam.setZoom(1);
-    const c = this.P(this.camTarget.x, this.camTarget.y);
-    const tx = c.x - this.W / 2, ty = c.y - 22 - this.H / 2;
-    const lerp = set.reducedMotion ? 1 : Math.min(1, delta / 110);
-    cam.scrollX += (tx - cam.scrollX) * lerp;
-    cam.scrollY += (ty - cam.scrollY) * lerp;
+    const pos = this.stepCamera(delta, latest, me, watched, drawnAt, null);
+    if (pos) {
+      cam.scrollX = pos.x - this.W / 2;
+      cam.scrollY = pos.y - CAM_LIFT - this.H / 2;
+    }
+  }
+
+  /**
+   * League of Legends camera (game/cameraRig.ts): unlocked by default, edge panning and middle-mouse drag, the lock
+   * key (Y) follows the hero, Center (C) and F1 / F2-F5 hold the view on you or a teammate, a controller always
+   * follows, spectating follows the watched teammate until you pan. Returns the ground point at the view centre.
+   */
+  private stepCamera(delta: number, s: Snapshot, me: number, watched: number | null, drawnAt: Map<number, Pt>, cine: Pt | null): Pt | null {
+    const set = this.settings();
+    const ci = this.input2.camera();
+    if (ci.lock && !cine) {
+      updateSettings({ camLocked: !set.camLocked });   // persisted, like LoL's lock toggle
+      this.net.notice('info', 'CAMERA', set.camLocked ? 'Camera unlocked: edge-pan or middle-drag to look around' : 'Camera locked to your hero');
+    }
+    const k = this.game.canvas.clientWidth / this.W || 1;
+    const dt = Math.min(0.1, delta / 1000);
+    const ev = set.edgePan && ci.edge ? edgePanVelocity(ci.edge.x, ci.edge.y, ci.edge.w, ci.edge.h, CAM.edgeMargin, CAM.edgeSpeed * set.edgePanSpeed) : { x: 0, y: 0 };
+    // grab-and-drag: the floor follows the middle-dragged pointer
+    const pan = { x: ev.x * dt - ci.drag.x / k, y: ev.y * dt - ci.drag.y / k };
+    const follow = this.P(this.camTarget.x, this.camTarget.y);
+    let hold: Pt | null = null;
+    if (ci.focus !== null) {
+      // F1 = you, F2-F5 = teammates in seat order
+      const slot = ci.focus === 0 ? me : s.players.filter((p) => p.s !== me).sort((a, b) => a.s - b.s)[ci.focus - 1]?.s;
+      const at = slot === undefined ? undefined : drawnAt.get(slot);
+      if (at) hold = this.P(at.x, at.y);
+    } else if (ci.center) hold = follow;
+    const snap = this.camSnap;
+    // a pending cut waits for the hero to be placed this round (the follow point is stale until then)
+    if (snap !== 'cut' || this.renderSelf.init) this.camSnap = 'none';
+    return this.rig.step({
+      dt, follow, subject: `p${watched ?? me}`, spectating: watched !== null, locked: set.camLocked, forceFollow: this.input2.usingPad,
+      hold, pan, snap: snap === 'cut' && !this.renderSelf.init ? 'none' : snap, cine, reduced: set.reducedMotion,
+      map: this.net.map ? { w: this.net.map.w, h: this.net.map.h } : null,
+    });
+  }
+
+  /**
+   * Enemy names above their health bars. Bosses, champions and rares always; ordinary foes when hovered, targeted by
+   * a click-to-attack, or hurt by a hit in the last few seconds (only the most recently hit few, capped by graphics
+   * tier, so a big pack never turns into a wall of text). Text objects are pooled per foe and only re-rasterised
+   * when the name or colour changes.
+   */
+  private placeNames() {
+    const now = this.time.now;
+    const order = this.clickMove.order;
+    const target = order?.k === 'attack' ? `e${order.i}:${order.g}` : null;
+    const cap = { low: 3, medium: 5, high: 8, ultra: 10 }[gfx().tier] ?? 6;
+    const shown: typeof this.nameReq = [];
+    const hurt: typeof this.nameReq = [];
+    for (const r of this.nameReq) {
+      if (r.prio > 0 || r.key === this.hoverKey || r.key === target) shown.push(r);
+      else if (r.hurt && now - r.hitAt < 5000) hurt.push(r);
+    }
+    hurt.sort((a, b) => b.hitAt - a.hitAt);
+    for (let i = 0; i < hurt.length && i < cap; i++) shown.push(hurt[i]!);
+    const live = new Set<string>();
+    for (const r of shown) {
+      live.add(r.key);
+      let t = this.nameTags.get(r.key);
+      if (!t) {
+        t = this.namePool.pop() ?? this.add.text(0, 0, '', { fontFamily: FONT_WORLD, fontSize: `${WORLD_TEXT_PX.label}px`, color: '#ebe0c8', stroke: '#070505', strokeThickness: 3, resolution: 1 }).setOrigin(0.5, 1).setDepth(4550);
+        this.nameTags.set(r.key, t);
+      }
+      const sig = `${r.color}|${r.text}`;
+      if (t.getData('sig') !== sig) { t.setData('sig', sig); t.setColor(r.color).setText(r.text); }
+      t.setPosition(Math.round(r.x), Math.round(r.y)).setVisible(true);
+      // a cohort count rides above the name
+      if (r.badge?.visible) r.badge.setY(Math.round(r.y - WORLD_TEXT_PX.label + 2));
+    }
+    for (const [key, t] of this.nameTags) {
+      if (live.has(key)) continue;
+      t.setVisible(false);
+      this.nameTags.delete(key);
+      this.namePool.push(t);
+    }
+    this.nameReq.length = 0;
+  }
+
+  private releaseNames() {
+    for (const t of this.nameTags.values()) { t.setVisible(false); this.namePool.push(t); }
+    this.nameTags.clear();
+    this.nameReq.length = 0;
   }
 
   /** Hide / restore a live actor while a cutscene puppet stands in for it (game/cinematic). */
@@ -1159,6 +1262,15 @@ export class CombatScene extends Phaser.Scene {
       const col = v.elite ? (ELITE_COLOR[v.elite]?.main ?? 0xd6323c) : e.obj ? 0xd6323c : 0x8a5ad0;
       v.bar.fillStyle(col, 1).fillRect(bx, by, Math.round(w * e.hp), v.elite ? 3 : 2);
       if (v.elite) v.bar.fillStyle(0xffffff, 0.6).fillRect(bx, by, Math.round(w * e.hp), 1);
+    }
+    if (e.st !== 'dying' && !this.cine?.active) {
+      // nameplate request (placed after the frame's hover is known, placeNames): bosses and elites always, others when
+      // hovered, targeted or recently hurt
+      const base = (e.boss ? BOSS_BY_ID[e.k]?.name : undefined) ?? ENEMY_BY_ID[e.k]?.name ?? e.k;
+      const prio = e.boss ? 3 : v.elite ? 2 : 0;
+      const color = e.boss ? '#ff6a5e' : v.elite === 2 ? '#ffd36a' : v.elite ? '#7cc0ff' : e.obj ? '#e8c66a' : '#ebe0c8';
+      const ny = e.boss ? py - Math.max(64, top + 6) : py - Math.max(40, top + 2) - 2;
+      this.nameReq.push({ key, text: v.elite ? eliteName(base, e.af) : base, color, x: px, y: ny, prio, hurt: e.hp < 0.999, hitAt: this.lastHit.get(e.i)?.at ?? -1e9, badge: e.cnt ? v.badge : undefined });
     }
     if (e.sh && !(e.af ?? []).includes('shielding')) v.bar.lineStyle(2, 0x9fd8ff, 0.9).strokeEllipse(Math.round(px), Math.round(py - 14), iso.rx(e.r) * 2 + 12, iso.ry(e.r) * 2 + 20);
     if (e.boss && e.stag) { const r = 1.6 + (Math.floor(this.time.now / 100) % 2) * 0.15; v.bar.lineStyle(2, 0xffd23f, 1).strokeEllipse(Math.round(px), Math.round(py), iso.rx(r) * 2, iso.ry(r) * 2); }
