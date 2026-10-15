@@ -181,7 +181,7 @@ export const CLASS: ClassDef = {
     { id: 'thorns', name: 'Thorns', theme: 'Reflected pain, bramble walls and spreading Venom' },
   ],
   accent: '#6b8f3a', role: 'Summoner bruiser · nature guardian',
-  base: { maxHealth: 1050, armor: 22, damage: 88, attackFrequency: 1.7, moveSpeed: 4.6, critTendency: '0.25', critMultiplier: '2', shieldCapacity: 0.6 },
+  base: { maxHealth: 1050, armor: 22, damage: 92, attackFrequency: 1.7, moveSpeed: 4.6, critTendency: '0.25', critMultiplier: '2', shieldCapacity: 0.6 },
   melee: true, basicSkill: 'w_thornspear', signatureSkill: 'w_wild_hunt',
   nodes: NODES.map((x) => x.id),
 };

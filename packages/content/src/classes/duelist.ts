@@ -114,7 +114,7 @@ export const CLASS: ClassDef = {
     { id: 'tempo', name: 'Tempo', theme: 'Combo, parries and momentum' },
   ],
   accent: '#d23a4e', role: 'Agile melee · crit assassin',
-  base: { maxHealth: 950, armor: 22, damage: 76, attackFrequency: 3.2, moveSpeed: 5.0, critTendency: '0.35', critMultiplier: '2.2', shieldCapacity: 0.6 },
+  base: { maxHealth: 950, armor: 22, damage: 80, attackFrequency: 3.2, moveSpeed: 5.0, critTendency: '0.35', critMultiplier: '2.2', shieldCapacity: 0.6 },
   melee: true, basicSkill: 'd_twin_fangs', signatureSkill: 'd_thousand_cuts',
   nodes: NODES.map((x) => x.id),
 };

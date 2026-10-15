@@ -115,7 +115,7 @@ export const CLASS: ClassDef = {
     { id: 'warcry', name: 'Warcry', theme: 'Leaps, quakes and terror' },
   ],
   accent: '#b3261e', role: 'Melee bruiser · rage',
-  base: { maxHealth: 960, armor: 20, damage: 92, attackFrequency: 2.1, moveSpeed: 4.8, critTendency: '0.3', critMultiplier: '2', shieldCapacity: 0.5 },
+  base: { maxHealth: 960, armor: 20, damage: 97, attackFrequency: 2.1, moveSpeed: 4.8, critTendency: '0.3', critMultiplier: '2', shieldCapacity: 0.5 },
   melee: true, basicSkill: 'b_chop', signatureSkill: 'b_avatar',
   nodes: NODES.map((x) => x.id),
 };

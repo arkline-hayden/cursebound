@@ -116,7 +116,7 @@ export const CLASS: ClassDef = {
     { id: 'aegis', name: 'Aegis', theme: 'Shield charges, domes, vows and rescue' },
   ],
   accent: '#f2d16b', role: 'Holy frontliner · support',
-  base: { maxHealth: 1040, armor: 35, damage: 110, attackFrequency: 1.3, moveSpeed: 4.4, critTendency: '0.2', critMultiplier: '2', shieldCapacity: 0.7 },
+  base: { maxHealth: 1040, armor: 35, damage: 115, attackFrequency: 1.3, moveSpeed: 4.4, critTendency: '0.2', critMultiplier: '2', shieldCapacity: 0.7 },
   melee: true, basicSkill: 't_hammer', signatureSkill: 't_judgment_day',
   nodes: NODES.map((x) => x.id),
 };

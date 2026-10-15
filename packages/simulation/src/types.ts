@@ -189,6 +189,10 @@ export interface EnemyState {
   perceiveIn: number;          // ticks until next perception update
   reactIn: number;             // reaction delay countdown for dodging projectiles
   strafeSign: number;
+  /** surround slot angle around the target hero (melee tactics, ai.ts); fleeing-until tick and once-only flag (cowards) */
+  slotAng?: number;
+  fleeUntil?: number;
+  fled?: number;
   cooldowns: Record<string, number>;
   attack: EnemyAttackState | null;
   // statuses (source indexed aggregates, PRD §5.3)

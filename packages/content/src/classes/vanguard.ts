@@ -106,7 +106,7 @@ export const CLASS: ClassDef = {
       { id: 'rally', name: 'Rally', theme: 'Banners, war cries, endurance and rescue' },
     ],
     accent: '#e0a040', role: 'Frontline melee · protector',
-    base: { maxHealth: 1000, armor: 50, damage: 100, attackFrequency: 2.2, moveSpeed: 4.6, critTendency: '0.25', critMultiplier: '2', shieldCapacity: 0.6 },
+    base: { maxHealth: 1000, armor: 50, damage: 105, attackFrequency: 2.2, moveSpeed: 4.6, critTendency: '0.25', critMultiplier: '2', shieldCapacity: 0.6 },
     melee: true, basicSkill: 'v_cleave', signatureSkill: 'v_earthbreaker',
     nodes: NODES.map((x) => x.id),
   };

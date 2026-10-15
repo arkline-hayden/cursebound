@@ -61,7 +61,7 @@ describe('A02/A03 multiplicative compounding', () => {
     const s = newRun(['vanguard']);
     for (let i = 0; i < 3; i++) applyCard(s, 'red_horizon', 'o' + i, []);
     expect(s.fate.factors['player.damage'].toString()).toBe('8e0');
-    expect(derivePlayer(s, s.players[0]).damage.toString()).toBe('8e2');
+    expect(derivePlayer(s, s.players[0]).damage.toString()).toBe('8.4e2');   // Vanguard base damage 105 x8
   });
   it('three -50% maximum health = 12.5% of base', () => {
     const s = newRun(['vanguard']);
