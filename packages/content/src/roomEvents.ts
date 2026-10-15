@@ -123,7 +123,7 @@ export interface PactDef {
   maxHealth?: string;
   /** immediate price: this fraction of current health is lost (never lethal) */
   bloodFrac?: number;
-  /** the gift is a random legendary's stat lines, doubled */
+  /** the gift is a random legendary's stat lines, amplified (each line's bonus × RELIC_AMPLIFY) */
   relic?: boolean;
   flavor: string;
 }
@@ -132,10 +132,12 @@ export const ALTAR_PACTS: PactDef[] = [
   { id: 'fury', name: 'Pact of Fury', gift: [{ stat: 'player.damage', percent: '25' }], maxHealth: '-15', flavor: 'Bleed a little. Hit a lot.' },
   { id: 'edge', name: 'Pact of the Keen Edge', gift: [{ stat: 'player.critTendency', percent: '50' }, { stat: 'player.critPotency', percent: '15' }], maxHealth: '-15', flavor: 'The altar hones what you offer it.' },
   { id: 'frenzy', name: 'Pact of Frenzy', gift: [{ stat: 'player.attackFrequency', percent: '18' }, { stat: 'player.movementSpeed', percent: '6' }], maxHealth: '-12', flavor: 'Your heart races. It will not stop.' },
-  { id: 'relic', name: 'Relic Pact', gift: [], maxHealth: '-15', relic: true, flavor: 'A dead hero’s strength, worn twice.' },
+  { id: 'relic', name: 'Relic Pact', gift: [], maxHealth: '-12', relic: true, flavor: 'A dead hero’s strength, worn deeper.' },
   { id: 'tithe', name: 'Blood Tithe', gift: [{ stat: 'player.damage', percent: '10' }], bloodFrac: 0.5, flavor: 'Pay now. Never again.' },
 ];
 export const PACT_BY_ID: Record<string, PactDef> = Object.fromEntries(ALTAR_PACTS.map((p) => [p.id, p]));
+/** Relic pact: a legendary line ×f binds as ×(1 + RELIC_AMPLIFY × (f − 1)) (×1.12 damage becomes ×1.30). */
+export const RELIC_AMPLIFY = 2.5;
 
 export interface WareDef {
   id: string;

@@ -1059,7 +1059,8 @@ export class CombatScene extends Phaser.Scene {
       // room events: Interact near a shrine / altar / merchant, or a click on one (render/RoomEvents.ts)
       const k = this.game.canvas.clientWidth / this.W || 1, cam = this.cameras.main;
       const click = s.primaryEdge && !s.usingPad && this.input2.pointer.inside ? { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY } : null;
-      this.roomFx.input((s.pressed & 64) !== 0, click, this.renderSelf.init ? this.renderSelf : null);
+      // a click that used / walks to an event is not also a ground click (the ground under a tall sprite lies behind it)
+      if (this.roomFx.input((s.pressed & 64) !== 0, click, this.renderSelf.init ? this.renderSelf : null)) { s.primaryEdge = false; s.primary = false; }
     }
     this.inputAcc += delta;
     if (this.inputAcc > 100) this.inputAcc = 100;

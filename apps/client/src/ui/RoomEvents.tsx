@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { LEGENDARY_BY_ID, MERCHANT, PACT_BY_ID, ROOM_EVENT_RULES, STAT_BY_ID, WARE_BY_ID } from '@cursebound/content';
+import { LEGENDARY_BY_ID, MERCHANT, PACT_BY_ID, RELIC_AMPLIFY, ROOM_EVENT_RULES, STAT_BY_ID, WARE_BY_ID } from '@cursebound/content';
 import type { SnapRoomEvent } from '@cursebound/simulation';
 import { netStore, type GameConnection } from '@/lib/net';
 import { useStore } from '@/lib/store';
@@ -36,9 +36,9 @@ export function CoinChip() {
   const coins = useStore(netStore, (s) => s.hud?.players[s.slot]?.co ?? 0);
   if (!coins) return null;
   return (
-    <div aria-label={`${coins} cursed coins`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-end', padding: '2px 8px', background: 'rgba(5,4,4,0.82)', border: '2px solid #3a2a14', boxShadow: '0 0 0 2px #000' }}>
-      <CoinIcon size={16} />
-      <b style={{ fontFamily: 'var(--font-num)', fontSize: 'var(--hud-label)', color: GOLD, textShadow: '2px 2px 0 #000' }}>{coins}</b>
+    <div aria-label={`${coins} cursed coins`} title="Cursed coins: spend them at the wandering merchant" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-end', padding: '2px 10px', background: 'rgba(5,4,4,0.82)', border: '2px solid #3a2a14', boxShadow: '0 0 0 2px #000' }}>
+      <CoinIcon size={20} />
+      <b style={{ fontFamily: 'var(--font-gothic)', fontSize: 'var(--hud-goth-sm)', lineHeight: 1, color: GOLD, textShadow: '2px 2px 0 #000' }}>{coins}</b>
     </div>
   );
 }
@@ -58,7 +58,7 @@ export function pactLines(offer: string): { name: string; gifts: string[]; price
   if (!def) return { name: id, gifts: [], prices: [], flavor: '' };
   const gifts = def.gift.map((g) => `${pctText(1 + Number(g.percent) / 100)} ${statShort(g.stat)}`);
   const leg = def.relic && item ? LEGENDARY_BY_ID[item] : undefined;
-  if (leg) for (const m of leg.modifiers) if (m.stat.startsWith('player.')) gifts.push(`${pctText(Number(m.factorPerRank) ** 2)} ${statShort(m.stat)}`);
+  if (leg) for (const m of leg.modifiers) if (m.stat.startsWith('player.')) gifts.push(`${pctText(1 + (Number(m.factorPerRank) - 1) * RELIC_AMPLIFY)} ${statShort(m.stat)}`);
   const prices: string[] = [];
   if (def.maxHealth) prices.push(`${pctText(1 + Number(def.maxHealth) / 100)} max health`);
   if (def.bloodFrac) prices.push(`Lose ${Math.round(def.bloodFrac * 100)}% of current health now`);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Big } from '@cursebound/numeric';
-import { COIN_RULES, LEGENDARIES, MAX_BLESSINGS, ROOM_EVENT_RULES, RUNNER_KIND, SHRINE_TUNING, isBossRound } from '@cursebound/content';
+import { COIN_RULES, LEGENDARIES, MAX_BLESSINGS, RELIC_AMPLIFY, ROOM_EVENT_RULES, RUNNER_KIND, SHRINE_TUNING, isBossRound } from '@cursebound/content';
 import {
   altarOffers, botCommands, botInput, buildSnapshot, computeLedger, createEnemy, deserializeState, derivePlayer, dropCoins, generateMap, hitEnemy,
   killEnemy, mitigationFactor, moveSpeedOf, rollCoins, roomEventSpots, seedRng, serializeState, spawnRunner, stateHash, step,
@@ -186,13 +186,13 @@ describe('room events: cursed altar', () => {
     // the pact survives a checkpoint
     const back = deserializeState(serializeState(s));
     expect(derivePlayer(back, back.players[0]).damage.eq(d1.damage)).toBe(true);
-    // a relic pact copies a legendary's lines, doubled; the blood tithe takes half the current health, never lethally
+    // a relic pact copies a legendary's lines, amplified; the blood tithe takes half the current health, never lethally
     const relicAltar = put(s, { kind: 'altar', type: 'altar', x: p.x, y: p.y, offers: ['fury', 'tithe', `relic:${relic.id}`] });
     use(s, 'altar', relicAltar.id, 2);
     const rec = p.pacts!.find((x) => x.id === 'relic')!;
     expect(rec.item).toBe(relic.id);
     const line = relic.modifiers.find((m) => m.stat === 'player.damage')!;
-    expect(Number(rec.mods.find((m) => m.stat === 'player.damage')!.factor)).toBeCloseTo(Number(line.factorPerRank) ** 2, 9);
+    expect(Number(rec.mods.find((m) => m.stat === 'player.damage')!.factor)).toBeCloseTo(1 + (Number(line.factorPerRank) - 1) * RELIC_AMPLIFY, 9);
     p.hp = Big.from('0.6');
     use(s, 'altar', put(s, { kind: 'altar', type: 'altar', x: p.x, y: p.y, offers: ['tithe', 'fury', 'edge'] }).id, 0);
     expect(p.hp.gte(Big.from('0.3'))).toBe(true);

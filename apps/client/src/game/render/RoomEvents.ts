@@ -103,7 +103,7 @@ export class RoomEventRenderer {
       this.dungeon.litObject(spr);
       const glow = gfx().softGlow && s.textures.exists('light:soft') ? s.add.image(0, 0, 'light:soft').setBlendMode(Phaser.BlendModes.ADD).setTint(GOLD).setAlpha(0.35).setScale(0.22, 0.17) : null;
       const label = s.add.text(0, 0, TREASURE_IMP.name, { fontFamily: FONT_WORLD, fontSize: `${WORLD_TEXT_PX.label}px`, color: '#ffd36a', stroke: '#070505', strokeThickness: 3, resolution: 1 }).setOrigin(0.5, 1).setDepth(4600);
-      const light = this.dungeon.lighting && s.lights ? s.lights.addLight(0, 0, 90, GOLD, 1.4) : null;
+      const light = this.dungeon.lighting && s.lights ? s.lights.addLight(0, 0, 80, GOLD, 0.9) : null;
       v = { spr, shadow: s.add.ellipse(0, 0, 14, 5, 0x000000, 0.5).setDepth(-58), glow, portal: null, label, bar: s.add.graphics().setDepth(4600), light, x, y, seen: 0, lastSpark: 0, lastJingle: 0, anim: '' };
       this.imps.set(e.i, v);
     }
@@ -121,7 +121,7 @@ export class RoomEventRenderer {
     if (e.flash && settingsStore.get().s.flashes) v.spr.setTintFill(0xffffff); else v.spr.clearTint();
     v.shadow.setPosition(px, py);
     v.glow?.setPosition(px, py - 12).setDepth(depth - 0.2).setAlpha(0.28 + 0.1 * Math.sin(now / 120));
-    v.light?.setPosition(px, py - 10);
+    v.light?.setPosition(px, py + 4);
     // the rift opens behind it while it channels
     if (info?.p && !v.portal) {
       v.portal = s.add.sprite(px, py + 4, 'rev:portal').setOrigin(0.5, 1).setAlpha(0).setScale(0.3);
@@ -166,7 +166,7 @@ export class RoomEventRenderer {
       if (!v) { v = this.makeView(e); this.views.set(e.i, v); }
       const dim = e.k === 'shrine' && snap.phase !== 'COMBAT' && !used;   // a shrine's power wanes once the fight is over
       v.spr.setAlpha(1);
-      if (v.light) v.light.intensity = dim ? 0.5 : (v.k === 'merchant' ? 1.2 : 1.6) * (0.9 + 0.12 * Math.sin(now / 260 + e.i));
+      if (v.light) v.light.intensity = dim ? 0.3 : (v.k === 'merchant' ? 0.7 : 0.9) * (0.9 + 0.12 * Math.sin(now / 260 + e.i));
       v.glow?.setAlpha((dim ? 0.12 : 0.3) + 0.08 * Math.sin(now / 300 + e.i));
       if (!used && !dim && !this.juice.low && now - v.lastMote > 360) {
         v.lastMote = now;
@@ -201,10 +201,11 @@ export class RoomEventRenderer {
     }
   }
 
-  /** Input from the scene's sampler: Interact pressed this frame, and a fresh primary click at a scene point. */
-  input(interactPressed: boolean, click: { x: number; y: number } | null, self: { x: number; y: number } | null) {
-    if (interactPressed && this.near) { this.use(this.near); return; }
-    if (!click) return;
+  /** Input from the scene's sampler: Interact pressed this frame, and a fresh primary click at a scene point.
+   *  Returns true when the click landed on an event (the scene then keeps it from becoming a ground click). */
+  input(interactPressed: boolean, click: { x: number; y: number } | null, self: { x: number; y: number } | null): boolean {
+    if (interactPressed && this.near) this.use(this.near);
+    if (!click) return false;
     // a click on an event's sprite: use it in reach, else walk there first
     for (const [id, v] of this.views) {
       const e = this.rev.get(id);
@@ -216,8 +217,9 @@ export class RoomEventRenderer {
         this.pending = { id, until: this.scene.time.now + 6000 };
         window.dispatchEvent(new CustomEvent('cursebound:moveto', { detail: { x: e.x, y: e.y } }));
       }
-      return;
+      return true;
     }
+    return false;
   }
 
   private use(e: SnapRoomEvent) {
@@ -351,7 +353,8 @@ export class RoomEventRenderer {
     const glow = !used && gfx().softGlow && s.textures.exists('light:soft')
       ? s.add.image(Math.round(q.x), Math.round(q.y) - (e.k === 'shrine' ? 40 : e.k === 'altar' ? 14 : 30), 'light:soft').setBlendMode(Phaser.BlendModes.ADD).setTint(col).setAlpha(0.3).setScale(e.k === 'altar' ? 0.3 : 0.24, e.k === 'altar' ? 0.2 : 0.2).setDepth(iso.depth(e.x, e.y) + 0.1)
       : null;
-    const light = !used && this.dungeon.lighting && s.lights ? s.lights.addLight(Math.round(q.x), Math.round(q.y) - 26, e.k === 'merchant' ? 120 : 150, col, 1.6) : null;
+    // a coloured pool on the floor around it (low and soft, so the sprite keeps its own colours)
+    const light = !used && this.dungeon.lighting && s.lights ? s.lights.addLight(Math.round(q.x), Math.round(q.y) + 6, e.k === 'merchant' ? 90 : 110, col, 0.9) : null;
     const shadow = s.add.ellipse(Math.round(q.x), Math.round(q.y), e.k === 'altar' ? 36 : 24, e.k === 'altar' ? 12 : 9, 0x000000, 0.45).setDepth(-58);
     return { k: e.k, t: e.t, x: e.x, y: e.y, used, spr, shadow, glow, light, lastMote: 0 };
   }

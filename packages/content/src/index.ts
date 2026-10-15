@@ -9,7 +9,7 @@ import { canonicalJson, sha256Hex } from './hash';
 import { AFFLICTION_RULES, CONTENT_VERSION, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION } from './rules';
 import { STATS } from './stats';
 import { BOUNTY_MODIFIERS } from './bounties';
-import { ALTAR_PACTS, COIN_RULES, MERCHANT_WARES, ROOM_EVENT_RULES, SHRINES, SHRINE_TUNING } from './roomEvents';
+import { ALTAR_PACTS, COIN_RULES, MERCHANT_WARES, RELIC_AMPLIFY, ROOM_EVENT_RULES, SHRINES, SHRINE_TUNING } from './roomEvents';
 
 export * from './types';
 export * from './stats';
@@ -59,7 +59,7 @@ export const CONTENT_MANIFEST = {
   // daily bounty modifiers (bounties.ts): a bounty run applies one at creation, so they are pinned with the content
   bounties: BOUNTY_MODIFIERS,
   // room events (roomEvents.ts): shrines, cursed altar pacts, merchant wares, treasure imp and cursed coin tuning
-  roomEvents: { rules: ROOM_EVENT_RULES, coins: COIN_RULES, shrines: SHRINES, shrineTuning: SHRINE_TUNING, pacts: ALTAR_PACTS, wares: MERCHANT_WARES },
+  roomEvents: { rules: ROOM_EVENT_RULES, coins: COIN_RULES, shrines: SHRINES, shrineTuning: SHRINE_TUNING, pacts: ALTAR_PACTS, relicAmplify: RELIC_AMPLIFY, wares: MERCHANT_WARES },
 };
 
 let cachedHash: string | null = null;

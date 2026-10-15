@@ -24,7 +24,7 @@ const tight: CSSProperties = { padding: '2px 6px', minWidth: 0, whiteSpace: 'now
 const ROOM_EVENT_TOOLS = [
   ...SHRINES.map((s) => ({ arg: `shrine_${s.id}`, name: s.name.replace(/^Shrine of /, ''), title: `${s.name}: ${s.short}`, color: s.color })),
   { arg: 'altar', name: 'Altar', title: 'Cursed altar: trade health for power', color: '#ff6a5e' },
-  { arg: 'merchant', name: 'Merchant', title: 'Wandering merchant: wares for cursed coins', color: ORANGE },
+  { arg: 'merchant', name: 'Shop', title: 'Wandering merchant: wares for cursed coins', color: ORANGE },
   { arg: 'runner', name: 'Imp', title: 'Treasure imp: catch it before it escapes', color: '#ffd23f' },
   { arg: 'coins', name: '+30 coins', title: 'A heap of cursed coins', color: '#ffd23f' },
 ];

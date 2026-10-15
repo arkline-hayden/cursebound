@@ -1,6 +1,6 @@
 import { Big, percentToFactor } from '@cursebound/numeric';
 import {
-  ALTAR_PACTS, DRAUGHT_HEAL, GEAR_SLOTS, LEGENDARIES, LEGENDARY_BY_ID, LOOT_RULES, MAX_BLESSINGS, MERCHANT_BOONS, PACT_BY_ID,
+  ALTAR_PACTS, DRAUGHT_HEAL, GEAR_SLOTS, LEGENDARIES, LEGENDARY_BY_ID, LOOT_RULES, MAX_BLESSINGS, MERCHANT_BOONS, PACT_BY_ID, RELIC_AMPLIFY,
   ROOM_EVENT_RULES as R, RUNNER_KIND, SHRINES, SHRINE_BY_ID, SHRINE_TUNING as T, TICK_RATE, WARE_BY_ID, isBossRound,
 } from '@cursebound/content';
 import { blessingsOf } from './blessing';
@@ -343,7 +343,7 @@ function activateShrine(state: SimState, ev: SimEvent[], p: PlayerState, re: Roo
   ev.push({ t: 'domain', type: 'shrine_activated', payload: { round: state.round, slot: p.slot, shrine: re.type } });
 }
 
-/** Stat lines a pact binds: its gifts, a relic's legendary lines doubled, and the maximum-health price. */
+/** Stat lines a pact binds: its gifts, a relic's legendary lines amplified, and the maximum-health price. */
 export function pactMods(offer: string): { id: string; item?: string; mods: PactRecord['mods'] } {
   const [id, item] = offer.split(':');
   const def = PACT_BY_ID[id];
@@ -351,7 +351,7 @@ export function pactMods(offer: string): { id: string; item?: string; mods: Pact
   if (!def) return { id, mods };
   for (const g of def.gift) mods.push({ stat: g.stat, factor: percentToFactor(g.percent).toString() });
   const leg = def.relic && item ? LEGENDARY_BY_ID[item] : undefined;
-  if (leg) for (const m of leg.modifiers) if (m.stat.startsWith('player.')) mods.push({ stat: m.stat, factor: B(m.factorPerRank).mul(B(m.factorPerRank)).toString() });
+  if (leg) for (const m of leg.modifiers) if (m.stat.startsWith('player.')) mods.push({ stat: m.stat, factor: B(m.factorPerRank).sub(ONE).mul(B(RELIC_AMPLIFY)).add(ONE).toString() });
   if (def.maxHealth) mods.push({ stat: 'player.maxHealth', factor: percentToFactor(def.maxHealth).toString() });
   return { id, ...(leg ? { item: leg.id } : {}), mods };
 }
@@ -570,9 +570,17 @@ export function trainingRoomEvent(state: SimState, ev: SimEvent[], p: PlayerStat
   const list = eventState(state).list;
   // fan successive spawns around the aim so they never stack (deterministic: the yard's event count)
   const fan = ((list.length % 5) - 2) * 0.7;
-  const ahead = (dist: number, turn = fan) => {
+  const at = (dist: number, turn: number) => {
     const c = Math.cos(turn), s = Math.sin(turn);
     return nearestFloor(map, p.x + (p.aimX * c - p.aimY * s) * dist, p.y + (p.aimX * s + p.aimY * c) * dist);
+  };
+  // facing a wall the snapped point lands on the hero: swing round until it stands clear
+  const ahead = (dist: number, turn = fan) => {
+    for (let k = 0; k < 8; k++) {
+      const [x, y] = at(dist, turn + k * 0.785);
+      if (Math.hypot(x - p.x, y - p.y) >= dist * 0.6) return [x, y] as [number, number];
+    }
+    return at(dist, turn);
   };
   if (arg !== 'runner' && arg !== 'coins' && list.length >= 8) list.splice(0, list.length - 7);   // the yard keeps the newest few
   if (arg.startsWith('shrine_')) {
