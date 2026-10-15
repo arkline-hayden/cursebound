@@ -11,6 +11,8 @@ import { ensureIsoFallback, wallPropFor } from './isoArt';
 import { planDressing, trailMarks, type DressingPlan, type PlanStamp } from './dressing';
 import { Ambient } from './Ambient';
 import { gfx as gfxKnobs } from '../gfx';
+import { TRAINING_THEME } from '@cursebound/content';
+import { buildCourtyard } from './Courtyard';   // training grounds (its own art and daylight)
 import type { MapRoom } from '@cursebound/simulation';
 
 // Isometric dungeon renderer (PRD §15.1, Diablo-style 2:1 projection over the flat simulation plane).
@@ -46,7 +48,7 @@ export interface MapLike {
 }
 
 interface TorchLight { light: Phaser.GameObjects.Light; base: number; radius: number; flicker: number; phase: number; rate: number; glow?: Phaser.GameObjects.Image; core?: Phaser.GameObjects.Light; coreBase?: number }
-interface Occluder { objs: (Phaser.GameObjects.Image | Phaser.GameObjects.Sprite)[]; depth: number; x0: number; x1: number; y0: number; y1: number; alpha: number }
+export interface Occluder { objs: (Phaser.GameObjects.Image | Phaser.GameObjects.Sprite)[]; depth: number; x0: number; x1: number; y0: number; y1: number; alpha: number }
 type Placeable = Pick<PropDef, 'key' | 'anim' | 'originX' | 'originY' | 'light' | 'emissive' | 'glowKey' | 'glowAnim' | 'sway' | 'variants'> & { id?: string };
 
 /** Depth of props that lie flat on the floor: above the floor and decal textures, below hazards (-80), telegraphs (-70) and shadows. */
@@ -95,6 +97,8 @@ export class DungeonRenderer {
   buildStats = { sprites: 0, stamps: 0, lights: 0, vignettes: 0, planMs: 0, floorFx: 0, cliffs: 0, normals: false };
   /** the dressing plan of the current map (read-only; tests and tools) */
   plan: DressingPlan | null = null;
+  /** undoes scene-wide changes of a special floor (the training courtyard's camera background) */
+  private undo: (() => void) | null = null;
 
   constructor(private scene: Phaser.Scene, opts: { lighting?: boolean; ambient?: number } = {}) {
     this.lighting = opts.lighting !== false && !!scene.lights;
@@ -117,6 +121,7 @@ export class DungeonRenderer {
     this.map = map;
     const s = this.scene;
     const theme = map.theme ?? 'catacombs';
+    if (theme === TRAINING_THEME.id) { this.buildCourtyard(map, t0); return; }   // training grounds (render/Courtyard.ts)
     ensureTheme(s, theme);
     ensureIsoFallback(s, theme);
     const themeId = theme as ThemeId;
@@ -449,6 +454,22 @@ export class DungeonRenderer {
     this.buildStats = { sprites: plan.sprites.length, stamps, lights: this.torches.length, vignettes: plan.stats.vignettes, planMs: plan.stats.ms, floorFx: plan.floor.length, cliffs: plan.cliffs.length, normals };
   }
 
+  /** Training grounds: the sunlit town courtyard (render/Courtyard.ts) instead of a dungeon floor. */
+  private buildCourtyard(map: MapLike, t0: number) {
+    const out = buildCourtyard(this.scene, map, { lighting: this.lighting, lit: (o) => this.lit(o as typeof o & { setPipeline?: (p: string) => unknown }) });
+    this.objs.push(...out.objs);
+    this.occluders.push(...out.occluders);
+    this.decalRT = out.decalRT;
+    this.theme = out.theme;
+    this.bounds = out.bounds;
+    this.origin = out.origin;
+    this.undo = out.cleanup;
+    this.stamp = this.scene.make.image({ x: 0, y: 0, key: '__WHITE', add: false });
+    this.plan = null;
+    this.buildMs = performance.now() - t0;
+    this.buildStats = { sprites: out.stats.sprites, stamps: 0, lights: 0, vignettes: 0, planMs: 0, floorFx: 0, cliffs: 0, normals: false };
+  }
+
   private placeProp(id: string, x: number, y: number, depth: number, flip = false) {
     const p = PROPS[id];
     if (!p) return null;
@@ -580,6 +601,8 @@ export class DungeonRenderer {
   litObject<T extends Phaser.GameObjects.GameObject>(o: T): T { return this.lit(o as T & { setPipeline?: (p: string) => unknown }); }
 
   destroy(full = true) {
+    this.undo?.();
+    this.undo = null;
     this.ambient?.destroy();
     this.ambient = null;
     // the floor's data source points at the normal render texture: detach before either is destroyed

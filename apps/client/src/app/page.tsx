@@ -193,8 +193,8 @@ export default function Home() {
     return p;
   };
 
-  const start = async (kind: 'solo' | 'daily' | 'tutorial' | 'coop' | 'bounty', withBounty = kind === 'bounty') => {
-    const locked = kind === 'coop' ? null : lockedMessage(classId);
+  const start = async (kind: 'solo' | 'daily' | 'tutorial' | 'coop' | 'bounty' | 'training', withBounty = kind === 'bounty') => {
+    const locked = kind === 'coop' || kind === 'training' ? null : lockedMessage(classId);   // training grounds: every class may be tried
     if (locked) { setErr(locked); return; }
     setBusy(kind); setErr(null);
     try {
@@ -204,6 +204,7 @@ export default function Home() {
         challenge: kind === 'daily' ? 'daily' : 'random', tutorial: kind === 'tutorial',
         // daily bounty: the cloud bounty is passed through (online), else the authority's own (lib/progress.ts)
         ...(withBounty ? { bounty: bountyRoomOption() ?? true } : {}),
+        ...(kind === 'training' ? { training: true } : {}),   // training grounds: a sandbox, never scored or recorded
       });
       clearGuestSession();
       setSeat(r.roomId, r.seatToken, r.slot);
@@ -351,6 +352,7 @@ export default function Home() {
               </section>
             )}
             <div className="title-links">
+              <button className="btn small ghost" disabled={offline || !!busy} onClick={() => start('training')} title={`Train as ${cls?.name ?? 'your vessel'}: spawn foes and bosses, swap classes, rank every skill`}>{busy === 'training' ? 'Opening…' : 'Training Grounds'}</button>
               <Link className="btn small ghost" href="/records">Records</Link>
               <Link className="btn small ghost" href="/howto">Rules</Link>
               {settings.tutorialDone && <button className="btn small ghost" disabled={offline || !!busy} onClick={() => openVessel('tutorial')}>Tutorial</button>}

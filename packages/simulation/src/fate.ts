@@ -1,5 +1,6 @@
 import { Big, percentToFactor, floorMulBig } from '@cursebound/numeric';
 import { DUNGEON_THEMES, RARITY_WEIGHTS, RULES, TICK_RATE, basePoints, cardById, cardMechanics, cardRarity, cardStatEffects, isBossRound, type CardRarity } from '@cursebound/content';
+import { blessedCard } from './blessing';
 import { bindMechanic } from './boons';
 import { bountyRules } from './bountyRules';
 import { nextInt, seedRng, type RngState } from './rng';
@@ -125,10 +126,12 @@ export function resolveVotes(state: SimState, effective?: number[]): { cardSlot:
 
 /** Apply a card: stat effects multiply (X_new = X_old × (1 + p/100)); boons/banes bind one more copy whose
  *  magnitude stacks multiplicatively (boons.ts). Records Ledger provenance for every effect.
- *  Maximum health changes preserve each player's current health fraction (D07). */
-export function applyCard(state: SimState, cardId: string, offerId: string, ev: SimEvent[]) {
-  const card = cardById(cardId);
-  if (!card) throw new Error(`unknown card ${cardId}`);
+ *  Maximum health changes preserve each player's current health fraction (D07).
+ *  `blessed` (Fate's Blessing, blessing.ts): the card's price — negative stat and bane — is not applied. */
+export function applyCard(state: SimState, cardId: string, offerId: string, ev: SimEvent[], blessed = false) {
+  const found = cardById(cardId);
+  if (!found) throw new Error(`unknown card ${cardId}`);
+  const card = blessed ? blessedCard(found) : found;
   const beforeMax = state.players.map((p) => p.maxHp);
   let seq = state.fate.entries.length + (state.fate.mechanicEntries?.length ?? 0);
   const priceCopies = bountyRules(state).fatePriceCopies ?? 1;   // "Fate's Spite" bounty: every price is paid twice
@@ -148,7 +151,7 @@ export function applyCard(state: SimState, cardId: string, offerId: string, ev: 
     const d = derivePlayer(state, p);
     refreshMaxHp(p, beforeMax[i], d.maxHp);
   });
-  ev.push({ t: 'domain', type: 'fate_applied', payload: { cardId, offerId } });
+  ev.push({ t: 'domain', type: 'fate_applied', payload: blessed ? { cardId, offerId, blessed: true } : { cardId, offerId } });
 }
 
 export function refreshMaxHp(p: SimState['players'][number], oldMax: Big, newMax: Big) {

@@ -128,7 +128,7 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     return { ok: true };
   });
   route('POST', '/rooms', async (_m, req, _url, ctx) => {
-    const b = (await readBody(req)) as { profileId?: string; mode?: string; classId?: string; challenge?: string; tutorial?: boolean; bounty?: unknown };
+    const b = (await readBody(req)) as { profileId?: string; mode?: string; classId?: string; challenge?: string; tutorial?: boolean; bounty?: unknown; training?: boolean };
     const profile = await store.getProfile(assertId(String(b.profileId ?? ''), 'profile'));
     if (!profile) throw new HttpError(404, 'NOT_FOUND', 'profile not found');
     await assertProfileUse(profile.id, ctx);
@@ -137,7 +137,9 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     const challenge = b.challenge === 'daily' ? 'daily' : 'random';
     const classId = CLASS_BY_ID[String(b.classId)] ? String(b.classId) : 'vanguard';
     const level = await gateLevel(profile.id);
-    assertUnlocked(classId, level);
+    // training grounds (rooms.ts): a sandbox room, never scored or recorded; every class may be tried there
+    const training = !!b.training && !tutorial;
+    if (!training) assertUnlocked(classId, level);
     // daily bounty: `true` = this machine's own bounty (local mode); { id, modifierId } = the cloud bounty passed
     // through by an online client, its modifier validated against content
     let bounty: RoomBounty | null = null;
@@ -149,9 +151,10 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
       if (typeof o.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(o.id) || typeof o.modifierId !== 'string' || !BOUNTY_BY_ID[o.modifierId]) throw new HttpError(400, 'INVALID_INPUT', 'unknown bounty modifier');
       bounty = { id: o.id, modifierId: o.modifierId };
     }
-    const room = rooms.createRoom({ mode, challenge: tutorial ? 'tutorial' : bounty ? 'random' : challenge, tutorial, bounty });
+    if (training) bounty = null;
+    const room = rooms.createRoom({ mode, challenge: tutorial ? 'tutorial' : bounty ? 'random' : challenge, tutorial, bounty, ...(training ? { training } : {}) });
     const { seat, token } = room.addSeat(profile.id, profile.displayName, classId, level);
-    return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode, bounty: bounty?.modifierId ?? null };
+    return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode, bounty: bounty?.modifierId ?? null, ...(training ? { training } : {}) };
   });
   route('GET', '/rooms/:code', async (m) => {
     const room = rooms.byCode(m[1]);

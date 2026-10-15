@@ -30,6 +30,8 @@ export interface SnapPlayer {
   teth?: [number, number, number];
   /** prediction: ticks of movement lock (frozen / rooted) and of the chain left; chill stacks toward a freeze */
   lk?: number; tk?: number; chs?: number;
+  /** Fate's Blessings carried (blessing.ts); absent = none */
+  bl?: number;
 }
 export interface SnapEnemy {
   i: number; g: number; k: string; x: number; y: number; fx: number; fy: number; st: string; hp: number; cnt: string | null;
@@ -76,6 +78,8 @@ export interface Snapshot {
   doors?: SnapDoor[];
   /** cinematic hold (boss grand entrance): the tick the frozen fight resumes; present only while held (cinematic.ts) */
   cu?: number;
+  /** training grounds switches (training.ts); present only in training runs. ai: 1 = foes act, 0 = they stand still */
+  tr?: { ai: 0 | 1 };
 }
 
 export interface SnapLoot { i: number; it: string; x: number; y: number }
@@ -113,6 +117,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
         ...kitVars(p.vars),
         ...gearSnapshot(state, p),
         ...afflictionSnapshot(state, p),
+        ...(p.bless ? { bl: p.bless } : {}),
       };
     }),
     enemies: state.enemies.map((e) => {
@@ -147,6 +152,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
     lt: lootSnapshot(state),
     ...doorsField(state),
     ...(state.tick < (state.cinematicUntilTick ?? 0) ? { cu: state.cinematicUntilTick } : {}),
+    ...(state.training ? { tr: { ai: state.training.ai ? 1 : 0 } as const } : {}),
   };
 }
 

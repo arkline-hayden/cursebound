@@ -99,6 +99,7 @@ describe('legendary drops', () => {
     const s = toCombat(['vanguard']);
     for (let i = 0; i < 300; i++) {
       const id = chooseLegendary(s)!;
+      if (id === 'fates_blessing') continue;   // the legendary consumable shares the pool (blessing.test.ts)
       const def = LEGENDARY_BY_ID[id];
       expect(!def.classId || def.classId === 'vanguard').toBe(true);
     }

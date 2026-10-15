@@ -332,6 +332,7 @@ registerGlobalHooks({
   onEnemySpawn(state, ev, e) { rollElite(state, ev, e); },
 
   onTick(state, ev) {
+    if (state.training && !state.training.ai) return;   // training grounds: frozen foes keep their affixes quiet
     for (const e of state.enemies) {
       if (!isElite(e) || e.state === 'dying' || e.cohort.count.isZero() || e.dormant) continue;   // idle packs hold their affixes
       const av = e.avars ?? (e.avars = {});

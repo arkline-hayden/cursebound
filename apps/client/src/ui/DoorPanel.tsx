@@ -8,6 +8,7 @@ import { useStore } from '@/lib/store';
 import { doorColors } from '@/game/art/doors';
 import { ForecastDetail, MechLine, StatLine, cardDef, signed } from './FateVote';
 import { CardIcon } from './icons';
+import { BlessingIcon } from './itemIcons';
 import styles from './DoorPanel.module.css';
 
 // VOTING / FATE_COMMIT: the in-world door vote (REQ VOTE01 rules unchanged). The party walks the cleared floor to
@@ -15,6 +16,8 @@ import styles from './DoorPanel.module.css';
 // stays out of the way: a title strip, a compact panel for the door you are near or pointing at (dungeon, GIFT,
 // PRICE, who stands there, Forecast, Choose), and a slim bottom strip comparing all three doors (click to walk there).
 // Keys: 1 2 3 walk to a door · Enter chooses the door in the panel · F toggles its Forecast · Esc closes it.
+// Fate's Blessing: a hero carrying one can bless the card in the panel (B, or the rainbow Bless button): its price is
+// lifted for the commit (simulation blessing.ts). Blessed cards show their price struck through, in every view.
 // FATE_COMMIT shows nothing heavy: the walk-through cutscene (CINEMA) plays in the world.
 
 const NUMERALS = ['I', 'II', 'III'];
@@ -71,6 +74,12 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
   const voting = phase?.phase === 'VOTING' && !!offer;
 
   const choose = (i: number) => { if (!myVote.locked && !myVote.pending) net.vote(i, true); };
+  const blessings = me?.bl ?? 0;
+  const canBless = (i: number | null): i is number => {
+    if (i === null || blessings < 1 || !voting || !offer || doors?.find((d) => d.i === i)?.bl) return false;
+    const c = cardDef(offer.cardIds[i]);
+    return !!c && (!!c.negative || !!c.bane);
+  };
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (!voting || !doors) return;
@@ -82,6 +91,7 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
         if (d) { setPicked(i); walkTo(d); if (detail !== null) setDetail(i); }
       } else if (e.code === 'Escape' && detail !== null) setDetail(null);
       else if (e.code === 'KeyF' && focus !== null) setDetail(detail === null ? focus : null);
+      else if (e.code === 'KeyB' && canBless(focus)) { e.preventDefault(); net.bless(focus); }
       else if ((e.code === 'Enter' || e.code === 'NumpadEnter') && focus !== null && !t?.closest?.('button, summary')) { e.preventDefault(); choose(focus); }
     };
     window.addEventListener('keydown', on);
@@ -115,6 +125,7 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
         <div className={styles.sub}>
           <span>{coop ? 'Gather in one door together' : 'Step into a door'} · next: round {fc.nextRound}{fc.nextIsBoss ? ' (boss lair)' : ''}</span>
           {secs !== null && <span className="chip warn" role="timer" aria-label={`${Math.ceil(secs)} seconds left to choose`}>{Math.ceil(secs)}s</span>}
+          {blessings > 0 && <span className="chip prism-border" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }} aria-label={`You carry ${blessings} Fate's Blessing${blessings > 1 ? 's' : ''}`}><BlessingIcon size={16} /> ×{blessings}</span>}
           <button className="btn small" onClick={onLedger}>Ledger</button>
         </div>
       </div>
@@ -133,14 +144,15 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
             <CardIcon cardId={focusCard.id} size={32} />
             <span className={styles.cardName}>{focusCard.name}</span>
             <span className={styles.rarity} style={{ color: RARITIES[cardRarity(focusCard)].color }}>{RARITIES[cardRarity(focusCard)].name}</span>
+            {focusDoor?.bl && <span className="chip prism-border prism-text" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><BlessingIcon size={16} /> Blessed</span>}
           </div>
           <div className="fv-section gift">
             <span className="fv-label">Gift</span>
             {focusCard.boon && <MechLine eff={focusCard.boon} side="gift" mf={focusFc.mechanics.find((m) => m.side === 'gift')} />}
             {focusCard.positive && <StatLine eff={focusCard.positive} side="gift" na={focusFc.positive ? !focusFc.positive.applicable : false} />}
           </div>
-          <div className="fv-section price">
-            <span className="fv-label">Price</span>
+          <div className="fv-section price" style={focusDoor?.bl ? { textDecoration: 'line-through', opacity: 0.5 } : undefined} aria-label={focusDoor?.bl ? 'Price lifted by a Fate’s Blessing' : undefined}>
+            <span className="fv-label">{focusDoor?.bl ? 'Price · lifted' : 'Price'}</span>
             {focusCard.bane && <MechLine eff={focusCard.bane} side="price" mf={focusFc.mechanics.find((m) => m.side === 'price')} />}
             {focusCard.negative && <StatLine eff={focusCard.negative} side="price" />}
           </div>
@@ -153,6 +165,7 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
           {focusDoor && focusDoor.hold > 0 && <div className={styles.hold} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(focusDoor.hold * 100)}><i style={{ width: `${focusDoor.hold * 100}%` }} /></div>}
           <div className={styles.actions}>
             <button className="btn" aria-expanded={detail !== null} onClick={() => setDetail(detail === null ? focus : null)}>Forecast <span className="kbd">F</span></button>
+            {canBless(focus) && <button className="btn prism-border" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }} onClick={() => net.bless(focus)} aria-label={`Bless ${focusCard.name}: lift its price (${blessings} left)`}><BlessingIcon size={16} /> Bless <span className="kbd">B</span></button>}
             <button className="btn primary" disabled={myVote.locked || myVote.pending} onClick={() => choose(focus)}>
               {myVote.locked ? (myVote.cardSlot === focus ? 'Chosen ✦' : 'Vote sealed') : <>Choose <span className="kbd">Enter</span></>}
             </button>
@@ -182,7 +195,8 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
                   <span className={styles.pips}>{d.v.map((s) => <i key={s} className={styles.pip} style={{ background: accentOf(s) }} title={nameOf(s)} />)}</span>
                 </span>
                 <span className={`${styles.line} ${styles.gift}`}>+ {l.gift}</span>
-                <span className={`${styles.line} ${styles.price}`}>− {l.price}</span>
+                <span className={`${styles.line} ${styles.price}`} style={d.bl ? { textDecoration: 'line-through', opacity: 0.5 } : undefined}>− {l.price}</span>
+                {d.bl && <span className={`${styles.line} prism-text`} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><BlessingIcon size={16} /> Blessed</span>}
               </button>
             );
           })}

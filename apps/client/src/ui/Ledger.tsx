@@ -186,6 +186,11 @@ export function Ledger({ net, onClose }: { net: GameConnection; onClose: () => v
             )}
             <section className="well" aria-labelledby="tl-h">
               <h3 id="tl-h" className="lg-h">Timeline ({view.timelineTotal + (view.mechanicTimeline?.length ?? 0)} effects)</h3>
+              {(view.blessings ?? []).length > 0 && (
+                <ul className="lg-timeline" aria-label="Blessed cards">
+                  {view.blessings!.map((b) => <li key={`${b.round}-${b.cardId}`}><span className="faint">after R{b.round}</span> {cardName(b.cardId)}: <b className="prism-text">Blessed</b> <span className="faint">· price lifted by {b.name}’s Fate’s Blessing</span></li>)}
+                </ul>
+              )}
               <ol className="lg-timeline">
                 {timeline.map((t) => <li key={t.seq}><span className="faint">after R{t.round}</span> {cardName(t.cardId)}: {t.label} <b className={t.good ? 'pos' : 'neg'}>{t.value}</b></li>)}
               </ol>

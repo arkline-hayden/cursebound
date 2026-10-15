@@ -28,6 +28,8 @@ export interface SnapDoor {
   b?: 1;
   /** the committed door (FATE_COMMIT) */
   sel?: 1;
+  /** the card behind this door carries a Fate's Blessing (blessing.ts): its price is lifted */
+  bl?: 1;
 }
 
 // ---------------- placement ----------------
@@ -349,6 +351,7 @@ export function doorSnapshot(state: SimState): SnapDoor[] | undefined {
     };
     if (doors.boss) s.b = 1;
     if (doors.chosen === d.i) s.sel = 1;
+    if (state.offer?.blessed?.some((b) => b.card === d.i)) s.bl = 1;
     return s;
   });
 }

@@ -47,6 +47,8 @@ export type SfxId =
   | 'footstep'
   | 'legendary_drop'
   | 'legendary_equip'
+  /** Fate's Blessing found or spent (prismatic chime) */
+  | 'fate_blessing'
   // afflictions (FOES)
   | 'chain_throw'
   | 'chain_bind'
@@ -159,6 +161,7 @@ export const SFX_IDS: readonly SfxId[] = [
   'footstep',
   'legendary_drop',
   'legendary_equip',
+  'fate_blessing',
   'chain_throw',
   'chain_bind',
   'chain_break',
@@ -209,6 +212,7 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   fate_commit: 'Fate committed',
   legendary_drop: 'Legendary item dropped',
   legendary_equip: 'Legendary equipped',
+  fate_blessing: 'Fate’s Blessing',
   chain_throw: '[chain whips]',
   chain_bind: '[chain clanks]',
   chain_break: '[chain snaps]',

@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CLASS_BY_ID, GEAR_SLOTS, GEAR_SLOT_NAMES } from '@cursebound/content';
+import { CLASS_BY_ID, GEAR_SLOTS, GEAR_SLOT_NAMES, LEGENDARY_BY_ID, type LegendaryDef } from '@cursebound/content';
 import { netStore } from '@/lib/net';
 import { keyCap, settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
-import { ItemIcon, SlotIcon } from './itemIcons';
+import { BlessingIcon, ItemIcon, SlotIcon } from './itemIcons';
 import { ORANGE, classTag, gearFromSnap, modifierLines } from './gearText';
+import { compareLegendary } from './gearCompare';
+import { GearCompareTip } from './GearCompareTip';
 
 // Legendary gear panel (key I, or Menu → Legendary gear): the seven equipment slots of a party member with item
 // icons, names in legendary orange, the unique perk, ×factor stat modifiers and lore. Pixel-art styling: hard
 // 2px borders, no gradients or rounded corners, pixel fonts at integer sizes.
+// Quick-compare: hovering or focusing (mouse, keyboard or controller) an ally's piece or a legendary lying nearby
+// shows it beside what you wear in that slot (GearCompareTip), without equipping anything.
 
 const box = (filled: boolean): React.CSSProperties => ({
   display: 'grid', gridTemplateColumns: '56px 1fr', gap: 12, alignItems: 'start', padding: 8,
@@ -27,12 +31,24 @@ export function GearPanel({ onClose }: { onClose: () => void }) {
   const mySlot = useStore(netStore, (s) => s.slot);
   const keys = useStore(settingsStore, (s) => s.s.keys);
   const [view, setView] = useState(mySlot);
+  const [cmp, setCmp] = useState<LegendaryDef | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { closeRef.current?.focus(); }, []);
   const players = snap?.players ?? [];
   const who = players[view] ?? players[mySlot];
   const gear = gearFromSnap(who);
   const count = Object.keys(gear).length;
+  const meSnap = players[mySlot];
+  const mine = gearFromSnap(meSnap);
+  // legendaries on the ground near you (combat only), nearest first
+  const nearby = (snap?.phase === 'COMBAT' && meSnap ? snap.lt ?? [] : [])
+    .map((it) => ({ it, def: LEGENDARY_BY_ID[it.it], d: Math.hypot(it.x - meSnap!.x, it.y - meSnap!.y) }))
+    .filter((x): x is { it: typeof x.it; def: LegendaryDef; d: number } => !!x.def && x.d <= 9)
+    .sort((a, b) => a.d - b.d).slice(0, 4);
+  const compare = cmp ? compareLegendary(cmp, mine[cmp.slot] ?? null, meSnap?.c) : null;
+  const peek = (def: LegendaryDef | undefined) => ({
+    onMouseEnter: () => def && setCmp(def), onMouseLeave: () => setCmp(null), onFocus: () => def && setCmp(def), onBlur: () => setCmp(null),
+  });
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="gear-h" style={{ zIndex: 'var(--z-modal)' as unknown as number }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="frame ornate" style={{ width: 'min(980px, 100%)', maxHeight: '92vh', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -40,6 +56,7 @@ export function GearPanel({ onClose }: { onClose: () => void }) {
           <h2 id="gear-h" className="panel-title" style={{ fontSize: 'var(--fs-goth-lg)', color: ORANGE }}>Legendary Gear</h2>
           <div className="row" style={{ gap: 8 }}>
             <span style={label}>{count}/7 equipped</span>
+            {(who?.bl ?? 0) > 0 && <span className="prism-text" style={{ ...label, display: 'inline-flex', gap: 4, alignItems: 'center' }} aria-label={`Carrying ${who!.bl} Fate’s Blessing`}><BlessingIcon size={16} /> Blessing ×{who!.bl}</span>}
             <button ref={closeRef} className="btn small" onClick={onClose}>Close <span className="kbd">{keyCap(keys.inventory?.[0] ?? 'KeyI')}</span></button>
           </div>
         </div>
@@ -56,11 +73,23 @@ export function GearPanel({ onClose }: { onClose: () => void }) {
           Legendaries drop rarely from foes, more often from champions and rares, and always from bosses. Walk over one to wear it in an empty slot;
           press <span className="kbd">{keyCap(keys.interact?.[0] ?? 'KeyG')}</span> on it to swap (your old piece drops at your feet). Gear lasts the whole run.
         </p>
+        {nearby.length > 0 && (
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={label}>On the ground nearby</span>
+            {nearby.map(({ it, def }) => (
+              <button key={it.i} className="btn small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: ORANGE }} {...peek(def)} aria-label={`${def.name} on the ground: compare with your ${GEAR_SLOT_NAMES[def.slot]}`}>
+                <ItemIcon itemId={def.id} size={16} /> {def.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {compare && <GearCompareTip c={compare} style={{ alignSelf: 'center' }} />}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8 }}>
           {GEAR_SLOTS.map((slot) => {
             const def = gear[slot];
+            const ally = view !== mySlot && !!def;
             return (
-              <div key={slot} style={box(!!def)}>
+              <div key={slot} style={box(!!def)} {...(ally ? { tabIndex: 0, ...peek(def), 'aria-label': `${def!.name}: compare with your ${GEAR_SLOT_NAMES[slot]}` } : {})}>
                 <div style={socket(!!def)}>{def ? <ItemIcon itemId={def.id} size={48} label={def.name} /> : <SlotIcon slot={slot} size={48} />}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                   <span style={label}>{GEAR_SLOT_NAMES[slot]}{def && classTag(def) ? ` · ${classTag(def)}` : ''}</span>

@@ -7,6 +7,7 @@ import type { DungeonRenderer } from './DungeonRenderer';
 import { iso } from './iso';
 import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 import { netStore } from '@/lib/net';
+import { PrismSparkles, prismColor, prismRing } from './prismatic';
 
 // The in-world Fate vote (doors.ts in the simulation): three themed archways set into one stretch of wall, drawn from
 // snapshot.doors during VOTING and FATE_COMMIT. Each door is split into three depth strips (one per wall tile it
@@ -18,6 +19,8 @@ import { netStore } from '@/lib/net';
 // Window events (DOM):
 //   'cursebound:doorhover'  detail { i: number | null }        pointer over a door (DoorPanel shows it)
 //   'cursebound:moveto'     detail { x, y } (world tiles)      clicking a door walks the hero to its front point
+// A door whose card carries a Fate's Blessing (snapshot bl) shimmers in rainbow: its portal sheet, light and spill
+// wheel through the hues, a rainbow ring turns round its voting spot and sparkles rise from the opening.
 
 const { FW, TILE_COL, TILE_W, TEX_H } = DOOR_GEOM;
 const STRIPS: [number, number][] = [[0, TILE_COL], [TILE_COL, TILE_W], [TILE_COL + TILE_W, FW - TILE_COL - TILE_W]];
@@ -47,6 +50,8 @@ interface DoorView {
   sel: boolean;
   color: number;
   glow: number;
+  /** blessed (Fate's Blessing): rainbow shimmer */
+  bl: boolean;
 }
 
 export class DoorRenderer {
@@ -59,6 +64,8 @@ export class DoorRenderer {
   private localDoor: number | null = null;
   private lockedSeen = false;
   private handlers: [EventTarget, string, EventListener][] = [];
+  private sparks = new PrismSparkles();
+  private sparkG: Phaser.GameObjects.Graphics | null = null;
 
   constructor(
     private scene: Phaser.Scene,
@@ -100,6 +107,8 @@ export class DoorRenderer {
     const now = this.scene.time.now;
     const dt = Math.min(0.1, delta / 1000);
     const committing = snap.phase === 'FATE_COMMIT';
+    const sg = this.sparkG ??= this.scene.add.graphics().setDepth(4650);
+    sg.clear();
     // local vote lock: the Choose button (explicit vote) -> the choose chime
     const locked = netStore.get().myVote.locked;
     if (locked && !this.lockedSeen) this.sfx('door_choose', me?.x, me?.y, 2);
@@ -117,6 +126,13 @@ export class DoorRenderer {
       if (d.hold >= 0.999 && prevHold < 0.999) this.sfx('door_choose', d.x, d.y, 2);
       if (d.sel && !v.sel) { this.sfx('door_open', d.x, d.y, 3); this.dungeon.flashLight(this.P(d.x, d.y).x, this.P(d.x, d.y).y - 30, 220, v.color, 3, 900); }
       v.sel = !!d.sel;
+      if (d.bl && !v.bl) {
+        // just blessed: a rainbow flare at the door (LootRenderer plays the chime and the ground burst)
+        const o = this.P(d.x - d.nx * 0.5, d.y - d.ny * 0.5);
+        this.sparks.burst(o.x, o.y - 40, 60, 26, 70);
+        this.dungeon.flashLight(o.x, o.y - 30, 260, prismColor(now), 3, 900);
+      }
+      v.bl = !!d.bl;
       // opening: the chosen door opens wide, others close while the party passes through
       const target = committing ? (v.sel ? 1 : 0) : anyNear || this.hover === d.i ? 1 : 0;
       const rate = committing && v.sel ? 3.5 : 2.4;
@@ -141,12 +157,28 @@ export class DoorRenderer {
       if (v.light) v.light.intensity = (0.9 + v.open * 1.1 + near + boost) * v.alpha;
       if (v.point) { v.point.intensity = (0.05 + v.open * 0.12 + near * 0.08 + boost * 0.1) * v.alpha; v.point.radius = 34 + v.open * 14; }
       if (v.spill) v.spill.setAlpha((0.08 + v.open * 0.22 + near * 0.15 + boost * 0.12) * v.alpha);
+      if (v.bl) this.shimmer(v, now, dt);
     }
+    this.sparks.draw(sg, now, delta);
     // the local hero's hum while standing near a door (throttled)
     if (localDoor !== null && !committing) {
       if (localDoor !== this.localDoor || now - this.lastHum > 2600) { this.sfx('door_hum', me?.x, me?.y, 1); this.lastHum = now; }
     }
     this.localDoor = localDoor;
+  }
+
+  /** Rainbow shimmer of a blessed door: wheeling portal, light and spill colours plus sparkles in the opening. */
+  private shimmer(v: DoorView, now: number, dt: number) {
+    const c0 = prismColor(now, 0), c1 = prismColor(now, 0.33), c2 = prismColor(now, 0.66);
+    for (const img of v.layers.portal) img.setTint(c0, c1, c2, c0);
+    for (const img of v.layers.glow) img.setTint(c1);
+    if (v.light) v.light.setColor(c2);
+    if (v.point) v.point.color.setFromRGB({ r: (c0 >> 16) & 255, g: (c0 >> 8) & 255, b: c0 & 255 });
+    if (v.spill) v.spill.setTint(c1);
+    if (v.alpha > 0.05) {
+      const o = this.P(v.d.x - v.d.nx * 0.5, v.d.y - v.d.ny * 0.5);
+      this.sparks.stream(1000 + v.d.i, o.x, o.y - 30, 22, dt, 16);
+    }
   }
 
   /** Door the local hero is near (for tests and the panel), else null. */
@@ -191,7 +223,7 @@ export class DoorRenderer {
         fontFamily: FONT_WORLD, fontSize: `${WORLD_TEXT_PX.label}px`, color: `#${glow.toString(16).padStart(6, '0')}`, stroke: '#070505', strokeThickness: 3, align: 'center', resolution: 1,
       }).setOrigin(0.5, 1).setDepth(4600).setAlpha(0);
       const gfx = s.add.graphics().setDepth(FLAT + 0.4);
-      this.views.push({ d, side, theme, ox, oy, depth: (wx + wy + 1) * 10 + 0.5, layers, sigil, spill, point, light, label, gfx, open: 0, alpha: 0, fade: 1, born: now, hold: d.hold, sel: !!d.sel, color, glow });
+      this.views.push({ d, side, theme, ox, oy, depth: (wx + wy + 1) * 10 + 0.5, layers, sigil, spill, point, light, label, gfx, open: 0, alpha: 0, fade: 1, born: now, hold: d.hold, sel: !!d.sel, color, glow, bl: !!d.bl });
       this.dungeon.flashLight(opening.x, opening.y - 24, 160, color, 2.2, 700);
     }
     this.hideClutter();
@@ -235,7 +267,8 @@ export class DoorRenderer {
       g.strokePath();
     };
     ring(0, 1, 0x000000, 0.45 * v.alpha, 4);
-    ring(0, 1, v.color, (focus ? 0.4 : 0.22) * v.alpha, 2);
+    if (v.bl) prismRing(g, c.x, c.y, rx + 3, ry + 1.5, now, 0.95 * v.alpha, 2, 24);
+    else ring(0, 1, v.color, (focus ? 0.4 : 0.22) * v.alpha, 2);
     if (d.hold > 0) ring(0, Math.min(1, d.hold), v.glow, v.alpha, 3);
     // pips: who stands here (class colours), above the sigil
     const n = d.v.length;
@@ -291,6 +324,7 @@ export class DoorRenderer {
     }
     this.views = [];
     this.sig = '';
+    this.sparkG?.clear();
     for (const o of this.hidden) if (o.active) (o as Phaser.GameObjects.Image).setVisible(true);
     this.hidden = [];
     if (this.hover !== null) { this.hover = null; window.dispatchEvent(new CustomEvent('cursebound:doorhover', { detail: { i: null } })); }
@@ -299,6 +333,8 @@ export class DoorRenderer {
 
   destroy() {
     this.clear();
+    this.sparkG?.destroy();
+    this.sparkG = null;
     for (const [t, ev, fn] of this.handlers) t.removeEventListener(ev, fn);
     this.handlers = [];
   }

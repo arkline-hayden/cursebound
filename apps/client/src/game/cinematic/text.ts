@@ -1,4 +1,4 @@
-import { BOSS_BY_ID, DUNGEON_THEMES, MECHANIC_BY_ID, STAT_BY_ID, cardById, mechanicText, type CardEffect, type MechanicEffect } from '@cursebound/content';
+import { BOSS_BY_ID, DUNGEON_THEMES, TRAINING_THEME, MECHANIC_BY_ID, STAT_BY_ID, cardById, mechanicText, type CardEffect, type MechanicEffect } from '@cursebound/content';
 import { B, formatMechanicValue } from '@cursebound/simulation';
 import { renderTheme } from '../render/themes';
 
@@ -31,6 +31,7 @@ export function themeGlow(th: string | undefined): number {
 export function hexCss(c: number): string { return `#${c.toString(16).padStart(6, '0')}`; }
 
 export function themeName(th: string | undefined): string {
+  if (th === TRAINING_THEME.id) return TRAINING_THEME.name;   // training grounds (courtyard)
   return DUNGEON_THEMES.find((t) => t.id === th)?.name ?? 'The Deep Dark';
 }
 

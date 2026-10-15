@@ -1383,3 +1383,16 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
 .res-xp { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }
 .res-xp .res-xp-gain { font-family: var(--font-gothic); font-size: var(--fs-goth-sm); line-height: 1; color: var(--ember-hi); text-shadow: var(--shadow-hard); }
 .res-xp .bar.xp { width: 160px; }
+/* ---- Fate's Blessing: prismatic hue cycling in hard steps (pixel art never blends) ---- */
+@keyframes prismCycle { from { filter: hue-rotate(0deg) saturate(1.2); } to { filter: hue-rotate(360deg) saturate(1.2); } }
+@keyframes prismBorder {
+  0% { border-color: #ff4a5e; } 17% { border-color: #ffb13a; } 33% { border-color: #f5ec4a; }
+  50% { border-color: #5ef07a; } 67% { border-color: #4ac8ff; } 83% { border-color: #b46cff; } 100% { border-color: #ff4a5e; }
+}
+@keyframes prismText {
+  0% { color: #ff6a7a; } 17% { color: #ffc05a; } 33% { color: #f8f070; } 50% { color: #7af58e; } 67% { color: #6ad4ff; } 83% { color: #c88aff; } 100% { color: #ff6a7a; }
+}
+.prism-cycle { animation: prismCycle 1.6s steps(12) infinite; }
+.prism-border { animation: prismBorder 1.8s steps(6) infinite; }
+.prism-text { animation: prismText 1.8s steps(6) infinite; }
+@media (prefers-reduced-motion: reduce) { .prism-cycle, .prism-border, .prism-text { animation: none; } }

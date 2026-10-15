@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { netStore, type GameConnection } from '@/lib/net';
 import { useStore } from '@/lib/store';
 import { SettingsPanel } from './SettingsPanel';
@@ -34,7 +35,10 @@ export function PauseMenu({ net, onClose, onLedger }: { net: GameConnection; onC
           <button className="menu-item" onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings}>Settings</button>
           {showSettings && <div className="well" style={{ textAlign: 'left' }}><SettingsPanel compact /></div>}
           <hr className="rule" />
-          {!confirm ? (
+          {phase.training ? (
+            // training grounds: nothing to retire or bank, just leave (the room is discarded, never recorded)
+            <Link className="btn danger" href="/">Leave the training grounds</Link>
+          ) : !confirm ? (
             <button className="btn danger" onClick={() => setConfirm(true)}>{solo ? 'Retire run…' : myRetire ? 'Withdraw retire vote' : 'Vote to retire…'}</button>
           ) : (
             <div className="well col" style={{ textAlign: 'left' }}>

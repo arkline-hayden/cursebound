@@ -47,6 +47,8 @@ export class Room implements AuthorityHost {
   readonly seed: string;
   readonly challengeId: string | null;
   readonly tutorial: boolean;
+  /** training grounds room (simulation training.ts): accepts TRAIN, never scores, persists or records the run */
+  readonly training: boolean;
   readonly bounty: RoomBounty | null;
   seats: Seat[] = [];
   stage: RoomStage = 'LOBBY';
@@ -55,7 +57,7 @@ export class Room implements AuthorityHost {
   lastActivity = Date.now();
   private seatLinks = new Map<number, SeatLink>();
 
-  constructor(private mgr: RoomManager, o: { mode: 'solo' | 'coop'; seed: string; challengeId: string | null; tutorial: boolean; trust: 'local' | 'lan'; bounty?: RoomBounty | null }) {
+  constructor(private mgr: RoomManager, o: { mode: 'solo' | 'coop'; seed: string; challengeId: string | null; tutorial: boolean; trust: 'local' | 'lan'; bounty?: RoomBounty | null; training?: boolean }) {
     this.id = newId('room');
     this.code = newRoomCode();
     this.mode = o.mode;
@@ -63,6 +65,7 @@ export class Room implements AuthorityHost {
     this.challengeId = o.challengeId;
     this.tutorial = o.tutorial;
     this.trust = o.trust;
+    this.training = !!o.training;
     this.bounty = o.bounty ?? null;
   }
 
@@ -179,6 +182,15 @@ export class Room implements AuthorityHost {
         return;
       }
       case 'PING': if (seat.socket) this.send(seat.socket, { t: 'PONG', c: msg.c, serverTick: a?.state.tick ?? 0 }); return;
+      // training grounds tools: seat-scoped, accepted only in training rooms (the simulation re-checks state.training)
+      case 'TRAIN': {
+        if (!this.training || !a) { if (seat.socket) this.send(seat.socket, { t: 'ACK', requestId: msg.requestId, ok: false, code: 'NOT_TRAINING' }); return; }
+        a.submitCommand({ type: 'TRAIN', slot: seat.slot, op: msg.op, ...(msg.arg !== undefined ? { arg: msg.arg } : {}), ...(msg.tier !== undefined ? { tier: msg.tier } : {}) }, { slot: seat.slot, requestId: msg.requestId });
+        this.later(() => a.afterCommand('TRAIN'));
+        return;
+      }
+      // Fate's Blessing on an offered card (validated by the simulation: phase, offer, a held blessing, one per card)
+      case 'BLESS': a?.submitCommand({ type: 'BLESS', slot: seat.slot, offerId: msg.offerId, cardSlot: msg.slot }, { slot: seat.slot, requestId: msg.requestId }); this.later(() => a?.afterCommand('BLESS')); return;
       case 'HELLO': return;
     }
   }
@@ -194,13 +206,14 @@ export class Room implements AuthorityHost {
       runId, seed: this.seed, mode: this.mode, trust: this.trust, challengeId: this.challengeId, contentHash: contentHash(), tutorial: this.tutorial,
       roster: this.seats.map((s) => ({ slot: s.slot, profileId: s.profileId, name: s.name, classId: s.classId })),
       ...(this.bounty ? { bounty: this.bounty.modifierId } : {}),   // daily bounty modifier (simulation bounty.ts)
+      ...(this.training ? { training: true } : {}),   // training grounds (simulation training.ts)
     };
     const state = createRun(params);
     // bounty runs rank in their own division per modifier (protocol boardKey)
     const key = boardKey({ rulesVersion: RULES_VERSION, contentHash: contentHash(), scoreVersion: SCORE_VERSION, n: state.n, mode: this.mode, challengeId: this.challengeId, trust: this.trust, bounty: this.bounty?.modifierId });
-    let practice = this.tutorial;
+    let practice = this.tutorial || this.training;
     if (!practice && this.challengeId) practice = await this.mgr.store.hasRankedAttempt(key, this.seats.map((s) => s.profileId)).catch(() => false);
-    this.authority = new RunAuthority({ state, store: this.mgr.store, logger: this.mgr.log, host: this, boardKey: key, practice, createParams: params, bountyId: this.bounty?.id ?? null });
+    this.authority = new RunAuthority({ state, store: this.mgr.store, logger: this.mgr.log, host: this, boardKey: key, practice, createParams: params, bountyId: this.bounty?.id ?? null, ...(this.training ? { training: true } : {}) });
     this.mgr.log.info('run_started', { roomId: this.id, runId, n: state.n, mode: this.mode, practice });
     this.broadcastRoom();
     for (const l of this.seatLinks.values()) this.authority.resync(l);
@@ -245,14 +258,14 @@ export class RoomManager {
       const idle = now - r.lastActivity;
       const ended = r.authority?.state.phase === 'RESULTS';
       const empty = r.seats.every((s) => !s.socket);
-      if ((ended && empty && idle > 60000) || (r.stage === 'LOBBY' && empty && idle > 10 * 60000) || (empty && idle > 6 * 3600 * 1000)) {
+      if ((r.training && empty && idle > 120000) || (ended && empty && idle > 60000) || (r.stage === 'LOBBY' && empty && idle > 10 * 60000) || (empty && idle > 6 * 3600 * 1000)) {
         r.authority?.dispose();
         this.rooms.delete(id);
       }
     }
   }
 
-  createRoom(o: { mode: 'solo' | 'coop'; challenge: 'daily' | 'random' | 'tutorial'; tutorial: boolean; bounty?: RoomBounty | null }): Room {
+  createRoom(o: { mode: 'solo' | 'coop'; challenge: 'daily' | 'random' | 'tutorial'; tutorial: boolean; bounty?: RoomBounty | null; training?: boolean }): Room {
     let seed: string;
     let challengeId: string | null = null;
     if (o.challenge === 'daily') {
@@ -263,11 +276,13 @@ export class RoomManager {
     } else if (o.tutorial) {
       seed = 'tutorial-1';
       challengeId = 'tutorial';
+    } else if (o.training) {
+      seed = `training-${crypto.randomBytes(4).toString('hex')}`;   // training grounds: never a board or challenge
     } else {
       seed = crypto.randomBytes(8).toString('hex');
     }
     const trust: 'local' | 'lan' = o.mode === 'coop' && this.cfg.lan ? 'lan' : 'local';
-    const room = new Room(this, { mode: o.mode, seed, challengeId, tutorial: o.tutorial, trust, bounty: o.tutorial ? null : o.bounty ?? null });
+    const room = new Room(this, { mode: o.mode, seed, challengeId, tutorial: o.tutorial, trust, bounty: o.tutorial || o.training ? null : o.bounty ?? null, ...(o.training ? { training: true } : {}) });
     this.rooms.set(room.id, room);
     return room;
   }
