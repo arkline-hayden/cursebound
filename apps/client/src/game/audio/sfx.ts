@@ -78,6 +78,20 @@ export type SfxId =
   | 'boss_roar'
   | 'stag_cry'
   | 'bell_toll'
+  // the Corrupted Core and the Iron Colossus (render/bosses)
+  | 'core_charge'
+  | 'core_laser'
+  | 'core_firewall'
+  | 'core_glitch'
+  | 'core_purge_alarm'
+  | 'core_purge'
+  | 'core_deploy'
+  | 'colossus_raise'
+  | 'colossus_hammer'
+  | 'colossus_stomp'
+  | 'colossus_vent'
+  | 'lava_vent'
+  | 'lava_erupt'
   // movement / ui
   | 'move_click'
   | 'minimap_ping'
@@ -188,6 +202,19 @@ export const SFX_IDS: readonly SfxId[] = [
   'boss_roar',
   'stag_cry',
   'bell_toll',
+  'core_charge',
+  'core_laser',
+  'core_firewall',
+  'core_glitch',
+  'core_purge_alarm',
+  'core_purge',
+  'core_deploy',
+  'colossus_raise',
+  'colossus_hammer',
+  'colossus_stomp',
+  'colossus_vent',
+  'lava_vent',
+  'lava_erupt',
   'move_click',
   'minimap_ping',
   'chest_open',
@@ -237,5 +264,17 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   boss_roar: '[boss roars]',
   stag_cry: '[stag shrieks]',
   bell_toll: '[bell tolls]',
+  core_laser: 'Lasers fire',
+  core_firewall: 'Firewall closing in',
+  core_glitch: 'Static glitch',
+  core_purge_alarm: 'Purge alarm: find a safe tile',
+  core_purge: 'System purge',
+  core_deploy: 'Drones deploy',
+  colossus_raise: 'Hammer rises',
+  colossus_hammer: 'Hammer quake',
+  colossus_stomp: 'Iron stomp',
+  colossus_vent: 'Furnace vents',
+  lava_vent: 'Slag bubbles',
+  lava_erupt: 'Lava erupts',
   chest_open: '[chest creaks open]',
 };

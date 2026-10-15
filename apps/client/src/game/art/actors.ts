@@ -3,6 +3,8 @@
  * Texture key: `actor:${actor}`; animation key: `${actor}:${state}:${dir}`.
  */
 import { renderBossFrame } from './draw/bosses';
+import { renderCoreFrame } from './draw/bossCore';
+import { renderColossusFrame } from './draw/bossColossus';
 import { renderCreatureFrame, type CreatureId } from './draw/creatures';
 import { renderHeroFrame, type HeroClass, type HeroState } from './draw/humanoid';
 import { Painter, PixelBuffer, Sheet, polishActor } from './draw/pixel';
@@ -34,7 +36,11 @@ export type ActorId =
   | 'gaoler'
   | 'rimewraith'
   | 'gloomshade'
-  | 'webweaver';
+  | 'webweaver'
+  | 'corruptcore'
+  | 'coredrone'
+  | 'coreturret'
+  | 'ironcolossus';
 
 export type ActorState = 'idle' | 'run' | 'attack' | 'cast' | 'dodge' | 'hit' | 'downed' | 'revive' | 'death' | 'windup' | 'stagger';
 
@@ -67,6 +73,10 @@ export const ACTOR_IDS: readonly ActorId[] = [
   'rimewraith',
   'gloomshade',
   'webweaver',
+  'corruptcore',
+  'coredrone',
+  'coreturret',
+  'ironcolossus',
 ];
 
 export interface StateSpec {
@@ -165,6 +175,36 @@ const BELL_STATES: Record<string, StateSpec> = {
   death: { durations: [110, 110, 120, 130, 140, 160, 190, 280], loop: false },
 };
 
+/** The Corrupted Core: a floating eye (no gait), a long glare on attack, a glitched stagger and a flinch. */
+const CORE_STATES: Record<string, StateSpec> = {
+  idle: { durations: [200, 180, 200, 200, 180, 200], loop: true },
+  windup: { durations: [150, 150, 170, 230], loop: false },
+  attack: { durations: [70, 70, 90, 110, 140, 190], loop: false },
+  stagger: { durations: [140, 200, 200], loop: true },
+  hit: { durations: [70, 120], loop: false },
+  death: { durations: [100, 100, 110, 120, 130, 150, 180, 260], loop: false },
+};
+
+/** The Iron Colossus: a slow stomp, a long hammer raise, an overheated (vented) stagger. */
+const COLOSSUS_STATES: Record<string, StateSpec> = {
+  idle: { durations: [340, 280, 340, 280], loop: true },
+  run: { durations: rep(6, 125), loop: true },
+  windup: { durations: [200, 200, 240, 320], loop: false },
+  attack: { durations: [60, 80, 100, 130, 170, 230], loop: false },
+  stagger: { durations: [160, 220, 220], loop: true },
+  hit: { durations: [80, 140], loop: false },
+  death: { durations: [120, 120, 130, 140, 150, 170, 200, 300], loop: false },
+};
+
+/** The Core's drones and turrets: small machines, front only. */
+const ADD_STATES: Record<string, StateSpec> = {
+  idle: { durations: [140, 140, 140, 140], loop: true },
+  windup: { durations: [110, 110, 140, 180], loop: false },
+  attack: { durations: [60, 70, 100, 140], loop: false },
+  hit: { durations: [70, 120], loop: false },
+  death: { durations: [80, 90, 100, 120, 140, 200], loop: false },
+};
+
 interface ActorSpec {
   frameW: number;
   frameH: number;
@@ -217,6 +257,10 @@ const SPECS: Record<ActorId, ActorSpec> = {
   rimewraith: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 9, dirs: ENEMY_DIRS, states: ENEMY_STATES },
   gloomshade: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 8, dirs: ENEMY_DIRS, states: ENEMY_STATES },
   webweaver: { frameW: 48, frameH: 48, originX: 0.5, originY: 41 / 48, shadowRadius: 14, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  corruptcore: { frameW: 160, frameH: 160, originX: 0.5, originY: 150 / 160, shadowRadius: 26, dirs: ENEMY_DIRS, states: CORE_STATES, aliases: { run: 'idle' } },
+  coredrone: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 7, dirs: ['s'], states: ADD_STATES, aliases: { run: 'idle' } },
+  coreturret: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 12, dirs: ['s'], states: ADD_STATES, aliases: { run: 'idle' } },
+  ironcolossus: { frameW: 176, frameH: 176, originX: 0.5, originY: 164 / 176, shadowRadius: 52, dirs: ['s'], states: COLOSSUS_STATES },
 };
 
 export const ACTOR_META: Record<
@@ -311,6 +355,8 @@ export function isHeroActor(id: string): id is HeroClass {
 function renderFrame(actor: ActorId, state: string, dir: ActorDir, i: number, n: number, painter: Painter): PixelBuffer {
   if (isHeroActor(actor)) return renderHeroFrame(actor, state as HeroState, dir, i, n, painter);
   if (actor === 'prismstag' || actor === 'bellroot') return renderBossFrame(actor, state, dir, i, n, painter);
+  if (actor === 'corruptcore' || actor === 'coredrone' || actor === 'coreturret') return renderCoreFrame(actor, state, dir, i, n, painter);
+  if (actor === 'ironcolossus') return renderColossusFrame(state, i, n, painter);
   return renderCreatureFrame(actor as CreatureId, state, dir, i, n, painter);
 }
 

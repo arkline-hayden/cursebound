@@ -464,6 +464,24 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
         s.tone(o, t, { f: 50, f2: 35, dur: 1.4, gain: 0.25, attack: 0.1 });
         return synthSfx(s, 'stag_cry', o, t, env);
       }
+      if (env.boss === 'corruptcore') {
+        // a machine scream: a bit-crushed square wail sliding down, torn up by glitches, over a sub drop
+        for (const [f, det, g] of [[880, 0, 0.06], [1320, 14, 0.03], [440, -9, 0.05]] as [number, number, number][]) {
+          s.tone(o, t, { type: 'square', f, f2: f * 0.35, dur: 1.5, gain: g, filter: 3200, attack: 0.04, glide: 1.4, detune: det });
+        }
+        for (let k = 0; k < 10; k++) s.click('glitch', o, t + r() * 1.4, 0.7);
+        s.tone(o, t, { f: 60, f2: 30, dur: 1.6, gain: 0.3, attack: 0.05 });
+        return 1.8;
+      }
+      if (env.boss === 'ironcolossus') {
+        // a steam whistle over grinding iron and a furnace roar
+        s.tone(o, t, { f: 760, f2: 690, dur: 1.4, gain: 0.05, attack: 0.08 });
+        s.tone(o, t, { f: 1140, f2: 1030, dur: 1.4, gain: 0.025, attack: 0.08 });
+        s.noiseHit(o, t, { dur: 1.6, type: 'lowpass', f: 500, gain: 0.25, attack: 0.1, brown: true });
+        s.tone(o, t, { type: 'sawtooth', f: 46, f2: 38, dur: 1.6, gain: 0.14, filter: 260, attack: 0.1 });
+        for (let k = 0; k < 4; k++) s.click('anvil', o, t + 0.2 + k * 0.3, 0.5);
+        return 1.8;
+      }
       const ctx = s.ctx;
       const ws = ctx.createWaveShaper();
       ws.curve = s.crunch;
@@ -520,6 +538,75 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.bigBell(o, t, 98, 4.5, 0.28);
       s.tone(o, t, { f: 49, dur: 3, gain: 0.12, attack: 0.02 });
       return 4.5;
+
+    // ---------------------------------------------------------------- the Corrupted Core
+    case 'core_charge':
+      // capacitors spinning up: a filtered saw sweep over a hiss riser, a stutter of blips on top
+      s.tone(o, t, { type: 'sawtooth', f: 180, f2: 1500, dur: 0.95, gain: 0.07, filter: 2400, q: 6, attack: 0.3, glide: 0.9 });
+      s.noiseHit(o, t, { dur: 0.9, f: 800, f2: 5000, q: 2, gain: 0.06, attack: 0.7 });
+      for (let k = 0; k < 4; k++) s.click('blip', o, t + 0.5 + k * 0.09, 0.6);
+      return 1.0;
+    case 'core_laser':
+      s.tone(o, t, { type: 'square', f: 1900, f2: 320, dur: 0.16, gain: 0.045, filter: 3600 });
+      s.noiseHit(o, t, { dur: 0.08, type: 'highpass', f: 4000, gain: 0.05 });
+      return s.tone(o, t, { type: 'sawtooth', f: 95, f2: 60, dur: 0.22, gain: 0.06, filter: 600 });
+    case 'core_firewall':
+      s.noiseHit(o, t, { dur: 1.2, type: 'lowpass', f: 380, f2: 1400, q: 1.5, gain: 0.22, attack: 0.15, brown: true });
+      s.tone(o, t, { type: 'sawtooth', f: 62, f2: 74, dur: 1.2, gain: 0.08, filter: 500, attack: 0.1 });
+      for (let k = 0; k < 6; k++) s.click('glitch', o, t + r() * 1.0, 0.5);
+      return 1.3;
+    case 'core_glitch':
+      for (let k = 0; k < 6; k++) {
+        s.click('glitch', o, t + k * 0.045, 0.8);
+        s.tone(o, t + k * 0.045, { type: 'square', f: 300 + r() * 1800, dur: 0.03, gain: 0.035, filter: 4000 });
+      }
+      return 0.4;
+    case 'core_purge_alarm':
+      // klaxon: two tones alternating four times over a sub drone
+      for (let k = 0; k < 4; k++) s.tone(o, t + k * 0.4, { type: 'square', f: k % 2 ? 660 : 880, dur: 0.34, gain: 0.05, filter: 2200, attack: 0.02 });
+      s.tone(o, t, { type: 'sawtooth', f: 41, dur: 1.7, gain: 0.08, filter: 300, attack: 0.2 });
+      return 1.8;
+    case 'core_purge':
+      s.crunchHit(o, t, { dur: 0.35, f: 700, q: 0.7, gain: 0.32, drive: 6 });
+      s.tone(o, t, { f: 55, f2: 28, dur: 1.4, gain: 0.32, attack: 0.01 });
+      s.noiseHit(o, t + 0.05, { dur: 1.2, f: 3000, f2: 300, q: 1, gain: 0.1, attack: 0.02 });
+      for (let k = 0; k < 8; k++) s.click('glitch', o, t + 0.1 + r() * 0.8, 0.6);
+      return 1.5;
+    case 'core_deploy':
+      s.tone(o, t, { type: 'square', f: 420, f2: 1260, dur: 0.12, gain: 0.04, filter: 3000 });
+      s.click('anvil', o, t + 0.1, 0.4);
+      return s.noiseHit(o, t + 0.1, { dur: 0.25, type: 'highpass', f: 3000, gain: 0.04, attack: 0.02 }) + 0.1;
+
+    // ---------------------------------------------------------------- the Iron Colossus
+    case 'colossus_raise':
+      // iron groaning up: a slow, detuned saw creak, chains and a hiss of steam
+      s.tone(o, t, { type: 'sawtooth', f: 70, f2: 110, dur: 1.1, gain: 0.1, filter: 420, q: 5, attack: 0.25, glide: 1.0 });
+      s.tone(o, t, { type: 'sawtooth', f: 73, f2: 115, dur: 1.1, gain: 0.06, filter: 380, q: 4, attack: 0.3, glide: 1.0, detune: 18 });
+      for (let k = 0; k < 4; k++) s.click('chain', o, t + 0.15 + k * 0.18, 0.7);
+      s.noiseHit(o, t + 0.5, { dur: 0.7, type: 'highpass', f: 3500, gain: 0.05, attack: 0.2 });
+      return 1.2;
+    case 'colossus_hammer':
+      s.crunchHit(o, t, { dur: 0.3, f: 900, q: 0.8, gain: 0.38, drive: 6 });
+      s.tone(o, t, { f: 72, f2: 30, dur: 1.2, gain: 0.42, attack: 0.005 });
+      s.click('anvil', o, t, 1);
+      s.bell(o, t + 0.01, 196, 1.3, 0.08, 0.6);
+      s.noiseHit(o, t + 0.04, { dur: 0.9, type: 'lowpass', f: 300, gain: 0.18, attack: 0.02, brown: true });
+      return 1.4;
+    case 'colossus_stomp':
+      s.tone(o, t, { f: 62, f2: 34, dur: 0.45, gain: 0.34, attack: 0.004 });
+      return s.noiseHit(o, t, { dur: 0.3, type: 'lowpass', f: 260, gain: 0.2, brown: true });
+    case 'colossus_vent':
+      s.noiseHit(o, t, { dur: 1.2, type: 'highpass', f: 2600, gain: 0.12, attack: 0.04 });
+      s.noiseHit(o, t, { dur: 1.0, f: 900, q: 1.2, gain: 0.06, attack: 0.05 });
+      s.tone(o, t + 0.05, { f: 1250, f2: 980, dur: 0.9, gain: 0.03, attack: 0.1 });
+      return 1.3;
+    case 'lava_vent':
+      for (let k = 0; k < 7; k++) s.tone(o, t + k * 0.13 + r() * 0.05, { f: 110 + r() * 90, f2: 70, dur: 0.1, gain: 0.08, filter: 500, q: 3 });
+      return 1.0;
+    case 'lava_erupt':
+      s.noiseHit(o, t, { dur: 0.9, f: 300, f2: 2200, q: 1.2, gain: 0.18, attack: 0.06 });
+      s.crunchHit(o, t + 0.05, { dur: 0.25, f: 1200, q: 0.8, gain: 0.16, drive: 4 });
+      return s.tone(o, t, { f: 58, f2: 40, dur: 0.8, gain: 0.2 });
     default:
       return 0.1;
   }

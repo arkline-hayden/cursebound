@@ -13,6 +13,7 @@ import { cinematicEnd, cinematicRebroadcast, cinematicStart, type CinematicKind 
 import { cineOverlay } from './overlay';
 import { Puppet, dirOf } from './puppet';
 import { BOSS_CINE, bossEpithet, bossName, cardLine, fatesLine, hexCss, themeGlow, themeName } from './text';
+import { BOSS_ENTRANCES } from './entrances';
 import { E, Timeline, lerp, type Ease, type TimelineCtx } from './timeline';
 
 // Cutscene director. Every scene is driven by authoritative sim events / phases, so all co-op clients play the same
@@ -654,7 +655,7 @@ export class CinematicDirector {
     let fx = party.x - x, fy = party.y - y;
     const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
     const actor = (ACTOR_IDS as readonly string[]).includes(kind) ? (kind as ActorId) : null;
-    const lift = bell ? 64 : stag ? 46 : 40;
+    const lift = bell ? 64 : stag ? 46 : kind === 'ironcolossus' ? 70 : kind === 'corruptcore' ? 60 : 40;
     const reduced = this.settings().reducedEffects;
     const motion = !this.settings().reducedMotion;
 
@@ -793,6 +794,18 @@ export class CinematicDirector {
           if (motion) this.zoom = 2;
         }
       }));
+    } else if (BOSS_ENTRANCES[kind]) {
+      // bosses that stage their own emergence (cinematic/entrances)
+      BOSS_ENTRANCES[kind]!({
+        tl: sc.tl, J, x, y, sq, fx, fy, pup, glow: info.glow, dust: info.dust, T, REVEAL, ROAR, reduced, motion, dirOf,
+        sfx: (ctx, id, priority = 2) => this.sfx(ctx, id, spot, priority),
+        image: (k2, ix, iy, depth) => this.image(sc, k2, ix, iy, depth),
+        sprite: (k2, ix, iy, depth) => this.sprite(sc, k2, ix, iy, depth),
+        light: (lx, ly, radius, color, intensity) => this.light(sc, lx, ly, radius, color, intensity),
+        flash: (fx2, fy2, radius, color, intensity, ms) => this.flash(fx2, fy2, radius, color, intensity, ms),
+        debris: (dx2, dy2, n, tint) => this.debrisAt(dx2, dy2, n, tint),
+        zoom: (z) => { if (motion) this.zoom = z; },
+      });
     } else {
       // any other boss: rises out of a flare of its colour
       const lamp = this.light(sc, sq.x, sq.y - 30, 260, info.glow, 0);

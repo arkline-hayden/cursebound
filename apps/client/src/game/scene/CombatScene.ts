@@ -16,6 +16,7 @@ import { EliteFx, ELITE_COLOR } from '../render/EliteFx';
 import { PickupRenderer } from '../render/Pickups';
 import { Outlines } from '../render/Outlines';
 import { AfflictionFx, foeActor, heroTint } from '../render/Afflictions';
+import { BossFx } from '../render/bosses';
 import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
@@ -54,7 +55,7 @@ function hpNum(compact: string): string {
   return formatBig(b);
 }
 
-const BOSS_KINDS = new Set(['prismstag', 'bellroot']);
+const BOSS_KINDS = new Set(['prismstag', 'bellroot', 'corruptcore', 'ironcolossus']);
 /** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
 const CAM_LIFT = 22;
 /** Kill-streak milestones and their colours (escalating). */
@@ -109,6 +110,8 @@ export class CombatScene extends Phaser.Scene {
   /** crisp 1px foe outlines (render/Outlines.ts) and hero afflictions / new foe attacks (render/Afflictions.ts) */
   outlines!: Outlines;
   aff!: AfflictionFx;
+  /** scripted bosses' presentation (render/bosses) */
+  bossFx!: BossFx;
   /** in-world door vote (render/Doors.ts) */
   doorsR: DoorRenderer | null = null;
   private actors = new Map<string, ActorView>();
@@ -202,6 +205,10 @@ export class CombatScene extends Phaser.Scene {
     this.elites = new EliteFx(this, this.juice, this.dungeon);
     this.outlines = new Outlines(this);
     this.aff = new AfflictionFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
+    this.bossFx = new BossFx({
+      scene: this, juice: this.juice, dungeon: this.dungeon, sfx: (id, x, y, priority = 1) => this.sfx(id as SfxId, x, priority, y),
+      banner: (text, tone) => this.banner(text, tone), reduced: () => this.settings().reducedEffects, me: () => netStore.get().slot,
+    });
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.hazardG = this.add.graphics().setDepth(-80);
@@ -435,6 +442,7 @@ export class CombatScene extends Phaser.Scene {
   private handleEvent(e: SimEvent, me: number, snap: Snapshot | null) {
     const pal = this.palette();
     const J = this.juice;
+    if (this.bossFx.onEvent(e, snap)) return;   // scripted bosses: beams, quakes, glitches, banners (render/bosses)
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
     switch (e.t) {
       case 'hit': {
@@ -827,6 +835,7 @@ export class CombatScene extends Phaser.Scene {
     this.watchFrames(realNow, avgFrame, latest);
     this.loot?.update(latest, this.net.events);   // reads (does not consume) the event queue
     this.cine?.ingest(this.net.events, latest);   // cutscene triggers (reads, does not consume)
+    this.bossFx.sync(latest, this.net.map);   // which entities belong to scripted bosses (render/bosses)
     this.handleEvents(latest);
     J.update(delta / 1000);
     this.elites.begin(this.time.now);
@@ -917,6 +926,7 @@ export class CombatScene extends Phaser.Scene {
     this.aff.drawCaches(latest.pickups);   // cursed caches (render/Afflictions.ts)
     this.drawDebug(latest);
     this.drawFx();
+    this.bossFx.draw(this.time.now);
     this.doorsR?.update(latest, this.renderSelf.init ? this.renderSelf : null, me, delta);
     this.cine?.update(delta, latest, this.focus);
     this.dungeon.update(this.time.now, this.focus);
@@ -1290,6 +1300,7 @@ export class CombatScene extends Phaser.Scene {
     else v.sprite.clearTint();
     // frozen foes stop animating; everything else plays at normal speed
     if (e.fz) v.sprite.anims.pause(); else if (v.sprite.anims.isPaused) v.sprite.anims.resume();
+    if (e.boss) this.bossFx.drawEnemy(v.sprite, e, this.time.now);   // scripted bosses (e.g. the Core's echoes glitch)
     v.shadow.setAlpha(1).setScale(v.baseScale);
     const set = this.settings();
     void set;

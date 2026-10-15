@@ -8,6 +8,8 @@ import { renderTheme } from '../render/themes';
 export const BOSS_CINE: Record<string, { epithet: string; glow: number; css: string; dust: number }> = {
   prismstag: { epithet: 'Crowned in Cold Ghost-fire', glow: 0x8fd8ff, css: '#9fe0ff', dust: 0x6a8aa8 },
   bellroot: { epithet: 'Toller of the Drowned Dead', glow: 0xffb050, css: '#ffc46a', dust: 0x6a5a48 },
+  corruptcore: { epithet: 'Kernel of the Cursed Datavault', glow: 0x40e8ff, css: '#7af0ff', dust: 0x2a3446 },
+  ironcolossus: { epithet: 'Heart of the Ember Forge', glow: 0xff8a2a, css: '#ffa860', dust: 0x5a4a40 },
 };
 
 export function bossName(kind: string): string {

@@ -65,6 +65,8 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   blind_burst: 6, web_spit: 2, rooted: 5, silenced: 6,
   door_appear: 6, door_hum: 2, door_open: 7, door_choose: 7, portal_open: 8, portal_enter: 8,
   cine_whoosh: 7, title_boom: 9, round_start: 8, boss_rumble: 8, boss_emerge: 9, boss_roar: 9, stag_cry: 9, bell_toll: 8,
+  core_charge: 6, core_laser: 6, core_firewall: 7, core_glitch: 5, core_purge_alarm: 9, core_purge: 8, core_deploy: 5,
+  colossus_raise: 6, colossus_hammer: 8, colossus_stomp: 7, colossus_vent: 6, lava_vent: 4, lava_erupt: 6,
 };
 
 /** At most this many simultaneous voices of one cue (oldest is stolen). */
@@ -72,6 +74,7 @@ const PER_ID_CAP: Partial<Record<SfxId, number>> = {
   kill: 4, hit_enemy: 4, enemy_death: 3, enemy_shoot: 3, enemy_bite: 3, footstep: 3, crit: 3, swing: 4, heal: 3,
   poisoned: 2, chain_throw: 3, chain_bind: 2, ice_shatter: 3, freeze: 2, web_spit: 3, poison_spit: 3, door_hum: 1,
   telegraph_warn: 4, move_click: 1, minimap_ping: 2, heartbeat: 1,
+  core_laser: 2, core_glitch: 3, core_deploy: 2,
 };
 
 /** Big moments that briefly pull the music down: [dB, hold s, release s]. */
@@ -79,6 +82,7 @@ const SFX_DUCK: Partial<Record<SfxId, [number, number, number]>> = {
   boss_ring: [-6, 0.3, 0.8], signature_slam: [-4, 0.15, 0.5], title_boom: [-10, 0.8, 1.5], boss_roar: [-9, 0.8, 1],
   boss_emerge: [-8, 1, 1.2], stag_cry: [-6, 0.8, 1], bell_toll: [-5, 1, 1.5], legendary_drop: [-6, 0.6, 1.2], fate_blessing: [-6, 0.8, 1.2],
   player_downed: [-6, 0.6, 1], portal_enter: [-6, 0.6, 1], boss_phase: [-6, 0.8, 1],
+  core_purge: [-7, 0.5, 1], colossus_hammer: [-5, 0.2, 0.6],
 };
 
 const MAX_VOICES = 32;

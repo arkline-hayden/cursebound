@@ -132,7 +132,7 @@ describe('per-room design (map generation tier 3)', () => {
   });
 
   it('gives every boss arena its set piece', () => {
-    const pieces: Record<string, string> = { ritual: 'sigil', belltower: 'rose', colosseum: 'sand', nave: 'rose' };
+    const pieces: Record<string, string> = { ritual: 'sigil', belltower: 'rose', colosseum: 'sand', nave: 'rose', datavault: 'sigil', foundry: 'mos' };
     const seen = new Set<string>();
     for (let s = 0; s < 16; s++) {
       const m = generateMap('arena-' + s, 5, true);

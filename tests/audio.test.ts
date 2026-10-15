@@ -14,7 +14,7 @@ describe('music specs', () => {
   it('cover every dungeon theme and both bosses', () => {
     expect([...AUDIO_THEMES].sort()).toEqual([...THEME_IDS].sort());
     for (const t of AUDIO_THEMES) expect(THEME_SONGS[t].id).toBe(t);
-    expect(Object.keys(BOSS_SONGS).sort()).toEqual(['bellroot', 'prismstag']);
+    expect(Object.keys(BOSS_SONGS).sort()).toEqual(['bellroot', 'corruptcore', 'ironcolossus', 'prismstag']);
   });
 
   it('are internally consistent', () => {

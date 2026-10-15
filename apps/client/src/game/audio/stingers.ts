@@ -81,6 +81,8 @@ export function playStinger(s: Synth, kind: StingerKind, o: AudioNode, t: number
       s.noiseHit(o, t, { dur: 1.6, f: 600, f2: 300, q: 0.8, gain: 0.08, attack: 0.1 });
       if (k.boss === 'prismstag') for (const f of [1750, 1860, 2480]) s.tone(o, h, { f, f2: f * 0.8, dur: 1.4, gain: 0.02, attack: 0.08, glide: 1.4 });
       else if (k.boss === 'bellroot') s.bigBell(o, h, 65, 3.5, 0.14);
+      else if (k.boss === 'corruptcore') for (let i = 0; i < 6; i++) s.tone(o, h + i * 0.07, { type: 'square', f: 1200 - i * 140, dur: 0.12, gain: 0.025, filter: 3000 });
+      else if (k.boss === 'ironcolossus') { s.drum('taiko', o, h + 0.02, 1.3); s.click('anvil', o, h, 1); }
       return;
     }
     case 'round_clear': {
