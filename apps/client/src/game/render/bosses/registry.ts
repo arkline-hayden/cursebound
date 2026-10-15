@@ -1,12 +1,15 @@
 import type * as Phaser from 'phaser';
-import type { SimEvent, SnapEnemy, Snapshot } from '@cursebound/simulation';
+import type { MapState, SimEvent, SnapEnemy, Snapshot } from '@cursebound/simulation';
+import type { ActorState } from '../../art/actors';
+import type { FxCtx } from '../fx/registry';
 import type { Juice } from '../Juice';
 import type { DungeonRenderer } from '../DungeonRenderer';
 
 // Presentation of the scripted bosses (simulation bosses/*). Each boss file registers a kit: how its sim events look
-// and sound (laser beams, glitch jumps, hammer quakes, banners that say what to do) and any per-frame touch on its
-// sprites (the Corrupted Core's echoes glitch now and then). Hazards and projectiles register in the shared fx
-// registry (render/fx/registry.ts). Everything here is cosmetic.
+// and sound (laser beams, glitch jumps, hammer quakes, dives and gales, banners that say what to do), any per-frame
+// touch on its sprites (the Corrupted Core's echoes glitch now and then, the Gale Wyrm climbs out of reach) and
+// lair-wide effects (the Crater Horror swallows the light). Hazards and projectiles register in the shared fx
+// registry (render/fx/registry.ts). Everything here is cosmetic. No camera shake anywhere.
 
 /** What a boss kit may use (CombatScene closures). */
 export interface BossFxHost {
@@ -21,7 +24,12 @@ export interface BossFxHost {
   reduced(): boolean;
   /** the local hero's slot */
   me(): number;
+  /** the shared fx context (hazard and skill fx helpers) */
+  fxCtx(): FxCtx;
 }
+
+/** A per-frame presentation override for a boss sprite: lift (screen px), shadow scale and an animation state. */
+export interface BossLook { lift: number; shadow: number; state?: ActorState }
 
 /** A short-lived beam the boss layer draws (world coordinates, ms clock). */
 export interface Beam { x0: number; y0: number; x1: number; y1: number; w: number; color: number; core: number; born: number; until: number }
@@ -33,6 +41,14 @@ export interface BossKit {
   drawEnemy?(host: BossFxHost, sprite: Phaser.GameObjects.Sprite, e: SnapEnemy, now: number): void;
   /** A light the boss carries (its eye, its furnace) so it reads in the dark lair; dy = height above its feet (px). */
   light?(e: SnapEnemy, now: number): { color: number; radius: number; intensity: number; dy: number } | null;
+  /** Presentation override for one of this boss kind's sprites this frame (a flying boss aloft), or null. */
+  look?(host: BossFxHost, e: SnapEnemy, delta: number): BossLook | null;
+  /** Start of every frame, before hazards draw (whether or not this boss is on the floor). */
+  begin?(host: BossFxHost, map: MapState | null): void;
+  /** End of every frame, after the cutscene director set the lights (lair-wide lighting, veils). */
+  frame?(host: BossFxHost, snap: Snapshot, delta: number): void;
+  /** The scene is shutting down: drop lights and scene objects the kit holds. */
+  destroy?(host: BossFxHost): void;
 }
 
 /** Transient boss effects drawn above the floor (beams), owned by BossFx. */

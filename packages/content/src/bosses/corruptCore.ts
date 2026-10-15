@@ -18,7 +18,7 @@ export const CORRUPT_CORE: BossDef = {
   description: 'Sweeps the vault with laser grids (stand in a dark lane), closes firewalls in from the edges, deploys drones and turrets, and glitch-jumps beside you leaving corrupted tiles. Below a third it purges every tile but a few safe ones. From two thirds it splits into three mirrored bodies: only the one whose eye follows you is real.',
   refUnitHealth: 1200, bossFactor: 8, baseDamage: 46, armor: 35, radius: 1.2, moveSpeed: 1.6, tags: ['boss', 'flying'],
   vulnerableMultiplier: '1.6', staggerMeter: 650,
-  loot: 'lg_overclocked_kernel',
+  loot: ['lg_overclocked_kernel'],
   phases: [
     { healthFrac: 1.0, weight: 1, patterns: [['cc_lasergrid', 'cc_glitch'], ['cc_deploy', 'cc_firewall'], ['cc_glitch', 'cc_lasergrid', 'cc_firewall']], cadence: '1.15' },
     { healthFrac: 2 / 3, weight: 1, patterns: [['cc_split', 'cc_lasergrid', 'cc_firewall'], ['cc_glitch', 'cc_deploy', 'cc_lasergrid'], ['cc_firewall', 'cc_glitch']], cadence: '1.05' },

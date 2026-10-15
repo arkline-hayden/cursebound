@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { DODGE, BOSS_BY_ID, ENEMY_BY_ID, affixNames, eliteName, CLASS_BY_ID } from '@cursebound/content';
+import { DODGE, BOSSES, BOSS_BY_ID, ENEMY_BY_ID, affixNames, eliteName, CLASS_BY_ID } from '@cursebound/content';
 import { formatBig, Big } from '@cursebound/numeric';
 import type { Snapshot, SnapEnemy, SnapPlayer, SimEvent } from '@cursebound/simulation';
 import { buildArt, ensureActor } from '../art/generate';
@@ -53,7 +53,7 @@ function hpNum(compact: string): string {
   return formatBig(b);
 }
 
-const BOSS_KINDS = new Set(['prismstag', 'bellroot', 'corruptcore', 'ironcolossus']);
+const BOSS_KINDS = new Set(BOSSES.map((b) => b.id));
 /** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
 const CAM_LIFT = 22;
 /** Kill-streak milestones and their colours (escalating). */
@@ -225,6 +225,7 @@ export class CombatScene extends Phaser.Scene {
     this.bossFx = new BossFx({
       scene: this, juice: this.juice, dungeon: this.dungeon, sfx: (id, x, y, priority = 1) => this.sfx(id as SfxId, x, priority, y),
       banner: (text, tone) => this.banner(text, tone), reduced: () => this.settings().reducedEffects, me: () => netStore.get().slot,
+      fxCtx: () => this.hazardFxCtx(),
     });
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
@@ -891,6 +892,7 @@ export class CombatScene extends Phaser.Scene {
     this.aff.begin(this.time.now);
     this.roomFx?.begin(latest);
     this.themeFx.begin();
+    this.bossFx.begin(this.net.map);   // scripted bosses' per-frame hooks (the sky / moon hazard layer)
     this.focus.length = 0;
     if (!ip || !latest) { this.drawFx(); return; }
     const { a, b, t } = ip;
@@ -984,6 +986,7 @@ export class CombatScene extends Phaser.Scene {
     this.cine?.update(delta, latest, this.focus);
     this.dungeon.update(this.time.now, this.focus);
     this.cine?.applyLights();
+    this.bossFx.frame(latest, delta);   // scripted bosses' lair lighting: the Crater Horror's darkness (after the cutscene lights)
     const cam = this.cameras.main;
     const cc = this.cine?.camera();   // a cutscene drives the camera (integer zoom only)
     if (cc) {
@@ -1331,9 +1334,11 @@ export class CombatScene extends Phaser.Scene {
     if (e.st !== 'dying') v.lastHp = e.hp;
     if (v.gibbed) { v.bar?.clear(); v.badge?.setVisible(false); v.shadow.setAlpha(0); return; }
     const st: ActorState = e.st === 'dying' ? 'death' : e.st === 'windup' ? 'windup' : e.st === 'attack' || e.st === 'recovery' ? 'attack' : e.st === 'stagger' || e.stag ? 'stagger' : e.st === 'move' ? 'run' : 'idle';
-    this.play(v, st, this.dirOf(e.fx, e.fy));
+    const bl = e.boss ? this.bossFx.look(e, delta) : null;   // a flying boss aloft (render/bosses: the Gale Wyrm)
+    this.play(v, bl?.state ?? st, this.dirOf(e.fx, e.fy));
     v.sprite.setDepth(depth).setAlpha(1);
     this.applyRecoil(v, px, py, delta);
+    if (bl) { v.sprite.y -= Math.round(bl.lift); v.sprite.setDepth(depth + bl.lift * 2); }
     // white hit flash, then the element tint: driven by the hit event together with the stagger flinch, so it lands on
     // the frame the hit does (bigger hits flash a touch longer); the snapshot flag only covers hits we saw no event for
     const sinceHit = v.flinchAt === undefined ? Infinity : this.juice.clock - v.flinchAt;
@@ -1351,7 +1356,7 @@ export class CombatScene extends Phaser.Scene {
     // frozen foes stop animating; everything else plays at normal speed
     if (e.fz) v.sprite.anims.pause(); else if (v.sprite.anims.isPaused) v.sprite.anims.resume();
     if (e.boss) this.bossFx.drawEnemy(v.sprite, e, this.time.now);   // scripted bosses (e.g. the Core's echoes glitch)
-    v.shadow.setAlpha(1).setScale(v.baseScale);
+    v.shadow.setAlpha(1).setScale(v.baseScale * (bl?.shadow ?? 1));
     const set = this.settings();
     void set;
     if (v.elite) this.elites.draw(v.sprite, e, x, y, this.time.now);

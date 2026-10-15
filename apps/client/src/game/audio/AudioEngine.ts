@@ -75,6 +75,7 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   summon_rise: 4, beast_howl: 4, beast_roar: 4, mech_deploy: 4, steam_vent: 4,
   core_charge: 6, core_laser: 6, core_firewall: 7, core_glitch: 5, core_purge_alarm: 9, core_purge: 8, core_deploy: 5,
   colossus_raise: 6, colossus_hammer: 8, colossus_stomp: 7, colossus_vent: 6, lava_vent: 4, lava_erupt: 6,
+  drake_screech: 8, drake_gale: 6, drake_dive: 6, thunder_feather: 4, skyfall: 8, horror_moan: 9, tentacle_burst: 4, gravity_well: 6, void_beam: 7,
 };
 
 /** At most this many simultaneous voices of one cue (oldest is stolen). */
@@ -82,6 +83,7 @@ const PER_ID_CAP: Partial<Record<SfxId, number>> = {
   kill: 4, hit_enemy: 4, enemy_death: 3, enemy_shoot: 3, enemy_bite: 3, footstep: 3, crit: 3, swing: 4, heal: 3,
   poisoned: 2, chain_throw: 3, chain_bind: 2, ice_shatter: 3, freeze: 2, web_spit: 3, poison_spit: 3, door_hum: 1,
   telegraph_warn: 4, move_click: 1, minimap_ping: 2, heartbeat: 1,
+  thunder_feather: 4, tentacle_burst: 4, void_beam: 1, drake_gale: 1,
   coin_pickup: 3, imp_jingle: 2,   // room events
   impact_light: 4, impact_heavy: 3, impact_fire: 4, impact_frost: 4, impact_storm: 4, impact_decay: 4, impact_astral: 3,
   kill_burn: 3, kill_shatter: 3, kill_zap: 3, kill_squelch: 3, kill_chime: 2,
@@ -107,6 +109,7 @@ const SFX_DUCK: Partial<Record<SfxId, [number, number, number]>> = {
   shrine_activate: [-5, 0.5, 1], altar_pact: [-7, 0.8, 1.2],   // room events
   blast_fire: [-3, 0.1, 0.4], zap_strike: [-3, 0.1, 0.4], smite: [-3, 0.15, 0.5],
   core_purge: [-7, 0.5, 1], colossus_hammer: [-5, 0.2, 0.6],
+  drake_screech: [-5, 0.5, 0.8], horror_moan: [-6, 1, 1.2],
 };
 
 const MAX_VOICES = 32;

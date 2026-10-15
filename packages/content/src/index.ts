@@ -11,6 +11,7 @@ import { STATS } from './stats';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { ALTAR_PACTS, COIN_RULES, MERCHANT_WARES, RELIC_AMPLIFY, ROOM_EVENT_RULES, SHRINES, SHRINE_TUNING } from './roomEvents';
 import { MINIBOSS_MECHANICS, MINIBOSS_NAMES } from './minibosses';
+import { SKY_FALL } from './bosses/skyDrake';
 
 export * from './types';
 export * from './stats';
@@ -19,6 +20,7 @@ export * from './mechanics';
 export * from './classes';
 export * from './enemies';
 export { SLAG_PATTERNS, slagLava } from './bosses/ironColossus';
+export { SKY_FALL } from './bosses/skyDrake';
 export * from './affixes';
 export * from './legendaries';
 export * from './consumables';
@@ -67,6 +69,8 @@ export const CONTENT_MANIFEST = {
   roomEvents: { rules: ROOM_EVENT_RULES, coins: COIN_RULES, shrines: SHRINES, shrineTuning: SHRINE_TUNING, pacts: ALTAR_PACTS, relicAmplify: RELIC_AMPLIFY, wares: MERCHANT_WARES },
   // named mini-bosses (minibosses.ts): name parts and signature mechanics (spawn, health and loot tunables are RULES)
   miniBosses: { names: MINIBOSS_NAMES, mechanics: MINIBOSS_MECHANICS },
+  // scripted bosses' shared rules (each boss's adds, loot and params live on its BossDef): the Gale Wyrm's long fall
+  bossRules: { skyFall: SKY_FALL },
 };
 
 let cachedHash: string | null = null;

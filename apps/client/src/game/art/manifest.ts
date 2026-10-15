@@ -82,6 +82,11 @@ const ACTOR_SOURCE: Record<ActorId, string> = {
   coredrone: 'apps/client/src/game/art/draw/bossCore.ts',
   coreturret: 'apps/client/src/game/art/draw/bossCore.ts',
   ironcolossus: 'apps/client/src/game/art/draw/bossColossus.ts',
+  skydrake: 'apps/client/src/game/art/draw/skyMoonBosses.ts',
+  moonhorror: 'apps/client/src/game/art/draw/skyMoonBosses.ts',
+  galeharpy: 'apps/client/src/game/art/draw/skyMoonCreatures.ts',
+  windelemental: 'apps/client/src/game/art/draw/skyMoonCreatures.ts',
+  craterspawn: 'apps/client/src/game/art/draw/skyMoonCreatures.ts',
 };
 
 /** Display names in the Sunken Catacombs theme (ids are stable). */
@@ -129,6 +134,11 @@ export const ACTOR_DISPLAY_NAME: Record<ActorId, string> = {
   coredrone: 'Watcher Drone',
   coreturret: 'Sentry Turret',
   ironcolossus: 'The Iron Colossus',
+  skydrake: 'The Gale Wyrm',
+  moonhorror: 'The Crater Horror',
+  galeharpy: 'Gale Harpy',
+  windelemental: 'Wind Elemental',
+  craterspawn: 'Crater Spawn',
 };
 
 const ACTOR_ROLE: Record<ActorId, string> = {
@@ -174,6 +184,11 @@ const ACTOR_ROLE: Record<ActorId, string> = {
   coredrone: 'summon',
   coreturret: 'summon',
   ironcolossus: 'boss',
+  skydrake: 'boss',
+  moonhorror: 'boss',
+  galeharpy: 'enemy',
+  windelemental: 'enemy',
+  craterspawn: 'enemy',
 };
 
 function buildManifest(): AssetEntry[] {
@@ -329,6 +344,11 @@ const REQUIRED_STATES: Record<ActorId, string[]> = {
   coredrone: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
   coreturret: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
   ironcolossus: ['idle', 'run', 'windup', 'attack', 'stagger', 'hit', 'death'],
+  skydrake: ['idle', 'run', 'windup', 'attack', 'stagger', 'death'],
+  moonhorror: ['idle', 'windup', 'attack', 'stagger', 'death'],
+  galeharpy: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  windelemental: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  craterspawn: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
 };
 
 /** Minimum frame counts from the art contract. */
@@ -341,11 +361,13 @@ const MIN_FRAMES: Record<string, Record<string, number>> = {
   bellroot: { idle: 4, windup: 4, attack: 6, stagger: 3, death: 8 },
   bigboss: { idle: 4, windup: 4, attack: 6, stagger: 3, hit: 2, death: 8 },
   machine: { idle: 4, windup: 4, attack: 4, hit: 2, death: 6 },
+  skydrake: { idle: 4, run: 4, windup: 4, attack: 5, stagger: 3, death: 8 },
+  moonhorror: { idle: 4, windup: 4, attack: 6, stagger: 3, death: 8 },
 };
 
 function frameClass(id: ActorId): string {
   if (isHeroActor(id)) return 'hero';
-  if (id === 'mite' || id === 'prismstag' || id === 'bellroot') return id;
+  if (id === 'mite' || id === 'prismstag' || id === 'bellroot' || id === 'skydrake' || id === 'moonhorror') return id;
   if (id === 'corruptcore' || id === 'ironcolossus') return 'bigboss';
   if (id === 'coredrone' || id === 'coreturret') return 'machine';
   if (id === 'spiritwolf' || id === 'spiritbear' || id === 'spiritelk') return 'companion';

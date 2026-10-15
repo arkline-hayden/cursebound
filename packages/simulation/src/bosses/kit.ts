@@ -4,18 +4,27 @@ import { inflictHit } from '../afflictions';
 import { actMul, moveMul } from '../cc';
 import { enemyAttackDamage, hitPlayer } from '../combat';
 import { bossReinforcements } from '../director';
-import { dist2, isWall, lineOfSight, moveCircle, norm, rayDistance } from '../geometry';
+import { dist2, inCone, isWall, lineOfSight, moveCircle, norm, rayDistance } from '../geometry';
+import { registerGlobalHooks } from '../hooks';
 import { findPath, nearestFloor, tileCenter } from '../map';
 import { toFloatClamped } from '../stats';
-import type { EnemyAttackState, EnemyState, PlayerState, SimEvent, SimState, Telegraph } from '../types';
+import type { EnemyAttackState, EnemyState, Hazard, PlayerState, SimEvent, SimState, Telegraph } from '../types';
 
 // Shared toolkit of the scripted bosses (bosses/<boss>.ts): phases and reinforcements, the pattern runner, a
-// windup -> release -> recovery attack machine, telegraphs, hero hits and movement. Mirrors the generic boss runner
-// in ai.ts so scripted bosses read and pace exactly like the others.
+// windup -> release -> recovery attack machine (with per-stage hooks), telegraphs, hero hits, movement and the bosses'
+// own hazards. Mirrors the generic boss runner in ai.ts so scripted bosses read and pace exactly like the others.
+// Shared rules for scripted attacks: every damaging release is telegraphed first (Telegraph objects the client draws
+// and the reference bot reads), dodge i-frames avoid damage and forced movement, and forced movement never drops a
+// hero into a chasm unannounced (chasm.ts: a push over the brink is the long fall). Script counters live in
+// EnemyState.bvars / Hazard.vars as plain numbers, so a checkpoint restores a fight mid-attack.
 
 export const DT = TICK_SEC;
 /** Seconds to ticks (at least one). */
 export const T = (sec: number) => Math.max(1, Math.round(sec / TICK_SEC));
+/** Smoothstep of t clamped to 0..1 (lift-offs, glides). */
+export const smooth = (t: number): number => { const k = Math.max(0, Math.min(1, t)); return k * k * (3 - 2 * k); };
+/** Distance from the boss to a point. */
+export const distTo = (e: EnemyState, p: { x: number; y: number }): number => Math.sqrt(dist2(e.x, e.y, p.x, p.y));
 
 /** Scripted state of a boss entity (created lazily). */
 export function bv(e: EnemyState): Record<string, number> { return (e.bvars ??= {}); }
@@ -101,24 +110,35 @@ export function walkToward(state: SimState, e: EnemyState, gx: number, gy: numbe
 export type StartResult = 'started' | 'wait' | 'skip';
 
 /**
- * The pattern runner (as ai.ts stepBoss): between patterns the boss pauses (`idle` runs); otherwise the next module
- * of the current phase pattern is offered to `start`, which begins it ('started'), needs more time ('wait', e.g.
- * still walking into range; a pattern never stalls longer than 3.5 s) or passes on it ('skip').
+ * Pattern bookkeeping (the rules of ai.ts stepBoss): the attack the current phase pattern offers next, or null while
+ * the pause between patterns runs (a finished pattern starts that pause and returns null too).
  */
-export function runPatterns(state: SimState, ev: SimEvent[], e: EnemyState, idle: (target: PlayerState | null) => void, start: (a: EnemyAttackDef, target: PlayerState) => StartResult) {
+export function patternAttack(e: EnemyState): EnemyAttackDef | null {
+  if ((e.cooldowns['_pause'] ?? 0) > 0) return null;
   const def = BOSS_BY_ID[e.kind];
-  if ((e.cooldowns['_pause'] ?? 0) > 0) { idle(pickTarget(state, e)); return; }
   const ph = def.phases[Math.min(e.phaseIndex, def.phases.length - 1)];
   const pattern = ph.patterns[e.patternIndex % ph.patterns.length];
   if (e.patternStep >= pattern.length) {
     e.patternIndex++;
     e.patternStep = 0;
     e.cooldowns['_pause'] = 1.2 * Number(ph.cadence) / freq(e);
-    return;
+    return null;
   }
+  return def.attacks.find((x) => x.id === pattern[e.patternStep]) ?? null;
+}
+
+/**
+ * The pattern runner (as ai.ts stepBoss): between patterns the boss pauses (`idle` runs); otherwise the next module
+ * of the current phase pattern is offered to `start`, which begins it ('started'), needs more time ('wait', e.g.
+ * still walking into range; a pattern never stalls longer than 3.5 s) or passes on it ('skip'). Scripts that steer
+ * their own approach call patternAttack directly.
+ */
+export function runPatterns(state: SimState, ev: SimEvent[], e: EnemyState, idle: (target: PlayerState | null) => void, start: (a: EnemyAttackDef, target: PlayerState) => StartResult) {
+  if ((e.cooldowns['_pause'] ?? 0) > 0) { idle(pickTarget(state, e)); return; }
+  const a = patternAttack(e);
+  if (!a && (e.cooldowns['_pause'] ?? 0) > 0) return;   // the pattern just ended: its pause starts
   const target = pickTarget(state, e);
   if (!target) { e.state = 'idle'; e.vx = 0; e.vy = 0; return; }
-  const a = def.attacks.find((x) => x.id === pattern[e.patternStep]);
   const r = a ? start(a, target) : 'skip';
   if (r === 'skip') { e.patternStep++; e.stuckTimer = 0; return; }
   if (r === 'wait') {
@@ -129,12 +149,34 @@ export function runPatterns(state: SimState, ev: SimEvent[], e: EnemyState, idle
   e.stuckTimer = 0;
 }
 
-/** Begin a scripted attack aimed at (tx, ty): windup stage, `enemy_attack` windup event (client cue). */
-export function beginAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, tx: number, ty: number): EnemyAttackState {
-  let [dx, dy] = norm(tx - e.x, ty - e.y);
-  if (!dx && !dy) { dx = e.fx; dy = e.fy; }
-  e.fx = dx; e.fy = dy;
-  e.attack = { attackId: a.id, stage: 'windup', timer: a.windupSec / freq(e), ox: e.x, oy: e.y, dx, dy, tx, ty, hitSlots: [], telegraphId: -1 };
+/**
+ * A pattern pause can start mid-attack: the shared phase change (bossPhaseTick) resets the pattern while an attack may
+ * still be running, and that attack's end would skip the new phase's opener. Scripts that want every phase to open on
+ * its first pattern call this between attacks (no e.attack).
+ */
+export function openPhase(e: EnemyState) {
+  const v = bv(e);
+  if (v.ph === undefined) v.ph = e.phaseIndex;
+  if (v.ph === e.phaseIndex || e.attack) return;
+  v.ph = e.phaseIndex;
+  e.patternIndex = 0; e.patternStep = 0; e.cooldowns['_pause'] = 0;
+}
+
+/**
+ * Begin a scripted attack aimed at (tx, ty): windup stage, `enemy_attack` windup event (client cue). The boss faces the
+ * point, or along `aim` (dx, dy, as given) when the attack has its own heading, which may name its telegraph.
+ */
+export function beginAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, tx: number, ty: number, aim?: { dx: number; dy: number; telegraphId?: number }): EnemyAttackState {
+  let dx: number, dy: number;
+  if (aim) {
+    dx = aim.dx; dy = aim.dy;
+    e.fx = dx || e.fx; e.fy = dy || e.fy;
+  } else {
+    [dx, dy] = norm(tx - e.x, ty - e.y);
+    if (!dx && !dy) { dx = e.fx; dy = e.fy; }
+    e.fx = dx; e.fy = dy;
+  }
+  e.attack = { attackId: a.id, stage: 'windup', timer: a.windupSec / freq(e), ox: e.x, oy: e.y, dx, dy, tx, ty, hitSlots: [], telegraphId: aim?.telegraphId ?? -1 };
   e.state = 'windup';
   e.vx = 0; e.vy = 0;
   ev.push({ t: 'enemy_attack', id: e.id, attack: a.id, stage: 'windup' });
@@ -146,45 +188,69 @@ export function releaseTickOf(state: SimState, e: EnemyState, a: EnemyAttackDef)
   return state.tick + Math.max(0, Math.round(a.windupSec / freq(e) / DT));
 }
 
+export type AttackStage = 'windup' | 'release' | 'recovery';
+
+/** Stage hooks of a scripted attack (keyed by attack id), all optional; the stage machine is stepScripted. */
 export interface ScriptedAttack {
+  /** every tick of the attack, any stage, right after its timer advanced (k = progress 0..1 through the stage) */
+  tick?(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, stage: AttackStage, k: number): void;
   /** once, when the windup ends */
-  release(a: EnemyAttackDef, at: EnemyAttackState): void;
+  release?(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, at: EnemyAttackState): void;
   /** every tick of the release stage (after `release`) */
-  during?(a: EnemyAttackDef, at: EnemyAttackState): void;
+  during?(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, at: EnemyAttackState): void;
+  /** once, when the release ends (recovery begins) */
+  recover?(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, at: EnemyAttackState): void;
+  /** once, when the recovery ends (the pattern moves on) */
+  end?(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, at: EnemyAttackState): void;
+}
+
+/** A scripted attack that also starts itself (puts the boss in windup and lays its telegraphs). */
+export interface ScriptedModule extends ScriptedAttack {
+  start(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, target: PlayerState): void;
 }
 
 /**
  * Advance the boss's scripted attack one tick: windup (chill slows it, freeze stops it) -> release -> recovery ->
- * done (the next pattern module). Returns false when no attack is running.
+ * done (the next pattern module), calling the attack's stage hooks. A hook may end the attack (e.attack = null).
+ * Returns false when no attack is running.
  */
 export function stepScripted(state: SimState, ev: SimEvent[], e: EnemyState, h: Record<string, ScriptedAttack>): boolean {
   const at = e.attack;
   if (!at) return false;
   const a = attackOf(e, at.attackId);
   if (!a) { e.attack = null; e.state = 'idle'; return false; }
+  const m = h[a.id];
   const f = freq(e);
   at.timer -= DT * actMul(state, e);
+  if (m?.tick) {
+    const dur = (at.stage === 'windup' ? a.windupSec : at.stage === 'release' ? a.releaseSec : a.recoverySec) / f;
+    m.tick(state, ev, e, a, at.stage, Math.max(0, Math.min(1, 1 - at.timer / Math.max(1e-6, dur))));
+    if (!e.attack) return true;
+  }
   if (at.stage === 'windup') {
     if (at.timer > 0) return true;
     at.stage = 'release';
     at.timer += a.releaseSec / f;
     e.state = 'attack';
     ev.push({ t: 'enemy_attack', id: e.id, attack: a.id, stage: 'release' });
-    h[a.id]?.release(a, at);
+    m?.release?.(state, ev, e, a, at);
     if (!e.attack) return true;
   }
   if (at.stage === 'release') {
-    h[a.id]?.during?.(a, at);
+    m?.during?.(state, ev, e, a, at);
     if (at.timer > 0) return true;
     at.stage = 'recovery';
     at.timer += a.recoverySec / f;
     e.state = 'recovery';
+    m?.recover?.(state, ev, e, a, at);
+    if (!e.attack) return true;
   }
   if (at.stage === 'recovery') {
     if (at.timer > 0) return true;
     e.attack = null;
     e.state = 'idle';
     e.patternStep++;
+    m?.end?.(state, ev, e, a, at);
   }
   return true;
 }
@@ -261,3 +327,41 @@ export function safeSpot(state: SimState, p: PlayerState, bad: (x: number, y: nu
   }
   return null;
 }
+
+// ---------------- shared attacks ----------------
+
+/** The close-range cone a boss may carry (the Gale Wyrm's talon rake, the Crater Horror's maw lash): a telegraphed
+ *  cone at the target, one hit per hero inside it on release. */
+export const SWEEP: ScriptedModule = {
+  start(state, ev, e, a, target) {
+    let [dx, dy] = norm(target.x - e.x, target.y - e.y);
+    if (!dx && !dy) { dx = e.fx; dy = e.fy; }
+    const t = telegraph(state, e, a.id, a.telegraph, e.x, e.y, dx, dy, releaseTickOf(state, e, a));
+    beginAttack(state, ev, e, a, target.x, target.y, { dx, dy, telegraphId: t.id });
+  },
+  release(state, ev, e, a, at) {
+    const tg = a.telegraph.kind === 'cone' ? a.telegraph : { range: a.range, arcDeg: 90 };
+    const ch = Math.cos((tg.arcDeg / 2) * Math.PI / 180);
+    for (const p of aliveHeroes(state)) if (inCone(e.x, e.y, at.dx, at.dy, tg.range, ch, p.x, p.y, 0.3)) hitHero(state, ev, e, p, damageOf(state, e, a), a);
+    clearTelegraphs(state, e, a.id);
+  },
+};
+
+// ---------------- boss hazards ----------------
+
+export type BossHazardFn = (state: SimState, ev: SimEvent[], h: Hazard, owner: EnemyState | undefined) => void;
+const BOSS_HAZARDS: Record<string, BossHazardFn> = {};
+
+/** A scripted boss's own enemy hazard kind (firewalls, quake rings, gales, tentacles...): ticked by the one hazardTick
+ *  hook below, before the core hazard rules. `owner` is the boss that laid it (undefined once it is gone). */
+export function registerBossHazard(kind: string, fn: BossHazardFn) { BOSS_HAZARDS[kind] = fn; }
+
+registerGlobalHooks({
+  hazardTick(state, ev, h) {
+    if (h.owner !== 'enemy') return undefined;
+    const fn = BOSS_HAZARDS[h.kind];
+    if (!fn) return undefined;
+    fn(state, ev, h, state.enemies.find((x) => x.id === h.ownerId));
+    return true;
+  },
+});

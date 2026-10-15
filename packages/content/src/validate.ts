@@ -232,12 +232,23 @@ export function validateContent(): string[] {
     if (!(d >= 0 && d <= KNOCKBACK_RULES.maxPush)) errs.push(`knockback: ${id} push ${d} outside 0..${KNOCKBACK_RULES.maxPush}`);
   }
   if (KNOCKBACK_RULES.eliteFactor.some((f, i) => f < 0 || f > 1 || (i > 0 && f > KNOCKBACK_RULES.eliteFactor[i - 1]!))) errs.push('knockback: elite factors must fall from 1 by tier');
-  // themed lairs: known themes and bosses; signature loot is a known legendary
+  // unique ids: two foes (or bosses) sharing an id would silently shadow each other in ENEMY_BY_ID / BOSS_BY_ID
+  for (const [what, list] of [['enemy', ENEMIES], ['boss', BOSSES]] as const) {
+    const seen = new Set<string>();
+    for (const x of list) { if (seen.has(x.id)) errs.push(`${what} ${x.id}: duplicate id`); seen.add(x.id); }
+  }
+  // themed lairs: known themes and bosses, one lair per theme
   for (const [t, list] of Object.entries(THEME_BOSSES)) {
     if (!DUNGEON_THEMES.some((d) => d.id === t)) errs.push(`theme bosses: unknown theme ${t}`);
+    if (!list.length) errs.push(`theme bosses ${t}: empty pool`);
     for (const id of list) if (!BOSSES.some((b) => b.id === id)) errs.push(`theme bosses ${t}: unknown boss ${id}`);
   }
-  for (const b of BOSSES) if (b.loot && !LEGENDARY_BY_ID[b.loot]) errs.push(`${b.id}: unknown signature loot ${b.loot}`);
+  // boss reinforcement rosters name real foes; signature loot names shared (not class-only) legendaries
+  for (const b of BOSSES) {
+    if (b.adds && !b.adds.length) errs.push(`${b.id}: empty reinforcement roster`);
+    for (const k of b.adds ?? []) if (!ENEMY_BY_ID[k]) errs.push(`${b.id}: reinforcement roster names unknown foe ${k}`);
+    for (const id of b.loot ?? []) if (!LEGENDARY_BY_ID[id] || LEGENDARY_BY_ID[id].classId) errs.push(`${b.id}: unknown or class-only signature loot ${id}`);
+  }
   errs.push(...validateLegendaries());
   errs.push(...validateRoomEvents(isKnownStat));   // shrines, altar pacts, merchant wares
   errs.push(...validateProgression());

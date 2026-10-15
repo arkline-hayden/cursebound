@@ -11,10 +11,11 @@ import { THEME_IDS } from '../apps/client/src/game/art/dungeonThemes';
 const ALL_SONGS: SongSpec[] = [...Object.values(THEME_SONGS), MENU_SONG, ...Object.values(BOSS_SONGS), GENERIC_BOSS_SONG];
 
 describe('music specs', () => {
-  it('cover every dungeon theme and both bosses', () => {
+  it('cover every dungeon theme and every boss', () => {
     expect([...AUDIO_THEMES].sort()).toEqual([...THEME_IDS].sort());
     for (const t of AUDIO_THEMES) expect(THEME_SONGS[t].id).toBe(t);
-    expect(Object.keys(BOSS_SONGS).sort()).toEqual(['bellroot', 'corruptcore', 'ironcolossus', 'prismstag']);
+    expect(Object.keys(BOSS_SONGS).sort()).toEqual(['bellroot', 'corruptcore', 'ironcolossus', 'moonhorror', 'prismstag', 'skydrake']);
+    for (const [id, s] of Object.entries(BOSS_SONGS)) expect(s.id).toBe(`boss:${id}`);
   });
 
   it('are internally consistent', () => {

@@ -1,14 +1,13 @@
 import { slagLava, type EnemyAttackDef } from '@cursebound/content';
 import { hitPlayer } from '../combat';
 import { dist2, norm } from '../geometry';
-import { registerGlobalHooks } from '../hooks';
 import { makeHazard } from '../players';
 import { nextFloat, nextInt } from '../rng';
 import { B, fateFactor, toFloatClamped } from '../stats';
 import type { EnemyAttackState, EnemyState, Hazard, PlayerState, SimEvent, SimState } from '../types';
 import {
   DT, T, aliveHeroes, beginAttack, bossName, bossPhaseTick, bv, clearTelegraphs, damageOf, face, floorNear, freq,
-  hitHero, param, releaseTickOf, runPatterns, safeSpot, stepScripted, telegraph, walkToward, type ScriptedAttack, type StartResult,
+  hitHero, param, registerBossHazard, releaseTickOf, runPatterns, safeSpot, stepScripted, telegraph, walkToward, type ScriptedAttack, type StartResult,
 } from './kit';
 import { registerBossScript, type BotHint } from './registry';
 
@@ -183,12 +182,12 @@ function tickHeat(state: SimState, ev: SimEvent[], h: Hazard) {
 
 // ---------------- the script ----------------
 
-const ATTACKS = (state: SimState, ev: SimEvent[], e: EnemyState): Record<string, ScriptedAttack> => ({
-  ic_hammer: { release: (a, at) => releaseHammer(state, ev, e, a, at) },
-  ic_slag: { release: () => undefined },   // the slag hazard arms itself at the release tick
-  ic_stomp: { release: (a) => releaseStomp(state, ev, e, a) },
-  ic_overheat: { release: (a) => releaseOverheat(state, ev, e, a) },
-});
+const ATTACKS: Record<string, ScriptedAttack> = {
+  ic_hammer: { release: releaseHammer },
+  ic_slag: {},   // the slag hazard arms itself at the release tick
+  ic_stomp: { release: releaseStomp },
+  ic_overheat: { release: releaseOverheat },
+};
 
 function start(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, target: PlayerState): StartResult {
   switch (a.id) {
@@ -208,7 +207,7 @@ function step(state: SimState, ev: SimEvent[], e: EnemyState): boolean {
     return true;
   }
   if (e.state === 'stagger') e.state = 'idle';
-  if (stepScripted(state, ev, e, ATTACKS(state, ev, e))) return true;
+  if (stepScripted(state, ev, e, ATTACKS)) return true;
   runPatterns(state, ev, e, (target) => {
     // plod after the target between patterns; stand and loom once it is close
     if (target && dist2(e.x, e.y, target.x, target.y) > 3.4 * 3.4) { walkToward(state, e, target.x, target.y); e.state = 'move'; }
@@ -243,12 +242,6 @@ function botHint(state: SimState, p: PlayerState, e: EnemyState): BotHint | null
 
 registerBossScript(ID, { step, botHint });
 
-registerGlobalHooks({
-  hazardTick(state, ev, h) {
-    if (h.owner !== 'enemy') return undefined;
-    if (h.kind === 'ic_quake') { tickQuake(state, ev, h); return true; }
-    if (h.kind === 'ic_slag') { tickSlag(state, ev, h); return true; }
-    if (h.kind === 'ic_heat') { tickHeat(state, ev, h); return true; }
-    return undefined;
-  },
-});
+registerBossHazard('ic_quake', tickQuake);
+registerBossHazard('ic_slag', tickSlag);
+registerBossHazard('ic_heat', tickHeat);

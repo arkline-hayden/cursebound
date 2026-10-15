@@ -13,7 +13,7 @@ import { cinematicEnd, cinematicRebroadcast, cinematicStart, type CinematicKind 
 import { cineOverlay } from './overlay';
 import { Puppet, dirOf } from './puppet';
 import { BOSS_CINE, bossEpithet, bossName, cardLine, fatesLine, hexCss, themeGlow, themeName } from './text';
-import { BOSS_ENTRANCES } from './entrances';
+import { BOSS_ENTRANCES, ENTRANCE_LIFT } from './entrances';
 import { E, Timeline, lerp, type Ease, type TimelineCtx } from './timeline';
 
 // Cutscene director. Every scene is driven by authoritative sim events / phases, so all co-op clients play the same
@@ -52,11 +52,15 @@ interface Cine {
   /** boss rounds: the round intro hands its letterbox straight to the boss reveal */
   keepBars: boolean;
   skipped: boolean;
+  /** boss reveals: the authoritative end of the intro hold (snapshot cu), once seen */
+  holdEnd?: number;
 }
 
 type DoorInfo = { i: number; x: number; y: number; nx: number; ny: number; th: string; c: string; b?: number };
 
 const BOSS_TICKS = () => Math.round(((RULES as { bossIntroSec?: number }).bossIntroSec ?? 4) * TICK_RATE);
+/** A boss reveal still playing this long after the authority's hold ended is skipped to its end (background tab). */
+const BOSS_LATE_TICKS = Math.round(1 * TICK_RATE);
 const DOOR_SEC = () => (RULES as { doorWalkSec?: number }).doorWalkSec ?? 2.6;
 const TERMINAL = new Set(['RESULTS', 'FINALIZE', 'RECOVERY', 'PARTY_WIPE', 'RETIRE_REQUEST']);
 
@@ -145,6 +149,12 @@ export class CinematicDirector {
     const sc = this.cur;
     if (!sc) return;
     if (ph && TERMINAL.has(ph.phase)) { this.finish(sc, 'clear'); return; }
+    if (sc.kind === 'boss' && latest) {
+      if (latest.cu !== undefined) sc.holdEnd = latest.cu;
+      // the authority's hold ended a while ago but the visuals fell behind (a hidden tab stops frames while the server
+      // fights on): jump to the end so the boss is never an invisible puppet while it attacks
+      if (sc.holdEnd !== undefined && !sc.tl.finished && !sc.skipped && latest.tick > sc.holdEnd + BOSS_LATE_TICKS) { this.skipInner(); return; }
+    }
     if (!sc.tl.finished) sc.tl.update(Math.min(0.1, Math.max(0, deltaMs) / 1000));
     for (const p of sc.puppets) {
       p.sync();
@@ -655,7 +665,7 @@ export class CinematicDirector {
     let fx = party.x - x, fy = party.y - y;
     const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
     const actor = (ACTOR_IDS as readonly string[]).includes(kind) ? (kind as ActorId) : null;
-    const lift = bell ? 64 : stag ? 46 : kind === 'ironcolossus' ? 70 : kind === 'corruptcore' ? 60 : 40;
+    const lift = bell ? 64 : stag ? 46 : ENTRANCE_LIFT[kind] ?? 40;   // camera lift to frame the boss (entrances register theirs)
     const reduced = this.settings().reducedEffects;
     const motion = !this.settings().reducedMotion;
 
@@ -805,6 +815,7 @@ export class CinematicDirector {
         flash: (fx2, fy2, radius, color, intensity, ms) => this.flash(fx2, fy2, radius, color, intensity, ms),
         debris: (dx2, dy2, n, tint) => this.debrisAt(dx2, dy2, n, tint),
         zoom: (z) => { if (motion) this.zoom = z; },
+        graphics: (depth) => { const g = this.host.scene.add.graphics().setDepth(depth); sc.objs.push(g); return g; },
       });
     } else {
       // any other boss: rises out of a flare of its colour

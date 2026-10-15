@@ -117,7 +117,7 @@ describe('boss arenas', () => {
       st.round = r;
       setupRound(st, []);
       const boss = st.encounter!.bossId!;
-      expect(bossForRound(seed, r)).toBe(boss);
+      expect(bossForRound(seed, r, st.map!.theme)).toBe(boss);   // theme bosses (sky, moon) take their floor's boss round
       const m = st.map!;
       expect(m.layout).toBe('arena');
       expect(BOSS_ARENAS[boss]).toContain(m.arena);

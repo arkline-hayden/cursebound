@@ -608,6 +608,54 @@ const ARENA_PLANS: Record<string, KindPlan> = {
     }
     wallDecor(ctx, room, ['shield_crest', 'banner'], 0.3);
   },
+  /** the Gale Wyrm's floating ring: wind-carved crags, grass flattened by the wind, sky crystals on the brink, a
+   *  standing-stone perch where it alights */
+  skyring(ctx, room) {
+    const bx = ctx.boss ? Math.floor(ctx.boss.x) : Math.floor(room.cx), by = ctx.boss ? Math.floor(ctx.boss.y) : Math.floor(room.cy);
+    if (!medallion(ctx, 'rose', 6, bx, by, room)) dais(ctx, bx, by);   // a wind rose under its perch
+    room.blocks.forEach((b, k) => ctx.blocker(b.x, b.y, k % 3 === 2 ? 'sky_obelisk' : k % 2 ? 'boulder_big' : 'standing_stone', Math.floor(hash(b.x, b.y, ctx.seed + 881) * 2), hash(b.x, b.y, ctx.seed + 883) < 0.5));
+    const brink = (x: number, y: number) => ctx.isVoid(x + 1, y) || ctx.isVoid(x - 1, y) || ctx.isVoid(x, y + 1) || ctx.isVoid(x, y - 1);
+    for (const t of room.tiles) {
+      const [x, y] = xy(ctx, t);
+      if (Math.abs(x - bx) <= 2 && Math.abs(y - by) <= 2) continue;
+      const h = hash(x, y, ctx.seed + 931);
+      if (!free(ctx, x, y)) continue;
+      if (brink(x, y) && h < 0.07) { ctx.place('sky_crystal', x + 0.5, y + 0.5, false, hash(x, y, 7)); ctx.occupied[y * ctx.W + x] = 1; }
+      else if (h < 0.08 * ctx.density) ctx.place('grass_tuft', x + 0.5, y + 0.5, hash(x, y, 9) < 0.5, hash(x, y, 11));
+      else if (h < 0.11 * ctx.density) ctx.place('wildflowers', x + 0.5, y + 0.5, false, hash(x, y, 13));
+    }
+    ctx.emitter('wisp', bx + 0.5, by + 0.5, 3, 0.5);
+  },
+  /** the Crater Horror's basin: the pit it rises from, craters and regolith, moonrock, the wreck of an outpost */
+  crater(ctx, room) {
+    const bx = ctx.boss ? Math.floor(ctx.boss.x) : Math.floor(room.cx), by = ctx.boss ? Math.floor(ctx.boss.y) : Math.floor(room.cy);
+    room.blocks.forEach((b, k) => ctx.blocker(b.x, b.y, k % 5 === 4 ? 'monolith' : 'moonrock_big', Math.floor(hash(b.x, b.y, ctx.seed + 891) * 2), hash(b.x, b.y, ctx.seed + 893) < 0.5));
+    // the pit: a dark crater stain under the Horror and a ring of dust around it
+    ctx.decal('decal:crater', 2, bx + 0.5, by + 0.5, { sx: 2.8, sy: 1.5, alpha: 0.95 });
+    for (let n = 0; n < Math.round(7 * ctx.density); n++) {
+      const t = room.tiles[Math.floor(room.rnd() * room.tiles.length)]!;
+      const [x, y] = xy(ctx, t);
+      if (Math.abs(x - bx) + Math.abs(y - by) < 4) continue;
+      ctx.decal('decal:crater', Math.floor(room.rnd() * 3), x + 0.5, y + 0.5, { sx: 0.8 + room.rnd() * 0.8, sy: 0.5 + room.rnd() * 0.3, alpha: 0.7 });
+    }
+    sprinkle(ctx, room, ['ash0', 'ash1'], 0.05, (x, y) => Math.abs(x - bx) + Math.abs(y - by) > 3);
+    for (const t of room.tiles) {
+      const [x, y] = xy(ctx, t);
+      if (Math.abs(x - bx) <= 3 && Math.abs(y - by) <= 3) continue;
+      if (!free(ctx, x, y)) continue;
+      const h = hash(x, y, ctx.seed + 941);
+      // standing pieces only near the rim and the boulders: the middle of the basin stays clear for the fight
+      if (h < 0.05 * ctx.density && ctx.shallow(x, y)) ctx.place('moonrock', x + 0.5, y + 0.5, hash(x, y, 3) < 0.5, hash(x, y, 5));
+      else if (h < 0.065 * ctx.density) ctx.place('debris_panel', x + 0.5, y + 0.5, hash(x, y, 7) < 0.5, hash(x, y, 9));
+      else if (h < 0.072 * ctx.density && ctx.shallow(x, y)) ctx.place('canister', x + 0.5, y + 0.5, false, hash(x, y, 11));
+    }
+    // a wrecked lander and a planted flag by the rim, the last of the outpost
+    for (const [id, dx] of [['lander', 3], ['flag_pole', 5]] as const) {
+      const x = room.r.x + dx, y = by + (id === 'lander' ? 3 : -3);
+      if (free(ctx, x, y) && ctx.shallow(x, y) && ctx.place(id, x + 0.5, y + 0.5, false, 0)) ctx.occupied[y * ctx.W + x] = 1;
+    }
+    ctx.emitter('wisp', bx + 0.5, by + 0.5, 3, 0.7);
+  },
 };
 
 /** The Corrupted Core's data vault: a sigil on the raised core platform, pylons round it, rack rows on the arcs,

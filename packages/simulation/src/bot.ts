@@ -1,5 +1,5 @@
 import { CLASS_BY_ID, NODE_BY_ID, ROOM_EVENT_RULES, SKILL_BY_ID } from '@cursebound/content';
-import { bossBotHint } from './bosses/registry';
+import { bossBotHint, bossImmune } from './bosses/registry';
 import { lineOfSight } from './geometry';
 import { canAllocate, hasSpendableNode } from './sim';
 import { ACTION, type Command, type EnemyState, type PlayerInput, type PlayerState, type SimState } from './types';
@@ -56,7 +56,8 @@ function route(state: SimState, p: PlayerState, live: EnemyState[]): { target: E
 
 export function botInput(state: SimState, slot: number, seq: number): PlayerInput {
   const p = state.players[slot];
-  const live = state.enemies.filter((e) => e.state !== 'dying');
+  // a boss out of reach (aloft) is not a target: fight its adds and dodge until it lands (visible state)
+  const live = state.enemies.filter((e) => e.state !== 'dying' && !bossImmune(state, e));
   let target = live[0];
   let bd = Infinity;
   for (const e of live) {

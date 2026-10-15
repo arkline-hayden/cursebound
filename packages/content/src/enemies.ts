@@ -2,6 +2,8 @@ import type { BiomeDef, BossDef, EnemyAttackDef, EnemyDef } from './types';
 import { TREASURE_IMP } from './roomEvents';   // room events: the treasure imp (a non-objective runner)
 import { CORE_ADDS, CORRUPT_CORE } from './bosses/corruptCore';
 import { IRON_COLOSSUS } from './bosses/ironColossus';
+import { MOON_HORROR, MOON_HORROR_ADDS } from './bosses/moonHorror';
+import { SKY_DRAKE, SKY_DRAKE_ADDS } from './bosses/skyDrake';
 
 // Ordinary archetypes + a summon (PRD §14.2) and two boss templates (§14.3). First tuning proposals.
 // Individually weak, numerous foes (Diablo-style packs, director.ts); four archetypes impede heroes directly with
@@ -287,7 +289,10 @@ export const ENEMIES: EnemyDef[] = [
     ],
     weaknesses: { ember: '1.3' },
   },
-  ...CORE_ADDS,   // the Corrupted Core's drones and turrets (bosses/corruptCore.ts)
+  // scripted bosses' adds (summons and reinforcement rosters, BossDef.adds; never theme natives)
+  ...CORE_ADDS,        // the Corrupted Core's drones and turrets (bosses/corruptCore.ts)
+  ...SKY_DRAKE_ADDS,   // the Gale Wyrm's harpies and wind elementals (bosses/skyDrake.ts)
+  ...MOON_HORROR_ADDS, // the Crater Horror's brood (bosses/moonHorror.ts)
 ];
 
 /** Theme rosters (content 1.5): the foes native to each dungeon theme (EnemyDef.themes). Themes without natives use
@@ -336,6 +341,8 @@ export const BOSSES: BossDef[] = [
   },
   CORRUPT_CORE,    // server theme (bosses/corruptCore.ts)
   IRON_COLOSSUS,   // forge theme (bosses/ironColossus.ts)
+  SKY_DRAKE,       // sky theme (bosses/skyDrake.ts)
+  MOON_HORROR,     // moon theme (bosses/moonHorror.ts)
 ];
 
 export const BOSS_BY_ID: Record<string, BossDef> = Object.fromEntries(BOSSES.map((x) => [x.id, x]));
@@ -430,6 +437,8 @@ export const ARENA_DESIGNS: { id: string; name: string }[] = [
   { id: 'colosseum', name: 'Sunken colosseum' },
   { id: 'datavault', name: 'Cursed data vault' },
   { id: 'foundry', name: 'Molten foundry' },
+  { id: 'skyring', name: 'Floating ring of rock' },
+  { id: 'crater', name: 'Cratered lunar basin' },
 ];
 
 /** Which arena designs a boss may fight in (unknown bosses draw from every design). */
@@ -438,10 +447,16 @@ export const BOSS_ARENAS: Record<string, string[]> = {
   bellroot: ['belltower', 'colosseum'],
   corruptcore: ['datavault'],
   ironcolossus: ['foundry'],
+  skydrake: ['skyring'],
+  moonhorror: ['crater'],
 };
 
-/** Themed lairs: the boss a boss floor of this dungeon theme spawns (themes not listed draw from BIOMES[0].bosses). */
+/** Themed lairs: the boss a boss floor of this dungeon theme spawns (simulation mapgen.ts bossForRound, which
+ *  director.ts setupRound uses); themes not listed alternate the biome's classic bosses (BIOMES[0].bosses). Either way
+ *  the pick takes one draw of the round's encounter stream, so the rest of that stream never depends on the theme. */
 export const THEME_BOSSES: Record<string, string[]> = {
+  sky: ['skydrake'],
+  moon: ['moonhorror'],
   server: ['corruptcore'],
   forge: ['ironcolossus'],
 };

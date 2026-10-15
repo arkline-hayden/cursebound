@@ -293,8 +293,12 @@ export interface BossDef {
   /** Fraction of damage taken in stagger state multiplier (vulnerable core). */
   vulnerableMultiplier: string;
   staggerMeter: number;      // control converts to stagger
-  /** Signature legendary (content LEGENDARIES id) its kill drops while nobody wears it; otherwise a random one. */
-  loot?: string;
+  /** Signature legendaries (content LEGENDARIES ids, not class-only): its drop is one the party does not hold yet (worn
+   *  or on the ground; drawn from the loot stream when several remain), else a random legendary from the shared pool. */
+  loot?: string[];
+  /** Reinforcement roster (content ENEMIES ids): the waves at 2/3 and 1/3 health call these instead of the floor
+   *  theme's packs (simulation director.ts bossReinforcements). */
+  adds?: string[];
   /** Script tunables (seconds, world units, counts, fractions) read by a scripted boss (simulation bosses/*). */
   params?: Record<string, number>;
 }

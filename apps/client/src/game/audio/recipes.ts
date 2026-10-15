@@ -4,6 +4,7 @@
  * `env` carries context: the current floor surface (footsteps), the music key (tonal cues stay in key) and the boss.
  */
 
+import { bossRoar, bossSfx } from './bossRecipes';
 import { mtof } from './music';
 import type { SfxId } from './sfx';
 import type { Synth } from './synth';
@@ -466,6 +467,8 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       return 2.6;
     case 'boss_roar': {
       // growl: distorted saw through vowel formants with jitter, plus roaring noise
+      const themeRoar = bossRoar(s, o, t, env);   // the Gale Wyrm's screech, the Crater Horror's moan
+      if (themeRoar !== null) return themeRoar;
       if (env.boss === 'prismstag') {
         s.noiseHit(o, t, { dur: 1.2, f: 900, q: 1, gain: 0.1, attack: 0.1 });
         s.tone(o, t, { f: 50, f2: 35, dur: 1.4, gain: 0.25, attack: 0.1 });
@@ -905,6 +908,6 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.crunchHit(o, t + 0.05, { dur: 0.25, f: 1200, q: 0.8, gain: 0.16, drive: 4 });
       return s.tone(o, t, { f: 58, f2: 40, dur: 0.8, gain: 0.2 });
     default:
-      return 0.1;
+      return bossSfx(s, id, o, t, env) ?? 0.1;   // theme bosses (bossRecipes.ts)
   }
 }

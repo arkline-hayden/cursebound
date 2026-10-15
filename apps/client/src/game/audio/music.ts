@@ -317,7 +317,8 @@ export const MENU_SONG: SongSpec = {
   reverb: 0.7, echo: 0.25, level: 0.9, calmDensity: 0.75,
 };
 
-/** Boss songs, keyed by boss id (prismstag = The Hollow Stag, bellroot = The Bell Golem). */
+/** Boss songs, keyed by boss id (prismstag = The Hollow Stag, bellroot = The Bell Golem, skydrake = The Gale Wyrm,
+ *  moonhorror = The Crater Horror). */
 export const BOSS_SONGS: Record<string, SongSpec> = {
   // The Hollow Stag: ghost-fire hunt in 6/8, galloping hoof toms, theremin wail, choir
   prismstag: {
@@ -390,6 +391,44 @@ export const BOSS_SONGS: Record<string, SongSpec> = {
     },
     fill: '............xxox',
     reverb: 0.55, echo: 0.08, level: 1, minIntensity: 0.62, introBars: 2, calmDensity: 1,
+  },
+  // The Gale Wyrm: a storm-front in a soaring lydian 6/8, howling wind drone, harp arpeggios lashed by brass,
+  // galloping frame drums and thunder toms, shaker rain
+  skydrake: {
+    id: 'boss:skydrake', root: 50, scale: S.lydian, bpm: 132, steps: 12,
+    progressions: [[0, 1, 4, 0], [0, 5, 1, 4], [3, 1, 4, 0], [5, 4, 1, 0]],
+    drone: 'wind', pad: 'choir', motif: 'harp', motifOct: 24,
+    motifA: [[0, 4, 2], [2, 5, 1], [3, 6, 2], [6, 4, 3], [9, 2, 3]],
+    motifB: [[0, 7, 3], [3, 6, 1], [4, 4, 2], [6, 1, 6]],
+    bass: 'tri', bassPattern: 'x..x..x..o.o',
+    lead: 'brass', leadSteps: [0, 6],
+    perc: {
+      low: { kind: 'timpani', calm: 'x...........', combat: 'x.....x.....', heavy: 'x..x..x..x.x' },
+      mid: { kind: 'frame', combat: '..ox.o..ox.o', heavy: 'x.ox.ox.ox.o' },
+      accent: { kind: 'glass', combat: '......x.....', heavy: '...x.....x..' },
+      tick: { kind: 'shaker', combat: 'g.g.g.g.g.g.', heavy: 'gggggggggggg' },
+    },
+    fill: '.........xox',
+    reverb: 0.65, echo: 0.35, level: 1, minIntensity: 0.62, introBars: 2, calmDensity: 1,
+  },
+  // The Crater Horror: the void's drone under a choir gone wrong, theremin wails in locrian, a slow heartbeat of
+  // muffled drums and taiko, radio blips and glitches as the light dies
+  moonhorror: {
+    id: 'boss:moonhorror', root: 38, scale: S.locrian, bpm: 76, steps: 16, sevenths: true,
+    progressions: [[0, 1, 0, 4], [0, 4, 1, 0], [0, 5, 4, 1], [1, 0, 4, 0]],
+    drone: 'void', pad: 'whisperChoir', motif: 'theremin', motifOct: 12,
+    motifA: [[0, 0, 6], [6, 1, 2], [8, 4, 8]],
+    motifB: [[0, 4, 4], [4, 3, 4], [8, 1, 4], [12, 0, 4]],
+    bass: 'sub', bassPattern: 'x.......x...o...',
+    lead: 'tremolo', leadSteps: [0, 8],
+    perc: {
+      low: { kind: 'taiko', calm: 'x.......x.......', combat: 'x..x....x..x....', heavy: 'x..x..x.x..x.xx.' },
+      mid: { kind: 'muffled', combat: '....o.......o...', heavy: '..o.o...o.o.o.o.' },
+      accent: { kind: 'blip', combat: '......x.......x.', heavy: '..x...x...x...x.' },
+      tick: { kind: 'glitch', combat: '...g.......g....', heavy: '.g.g.g.g.g.g.g.g' },
+    },
+    fill: '............xxxx',
+    reverb: 0.85, echo: 0.45, level: 1, minIntensity: 0.62, introBars: 2, calmDensity: 1,
   },
 };
 

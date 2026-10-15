@@ -72,4 +72,4 @@ registerEntrance('corruptcore', (k) => {
     k.sfx(ctx, 'core_laser', 3);
     k.zoom(2);
   });
-});
+}, 60);   // camera lift

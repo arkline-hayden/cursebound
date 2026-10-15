@@ -132,7 +132,7 @@ describe('per-room design (map generation tier 3)', () => {
   });
 
   it('gives every boss arena its set piece', () => {
-    const pieces: Record<string, string> = { ritual: 'sigil', belltower: 'rose', colosseum: 'sand', nave: 'rose', datavault: 'sigil', foundry: 'mos' };
+    const pieces: Record<string, string> = { ritual: 'sigil', belltower: 'rose', colosseum: 'sand', nave: 'rose', datavault: 'sigil', foundry: 'mos', skyring: 'rose', crater: 'ash' };
     const seen = new Set<string>();
     for (let s = 0; s < 16; s++) {
       const m = generateMap('arena-' + s, 5, true);
@@ -141,6 +141,15 @@ describe('per-room design (map generation tier 3)', () => {
       expect(plan.roomFloor.some((f) => name(f.frame).startsWith(pieces[m.arena!]!)), m.arena).toBe(true);
     }
     expect(seen.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('dresses the theme bosses\' lairs: a wind rose on the floating ring, a dusty basin on the moon', () => {
+    for (let s = 0; s < 6; s++) for (const [theme, arena, piece] of [['sky', 'skyring', 'rose'], ['moon', 'crater', 'ash']] as const) {
+      const m = generateMap('lair-' + s, 5, true, theme);
+      expect(m.arena).toBe(arena);
+      const plan = planDressing(m);
+      expect(plan.roomFloor.some((f) => name(f.frame).startsWith(piece)), `${arena} ${s}`).toBe(true);
+    }
   });
 
   it('scales optional decor with the graphics tier density', () => {

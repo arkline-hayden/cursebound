@@ -31,5 +31,6 @@ export * from './bountyRules';
 export * from './coins';
 export * from './roomEvents';
 export * from './minibosses';
+export * from './bosses';   // scripted bosses: registry (immune, altitude, bot hints), chasms and the long fall, void beam
 export * from './runStats';
 export * from './tutorialRoom';

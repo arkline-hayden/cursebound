@@ -5,6 +5,8 @@
 import { renderBossFrame } from './draw/bosses';
 import { renderCoreFrame } from './draw/bossCore';
 import { renderColossusFrame } from './draw/bossColossus';
+import { renderSkyMoonBoss } from './draw/skyMoonBosses';
+import { renderSkyMoonCreature } from './draw/skyMoonCreatures';
 import { renderCreatureFrame, type CreatureId } from './draw/creatures';
 import { renderHeroFrame, type HeroClass, type HeroState } from './draw/humanoid';
 import { Painter, PixelBuffer, Sheet, polishActor } from './draw/pixel';
@@ -44,7 +46,13 @@ export type ActorId =
   | 'corruptcore'
   | 'coredrone'
   | 'coreturret'
-  | 'ironcolossus';
+  | 'ironcolossus'
+  // the Gale Wyrm and the Crater Horror with their adds (draw/skyMoonBosses.ts, draw/skyMoonCreatures.ts)
+  | 'skydrake'
+  | 'moonhorror'
+  | 'galeharpy'
+  | 'windelemental'
+  | 'craterspawn';
 
 export type ActorState = 'idle' | 'run' | 'attack' | 'cast' | 'dodge' | 'hit' | 'downed' | 'revive' | 'death' | 'windup' | 'stagger';
 
@@ -85,6 +93,11 @@ export const ACTOR_IDS: readonly ActorId[] = [
   'coredrone',
   'coreturret',
   'ironcolossus',
+  'skydrake',
+  'moonhorror',
+  'galeharpy',
+  'windelemental',
+  'craterspawn',
 ];
 
 export interface StateSpec {
@@ -213,6 +226,25 @@ const ADD_STATES: Record<string, StateSpec> = {
   death: { durations: [80, 90, 100, 120, 140, 200], loop: false },
 };
 
+/** The Gale Wyrm: a flapping hover, a gliding flight, the gathered storm, the strike / dive and a winded landing. */
+const WYRM_STATES: Record<string, StateSpec> = {
+  idle: { durations: [150, 130, 150, 130], loop: true },
+  run: { durations: rep(4, 110), loop: true },
+  windup: { durations: [150, 150, 180, 240], loop: false },
+  attack: { durations: [70, 80, 90, 120, 160], loop: false },
+  stagger: { durations: [160, 220, 220], loop: true },
+  death: { durations: [110, 110, 120, 120, 130, 150, 180, 260], loop: false },
+};
+
+/** The Crater Horror: swaying tentacles and a slow blink, the eye widening, the lash, a half-closed daze. */
+const HORROR_STATES: Record<string, StateSpec> = {
+  idle: { durations: [300, 260, 300, 260], loop: true },
+  windup: { durations: [180, 180, 210, 260], loop: false },
+  attack: { durations: [70, 80, 90, 110, 150, 200], loop: false },
+  stagger: { durations: [170, 240, 240], loop: true },
+  death: { durations: [110, 110, 120, 130, 140, 160, 190, 280], loop: false },
+};
+
 interface ActorSpec {
   frameW: number;
   frameH: number;
@@ -282,6 +314,11 @@ const SPECS: Record<ActorId, ActorSpec> = {
   coredrone: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 7, dirs: ['s'], states: ADD_STATES, aliases: { run: 'idle' } },
   coreturret: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 12, dirs: ['s'], states: ADD_STATES, aliases: { run: 'idle' } },
   ironcolossus: { frameW: 176, frameH: 176, originX: 0.5, originY: 164 / 176, shadowRadius: 52, dirs: ['s'], states: COLOSSUS_STATES },
+  skydrake: { frameW: 160, frameH: 144, originX: 0.5, originY: 128 / 144, shadowRadius: 40, dirs: ENEMY_DIRS, states: WYRM_STATES },
+  moonhorror: { frameW: 192, frameH: 176, originX: 0.5, originY: 158 / 176, shadowRadius: 56, dirs: ['s'], states: HORROR_STATES, aliases: { run: 'idle' } },
+  galeharpy: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 9, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  windelemental: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 9, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  craterspawn: { frameW: 48, frameH: 48, originX: 0.5, originY: 40 / 48, shadowRadius: 10, dirs: ENEMY_DIRS, states: ENEMY_STATES },
 };
 
 export const ACTOR_META: Record<
@@ -378,6 +415,8 @@ function renderFrame(actor: ActorId, state: string, dir: ActorDir, i: number, n:
   if (actor === 'prismstag' || actor === 'bellroot') return renderBossFrame(actor, state, dir, i, n, painter);
   if (actor === 'corruptcore' || actor === 'coredrone' || actor === 'coreturret') return renderCoreFrame(actor, state, dir, i, n, painter);
   if (actor === 'ironcolossus') return renderColossusFrame(state, i, n, painter);
+  if (actor === 'skydrake' || actor === 'moonhorror') return renderSkyMoonBoss(actor, state, dir, i, n, painter);
+  if (actor === 'galeharpy' || actor === 'windelemental' || actor === 'craterspawn') return renderSkyMoonCreature(actor, state, dir, i, n, painter);
   return renderCreatureFrame(actor as CreatureId, state, dir, i, n, painter);
 }
 

@@ -1,14 +1,16 @@
 import { writeFileSync } from 'node:fs';
-import { BOSSES, CLASS_BY_ID, DUNGEON_THEMES, TICK_RATE, bossesForTheme, isBossRound } from '@cursebound/content';
+import { BOSSES, CLASS_BY_ID, DUNGEON_THEMES, THEME_BOSSES, TICK_RATE, bossesForTheme, isBossRound } from '@cursebound/content';
 import type { SimState } from '@cursebound/simulation';
 import { CLASS_IDS, arg, botTick, f1, mean, newRun, pct, skipTo } from './common';
 
-// Balance harness (npm run balance). Seeded bot runs, three benches:
+// Balance harness (npm run balance). Seeded bot runs, four benches:
 //  - early: solo, every class, natural rounds 1..4 (clear time, damage taken, downs, wipes)
 //  - late:  solo, every class, skip to round 8 and play rounds 8..9
 //  - boss:  skip to a boss round (5 and 10) and fight it, solo per class and as mixed parties of three
-// Options: --seeds N (default 3), --classes a,b, --bench early,late,boss, --out file.json
-//          --boss <id> (boss bench on a floor theme that lairs that boss) or --theme <id> (boss floors of that theme)
+//  - themeboss: the same against each theme's own boss (content THEME_BOSSES), its boss rounds forced onto its theme
+// Options: --seeds N (default 3), --classes a,b, --bench early,late,boss,themeboss, --out file.json
+//          --boss <id> (boss bench on a floor theme that lairs that boss) or --theme <id> (boss floors of that theme);
+//          with themeboss they narrow it to that boss / theme
 
 /** outcome: clear, wipe (party down), stall (bot found no path to the last foes before the time cap) */
 interface RoundStat { round: number; cleared: boolean; outcome: 'clear' | 'wipe' | 'stall'; sec: number; dmgTakenFrac: number; downs: number }
@@ -82,7 +84,7 @@ function benchBoss(party: string[], round: number, seed: string, theme: string |
 
 const seeds = Number(arg('seeds', '3'));
 const classes = arg('classes', CLASS_IDS.join(',')).split(',');
-const benches = arg('bench', 'early,late,boss').split(',');
+const benches = arg('bench', 'early,late,boss,themeboss').split(',');
 const result: Record<string, unknown> = {};
 const bossArg = arg('boss', '');
 const bossTheme = arg('theme', '') || (bossArg ? DUNGEON_THEMES.find((t) => bossesForTheme(t.id).includes(bossArg))?.id ?? null : null);
@@ -101,17 +103,21 @@ for (const [name, from, to] of [['early', 1, 4], ['late', 8, 9]] as const) {
   }
 }
 
-if (benches.includes('boss')) {
+// boss: the rotation bosses on their natural floors; themeboss: every theme boss on its own theme (THEME_BOSSES)
+for (const bench of ['boss', 'themeboss'] as const) {
+  if (!benches.includes(bench)) continue;
+  const themes = bench === 'boss' ? [bossTheme] : Object.keys(THEME_BOSSES).filter((t) => !bossTheme || t === bossTheme);
   const rows: ReturnType<typeof benchBoss>[] = [];
-  for (const round of [5, 10]) {
-    for (const c of classes) for (let s = 0; s < seeds; s++) rows.push(benchBoss([c], round, `BOSS_${c}_${round}_${s}`, bossTheme));
+  for (const theme of themes) for (const round of [5, 10]) {
+    const tag = bench === 'themeboss' && theme ? `_${theme}` : '';
+    for (const c of classes) for (let s = 0; s < seeds; s++) rows.push(benchBoss([c], round, `BOSS${tag}_${c}_${round}_${s}`, theme));
     for (let s = 0; s < seeds * 2; s++) {
       const party = [0, 1, 2].map((k) => classes[(s * 3 + k) % classes.length]);
-      rows.push(benchBoss(party, round, `BOSSP_${round}_${s}`, bossTheme));
+      rows.push(benchBoss(party, round, `BOSSP${tag}_${round}_${s}`, theme));
     }
   }
-  result.boss = rows;
-  console.log(`\n== boss: rounds 5 and 10, solo per class x ${seeds} seeds + ${seeds * 2} parties of 3${bossTheme ? ` (${bossTheme} floors)` : ''} ==`);
+  result[bench] = rows;
+  console.log(`\n== ${bench}: rounds 5 and 10, solo per class x ${seeds} seeds + ${seeds * 2} parties of 3${bench === 'themeboss' ? ' (each theme boss on its theme)' : bossTheme ? ` (${bossTheme} floors)` : ''} ==`);
   for (const round of [5, 10]) for (const kind of ['solo', 'party']) {
     const g = rows.filter((r) => r.round === round && (kind === 'solo' ? !r.party.includes('+') : r.party.includes('+')));
     const w = g.filter((r) => r.win);

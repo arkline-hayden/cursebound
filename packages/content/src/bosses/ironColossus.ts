@@ -15,7 +15,7 @@ export const IRON_COLOSSUS: BossDef = {
   description: 'Slow and armour-plated. Its hammer quakes send molten rings rolling outward (step through the gap or dodge-roll through), it floods the floor with glowing slag patterns that erupt into lava, and it stomps anyone at its feet. Every few blows it overheats: the plates vent and its glowing weak points take double damage.',
   refUnitHealth: 1750, bossFactor: 8, baseDamage: 56, armor: 80, radius: 1.7, moveSpeed: 1.0, tags: ['boss'],
   vulnerableMultiplier: '2.2', staggerMeter: 900,
-  loot: 'lg_heart_of_the_colossus',
+  loot: ['lg_heart_of_the_colossus'],
   phases: [
     { healthFrac: 1.0, weight: 1, patterns: [['ic_hammer', 'ic_stomp'], ['ic_slag', 'ic_hammer'], ['ic_hammer', 'ic_overheat']], cadence: '1.2' },
     { healthFrac: 2 / 3, weight: 1, patterns: [['ic_slag', 'ic_hammer', 'ic_stomp'], ['ic_hammer', 'ic_hammer', 'ic_overheat'], ['ic_slag', 'ic_slag', 'ic_hammer']], cadence: '1.05' },

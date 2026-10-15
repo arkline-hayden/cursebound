@@ -1,15 +1,18 @@
 import type * as Phaser from 'phaser';
-import type { SimEvent, SnapEnemy, Snapshot } from '@cursebound/simulation';
+import type { MapState, SimEvent, SnapEnemy, Snapshot } from '@cursebound/simulation';
 import { iso } from '../iso';
-import { BOSS_KITS, setBossFxMap, type Beam, type BossFxHost, type BossLayer } from './registry';
+import { BOSS_KITS, setBossFxMap, type Beam, type BossFxHost, type BossLayer, type BossLook } from './registry';
 // Side-effect imports: each scripted boss registers its kit, hazards and projectiles. One line per boss.
 import './corruptCore';
 import './ironColossus';
+import './skyDrake';
+import './moonHorror';
 
 export type { BossFxHost } from './registry';
 
-// Scripted-boss presentation layer (CombatScene owns one): routes sim events of scripted bosses to their kits, lets
-// kits touch their sprites every frame, and draws short-lived boss effects (laser beams) on the floor.
+// Scripted-boss presentation layer (CombatScene owns one, the single entry point for boss fx): routes sim events of
+// scripted bosses to their kits, lets kits touch (or lift) their sprites every frame, runs their per-frame hooks and
+// draws short-lived boss effects (laser beams) on the floor.
 
 const EVENT_OWNER = new Set(['enemy_attack', 'foe_fx', 'death', 'stagger', 'boss_phase', 'spawn']);
 
@@ -50,6 +53,25 @@ export class BossFx implements BossLayer {
     try { return kit.onEvent(this.host, this, e, snap); } catch (err) { console.error('[bossfx]', err); return false; }
   }
 
+  /** Start of frame (before hazards draw): every kit's begin hook. */
+  begin(map: MapState | null) {
+    for (const kit of Object.values(BOSS_KITS)) {
+      try { kit.begin?.(this.host, map); } catch (err) { console.error('[bossfx]', err); }
+    }
+  }
+
+  /** Presentation override for a boss sprite this frame (a flying boss aloft), or null. */
+  look(e: SnapEnemy, delta: number): BossLook | null {
+    return BOSS_KITS[e.k]?.look?.(this.host, e, delta) ?? null;
+  }
+
+  /** End of frame, after the cutscene lights: every kit's frame hook (lair-wide lighting). */
+  frame(snap: Snapshot, delta: number) {
+    for (const kit of Object.values(BOSS_KITS)) {
+      try { kit.frame?.(this.host, snap, delta); } catch (err) { console.error('[bossfx]', err); }
+    }
+  }
+
   /** Per-frame touch on a scripted boss's sprite (after the scene set frame, tint and position). */
   drawEnemy(sprite: Phaser.GameObjects.Sprite, e: SnapEnemy, now: number) {
     const kit = BOSS_KITS[e.k];
@@ -82,5 +104,5 @@ export class BossFx implements BossLayer {
     }
   }
 
-  destroy() { for (const l of this.carried.values()) this.host.scene.lights?.removeLight(l.light); this.carried.clear(); this.g.destroy(); this.beams = []; this.kinds.clear(); this.echoes.clear(); }
+  destroy() { for (const kit of Object.values(BOSS_KITS)) kit.destroy?.(this.host); for (const l of this.carried.values()) this.host.scene.lights?.removeLight(l.light); this.carried.clear(); this.g.destroy(); this.beams = []; this.kinds.clear(); this.echoes.clear(); }
 }

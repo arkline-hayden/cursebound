@@ -34,10 +34,18 @@ export interface EntranceKit {
   debris(x: number, y: number, n: number, tint: number): void;
   /** close-up for the cry (integer camera zoom; ignored under reduced motion) */
   zoom(z: number): void;
+  /** a scene-owned graphics layer (destroyed with the cutscene) */
+  graphics(depth: number): Phaser.GameObjects.Graphics;
 }
 
 export type Entrance = (k: EntranceKit) => void;
 
 export const BOSS_ENTRANCES: Record<string, Entrance> = {};
 
-export function registerEntrance(bossId: string, fn: Entrance) { BOSS_ENTRANCES[bossId] = fn; }
+/** Camera lift (px above the boss's feet) that frames each entrance; bosses without one use the director's default. */
+export const ENTRANCE_LIFT: Record<string, number> = {};
+
+export function registerEntrance(bossId: string, fn: Entrance, lift?: number) {
+  BOSS_ENTRANCES[bossId] = fn;
+  if (lift !== undefined) ENTRANCE_LIFT[bossId] = lift;
+}

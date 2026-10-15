@@ -187,6 +187,19 @@ export function chooseLegendary(state: SimState): string | null {
   return ids[nextInt(lootRng(state), ids.length)];
 }
 
+/** A boss's signature drop (content BossDef.loot): one of its signature items the party does not hold yet (worn or on
+ *  the ground), drawn from the loot stream when several remain (a single one draws nothing); undefined (the shared
+ *  pool) for bosses without signature loot or once every signature item is taken. */
+export function bossSignature(state: SimState, bossId: string): string | undefined {
+  const table = BOSS_BY_ID[bossId]?.loot;
+  if (!table?.length) return undefined;
+  const taken = new Set<string>();
+  for (const p of state.players) for (const s of GEAR_SLOTS) { const id = p.gear?.[s]; if (id) taken.add(id); }
+  for (const it of state.loot ?? []) taken.add(it.itemId);
+  const pool = table.filter((id) => LEGENDARY_BY_ID[id] && !taken.has(id));
+  return pool.length ? pool[nextInt(lootRng(state), pool.length)] : undefined;
+}
+
 /** Place a legendary on the ground near (x, y). */
 export function dropLegendary(state: SimState, ev: SimEvent[], x: number, y: number, source: LootRecord['source'], itemId?: string): GroundLoot | null {
   const id = itemId ?? chooseLegendary(state);
@@ -213,10 +226,8 @@ export function rollLoot(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (state.phase !== 'COMBAT') return;
   if (e.boss) {
     if (e.summonerId !== null) return;   // a boss's echo (bosses/corruptCore.ts mirror split) carries no loot
-    // the boss's signature legendary (BossDef.loot) first, while nobody wears it and none lies on the ground
-    const sig = BOSS_BY_ID[e.kind]?.loot;
-    const taken = !!sig && (state.players.some((p) => Object.values(p.gear ?? {}).includes(sig)) || (state.loot ?? []).some((it) => it.itemId === sig));
-    for (let i = 0; i < LOOT_RULES.bossDrops; i++) dropLegendary(state, ev, e.x, e.y, 'boss', i === 0 && sig && !taken ? sig : undefined);
+    // each drop is one of the boss's signature legendaries while any is still unclaimed, else the shared pool
+    for (let i = 0; i < LOOT_RULES.bossDrops; i++) dropLegendary(state, ev, e.x, e.y, 'boss', bossSignature(state, e.kind));
     return;
   }
   const roll = nextFloat(lootRng(state));

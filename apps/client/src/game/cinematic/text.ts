@@ -10,6 +10,8 @@ export const BOSS_CINE: Record<string, { epithet: string; glow: number; css: str
   bellroot: { epithet: 'Toller of the Drowned Dead', glow: 0xffb050, css: '#ffc46a', dust: 0x6a5a48 },
   corruptcore: { epithet: 'Kernel of the Cursed Datavault', glow: 0x40e8ff, css: '#7af0ff', dust: 0x2a3446 },
   ironcolossus: { epithet: 'Heart of the Ember Forge', glow: 0xff8a2a, css: '#ffa860', dust: 0x5a4a40 },
+  skydrake: { epithet: 'Sovereign of the Shattered Sky', glow: 0xbfe6ff, css: '#c8ecff', dust: 0x8a8a94 },
+  moonhorror: { epithet: 'Eye of the Dead Moon', glow: 0x9a6aff, css: '#c0a8ff', dust: 0x5a5862 },
 };
 
 export function bossName(kind: string): string {

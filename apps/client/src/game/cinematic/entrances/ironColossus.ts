@@ -65,4 +65,4 @@ registerEntrance('ironcolossus', (k) => {
       k.zoom(2);
     }
   }));
-});
+}, 70);   // camera lift

@@ -83,6 +83,8 @@ export function playStinger(s: Synth, kind: StingerKind, o: AudioNode, t: number
       else if (k.boss === 'bellroot') s.bigBell(o, h, 65, 3.5, 0.14);
       else if (k.boss === 'corruptcore') for (let i = 0; i < 6; i++) s.tone(o, h + i * 0.07, { type: 'square', f: 1200 - i * 140, dur: 0.12, gain: 0.025, filter: 3000 });
       else if (k.boss === 'ironcolossus') { s.drum('taiko', o, h + 0.02, 1.3); s.click('anvil', o, h, 1); }
+      else if (k.boss === 'skydrake') s.noiseHit(o, h, { dur: 1.8, f: 400, f2: 2400, q: 0.7, gain: 0.07, attack: 0.3 });   // a gust
+      else if (k.boss === 'moonhorror') for (const f of [41, 41.6]) s.tone(o, h, { f, dur: 2.4, gain: 0.12, attack: 0.3 });   // a sub beat
       return;
     }
     case 'round_clear': {

@@ -56,6 +56,9 @@ Animation key format: `${actor}:${state}:${dir}` e.g. `vanguard:run:se`. Texture
 | corruptcore (boss) | 160x160 | idle 6, windup 4, attack 6, stagger 3, hit 2, death 8 (5 views; `run` aliases idle) | floating gunmetal eye wrapped in a halo ring, flanking broken monitors, limp cables with live plugs; the eye looks the way it faces (the Mirror Split tell), cyan calm, magenta angry, red cracked when staggered |
 | coredrone / coreturret (summons) | 48x48 | idle 4, windup 4, attack 4, hit 2, death 6 (dir `s` only) | the Corrupted Core's hover eye-drone and tripod sentry turret |
 | ironcolossus (boss) | 176x176 | idle 4, run 6, windup 4, attack 6, stagger 3, hit 2, death 8 (dir `s` only) | towering riveted iron forge-engine: furnace chest, smokestack pauldrons, T-visor helm, piston fist, quake hammer; `stagger` = overheated, plates parted, weak points white-hot |
+| skydrake (boss) | 160x144 | idle 4, run 4, windup 4, attack 5, stagger 3, death 8 (5 views) | the Gale Wyrm: a storm-feathered wyrm with vast wings; `run` = the flight cycle (aloft the client lifts the sprite by the snapshot `alt`), `stagger` = landed winded |
+| moonhorror (boss) | 192x176 | idle 4, windup 4, attack 6, stagger 3, death 8 (dir `s` only; `run` aliases idle) | the Crater Horror: a great eye in a maw of pale tentacles rising from its crater; the eye widens on windup, half-closes in `stagger` |
+| galeharpy / windelemental / craterspawn (boss adds) | 48x48 | idle, run, windup, attack, hit, death (5 views) | the Gale Wyrm's storm harpy and knot of living wind, the Crater Horror's many-legged moon spawn |
 
 Animation principles: anticipation in windup/attack, squash/stretch-ish pixel shifts, leg cycles in run, weapon trail frames in attack, dodge = roll/blur pose, hit = white flash frame tint baked into frame 1, death = shatter/dissolve into crystal shards.
 Weapon/silhouette must stay consistent across directions.

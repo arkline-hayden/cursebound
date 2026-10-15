@@ -142,7 +142,17 @@ export type SfxId =
   | 'mech_deploy'
   | 'steam_vent'
   | 'trap_snap'
-  | 'blink';
+  | 'blink'
+  // the Gale Wyrm and the Crater Horror (audio/bossRecipes.ts)
+  | 'drake_screech'
+  | 'drake_gale'
+  | 'drake_dive'
+  | 'thunder_feather'
+  | 'skyfall'
+  | 'horror_moan'
+  | 'tentacle_burst'
+  | 'gravity_well'
+  | 'void_beam';
 
 export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 
@@ -307,6 +317,15 @@ export const SFX_IDS: readonly SfxId[] = [
   'steam_vent',
   'trap_snap',
   'blink',
+  'drake_screech',
+  'drake_gale',
+  'drake_dive',
+  'thunder_feather',
+  'skyfall',
+  'horror_moan',
+  'tentacle_burst',
+  'gravity_well',
+  'void_beam',
 ];
 
 /** Layered impact cue for a hit's damage type; physical splits by weapon weight (heavy = hammers, axes, slams). */
@@ -393,4 +412,13 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   altar_pact: '[the altar drinks]',
   imp_jingle: '[coins jingle]',
   imp_portal: '[a rift tears open]',
+  drake_screech: '[wyrm screeches]',
+  drake_gale: '[gale howls]',
+  drake_dive: '[wyrm dives]',
+  thunder_feather: '[lightning strikes]',
+  skyfall: '[blown off the island]',
+  horror_moan: '[the crater moans]',
+  tentacle_burst: '[tentacles burst out]',
+  gravity_well: '[gravity drags]',
+  void_beam: '[void beam hums]',
 };

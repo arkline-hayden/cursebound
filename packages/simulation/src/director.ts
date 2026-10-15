@@ -218,6 +218,8 @@ export function bossReinforcements(state: SimState, ev: SimEvent[], boss: EnemyS
   if (!pool.length) pool = PACK_TEMPLATES.filter((t) => t.minRound <= 1).map((t) => [t.id, 1] as [string, number]);
   const n = bossReinforceUnits(state.n, r, wave);
   const kinds: string[] = [];
+  const roster = BOSS_BY_ID[boss.kind]?.adds;   // bosses with their own roster (BossDef.adds: the Gale Wyrm's harpies, the Crater Horror's brood)
+  if (roster?.length) while (kinds.length < n) kinds.push(roster[nextInt(rng, roster.length)]);
   while (kinds.length < n) {
     const t = PACK_BY_ID[pickWeighted(rng, pool)];
     kinds.push(t.lead);

@@ -204,7 +204,7 @@ describe('the Corrupted Core', () => {
     for (let i = 0; i < 240 && !s.enemies.some((e) => e.bvars?.echo); i++) run(s, 1, shield);
     killEnemy(s, [], b, 0);
     expect(s.enemies.filter((e) => e.bvars?.echo).every((e) => e.state === 'dying')).toBe(true);
-    expect(s.loot!.filter((it) => it.itemId === BOSS_BY_ID.corruptcore.loot).length).toBe(1);
+    expect(s.loot!.filter((it) => it.itemId === BOSS_BY_ID.corruptcore.loot![0]).length).toBe(1);
   });
 });
 

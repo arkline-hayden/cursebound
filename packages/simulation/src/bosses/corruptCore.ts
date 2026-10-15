@@ -10,7 +10,7 @@ import { B, ONE, fateFactor, toFloatClamped } from '../stats';
 import type { EnemyAttackState, EnemyState, Hazard, PlayerState, SimEvent, SimState } from '../types';
 import {
   DT, T, aliveHeroes, attackOf, beginAttack, bossName, bossPhaseTick, bv, clearTelegraphs, damageOf, face, floorNear, freq,
-  hitHero, openRadius, param, releaseTickOf, runPatterns, safeSpot, stepScripted, telegraph, telegraphsOf, walkToward, type ScriptedAttack, type StartResult,
+  hitHero, openRadius, param, registerBossHazard, releaseTickOf, runPatterns, safeSpot, stepScripted, telegraph, telegraphsOf, walkToward, type ScriptedAttack, type StartResult,
 } from './kit';
 import { registerBossScript, type BotHint } from './registry';
 
@@ -420,9 +420,9 @@ function stepEcho(state: SimState, ev: SimEvent[], c: EnemyState) {
 
 // ---------------- the script ----------------
 
-const ATTACKS = (state: SimState, ev: SimEvent[], e: EnemyState): Record<string, ScriptedAttack> => ({
+const ATTACKS: Record<string, ScriptedAttack> = {
   cc_lasergrid: {
-    release: (a) => {
+    release: (state, ev, e, a) => {
       fireGrid(state, ev, e, 'cc_lasergrid', a);
       if (e.phaseIndex >= 1) {
         // the crossing grid: perpendicular lanes, marked as the first fires
@@ -434,17 +434,17 @@ const ATTACKS = (state: SimState, ev: SimEvent[], e: EnemyState): Record<string,
         e.attack!.timer = Math.max(e.attack!.timer, sec + DT);
       }
     },
-    during: (a) => {
+    during: (state, ev, e, a) => {
       const b = bv(e);
       if (b.g2 && state.tick >= b.g2) { b.g2 = 0; fireGrid(state, ev, e, 'cc_lasergrid2', a); }
     },
   },
-  cc_firewall: { release: (a) => releaseFirewall(state, e, a) },
-  cc_deploy: { release: () => releaseDeploy(state, ev, e) },
-  cc_glitch: { release: (a, at) => releaseGlitch(state, ev, e, a, at) },
-  cc_purge: { release: (a) => releasePurge(state, ev, e, a) },
-  cc_split: { release: (a) => releaseSplit(state, ev, e, a) },
-});
+  cc_firewall: { release: (state, _ev, e, a) => releaseFirewall(state, e, a) },
+  cc_deploy: { release: (state, ev, e) => releaseDeploy(state, ev, e) },
+  cc_glitch: { release: releaseGlitch },
+  cc_purge: { release: releasePurge },
+  cc_split: { release: releaseSplit },
+};
 
 function start(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttackDef, target: PlayerState): StartResult {
   const b = bv(e);
@@ -485,7 +485,7 @@ function step(state: SimState, ev: SimEvent[], e: EnemyState): boolean {
   tickSplit(state, ev, e);
   if (e.staggerUntil > state.tick) { e.state = 'stagger'; e.attack = null; e.vx = 0; e.vy = 0; cancelMarkers(state, e); return true; }
   if (e.state === 'stagger') e.state = 'idle';
-  if (stepScripted(state, ev, e, ATTACKS(state, ev, e))) return true;
+  if (stepScripted(state, ev, e, ATTACKS)) return true;
   runPatterns(state, ev, e, (target) => {
     if (target) face(e, target.x, target.y);
     // drift back over the platform between patterns (held still while split, so the echoes stay mirrored)
@@ -544,14 +544,12 @@ function botHint(state: SimState, p: PlayerState, e: EnemyState): BotHint | null
 
 registerBossScript(ID, { step, botHint });
 
+registerBossHazard('cc_firewall', tickFirewall);
+registerBossHazard('cc_corrupt', tickCorrupt);
+registerBossHazard('cc_safe', () => undefined);    // markers: the purge resolves at its release
+registerBossHazard('cc_purge', () => undefined);
+
 registerGlobalHooks({
-  hazardTick(state, ev, h) {
-    if (h.owner !== 'enemy') return undefined;
-    if (h.kind === 'cc_firewall') { tickFirewall(state, ev, h); return true; }
-    if (h.kind === 'cc_corrupt') { tickCorrupt(state, ev, h); return true; }
-    if (h.kind === 'cc_safe' || h.kind === 'cc_purge') return true;   // markers: the purge resolves at its release
-    return undefined;
-  },
   onKill(state, ev, e) {
     // a destroyed echo bursts into corrupted tiles where it hovered
     if (e.kind !== ID || !e.bvars?.echo) return;
