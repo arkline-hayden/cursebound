@@ -18,6 +18,7 @@ import { Painter, PixelBuffer, Sheet, bayer, hash2, lighten, mix, outlinePass, r
 import { PILLAR_H, THEME_DECAL_SPECS, THEME_PROP_SPECS, VARIANT_THEMES, buildThemeFrames, fadePillarTop, paintTallPillar, themeCapTexture, themeFloorFrame, themeVoidFrame, type ThemeId } from './dungeonThemes';
 import { CLUTTER_NO_OUTLINE, CLUTTER_PROP_SPECS, type ClutterSpec, type PropFx } from './clutter';
 import { ROOM_NO_OUTLINE, ROOM_PROP_SPECS } from './roomProps';
+import { THEME_EXTRA_NO_OUTLINE, THEME_EXTRA_PROP_SPECS } from './themeProps';
 import { AMBIENT_FX_SPECS, AMBIENT_TEXTURE_KEYS, CRITTER_SPECS, STORY_DECAL_SPECS } from './ambientArt';
 
 export type { PropFx } from './clutter';
@@ -821,7 +822,7 @@ const PROP_SPECS: Record<string, PropSpec> = {
   },
 };
 
-const ALL_PROP_SPECS: Record<string, PropSpec & Partial<ClutterSpec>> = { ...PROP_SPECS, ...THEME_PROP_SPECS, ...CLUTTER_PROP_SPECS, ...ROOM_PROP_SPECS };
+const ALL_PROP_SPECS: Record<string, PropSpec & Partial<ClutterSpec>> = { ...PROP_SPECS, ...THEME_PROP_SPECS, ...CLUTTER_PROP_SPECS, ...ROOM_PROP_SPECS, ...THEME_EXTRA_PROP_SPECS };
 
 /** Set-dressing hints for the original props (how the renderer bakes, layers and animates them). */
 const LEGACY_HINTS: Record<string, Partial<PropDef>> = {
@@ -841,7 +842,7 @@ const LEGACY_HINTS: Record<string, Partial<PropDef>> = {
 };
 
 /** Clutter props are generated lazily (per map, on first use) by the Phaser layer; see buildPropSheets(). */
-export const CLUTTER_PROP_IDS: readonly string[] = Object.keys(CLUTTER_PROP_SPECS);
+export const CLUTTER_PROP_IDS: readonly string[] = [...Object.keys(CLUTTER_PROP_SPECS), ...Object.keys(THEME_EXTRA_PROP_SPECS)];
 
 export const PROPS: Record<string, PropDef> = Object.fromEntries(
   Object.entries(ALL_PROP_SPECS).map(([name, s]) => {
@@ -1088,7 +1089,7 @@ function glowOnly(buf: PixelBuffer, p: Painter): void {
 }
 
 /** Flat floor overlays that read better without the sprite outline. */
-const NO_OUTLINE = new Set(['prop:cobweb', 'prop:puddle', 'prop:ritual', 'prop:lavacrack', ...CLUTTER_NO_OUTLINE, ...ROOM_NO_OUTLINE]);
+const NO_OUTLINE = new Set(['prop:cobweb', 'prop:puddle', 'prop:ritual', 'prop:lavacrack', ...CLUTTER_NO_OUTLINE, ...ROOM_NO_OUTLINE, ...THEME_EXTRA_NO_OUTLINE]);
 
 /** Keys of every texture produced by buildDungeonSheets + buildThemeSheets for all themes (for the manifest). */
 export const DUNGEON_TEXTURE_KEYS: readonly string[] = [

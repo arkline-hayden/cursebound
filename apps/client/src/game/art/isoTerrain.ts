@@ -81,9 +81,9 @@ export function isoKeys(theme: ThemeId): IsoKeys {
 export const normalKey = (key: string): string => `${key}:n`;
 
 /** Themes whose wall details include emissive pixels (wallglow sheet exists). */
-const WALL_GLOW_THEMES: readonly ThemeId[] = ['catacombs', 'flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost'];
+const WALL_GLOW_THEMES: readonly ThemeId[] = ['catacombs', 'flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost', 'sky', 'moon', 'server'];
 /** Themes whose overlays include emissive pixels. */
-const DECO_GLOW_THEMES: readonly ThemeId[] = ['sanctum', 'fungal', 'forge'];
+const DECO_GLOW_THEMES: readonly ThemeId[] = ['sanctum', 'fungal', 'forge', 'server'];
 
 /** Every iso texture key for every theme (manifest), including normal maps. */
 export const ISO_TEXTURE_KEYS: readonly string[] = THEME_IDS.flatMap((t) => {
@@ -131,6 +131,9 @@ const WALL_RAMP: Record<ThemeId, Ramp> = {
   fungal: R(0x140f0b, 0x241b13, 0x382a1d, 0x4e3e2d, 0x685640),
   forge: R(0x0c0a0c, 0x181518, 0x242024, 0x332d32, 0x4a4248),
   frost: R(0x152030, 0x233448, 0x364c66, 0x52708c, 0x86aac8),
+  sky: R(0x3a3020, 0x5a4c34, 0x7c6c4c, 0xa08e68, 0xc4b48a),
+  moon: R(0x26272e, 0x3a3c44, 0x52545e, 0x6e707c, 0x92949e),
+  server: R(0x10131a, 0x1c2230, 0x2a3244, 0x3e485e, 0x5a667e),
 };
 
 const PLINTH_RAMP: Record<ThemeId, Ramp> = {
@@ -141,6 +144,9 @@ const PLINTH_RAMP: Record<ThemeId, Ramp> = {
   fungal: R(0x120c08, 0x221810, 0x362618, 0x4a3622, 0x624a30),
   forge: MATERIALS.iron,
   frost: R(0x1a2636, 0x2c3e56, 0x425876, 0x607a98, 0x90acca),
+  sky: R(0x2a1e12, 0x44321e, 0x60482c, 0x7c623e, 0x9a7e54),
+  moon: R(0x2e3036, 0x46484f, 0x60626a, 0x7e8088, 0xa2a4ac),
+  server: R(0x0a0c10, 0x14171e, 0x1e222c, 0x2c323e, 0x404858),
 };
 
 /** Brightness gain applied to cap textures so wall tops read as the most lit surface. */
@@ -152,7 +158,17 @@ const TOP_GAIN: Record<ThemeId, [number, number]> = {
   fungal: [1.9, 8],
   forge: [1.8, 8],
   frost: [1.25, 10],
+  sky: [1.35, 6],
+  moon: [1.45, 8],
+  server: [1.6, 4],
 };
+
+/** Growth that creeps over a theme's masonry (moss, algae, rime, turf, regolith dust, oil grime). */
+function mossOf(theme: ThemeId): Ramp {
+  if (theme === 'flooded' || theme === 'frost' || theme === 'sky' || theme === 'moon') return styleOf(theme).growth;
+  if (theme === 'server') return R(0x040506, 0x08090c, 0x0e1014, 0x14171c, 0x1c2026);
+  return D.moss;
+}
 
 // ---------------------------------------------------------------- small helpers
 
@@ -347,7 +363,7 @@ function plinth(f: Face, theme: ThemeId, seed: number): void {
       const lx = (x + 4) % 16;
       let c: number;
       let h = 0.8;
-      if (lx === 15 && theme !== 'forge') {
+      if (lx === 15 && theme !== 'forge' && theme !== 'server') {
         c = S.mortar;
         h = -1.5;
       } else {
@@ -362,6 +378,13 @@ function plinth(f: Face, theme: ThemeId, seed: number): void {
       if (theme === 'sanctum' && ly === 1) c = S.growth[2]!;
       if (theme === 'frost' && ly < 3 + Math.round(Math.sin(x * 0.4) * 1.2)) c = tone(S.growth, 2 + (ly === 0 ? 1 : 0));
       if ((theme === 'flooded' || theme === 'fungal') && ly > 2 && pnoise(x, y, 4, seed + 1) > 0.74) c = tone(theme === 'flooded' ? S.growth : D.moss, 0.6 + bayer(x, y) * 1.6);
+      // sky: turf spilling over the rock foot; moon: regolith banked against it; server: a status light strip
+      if (theme === 'sky' && (ly < 2 + Math.round(pnoise(x, 0, 8, seed) * 2) || pnoise(x, y, 4, seed + 2) > 0.78)) c = tone(S.growth, 1.4 + bayer(x, y) * 1.4 + (ly === 0 ? 1 : 0));
+      if (theme === 'moon' && ly > 6 - Math.round(pnoise(x, 0, 8, seed + 3) * 3)) c = tone(S.growth, 1.2 + bayer(x, y) * 1.2);
+      if (theme === 'server' && ly === 3 && x % 8 < 5) {
+        c = x % 8 === 4 ? S.accent[3]! : S.growth[3]!;
+        f.glow.set(x, y, c, 220);
+      }
       f.col.set(x, y, c);
       f.h[y * FW + x] = h;
     }
@@ -512,6 +535,62 @@ function material(theme: ThemeId, f: Face, seed: number): void {
           } else if ((f.col.get(x, y) & 0xffffff) === S.mortar && hash2(x, y, seed) > 0.5) f.col.set(x, y, S.growth[0]!);
         }
       break;
+    case 'sky': {
+      // weathered sandstone strata: long uneven beds, softer bands eroded back, tufts rooted in the joints
+      masonry(f, theme, ramp, 0x1a140c, 'rubble', seed, 1.6);
+      for (let y = CORNICE; y < PLINTH; y++)
+        for (let x = 0; x < FW; x++) {
+          const bed = Math.floor((y + pnoise(x, y, 8, seed + 4) * 5) / 7);
+          if (bed % 3 === 1) {
+            f.col.set(x, y, mix(f.col.get(x, y) & 0xffffff, 0x2a1e12, 0.25));
+            f.h[y * FW + x] = f.h[y * FW + x]! - 0.6;
+          }
+          if ((f.col.get(x, y) & 0xffffff) === 0x1a140c && hash2(x, y, seed + 5) > 0.82) f.col.set(x, y, S.growth[2 + (hash2(x, y, seed) > 0.5 ? 1 : 0)]!);
+        }
+      break;
+    }
+    case 'moon': {
+      // layered grey basalt and breccia; pale regolith settled on every ledge
+      masonry(f, theme, ramp, S.mortar, 'rubble', seed, 2.2);
+      for (let y = CORNICE; y < PLINTH; y++)
+        for (let x = 0; x < FW; x++) {
+          const i = y * FW + x;
+          if (f.h[i]! > -0.2 && f.h[(y - 1) * FW + x]! < -0.6 && hash2(x, y, seed + 3) > 0.35) f.col.set(x, y, tone(S.growth, 2 + bayer(x, y)));
+          if (hash2(x, y, seed + 4) > 0.97) f.col.set(x, y, tone(ramp, 3.6));
+        }
+      break;
+    }
+    case 'server': {
+      // rack bays: a steel frame every 16 texels, vented doors between, rails and the odd status light
+      for (let y = CORNICE; y < PLINTH; y++)
+        for (let x = 0; x < FW; x++) {
+          const i = y * FW + x;
+          const lx = x % 16;
+          let c: number;
+          let h = 0;
+          if (lx === 0 || lx === 15) {
+            c = tone(ramp, lx === 0 ? 3.2 : 1.2);
+            h = 1.4;
+          } else if (lx === 1 || lx === 14) {
+            c = 0x040508;
+            h = -1.2;
+          } else {
+            const slot = (y - CORNICE) % 3 === 1 && lx >= 3 && lx <= 12;
+            c = slot ? 0x06070a : tone(ramp, 1.7 + (pnoise(x, y, 8, seed) - 0.5) * 0.4 + bayer(x, y) * 0.25);
+            h = slot ? -1 : 0.2;
+          }
+          f.col.set(x, y, c);
+          f.h[i] = h;
+        }
+      const r = rng(seed);
+      for (let k = 0; k < 6; k++) {
+        const x = 3 + Math.floor(r() * 10) + (k % 2) * 16, y = CORNICE + 2 + Math.floor(r() * 40);
+        const c = k % 3 === 0 ? S.accent[3]! : k % 3 === 1 ? S.growth[3]! : 0x7aff9a;
+        f.col.set(x, y, c);
+        f.glow.set(x, y, c, 230);
+      }
+      break;
+    }
     default:
       break;
   }
@@ -836,8 +915,159 @@ const DETAILS: Record<string, Detail> = {
   },
 };
 
+// sky island, moon and server room wall details
+const OPEN_DETAILS: Record<string, Detail> = {
+  // ---- sky
+  ivy: (p, _b, S, r) => {
+    for (let k = 0; k < 3; k++) {
+      let x = 6 + k * 9 + r() * 4;
+      for (let y = 3; y < 46 + r() * 8; y += 1.4) {
+        x += (r() - 0.5) * 1.8;
+        p.dot(x, y);
+        if (r() < 0.45) p.ellipse(x + (r() < 0.5 ? -1.8 : 1.8), y + 0.5, 1.6, 1.1);
+      }
+    }
+    p.fill(S.growth, { mode: 'sphere', dither: true, light: 0.1 });
+  },
+  hangRoots: (p, _b, _S, r) => {
+    for (let k = 0; k < 6; k++) {
+      const x = 2 + k * 5.4 + r() * 2;
+      const L = 18 + r() * 30;
+      p.capsule(x, 0, x + (r() - 0.5) * 6, L * 0.55, 1.5, 0.9).capsule(x + (r() - 0.5) * 6, L * 0.55, x + (r() - 0.5) * 8, L, 0.9, 0.3);
+    }
+    p.fill(MATERIALS.root, { mode: 'cyl', dither: true });
+  },
+  windShrine: (p, buf, S) => {
+    // a little niche with a carved bird and a wind-worn offering bowl
+    for (let y = 18; y < 40; y++)
+      for (let x = 9; x < 24; x++) {
+        const dx = (x + 0.5 - 16.5) / 7.5, dy = y < 25 ? (25 - y) / 7 : 0;
+        if (dx * dx + dy * dy <= 1) buf.set(x, y, mix(0x1a140c, 0x4a3c28, Math.max(0, 1 - Math.abs(dx)) * 0.5));
+      }
+    p.poly([12, 30, 16, 26, 21, 30, 16, 29]).fill(S.wall, { mode: 'emboss', light: 0.3 });
+    p.ellipse(16, 37, 4, 1.6).fill(S.accent, { mode: 'sphere', inner: false });
+    p.gpx(16, 35, S.accent[4]!, S.accent[3]!);
+  },
+  prayerFlags: (p, _b, _S, r) => {
+    const cols: Ramp[] = [MATERIALS.bloodRed, R(0x14306a, 0x2050a0, 0x3a78d0, 0x6aa8f0, 0xb0d8ff), R(0x6a5a10, 0xa08a20, 0xd0b838, 0xf0e070, 0xfff8c0), R(0x1a4a1a, 0x2a7a2a, 0x3aa83a, 0x70d070, 0xb0f0b0), R(0xa0a0a0, 0xc8c8c8, 0xe8e8e8, 0xf8f8f8, 0xffffff)];
+    p.line(0, 12, 32, 18).fill(R(0x2a2216, 0x4a3c26, 0x6e5a3a, 0x948054, 0xb8a272), { mode: 'flat', tone: 2, inner: false });
+    for (let k = 0; k < 6; k++) {
+      const x = 2 + k * 5.2, y = 12 + x * 0.19;
+      p.poly([x, y, x + 4, y + 0.8, x + 4 + (r() - 0.5), y + 6.5, x + (r() - 0.5), y + 6]).fill(cols[k % cols.length]!, { mode: 'cyl', inner: false });
+    }
+  },
+  nest: (p, _b, S, r) => {
+    p.ellipse(16, 30, 9, 3.4).fill(R(0x2a1e10, 0x4a3820, 0x6e5832, 0x927a4a, 0xb49c66), { mode: 'sphere', dither: true });
+    for (let k = 0; k < 9; k++) p.line(8 + r() * 4, 29 + r() * 3, 20 + r() * 5, 28 + r() * 4);
+    p.fill(R(0x2a1e10, 0x4a3820, 0x6e5832, 0x927a4a, 0xb49c66), { mode: 'flat', tone: 3, inner: false });
+    for (const x of [13, 16, 19]) p.ellipse(x, 28, 1.6, 1.3).fill(R(0x7a8ca0, 0xa8bccc, 0xcce0ec, 0xe8f4fa, 0xffffff), { mode: 'sphere', inner: false });
+    void S;
+  },
+  sunGlyph: (p, _b, S) => {
+    for (let a = 0; a < Math.PI * 2; a += 0.12) p.dot(16 + Math.cos(a) * 5, 26 + Math.sin(a) * 5);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      p.line(16 + Math.cos(a) * 7, 26 + Math.sin(a) * 7, 16 + Math.cos(a) * 10, 26 + Math.sin(a) * 10);
+    }
+    p.fill(S.accent, { mode: 'flat', tone: 3, glow: S.accent[3]!, inner: false });
+  },
+  // ---- moon
+  hullPanel: (p, buf, S) => {
+    p.rect(3, 10, 26, 36).fill(S.accent, { mode: 'emboss', dither: true });
+    for (const y of [18, 30]) p.rect(3, y, 26, 1);
+    p.fill(S.accent, { mode: 'flat', tone: 0, inner: false });
+    for (const [x, y] of [[5, 12], [26, 12], [5, 43], [26, 43], [16, 12], [16, 43]] as const) buf.set(x, y, S.accent[4]!);
+    for (let x = 3; x < 29; x++) for (let y = 38; y < 42; y++) buf.set(x, y, (x + y) % 6 < 3 ? 0xd8a020 : 0x18181c);
+  },
+  porthole: (p, _b, S) => {
+    p.ellipse(16, 26, 9, 9).fill(S.accent, { mode: 'emboss' });
+    p.ellipse(16, 26, 6.5, 6.5).fill(R(0x0a1830, 0x183a6a, 0x3a70b0, 0x7ab0e8, 0xd0ecff), { mode: 'sphere', glow: 0x7ab0e8, light: 0.2, inner: false });
+    p.px(13, 23, 0xe8f6ff).px(14, 23, 0xb8dcf8);
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; p.px(16 + Math.cos(a) * 8, 26 + Math.sin(a) * 8, S.accent[4]!); }
+  },
+  airlock: (p, buf, S) => {
+    p.rect(6, 12, 20, 42).fill(S.accent, { mode: 'emboss' });
+    p.rect(9, 16, 14, 38).fill(R(0x14161c, 0x22262e, 0x343a46, 0x4a5262, 0x646e82), { mode: 'emboss', dither: true });
+    for (let y = 16; y < 54; y++) buf.set(16, y, 0x08090c);
+    for (let y = 44; y < 54; y++) for (let x = 9; x < 23; x++) if (x !== 16) buf.set(x, y, (x - y + 64) % 6 < 3 ? 0xd8a020 : 0x18181c);
+    p.gpx(16, 9, 0xff3a2a, 0xa01414);
+  },
+  antenna: (p, _b, S) => {
+    p.capsule(16, 50, 16, 16, 0.9, 0.7).fill(S.accent, { mode: 'cyl' });
+    p.ellipse(12, 16, 7, 4.5).minus().ellipse(10, 15, 6, 3.5).fill(S.accent, { mode: 'emboss', light: 0.3 });
+    p.line(12, 16, 17, 12).fill(S.accent, { mode: 'flat', tone: 3, inner: false });
+    p.gpx(17, 11, 0xff3a2a, 0xa01414);
+  },
+  hazard: (_p, buf) => {
+    for (let y = 30; y < 38; y++) for (let x = 0; x < FW; x++) buf.set(x, y, (x + y) % 8 < 4 ? 0xd8a020 : 0x18181c);
+    for (let x = 0; x < FW; x++) { buf.set(x, 29, 0x0a0a0c); buf.set(x, 38, 0x0a0a0c); }
+  },
+  dustDrift: (_p, buf, S) => {
+    for (let y = 28; y < PLINTH; y++) for (let x = 0; x < FW; x++) {
+      const top = 40 + Math.sin(x * 0.35) * 4 + pnoise(x, 0, 8, 7) * 6;
+      if (y >= top) buf.set(x, y, tone(S.growth, 1.4 + (y - top < 1 ? 1.6 : 0) + bayer(x, y) * 0.8));
+    }
+  },
+  beacon: (p, _b, S) => {
+    p.rect(12, 20, 8, 10).fill(S.accent, { mode: 'emboss' });
+    p.ellipse(16, 18, 3, 2.4).fill(R(0x3a0808, 0x7a1010, 0xc81e1e, 0xff5a4a, 0xffc0b0), { mode: 'sphere', glow: 0xff3a2a, inner: false });
+    p.capsule(16, 30, 16, 50, 0.8, 0.8).fill(R(0x0a0a0c, 0x18181c, 0x26262c, 0x36363e, 0x4a4a54), { mode: 'cyl', inner: false });
+  },
+  // ---- server
+  ledRack: (p, buf, S, r) => {
+    p.rect(4, 8, 24, 44).fill(R(0x06070a, 0x0c0e12, 0x14171c, 0x1c2028, 0x262c36), { mode: 'emboss' });
+    for (let y = 10; y < 50; y += 4) {
+      for (let x = 6; x < 26; x++) buf.set(x, y + 2, 0x020203);
+      for (let k = 0; k < 4; k++) {
+        const x = 7 + Math.floor(r() * 18);
+        const c = r() < 0.6 ? 0x5aff7a : r() < 0.5 ? S.growth[3]! : 0xffb030;
+        p.gpx(x, y, c, c);
+      }
+    }
+  },
+  cableTray: (p, _b, _S, r) => {
+    p.rect(0, 6, 32, 4).fill(R(0x14171e, 0x262c38, 0x3a4256, 0x56607a, 0x8a96b0), { mode: 'emboss' });
+    const cols: Ramp[] = [R(0x060608, 0x101014, 0x1c1c22, 0x2a2a32, 0x3c3c46), R(0x200608, 0x40100e, 0x6a1c18, 0x983028, 0xc04c40), R(0x06141e, 0x0c2a3a, 0x164a62, 0x2a7090, 0x4a9ac0)];
+    for (let k = 0; k < 7; k++) {
+      const x = 2 + k * 4.2 + r() * 1.5;
+      const L = 14 + r() * 32;
+      p.capsule(x, 10, x + Math.sin(k) * 2, 10 + L * 0.6, 1, 1).capsule(x + Math.sin(k) * 2, 10 + L * 0.6, x + Math.sin(k) * 3.5, 10 + L, 1, 0.8).fill(cols[k % 3]!, { mode: 'cyl', inner: false });
+    }
+  },
+  ventGrille: (p, buf, S) => {
+    p.rect(6, 18, 20, 18).fill(R(0x14171e, 0x262c38, 0x3a4256, 0x56607a, 0x8a96b0), { mode: 'emboss' });
+    for (let y = 20; y < 34; y += 2) for (let x = 8; x < 24; x++) buf.set(x, y, mix(S.growth[1]!, 0x020304, 0.5));
+    for (let y = 21; y < 34; y += 2) for (let x = 8; x < 24; x++) buf.set(x, y, S.growth[2]!);
+  },
+  terminal: (p, buf, S, r) => {
+    p.rect(5, 14, 22, 18).fill(R(0x14171e, 0x262c38, 0x3a4256, 0x56607a, 0x8a96b0), { mode: 'emboss' });
+    for (let y = 16; y < 30; y++) for (let x = 7; x < 25; x++) buf.set(x, y, mix(0x021014, S.growth[1]!, (y % 2) * 0.25));
+    for (let y = 17; y < 29; y += 2) {
+      const len = 4 + Math.floor(r() * 12);
+      for (let x = 8; x < 8 + len; x++) buf.set(x, y, y === 27 ? S.accent[3]! : S.growth[3]!);
+    }
+    p.rect(9, 33, 14, 3).fill(R(0x0a0c10, 0x14171e, 0x1e222c, 0x2c323e, 0x404858), { mode: 'emboss' });
+  },
+  warningGlyph: (p, _b, S) => {
+    p.poly([16, 14, 26, 34, 6, 34]).minus().poly([16, 18, 23, 32, 9, 32]).fill(S.accent, { mode: 'flat', tone: 3, glow: S.accent[3]!, inner: false });
+    p.rect(15, 21, 2, 6).rect(15, 29, 2, 1.6).fill(S.accent, { mode: 'flat', tone: 4, glow: S.accent[3]!, inner: false });
+  },
+  glitch: (_p, buf, S, r) => {
+    for (let k = 0; k < 9; k++) {
+      const y0 = CORNICE + Math.floor(r() * 44), h = 1 + Math.floor(r() * 3), sh = Math.floor((r() - 0.5) * 10);
+      const tint = k % 3 === 0 ? S.accent[3]! : k % 3 === 1 ? S.growth[3]! : -1;
+      for (let y = y0; y < Math.min(PLINTH, y0 + h); y++) {
+        const row: number[] = [];
+        for (let x = 0; x < FW; x++) row.push(buf.get(((x + sh) % FW + FW) % FW, y) & 0xffffff);
+        for (let x = 0; x < FW; x++) buf.set(x, y, tint < 0 ? row[x]! : mix(row[x]!, tint, 0.55));
+      }
+    }
+  },
+};
+
 // extra wall details (iron-barred cell, skull / candle niche)
 const EXTRA_DETAILS: Record<string, Detail> = {
+  ...OPEN_DETAILS,
   bars: (p, buf, S, r) => {
     for (let y = 16; y < 38; y++)
       for (let x = 8; x < 25; x++) {
@@ -886,7 +1116,8 @@ const EXTRA_DETAILS: Record<string, Detail> = {
 };
 
 /** Details whose bright pixels are light sources (copied to the unlit glow layer). */
-const GLOWING = new Set(['alcove', 'skullCandle', 'goldCandles', 'rune', 'sigil', 'slimeNiche', 'shroomsTeal', 'shroomsPink', 'mycelium', 'sporePods', 'lavaCrack', 'lavaSeep', 'furnace', 'vent', 'niche', 'iceCrystals']);
+const GLOWING = new Set(['alcove', 'skullCandle', 'goldCandles', 'rune', 'sigil', 'slimeNiche', 'shroomsTeal', 'shroomsPink', 'mycelium', 'sporePods', 'lavaCrack', 'lavaSeep', 'furnace', 'vent', 'niche', 'iceCrystals',
+  'windShrine', 'sunGlyph', 'porthole', 'airlock', 'antenna', 'beacon', 'ledRack', 'ventGrille', 'terminal', 'warningGlyph', 'glitch']);
 
 /** The 8 theme detail variants per theme (face variants WALL_STRUCT.length .. +7). */
 export const ISO_WALL_DETAILS: Record<ThemeId, string[]> = {
@@ -897,6 +1128,9 @@ export const ISO_WALL_DETAILS: Record<ThemeId, string[]> = {
   fungal: ['shroomsTeal', 'shroomsPink', 'roots', 'mycelium', 'sporePods', 'mossDrip', 'alcove', 'crack'],
   forge: ['lavaCrack', 'ironPlate', 'chains', 'vent', 'lavaSeep', 'furnace', 'pipe', 'grate'],
   frost: ['icicles', 'frozenCorpse', 'rime', 'frozenFall', 'iceCrystals', 'ring', 'bars', 'banner'],
+  sky: ['ivy', 'hangRoots', 'windShrine', 'prayerFlags', 'nest', 'sunGlyph', 'crack', 'growth'],
+  moon: ['hullPanel', 'porthole', 'airlock', 'antenna', 'hazard', 'dustDrift', 'crack', 'beacon'],
+  server: ['ledRack', 'cableTray', 'ventGrille', 'terminal', 'warningGlyph', 'glitch', 'crack', 'pipe'],
 };
 
 /** All face variants of a theme, in frame order. */
@@ -957,8 +1191,10 @@ function arch(f: Face, theme: ThemeId, half: 0 | 1, seed: number): void {
     for (let xx = 0; xx < FW; xx++) {
       const x = xx + half * FW;
       const dx = (x + 0.5 - cx) / rx;
-      const inside = y >= spring ? Math.abs(dx) < 1 : (dx * dx + ((spring - y - 0.5) / ry) ** 2) < 1;
-      const outer = y >= spring ? Math.abs((x + 0.5 - cx) / (rx + 3)) < 1 : (((x + 0.5 - cx) / (rx + 3)) ** 2 + ((spring - y - 0.5) / (ry + 3)) ** 2) < 1;
+      // machine-built themes recess a square bay instead of a round arch
+      const square = theme === 'server' || theme === 'moon';
+      const inside = square ? Math.abs(dx) < 1 && y >= spring - ry + 4 : y >= spring ? Math.abs(dx) < 1 : (dx * dx + ((spring - y - 0.5) / ry) ** 2) < 1;
+      const outer = square ? Math.abs((x + 0.5 - cx) / (rx + 3)) < 1 && y >= spring - ry + 1 : y >= spring ? Math.abs((x + 0.5 - cx) / (rx + 3)) < 1 : (((x + 0.5 - cx) / (rx + 3)) ** 2 + ((spring - y - 0.5) / (ry + 3)) ** 2) < 1;
       const i = y * FW + xx;
       if (inside) {
         // recessed panel: small dark bricks
@@ -974,7 +1210,7 @@ function arch(f: Face, theme: ThemeId, half: 0 | 1, seed: number): void {
       } else if (outer) {
         // voussoirs: radial joints round the arch, square jambs below the springline
         let joint: boolean;
-        if (y >= spring) joint = (y - spring) % 7 === 6;
+        if (y >= spring || square) joint = (y - spring + 63) % 7 === 6;
         else {
           const a = Math.atan2((spring - y) / (ry + 1.5), (x + 0.5 - cx) / (rx + 1.5));
           joint = Math.abs(((a / Math.PI) * 9) % 1) < 0.12;
@@ -1020,15 +1256,15 @@ function damp(f: Face, theme: ThemeId, seed: number): void {
     const len = 14 + Math.floor(r() * 30);
     for (let y = CORNICE; y < CORNICE + len && y < PLINTH; y++) {
       const x = x0 + Math.round(Math.sin(y * 0.3 + k) * 0.6);
-      f.col.set(x, y, mix(f.col.get(x, y) & 0xffffff, theme === 'forge' ? 0x000000 : 0x0a1418, 0.45));
+      f.col.set(x, y, mix(f.col.get(x, y) & 0xffffff, theme === 'forge' || theme === 'server' ? 0x000000 : 0x0a1418, 0.45));
       if (y % 7 === 0) f.col.set(x, y, mix(f.col.get(x, y) & 0xffffff, 0xb8c8c8, 0.25));
     }
   }
   for (let y = 38; y < PLINTH; y++)
     for (let x = 0; x < FW; x++) {
-      if (hash2(x, y, seed + 1) > 0.94 && theme !== 'forge') f.col.set(x, y, mix(f.col.get(x, y) & 0xffffff, 0xd8dccc, 0.45));
+      if (hash2(x, y, seed + 1) > 0.94 && theme !== 'forge' && theme !== 'server') f.col.set(x, y, mix(f.col.get(x, y) & 0xffffff, 0xd8dccc, 0.45));
       const m = pnoise(x, y, 4, seed + 2) + (y - 38) * 0.02;
-      if (m > 0.8) f.col.set(x, y, tone(theme === 'flooded' || theme === 'frost' ? S.growth : D.moss, 0.6 + (m - 0.8) * 8 + bayer(x, y)));
+      if (m > 0.8) f.col.set(x, y, tone(mossOf(theme), 0.6 + (m - 0.8) * 8 + bayer(x, y)));
     }
 }
 
@@ -1051,7 +1287,7 @@ function everyday(theme: ThemeId, f: Face, frame: number, side: number): void {
     const p = new Painter(buf);
     const before = buf.data.slice();
     for (let k = 0; k < 4; k++) p.ellipse(r() * 32, 50 + r() * 4, 1.8 + r() * 2, 1.4 + r());
-    p.fill(theme === 'flooded' || theme === 'frost' ? S.growth : D.moss, { mode: 'sphere', dither: true });
+    p.fill(mossOf(theme), { mode: 'sphere', dither: true });
     liftChanged(f, before, 0.4, 1);
   } else if (kind === 5) {
     for (let k = 0; k < 3; k++) {
@@ -1143,9 +1379,9 @@ function roughenCap(cap: PixelBuffer, theme: ThemeId, seed: number, amount: numb
       cap.set(Math.round(x), Math.round(y), 0x050404);
     }
   }
-  if (theme === 'frost' || theme === 'ossuary' || theme === 'fungal') {
+  if (theme === 'frost' || theme === 'ossuary' || theme === 'fungal' || theme === 'sky' || theme === 'moon') {
     for (let n = 0; n < 4; n++) p.ellipse(4 + r() * 24, 4 + r() * 24, 2.4 + r() * 3, 1.8);
-    p.fill(theme === 'frost' ? S.growth : theme === 'ossuary' ? MATERIALS.boneDry : D.moss, { mode: 'sphere', dither: true, inner: false });
+    p.fill(theme === 'frost' || theme === 'sky' || theme === 'moon' ? S.growth : theme === 'ossuary' ? MATERIALS.boneDry : D.moss, { mode: 'sphere', dither: true, inner: false });
   }
 }
 
@@ -1248,6 +1484,9 @@ function isoCliff(theme: ThemeId, idx: number): PixelBuffer {
     fungal: R(0x140e09, 0x22180f, 0x322416, 0x44321e, 0x5a4428),
     forge: R(0x100e0e, 0x1a1616, 0x262020, 0x332b2b, 0x463c3c),
     frost: R(0x182232, 0x243248, 0x34465e, 0x4a6080, 0x6a84a4),
+    sky: R(0x2a1c10, 0x44301c, 0x5e4428, 0x7a5a36, 0x987448),
+    moon: R(0x1c1d22, 0x2c2e34, 0x40424a, 0x585a64, 0x767884),
+    server: R(0x06070a, 0x0e1014, 0x181b22, 0x242a34, 0x343c4a),
   };
   const E = earth[theme];
   const p = new Painter(new PixelBuffer(FW, CLIFF_H));
@@ -1298,6 +1537,26 @@ function isoCliff(theme: ThemeId, idx: number): PixelBuffer {
       const x = Math.floor(r() * FW);
       for (let y = 7; y < 7 + 10 + Math.floor(r() * 30); y++) strata.set(x, y, mix(strata.get(x, y) & 0xffffff, S.pool[3]!, 0.45));
     }
+  if (theme === 'sky') {
+    // the shard's underside: a turf lip over the dirt, roots trailing down into the open air
+    for (let y = 0; y < 7; y++) for (let x = 0; x < FW; x++) strata.set(x, y, tone(S.growth, (y < 2 ? 3 : 1.6) + bayer(x, y) * 0.8 - y * 0.15));
+    for (let k = 0; k < 5; k++) {
+      const x = 2 + r() * 28;
+      p.capsule(x, 6, x + (r() - 0.5) * 6, 22 + r() * 30, 1, 0.3);
+    }
+    p.fill(MATERIALS.root, { mode: 'cyl', dither: true, inner: false });
+  }
+  if (theme === 'moon') for (let y = 0; y < 3; y++) for (let x = 0; x < FW; x++) strata.set(x, y, tone(S.growth, 2.4 - y * 0.6 + bayer(x, y) * 0.6));
+  if (theme === 'server') {
+    // the raised floor's steel edge, the plenum's pedestals and cable runs below it
+    for (let y = 0; y < 7; y++) for (let x = 0; x < FW; x++) strata.set(x, y, tone(PLINTH_RAMP.server, y === 0 ? 4 : y === 6 ? 0.5 : 2.2 + bayer(x, y) * 0.3));
+    for (let y = 7; y < CLIFF_H; y++) for (const px of [6, 22]) for (let dx = 0; dx < 2; dx++) strata.set(px + dx, y, tone(PLINTH_RAMP.server, dx ? 1.4 : 2.6));
+    for (let k = 0; k < 4; k++) {
+      const x = 3 + k * 7 + r() * 3;
+      p.capsule(x, 8, x + (r() - 0.5) * 4, 20 + r() * 26, 1, 0.8);
+    }
+    p.fill(R(0x200608, 0x40100e, 0x6a1c18, 0x983028, 0xc04c40), { mode: 'cyl', inner: false });
+  }
   for (let u = 0; u < DW; u++) {
     if ((u < 32 ? 0 : 1) !== side) continue;
     const top = LAST_TOP[u]! + 1;

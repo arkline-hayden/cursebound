@@ -52,7 +52,7 @@ export interface RoomCtx {
   blocker(x: number, y: number, id: string, frame?: number, flip?: boolean): void;
   shaft(x: number, y: number, w: number): void;
   drip(x: number, y: number): void;
-  emitter(kind: 'smoke' | 'steam' | 'spores' | 'embers' | 'wisp', x: number, y: number, z: number, rate: number): void;
+  emitter(kind: 'smoke' | 'steam' | 'spores' | 'embers' | 'wisp' | 'sparks', x: number, y: number, z: number, rate: number): void;
 }
 
 function hash(x: number, y: number, s: number): number {
@@ -319,7 +319,7 @@ const cistern: KindPlan = (ctx, room) => {
     const centres: RoomFloorName[] = ['poolC', 'poolC1', 'poolC2'];
     let k = 0;
     nineSlice(ctx, 'pool', pool.x, pool.y, pool.w, pool.h, () => centres[(k++ * 7 + room.r.v) % 3]!);
-    if (ctx.theme === 'flooded' || ctx.theme === 'fungal' || ctx.theme === 'catacombs') {
+    if (ctx.theme === 'flooded' || ctx.theme === 'fungal' || ctx.theme === 'catacombs' || ctx.theme === 'sky') {
       for (let n = 0; n < Math.round(3 * ctx.density); n++) {
         const x = pool.x + 1 + Math.floor(room.rnd() * Math.max(1, pool.w - 2)), y = pool.y + 1 + Math.floor(room.rnd() * Math.max(1, pool.h - 2));
         if (free(ctx, x, y)) ctx.place('lilies', x + 0.5, y + 0.5, room.rnd() < 0.5, room.rnd());
@@ -332,13 +332,14 @@ const cistern: KindPlan = (ctx, room) => {
   for (const t of shuffled(room, room.backN)) {
     if (spouts >= 3) break;
     const [x, y] = xy(ctx, t);
-    if (ctx.theme === 'forge') break;
+    // no spouts over lava; none over the sky's pond (its rim is too low) or the moon's frozen crater
+    if (ctx.theme === 'forge' || ctx.theme === 'sky' || ctx.theme === 'moon') break;
     ctx.face(x, y - 1, 'L', 'pipe_outlet');
     ctx.drip(x + 0.5, y + 0.3);
     spouts++;
   }
   alongWalls(ctx, room, ['bucket', 'urn', 'well'], { step: 4, max: 3, p: 0.7 });
-  if (ctx.theme === 'forge') ctx.emitter('steam', room.cx, room.cy, 6, 1.4);
+  if (ctx.theme === 'forge' || ctx.theme === 'server') ctx.emitter('steam', room.cx, room.cy, 6, 1.4);
 };
 
 const shrine: KindPlan = (ctx, room) => {
@@ -475,6 +476,8 @@ const forge: KindPlan = (ctx, room) => {
   blockers(ctx, room, 'furnace', 'anvil');
   alongWalls(ctx, room, ['forge_hearth', 'anvil', 'quench', 'orepile', 'minecart'], { step: 3, max: 5, p: 0.9 });
   wallDecor(ctx, room, ['toolrack', 'chainhooks'], 0.25);
+  // the server room's power plant: a shorted bus bar spitting sparks
+  if (ctx.theme === 'server') ctx.emitter('sparks', room.cx, room.cy - 0.5, 18, 0.9);
 };
 
 const bridge: KindPlan = (ctx, room) => {

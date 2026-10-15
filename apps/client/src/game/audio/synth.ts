@@ -440,6 +440,11 @@ export class Synth {
         this.tone(out, t, { f: 120, f2: 70, dur: 0.09, gain: 0.18 * v });
         this.noiseHit(out, t, { dur: 0.03, f: 1500, q: 2, gain: 0.08 * v });
         return;
+      case 'pulse':
+        // an electronic kick: a fast sine drop with a click on top
+        this.tone(out, t, { f: 150, f2: 40, dur: 0.3, gain: 0.34 * v, glide: 0.09 });
+        this.noiseHit(out, t, { dur: 0.012, type: 'highpass', f: 3000, gain: 0.06 * v, attack: 0.001 });
+        return;
     }
   }
 
@@ -494,6 +499,16 @@ export class Synth {
         return;
       case 'whisper':
         this.whisper(out, t, 0.5, 0.05 * v);
+        return;
+      case 'glitch':
+        // a stuttered digital burst: three square blips at random pitches over a gated noise crackle
+        for (let k = 0; k < 3; k++) this.tone(out, t + k * 0.028, { type: 'square', f: 300 + this.rand() * 2200, dur: 0.02, gain: 0.03 * v, attack: 0.001, filter: 5000 });
+        this.noiseHit(out, t, { dur: 0.06, type: 'bandpass', f: 2600 + this.rand() * 2000, q: 4, gain: 0.05 * v, attack: 0.001 });
+        return;
+      case 'blip':
+        // a radio beacon's blip: a pure high tone with a short tail
+        this.tone(out, t, { f: 1760, dur: 0.09, gain: 0.03 * v, attack: 0.003 });
+        this.tone(out, t + 0.11, { f: 1760, dur: 0.05, gain: 0.012 * v, attack: 0.003 });
         return;
     }
   }
@@ -661,6 +676,59 @@ export class Drone {
         const low = filter('lowpass', 220, 1);
         low.connect(this.out);
         add('sawtooth', 0.5, 0.4, low);
+        break;
+      }
+      case 'wind': {
+        // open fifths of soft sines riding a gusting band of noise: high, airy, never settling
+        const hp = filter('highpass', 220, 0.7);
+        hp.connect(this.out);
+        add('sine', 2, 0.3, hp);
+        add('sine', 3, 0.22, hp, 4);
+        add('triangle', 4, 0.08, hp, -5);
+        const n = ctx.createBufferSource();
+        n.buffer = s.white;
+        n.loop = true;
+        const bp = filter('bandpass', 900, 3);
+        lfo(0.09, 500, bp.frequency);
+        const ng = ctx.createGain();
+        ng.gain.value = 0.16;
+        lfo(0.13, 0.1, ng.gain);
+        n.connect(bp);
+        bp.connect(ng);
+        ng.connect(this.out);
+        n.start(t, s.rand() * 2);
+        this.extra.push(n);
+        break;
+      }
+      case 'void': {
+        // a sub sine and two slow-beating partials far above it: the silence of airless space, made audible
+        add('sine', 0.5, 0.7, this.out);
+        const a = add('sine', 3, 0.12, this.out, 0);
+        const b = add('sine', 3, 0.12, this.out, 7);
+        lfo(0.05, 6, a.detune);
+        lfo(0.07, -6, b.detune);
+        add('triangle', 1, 0.15, this.out, -3);
+        break;
+      }
+      case 'hum': {
+        // mains hum: a buzzing square through a narrow band, its harmonics drifting, a fan's hiss underneath
+        const bp = filter('bandpass', 240, 2.5);
+        bp.connect(this.out);
+        lfo(0.21, 40, bp.frequency);
+        add('square', 1, 0.35, bp);
+        add('sawtooth', 2, 0.18, bp, 5);
+        add('sine', 0.5, 0.5, this.out);
+        const n = ctx.createBufferSource();
+        n.buffer = s.white;
+        n.loop = true;
+        const hp = filter('highpass', 3000, 0.7);
+        const ng = ctx.createGain();
+        ng.gain.value = 0.05;
+        n.connect(hp);
+        hp.connect(ng);
+        ng.connect(this.out);
+        n.start(t, s.rand() * 2);
+        this.extra.push(n);
         break;
       }
     }

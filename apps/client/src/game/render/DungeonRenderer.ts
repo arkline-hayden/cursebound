@@ -10,6 +10,7 @@ import { HH, HW, STUB_H, WALL_H, iso, isoBounds } from './iso';
 import { ensureIsoFallback, wallPropFor } from './isoArt';
 import { planDressing, trailMarks, type DressingPlan, type PlanStamp } from './dressing';
 import { Ambient } from './Ambient';
+import { Skybox } from './Skybox';
 import { gfx as gfxKnobs } from '../gfx';
 import type { MapRoom } from '@cursebound/simulation';
 
@@ -27,7 +28,8 @@ import type { MapRoom } from '@cursebound/simulation';
 // What goes where comes from the deterministic planner in dressing.ts (typed rooms: roomDressing.ts); ambient life
 // lives in Ambient.ts. Chasms (MapState voids) draw no masonry: the floor's edge hangs over the drop as a cliff with
 // mist far below. Cosmetic density follows gfx().decorDensity; with gfx().animatedDecor off, props hold still,
-// flames stop flickering and the fog, haze and light shafts stay put.
+// flames stop flickering and the fog, haze and light shafts stay put. Open-air themes (RenderTheme.backdrop) hang
+// a sky or starfield behind the floor (Skybox.ts); the sky island draws its back walls as a low rim (lowWalls).
 
 export interface MapLike {
   w: number;
@@ -84,6 +86,7 @@ export class DungeonRenderer {
   private map: MapLike | null = null;
   private key: number[] | null = null;
   private ambient: Ambient | null = null;
+  private skybox: Skybox | null = null;
   lighting: boolean;
   /** animated decor on (gfx tier), read at build */
   private animated = true;
@@ -311,7 +314,8 @@ export class DungeonRenderer {
           continue;
         }
       }
-      if (w.kind === 'stub') {
+      // open-air floors (the sky shard) keep their back walls as a low rim: drawn like cut front walls, undressed
+      if (w.kind === 'stub' || (th.lowWalls && w.kind === 'block')) {
         const sf = stubFrames >= 4 ? pickIsoStub(x, y, seed) : Math.floor(hash(x, y, seed + 1) * stubFrames);
         const img = s.add.image(T.x - HW, T.y - STUB_H, stubKey, Math.min(stubFrames - 1, sf)).setOrigin(0, 0).setDepth(depth);
         this.objs.push(this.lit(img));
@@ -351,7 +355,7 @@ export class DungeonRenderer {
     }
 
     // cobwebs strung across inside corners of two tall walls
-    for (const cw of plan.cobwebs) {
+    if (!th.lowWalls) for (const cw of plan.cobwebs) {
       const T = iso.p(cw.x, cw.y);
       this.placeProp('cobweb', T.x, T.y - WALL_H + 4, (cw.x + cw.y + 1) * 10 - 9.5);
     }
@@ -373,17 +377,21 @@ export class DungeonRenderer {
 
     // ---- themed ambient particles drifting through the whole floor
     const P = th.particles;
-    const key = P === 'snow' && s.textures.exists('pfx:snow') ? 'pfx:snow' : P === 'spores' && s.textures.exists('pfx:spore') ? 'pfx:spore' : P === 'drips' && s.textures.exists('pfx:drip') ? 'pfx:drip' : 'pfx:ember';
+    const key = P === 'snow' && s.textures.exists('pfx:snow') ? 'pfx:snow' : (P === 'spores' || P === 'data') && s.textures.exists('pfx:spore') ? 'pfx:spore' : P === 'drips' && s.textures.exists('pfx:drip') ? 'pfx:drip' : P === 'petals' && s.textures.exists('pfx:snow') ? 'pfx:snow' : 'pfx:ember';
     if (s.textures.exists(key)) {
       const cfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig =
         P === 'snow' ? { speedX: { min: -14, max: 4 }, speedY: { min: 14, max: 30 }, lifespan: 7000, frequency: 60, alpha: { start: 0.8, end: 0 } }
+        // petals and seeds blown across the sky shard on the wind
+        : P === 'petals' ? { speedX: { min: 30, max: 70 }, speedY: { min: -6, max: 14 }, lifespan: 6000, frequency: 140, alpha: { start: 0.85, end: 0 }, rotate: { min: 0, max: 360 } }
+        // data motes rising off the racks, a few at a time
+        : P === 'data' ? { speedX: { min: -3, max: 3 }, speedY: { min: -26, max: -10 }, lifespan: 3200, frequency: 120, alpha: { start: 0.8, end: 0 } }
         : P === 'drips' ? { speedY: { min: 120, max: 180 }, lifespan: 900, frequency: 200, alpha: { start: 0.7, end: 0.2 } }
         : P === 'embers' ? { speedX: { min: -10, max: 10 }, speedY: { min: -40, max: -14 }, lifespan: 3500, frequency: 90, alpha: { start: 0.9, end: 0 } }
         : P === 'spores' ? { speedX: { min: -8, max: 8 }, speedY: { min: -14, max: -4 }, lifespan: 6000, frequency: 80, alpha: { start: 0.7, end: 0 } }
         : { speedX: { min: -6, max: 6 }, speedY: { min: -10, max: -2 }, lifespan: 6000, frequency: 160, alpha: { start: 0.35, end: 0 } };
       const mgr = s.add.particles(0, 0, key, {
         x: { min: b.minX, max: b.maxX }, y: { min: -WALL_H, max: b.maxY }, scale: { min: 0.6, max: 1.1 }, tint: th.particleTint,
-        blendMode: P === 'drips' || P === 'snow' ? 'NORMAL' : 'ADD', ...cfg,
+        blendMode: P === 'drips' || P === 'snow' || P === 'petals' ? 'NORMAL' : 'ADD', ...cfg,
       }).setDepth(4800);
       this.objs.push(mgr);
     }
@@ -444,6 +452,9 @@ export class DungeonRenderer {
 
     // ---- ambient life: critters, smoke, spores, embers, drips, gusts
     this.ambient = new Ambient(s, plan.ambient, this.lighting);
+
+    // ---- open-air themes: the sky (clouds below, the shard's underside, islets) or the moon's starfield
+    if (th.backdrop) this.skybox = new Skybox(s, th.backdrop, plan, map.w, map.h, { animated: this.animated, density: knobs.decorDensity, seed });
 
     this.buildMs = performance.now() - t0;
     this.buildStats = { sprites: plan.sprites.length, stamps, lights: this.torches.length, vignettes: plan.stats.vignettes, planMs: plan.stats.ms, floorFx: plan.floor.length, cliffs: plan.cliffs.length, normals };
@@ -575,6 +586,7 @@ export class DungeonRenderer {
       for (const obj of o.objs) obj.setAlpha(o.alpha);
     }
     this.ambient?.update(time, focus);
+    this.skybox?.update(time);
   }
 
   litObject<T extends Phaser.GameObjects.GameObject>(o: T): T { return this.lit(o as T & { setPipeline?: (p: string) => unknown }); }
@@ -582,6 +594,8 @@ export class DungeonRenderer {
   destroy(full = true) {
     this.ambient?.destroy();
     this.ambient = null;
+    this.skybox?.destroy();
+    this.skybox = null;
     // the floor's data source points at the normal render texture: detach before either is destroyed
     if (this.floorRT) (this.floorRT.texture as unknown as { dataSource: unknown[] }).dataSource.length = 0;
     for (const o of this.objs) { this.scene.tweens?.killTweensOf(o); o.destroy(); }

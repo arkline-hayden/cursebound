@@ -9,7 +9,7 @@ export interface RenderTheme {
   torch: number;
   floorTint: number;
   wallTint: number;
-  particles: 'dust' | 'drips' | 'spores' | 'embers' | 'snow';
+  particles: 'dust' | 'drips' | 'spores' | 'embers' | 'snow' | 'petals' | 'data';
   particleTint: number;
   floorProps: { id: string; weight: number }[];
   wallProps: { id: string; weight: number }[];
@@ -23,6 +23,10 @@ export interface RenderTheme {
   fogAlpha: number;
   grade: number;
   torchBoost: number;
+  /** open-air floors: back walls drawn as a low rim (no wall dressing, no cobwebs) */
+  lowWalls?: boolean;
+  /** what lies beyond the floor's edges (Skybox.ts): open sky with drifting clouds, or a starfield with the Earth */
+  backdrop?: 'sky' | 'stars';
 }
 
 const ATMO: Record<ThemeId, { shaftColor: number; fogColor: number; fogAlpha: number; grade: number; torchBoost: number }> = {
@@ -33,6 +37,10 @@ const ATMO: Record<ThemeId, { shaftColor: number; fogColor: number; fogAlpha: nu
   fungal: { shaftColor: 0x9affd8, fogColor: 0x5aa890, fogAlpha: 0.14, grade: 0x88b8a4, torchBoost: 1.35 },
   forge: { shaftColor: 0xffb070, fogColor: 0x4a3a34, fogAlpha: 0.16, grade: 0xd09a78, torchBoost: 1.15 },
   frost: { shaftColor: 0xe4f6ff, fogColor: 0xd0e4fa, fogAlpha: 0.13, grade: 0x9cb8dc, torchBoost: 1.2 },
+  // sunbeams and cloud wisps in warm daylight; cold earthlight and settling dust; coolant mist under neon
+  sky: { shaftColor: 0xfff0c8, fogColor: 0xf4f8ff, fogAlpha: 0.12, grade: 0xf0dcc0, torchBoost: 1 },
+  moon: { shaftColor: 0xd8e8ff, fogColor: 0x9aa4b8, fogAlpha: 0.06, grade: 0x8a9ac0, torchBoost: 1.1 },
+  server: { shaftColor: 0x40e8ff, fogColor: 0x2a6a80, fogAlpha: 0.07, grade: 0x7a7aa8, torchBoost: 1.3 },
 };
 
 // Ambient is kept a touch brighter than the art defaults so the arena stays readable at range.
@@ -44,15 +52,24 @@ const TUNING: Record<ThemeId, { ambient: number; floorTint: number; wallTint: nu
   fungal: { ambient: 0x58847a, floorTint: 0xb8c8a0, wallTint: 0xa8b890, particleTint: 0x8ff0d0, decalTint: 0xd0ffe0 },
   forge: { ambient: 0x8a5a3a, floorTint: 0xb09080, wallTint: 0x98786a, particleTint: 0xffa040, decalTint: 0xffc8a0 },
   frost: { ambient: 0x7088a8, floorTint: 0xd8ecff, wallTint: 0xc8e0ff, particleTint: 0xffffff, decalTint: 0xd8f0ff },
+  sky: { ambient: 0xe0d4bc, floorTint: 0xffffff, wallTint: 0xffffff, particleTint: 0xfff0f6, decalTint: 0xffffff },
+  moon: { ambient: 0x7a8498, floorTint: 0xdce4f0, wallTint: 0xd0d8e8, particleTint: 0xd0d8e8, decalTint: 0xe0e8f8 },
+  server: { ambient: 0x3a4458, floorTint: 0xc8d4e8, wallTint: 0xb8c4dc, particleTint: 0x50f0ff, decalTint: 0xd0f0ff },
 };
 
 /** Light colour of torches / braziers where the art's flame colour would drown the room in one hue (warm-cool contrast). */
 const TORCH_OVERRIDE: Partial<Record<ThemeId, number>> = { sanctum: 0xff7a4a };
 
+/** Open-air themes: the sky shard's low rim and open sky, the moon's starfield. */
+const OPEN_AIR: Partial<Record<ThemeId, Pick<RenderTheme, 'lowWalls' | 'backdrop'>>> = {
+  sky: { lowWalls: true, backdrop: 'sky' },
+  moon: { backdrop: 'stars' },
+};
+
 export const RENDER_THEMES: Record<string, RenderTheme> = Object.fromEntries(
   (Object.keys(TUNING) as ThemeId[]).map((id) => {
     const a = THEME_ART[id];
-    return [id, { ...TUNING[id], ...ATMO[id], torch: TORCH_OVERRIDE[id] ?? a.torchColor, particles: a.particles, floorProps: a.props, wallProps: a.wallProps, torchProp: a.torchProp, pillarProp: a.pillarProp, grime: a.grime }];
+    return [id, { ...TUNING[id], ...ATMO[id], ...OPEN_AIR[id], torch: TORCH_OVERRIDE[id] ?? a.torchColor, particles: a.particles, floorProps: a.props, wallProps: a.wallProps, torchProp: a.torchProp, pillarProp: a.pillarProp, grime: a.grime }];
   }),
 );
 

@@ -38,6 +38,9 @@ const THEME_TINT: Record<string, { f0: string; f1: string; edge: string }> = {
   fungal: { f0: '#2c4a3e', f1: '#29453a', edge: '#9ff6dc' },
   forge: { f0: '#4e3428', f1: '#4a3125', edge: '#ffb060' },
   frost: { f0: '#3a4c5e', f1: '#364859', edge: '#e0f4ff' },
+  sky: { f0: '#4a6230', f1: '#455c2c', edge: '#fff0c0' },
+  moon: { f0: '#4a4c54', f1: '#45474f', edge: '#d8e8ff' },
+  server: { f0: '#232a38', f1: '#202634', edge: '#50f0ff' },
 };
 const tintOf = (theme: string | undefined) => THEME_TINT[theme ?? ''] ?? THEME_TINT.catacombs;
 

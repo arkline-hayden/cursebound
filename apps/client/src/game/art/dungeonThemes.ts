@@ -12,11 +12,11 @@
 import { MATERIALS, PALETTES } from './palette';
 import { Painter, PixelBuffer, bayer, hash2, lighten, mix, outlinePass, rng, type Ramp } from './draw/pixel';
 
-export type ThemeId = 'catacombs' | 'flooded' | 'ossuary' | 'sanctum' | 'fungal' | 'forge' | 'frost';
+export type ThemeId = 'catacombs' | 'flooded' | 'ossuary' | 'sanctum' | 'fungal' | 'forge' | 'frost' | 'sky' | 'moon' | 'server';
 export type VariantTheme = Exclude<ThemeId, 'catacombs'>;
 
-export const THEME_IDS: readonly ThemeId[] = ['catacombs', 'flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost'];
-export const VARIANT_THEMES: readonly VariantTheme[] = ['flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost'];
+export const THEME_IDS: readonly ThemeId[] = ['catacombs', 'flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost', 'sky', 'moon', 'server'];
+export const VARIANT_THEMES: readonly VariantTheme[] = ['flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost', 'sky', 'moon', 'server'];
 
 const T = 32;
 const OUT = PALETTES.outline;
@@ -102,6 +102,43 @@ export const STYLES: Record<VariantTheme, Style> = {
     accent: R(0x3a6a9a, 0x6aa8e0, 0xb0e0ff, 0xe8f8ff, 0xffffff),
     void: 0x04070c,
   },
+  // turf and pale sandstone flags on a shard of earth in open sky; sun-gold accents, clear rain pools
+  sky: {
+    floor: R(0x1a2a12, 0x2c4418, 0x44641e, 0x62882a, 0x8ab040),
+    floor2: R(0x3a3428, 0x5a5040, 0x7c705a, 0xa09478, 0xc8bc9c),
+    mortar: 0x1a1a10,
+    growth: R(0x2a4a14, 0x447020, 0x66982c, 0x94c444, 0xc8e878),
+    pool: R(0x163a5a, 0x2a6a94, 0x4a9ac4, 0x8ad0ee, 0xe0f8ff),
+    wall: R(0x3a3226, 0x5c503c, 0x807256, 0xa69676, 0xcabc9a),
+    cap: R(0x1e3410, 0x30521a, 0x4a7424, 0x6c9a32, 0x9ac650),
+    accent: R(0x6a4a10, 0xa07820, 0xd0a838, 0xf0d070, 0xfff4c0),
+    void: 0x7ab4e8,
+  },
+  // grey regolith and dark mare basalt, dust-frost highlights, ice in the crater floors, aluminium wreckage
+  moon: {
+    floor: R(0x26272c, 0x3a3c42, 0x52545c, 0x6e7078, 0x9294a0),
+    floor2: R(0x1c1d22, 0x2c2e34, 0x40424a, 0x585a64, 0x767884),
+    mortar: 0x101116,
+    growth: R(0x3a4458, 0x56647e, 0x7a8ca8, 0xa8bcd4, 0xdce8f6),
+    pool: R(0x10203a, 0x1c3a66, 0x3a6aa0, 0x7aa8d8, 0xc8e4ff),
+    wall: R(0x22232a, 0x34363e, 0x4a4c56, 0x666874, 0x8a8c9a),
+    cap: R(0x2e3036, 0x44464e, 0x5e6068, 0x7c7e88, 0xa4a6b0),
+    accent: R(0x2a2e36, 0x48505e, 0x6e7a8c, 0x9aa8bc, 0xd0dcec),
+    void: 0x020308,
+  },
+  // gunmetal raised floor and rack steel; cyan neon traces, glowing coolant, magenta curse-light
+  server: {
+    floor: R(0x0c0e14, 0x161a22, 0x222834, 0x323a4a, 0x48526a),
+    floor2: R(0x08090c, 0x101218, 0x1a1d26, 0x262a36, 0x363c4c),
+    mortar: 0x030406,
+    growth: R(0x04303a, 0x08606e, 0x10a8b8, 0x50f0ff, 0xc8ffff),
+    pool: R(0x02181e, 0x063a44, 0x0e7080, 0x30c8d8, 0xb0fcff),
+    poolGlow: true,
+    wall: R(0x0e1016, 0x1a1e28, 0x282e3c, 0x3a4256, 0x56607a),
+    cap: R(0x0a0c10, 0x14171e, 0x1e222c, 0x2c323e, 0x404858),
+    accent: R(0x3a0838, 0x7a1070, 0xd020c0, 0xff70f0, 0xffd0ff),
+    void: 0x020204,
+  },
 };
 
 /** Human notes for wall face variants per theme (manifest/debug). */
@@ -112,6 +149,9 @@ export const FACE_NOTES: Record<VariantTheme, string[]> = {
   fungal: ['cave rock', 'cracked rock', 'teal shrooms', 'magenta shrooms', 'hanging roots', 'mycelium veins', 'spore pods', 'dripping moss'],
   forge: ['basalt columns', 'lava crack', 'soot stains', 'riveted iron plate', 'hanging chains', 'glowing vent', 'lava seep', 'furnace mouth'],
   frost: ['icy bricks', 'cracked ice', 'thick rime', 'frozen fall', 'frosted ring', 'great icicles', 'frozen corpse', 'snow drift'],
+  sky: ['strata rock', 'cracked rock', 'ivy', 'hanging roots', 'wind shrine', 'prayer flags', 'nest', 'sun glyph'],
+  moon: ['regolith rock', 'cracked basalt', 'dust drift', 'hull panel', 'porthole', 'airlock', 'antenna', 'hazard stripes'],
+  server: ['rack panel', 'cracked panel', 'cable tray', 'LED rack', 'vent grille', 'terminal', 'warning glyph', 'glitch'],
 };
 
 // ---------------------------------------------------------------- helpers
@@ -783,6 +823,45 @@ function themeFaceDetail(id: VariantTheme, p: Painter, buf: PixelBuffer, oy: num
   }
 }
 
+/** Wall tops of the open-air and machine themes (replacing the masonry courses): turf, regolith, steel deck plate. */
+function openCap(id: 'sky' | 'moon' | 'server', buf: PixelBuffer, oy: number, seed: number): void {
+  const S = STYLES[id];
+  // moon: two little craters per top (period 32, so neighbouring tops tile)
+  const craters: [number, number, number][] = [[8 + hash2(1, 2, seed) * 8, 8 + hash2(3, 4, seed) * 8, 3 + hash2(5, 6, seed) * 2], [20 + hash2(7, 8, seed) * 6, 18 + hash2(9, 1, seed) * 8, 2 + hash2(2, 3, seed) * 2]];
+  for (let y = 0; y < T; y++)
+    for (let x = 0; x < T; x++) {
+      let c: number;
+      if (id === 'sky') {
+        const n = pnoise(x, y, 8, seed) * 0.6 + pnoise(x, y, 4, seed + 1) * 0.4;
+        c = tone(S.cap, 0.9 + n * 2.6 + bayer(x, y) * 0.45);
+        const h = hash2(x, y, seed + 2);
+        if (h > 0.9 && n > 0.45) c = S.growth[4]!;
+        else if (h < 0.06) c = S.cap[0]!;
+        if (hash2(x, y, seed + 3) > 0.988) c = hash2(x, y, seed + 4) > 0.5 ? 0xfff0b0 : 0xf0b0d0;
+        if (pnoise(x, y, 8, seed + 5) > 0.74) c = tone(S.wall, 1.6 + pnoise(x, y, 4, seed + 6) * 2 + bayer(x, y) * 0.3);
+      } else if (id === 'moon') {
+        let v = 1.7 + (pnoise(x, y, 8, seed) - 0.5) * 1.1 + (pnoise(x, y, 4, seed + 1) - 0.5) * 0.6 + bayer(x, y) * 0.35;
+        for (const [cx, cy, r] of craters) {
+          const d = Math.hypot(x + 0.5 - cx, (y + 0.5 - cy) * 1.1) / r;
+          if (d < 0.8) v -= 0.9 - d * 0.5;
+          else if (d < 1.15) v += (cy > y ? 0.9 : -0.3);
+        }
+        c = tone(S.cap, v);
+        if (hash2(x, y, seed + 2) > 0.985) c = S.cap[4]!;
+      } else {
+        const px = Math.floor(x / 16), py = Math.floor(y / 16), lx = x % 16, ly = y % 16;
+        const seam = lx === 15 || ly === 15;
+        let v = 2 + (pnoise(x, y, 8, seed) - 0.5) * 0.4 + bayer(x, y) * 0.25 + (lx === 0 || ly === 0 ? 0.8 : 0);
+        const vented = hash2(px, py, seed + 7) < 0.5;
+        if (vented && lx >= 3 && lx <= 12 && ly >= 3 && ly <= 12 && ly % 3 === 1) v = 0.4;
+        c = seam ? S.mortar : tone(S.cap, v);
+        if ((lx === 1 || lx === 13) && (ly === 1 || ly === 13)) c = S.cap[4]!;
+        if (!vented && lx === 7 && ly === 7) c = hash2(px, py, seed + 8) > 0.5 ? S.growth[3]! : S.accent[3]!;
+      }
+      buf.set(x, y + oy, c);
+    }
+}
+
 function themeCap(id: VariantTheme, buf: PixelBuffer, oy: number, variant: number, mask: number, faceBelow: boolean): void {
   const S = STYLES[id];
   const C = S.cap;
@@ -803,6 +882,7 @@ function themeCap(id: VariantTheme, buf: PixelBuffer, oy: number, variant: numbe
       buf.set(x, y + oy, c);
     }
   }
+  if (id === 'sky' || id === 'moon' || id === 'server') openCap(id, buf, oy, seed);
   const p = new Painter(buf);
   const r = rng(seed + mask);
   if (id === 'ossuary') for (let k = 0; k < 3; k++) skull(p, 5 + r() * 22, oy + 5 + r() * 20, 1, S.wall, S.accent[0]!);
@@ -973,7 +1053,7 @@ export function paintTallPillar(p: Painter, id: ThemeId): void {
   const H = PILLAR_H;
   const shaftTop = 34, shaftBot = H - 16;
   const shaft = id === 'sanctum' ? (S.floor2 ?? S.wall) : id === 'frost' ? R(0x2a3c54, 0x40587a, 0x5c7aa0, 0x86a6c8, 0xc0d8f0) : S.wall;
-  const capRamp = id === 'sanctum' ? S.growth : id === 'frost' ? R(0x4a6482, 0x6a88aa, 0x8cacca, 0xb8d0e8, 0xe8f4ff) : S.cap;
+  const capRamp = id === 'sanctum' ? S.growth : id === 'frost' ? R(0x4a6482, 0x6a88aa, 0x8cacca, 0xb8d0e8, 0xe8f4ff) : id === 'sky' ? S.wall : id === 'moon' ? S.accent : id === 'server' ? S.wall : S.cap;
   // base: plinth block, top face, torus moulding
   p.rect(3, H - 11, 26, 10).fill(S.cap, { mode: 'emboss', dither: true });
   p.ellipse(16, H - 11, 13.5, 4).fill(capRamp, { mode: 'emboss', light: 0.3 });
@@ -988,6 +1068,38 @@ export function paintTallPillar(p: Painter, id: ThemeId): void {
     shroomCluster(p, 20, shaftBot - 14, S.growth, 3, 5, 1.1);
     shroomCluster(p, 12, shaftTop + 24, S.accent, 2, 7);
     shroomCluster(p, 18, shaftTop + 8, S.growth, 2, 9, 0.8);
+  } else if (id === 'sky') {
+    // a weathered sandstone column, sun-bleached on its lit side, ivy climbing out of the turf
+    p.rect(8, shaftTop, 16, shaftBot - shaftTop).fill(S.wall, { mode: 'cyl', dither: true, cx: 13 });
+    for (let k = 0; k < 4; k++) p.line(10 + k * 4, shaftTop + 2, 10 + k * 4, shaftBot - 2);
+    p.fill(S.wall, { mode: 'flat', tone: 1, inner: false, alpha: 140 });
+    for (const y of [shaftTop + 22, shaftTop + 46]) p.rect(8, y, 16, 1);
+    p.fill(S.wall, { mode: 'flat', tone: 0, inner: false, alpha: 200 });
+    const r = rng(53);
+    let vx = 12;
+    for (let y = shaftBot; y > shaftTop + 10; y -= 1.5) {
+      vx += (r() - 0.5) * 1.6;
+      vx = Math.max(9, Math.min(23, vx));
+      p.dot(vx, y);
+      if (r() < 0.35) p.ellipse(vx + (r() < 0.5 ? -1.6 : 1.6), y, 1.3, 1);
+    }
+    p.fill(S.growth, { mode: 'sphere', dither: true, inner: false });
+  } else if (id === 'moon') {
+    // an outpost support pylon: a riveted steel shaft in a hazard-striped collar, a dead beacon at its head
+    p.rect(9, shaftTop, 14, shaftBot - shaftTop).fill(S.accent, { mode: 'cyl', cx: 13 });
+    for (let y = shaftTop + 4; y < shaftBot - 4; y += 9) for (const x of [10, 21]) p.px(x, y, S.accent[4]!);
+    for (let y = shaftBot - 14; y < shaftBot - 4; y++) for (let x = 9; x < 23; x++) p.px(x, y, (x + y) % 6 < 3 ? 0xd8a020 : 0x18181c);
+    p.rect(8, shaftTop + 30, 16, 3).fill(S.wall, { mode: 'cyl', inner: false });
+    p.ellipse(16, shaftTop + 3, 2.4, 2).fill(R(0x3a0808, 0x6a1010, 0xa01e1e, 0xd04040, 0xf08080), { mode: 'sphere', inner: false });
+  } else if (id === 'server') {
+    // a cable riser: a dark steel column cased in cable bundles, a cyan status strip running up its face
+    p.rect(8, shaftTop, 16, shaftBot - shaftTop).fill(S.wall, { mode: 'cyl', dither: true, cx: 13 });
+    for (const x of [10, 21]) p.line(x, shaftTop + 2, x, shaftBot - 2);
+    p.fill(R(0x060608, 0x0e0e12, 0x18181e, 0x24242c, 0x32323c), { mode: 'cyl', inner: false });
+    for (let y = shaftTop + 6; y < shaftBot - 6; y += 4) p.px(15, y, S.growth[y % 12 === 2 ? 4 : 3]!).px(16, y, S.growth[2]!);
+    for (const y of [shaftTop + 18, shaftTop + 44]) p.rect(7, y, 18, 2);
+    p.fill(S.cap, { mode: 'cyl', inner: false });
+    p.px(13, shaftTop + 26, S.accent[3]!).px(18, shaftBot - 20, S.accent[3]!);
   } else {
     p.rect(8, shaftTop, 16, shaftBot - shaftTop).fill(shaft, { mode: 'cyl', dither: true, cx: 14 });
     // fluting: dark grooves with a lit edge
@@ -1445,6 +1557,16 @@ export const THEME_PROP_SPECS: Record<string, ThemePropSpec> = {
   pillar_fungal: pillarVariant('fungal'),
   pillar_forge: pillarVariant('forge'),
   pillar_frost: pillarVariant('frost'),
+  // open sky has no vault to rise into: the sky column ends in a broken, sunlit top instead of fading out
+  pillar_sky: { ...pillarVariant('sky'), post: (buf) => {
+    for (let x = 0; x < buf.w; x++) {
+      const cut = 40 + Math.round(Math.sin(x * 0.9) * 2 + hash2(x, 3, 61) * 5 + (x > 18 ? 6 : 0));
+      for (let y = 0; y < cut; y++) buf.set(x, y, 0, 0);
+      if (buf.alpha(x, cut)) buf.set(x, cut, mix(buf.get(x, cut) & 0xffffff, 0xfff4d8, 0.35));
+    }
+  } },
+  pillar_moon: pillarVariant('moon'),
+  pillar_server: pillarVariant('server'),
 };
 
 // ---------------------------------------------------------------- theme decals (grime)
@@ -1498,6 +1620,79 @@ export const THEME_DECAL_SPECS: ThemeDecalSpec[] = [
     frames: 3,
     draw: (b, i) => patch(b, 650 + i, (n, d, x, y) => (n > 0.42 + d * 0.32 ? [tone(STYLES.frost.growth, 0.8 + n * 2.6 + bayer(x, y) * 0.5), 210] : null)),
   },
+  // ---- sky: clover and wildflower patches, scattered pale pebbles
+  {
+    key: 'decal:clover',
+    w: 32,
+    h: 32,
+    frames: 3,
+    draw: (b, i) => patch(b, 660 + i, (n, d, x, y) => {
+      if (n < 0.38 + d * 0.36) return null;
+      const h = hash2(x, y, 661 + i);
+      if (h > 0.965) return [h > 0.985 ? 0xfff2a8 : i === 1 ? 0xf0a8d0 : 0xffffff, 255];
+      return [tone(STYLES.sky.growth, 0.6 + n * 3 + bayer(x, y) * 0.5), 225];
+    }),
+  },
+  { key: 'decal:pebbles', w: 32, h: 32, frames: 3, draw: (b, i) => patch(b, 670 + i, (n, d, x, y) => (hash2(x, y, 670 + i) > 0.9 - n * 0.08 && d < 0.85 ? [tone(STYLES.sky.floor2!, 1.6 + n * 2.6), 235] : null)) },
+  // ---- moon: little impact craters (raised lit rim, shadowed bowl) and drifts of pale dust
+  {
+    key: 'decal:crater',
+    w: 40,
+    h: 40,
+    frames: 3,
+    draw: (b, i) => {
+      const r = 8 + i * 3;
+      for (let y = 0; y < b.h; y++)
+        for (let x = 0; x < b.w; x++) {
+          const dx = x + 0.5 - 20, dy = (y + 0.5 - 20) * 1.15;
+          const d = Math.hypot(dx, dy) / r + (hash2(x, y, 680 + i) - 0.5) * 0.08;
+          if (d > 1.35) continue;
+          const M = STYLES.moon.floor;
+          if (d < 0.82) b.set(x, y, tone(M, 0.4 + d * 1.6 + (dx + dy < 0 ? -0.4 : 0.6) * (d / 0.82) + bayer(x, y) * 0.3), 225);
+          else if (d < 1.05) b.set(x, y, tone(M, (dy < 0 ? 2.4 : 3.6) + bayer(x, y) * 0.4), 235);
+          else if (hash2(x, y, 690 + i) > 0.55) b.set(x, y, tone(M, 2.6), Math.round(180 * (1.35 - d) / 0.3));
+        }
+    },
+  },
+  { key: 'decal:regolith', w: 40, h: 40, frames: 3, draw: (b, i) => patch(b, 700 + i, (n, d, x, y) => (n > 0.36 + d * 0.38 ? [tone(STYLES.moon.floor, 2.4 + n * 2 + bayer(x, y) * 0.4), Math.round(170 * (1 - d * 0.5))] : null)) },
+  // ---- server: glitched pixel smears (RGB-split blocks) and loose cable runs
+  {
+    key: 'decal:glitch',
+    w: 40,
+    h: 24,
+    frames: 3,
+    draw: (b, i) => {
+      const r = rng(710 + i);
+      for (let k = 0; k < 7 + i * 2; k++) {
+        const x0 = Math.floor(r() * 30), y0 = Math.floor(r() * 20), w = 3 + Math.floor(r() * 10), h = 1 + Math.floor(r() * 2);
+        const c = k % 3 === 0 ? STYLES.server.accent[3]! : k % 3 === 1 ? STYLES.server.growth[3]! : 0xf0f0ff;
+        for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) b.set(x, y, c, 150 + Math.floor(hash2(x, y, i) * 90));
+        for (let x = x0; x < x0 + w; x++) b.set(x + 1, y0 + h, STYLES.server.accent[1]!, 110);
+      }
+    },
+  },
+  {
+    key: 'decal:cable',
+    w: 40,
+    h: 24,
+    frames: 3,
+    draw: (b, i) => {
+      const p = new Painter(b);
+      const r = rng(720 + i);
+      const cols: Ramp[] = [R(0x060608, 0x101014, 0x1c1c22, 0x2a2a32, 0x3c3c46), R(0x200608, 0x40100e, 0x6a1c18, 0x983028, 0xc04c40), R(0x06141e, 0x0c2a3a, 0x164a62, 0x2a7090, 0x4a9ac0)];
+      for (let k = 0; k < 2 + (i % 2); k++) {
+        let x = 2 + r() * 6, y = 4 + r() * 16;
+        let a = (r() - 0.5) * 0.8;
+        for (let s = 0; s < 34; s++) {
+          a += (r() - 0.5) * 0.5;
+          x += Math.cos(a);
+          y += Math.sin(a) * 0.5;
+          p.circle(x, y, 1);
+        }
+        p.fill(cols[(k + i) % cols.length]!, { mode: 'cyl', inner: false });
+      }
+    },
+  },
 ];
 
 // ---------------------------------------------------------------- theme table
@@ -1516,7 +1711,7 @@ export interface ThemeArt {
   pillarProp: string;
   props: { id: string; weight: number }[];
   wallProps: { id: string; weight: number }[];
-  particles: 'dust' | 'drips' | 'spores' | 'embers' | 'snow';
+  particles: 'dust' | 'drips' | 'spores' | 'embers' | 'snow' | 'petals' | 'data';
   grime: string[];
   puddleTint?: number;
   /** native 2:1 isometric terrain keys (see isoTerrain.ts) */
@@ -1703,6 +1898,83 @@ export const THEME_ART: Record<ThemeId, ThemeArt> = {
     particles: 'snow',
     grime: ['decal:frost', 'decal:crack', 'decal:puddle'],
     puddleTint: 0xa8d8ff,
+  },
+  // the props named here live in themeProps.ts
+  sky: {
+    iso: isoOf('sky'),
+    floorKey: 'dungeon:floor:sky',
+    wallKey: 'dungeon:wall:sky',
+    voidKey: 'dungeon:void:sky',
+    ambient: 0xc8bca8,
+    torchColor: 0xffd890,
+    torchProp: 'lantern_sky',
+    pillarProp: 'pillar_sky',
+    props: [
+      { id: 'grass_tuft', weight: 5 },
+      { id: 'wildflowers', weight: 3 },
+      { id: 'boulder', weight: 3 },
+      { id: 'sky_crystal', weight: 1 },
+      { id: 'rubble', weight: 1 },
+      { id: 'bones', weight: 0.5 },
+    ],
+    wallProps: [
+      { id: 'ivy', weight: 3 },
+      { id: 'prayer_flags', weight: 2 },
+    ],
+    particles: 'petals',
+    grime: ['decal:clover', 'decal:pebbles', 'decal:moss'],
+    puddleTint: 0x8ad0ee,
+  },
+  moon: {
+    iso: isoOf('moon'),
+    floorKey: 'dungeon:floor:moon',
+    wallKey: 'dungeon:wall:moon',
+    voidKey: 'dungeon:void:moon',
+    ambient: 0x5a6478,
+    torchColor: 0xcfe4ff,
+    torchProp: 'lamp_moon',
+    pillarProp: 'pillar_moon',
+    props: [
+      { id: 'moonrock', weight: 4 },
+      { id: 'debris_panel', weight: 2 },
+      { id: 'canister', weight: 2 },
+      { id: 'solar_panel', weight: 1 },
+      { id: 'rubble', weight: 1 },
+    ],
+    wallProps: [
+      { id: 'porthole', weight: 2 },
+      { id: 'hull_vent', weight: 2 },
+      { id: 'cable_wall', weight: 1 },
+    ],
+    particles: 'dust',
+    grime: ['decal:crater', 'decal:regolith', 'decal:crack'],
+    puddleTint: 0x7aa8d8,
+  },
+  server: {
+    iso: isoOf('server'),
+    floorKey: 'dungeon:floor:server',
+    wallKey: 'dungeon:wall:server',
+    voidKey: 'dungeon:void:server',
+    ambient: 0x2a3446,
+    torchColor: 0x40e8ff,
+    torchProp: 'neon_cyan',
+    pillarProp: 'pillar_server',
+    props: [
+      { id: 'cable_coil', weight: 4 },
+      { id: 'floor_vent', weight: 2 },
+      { id: 'terminal', weight: 2 },
+      { id: 'rack_small', weight: 2 },
+      { id: 'chip_debris', weight: 2 },
+    ],
+    wallProps: [
+      { id: 'rack_wall', weight: 3 },
+      { id: 'neon_magenta', weight: 2 },
+      { id: 'cable_wall', weight: 2 },
+      { id: 'warning_sign', weight: 1 },
+    ],
+    particles: 'data',
+    grime: ['decal:glitch', 'decal:cable', 'decal:stain'],
+    puddleTint: 0x30c8d8,
   },
 };
 

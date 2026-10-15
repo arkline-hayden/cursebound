@@ -93,8 +93,8 @@ export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 export type MusicTrack = 'menu' | 'explore' | 'combat' | 'boss';
 
 /** Dungeon themes with their own music, ambience bed and footstep surface (DUNGEON_THEMES ids). */
-export type AudioTheme = 'catacombs' | 'flooded' | 'ossuary' | 'sanctum' | 'fungal' | 'forge' | 'frost';
-export const AUDIO_THEMES: readonly AudioTheme[] = ['catacombs', 'flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost'];
+export type AudioTheme = 'catacombs' | 'flooded' | 'ossuary' | 'sanctum' | 'fungal' | 'forge' | 'frost' | 'sky' | 'moon' | 'server';
+export const AUDIO_THEMES: readonly AudioTheme[] = ['catacombs', 'flooded', 'ossuary', 'sanctum', 'fungal', 'forge', 'frost', 'sky', 'moon', 'server'];
 
 /** Musical stingers (audio.stinger). Each ducks the music briefly. */
 export type StingerKind = 'door_open' | 'portal' | 'round_start' | 'boss_reveal' | 'boss_roar' | 'round_clear' | 'legendary' | 'party_wipe';

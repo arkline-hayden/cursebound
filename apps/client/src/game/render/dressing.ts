@@ -114,7 +114,7 @@ export interface PlanTrail {
 }
 
 export interface PlanEmitter {
-  kind: 'smoke' | 'steam' | 'spores' | 'embers' | 'wisp';
+  kind: 'smoke' | 'steam' | 'spores' | 'embers' | 'wisp' | 'sparks';
   x: number;
   y: number;
   /** px above the ground */
@@ -554,16 +554,19 @@ export function planDressing(map: DressMap, opts: DressOpts = {}): DressingPlan 
     }
     return false;
   };
+  // themes that re-dress the dungeon's furniture in their own (sky, moon, server room: vignettes.ts `rooms`)
+  const roomProp = (id: string): string => (dress.rooms?.[id] && PROPS[dress.rooms[id]!] ? dress.rooms[id]! : id);
   const ctx: RoomCtx = {
     W, H, theme, seed, density, arena: mapArena(wire), boss: mapBossSpawn(wire),
     isFloor, isWall, isVoid, freeStanding, shallow, reserved, occupied, owner,
-    place: (id, px, py, flip, fs) => place(id, px, py, flip, fs),
-    hug: hugAt,
-    face: (wx, wy, side, id) => { if (PROPS[id]) faceRequests.set(`${wx},${wy},${side}`, id); },
+    place: (id, px, py, flip, fs) => place(roomProp(id), px, py, flip, fs),
+    hug: (id, x, y, side, fs) => hugAt(roomProp(id), x, y, side, fs),
+    face: (wx, wy, side, id) => { const rid = roomProp(id); if (PROPS[rid]) faceRequests.set(`${wx},${wy},${side}`, rid); },
     floor: (name, x, y) => { if (isFloor(x, y) && ROOM_FLOOR[name] !== undefined) roomFloorAt.set(idx(x, y), ROOM_FLOOR[name]); },
     deco: (name, x, y) => { if (isFloor(x, y)) extraDeco.push({ frame: DECO[name], x, y }); },
     decal: (key, frame, x, y, o = {}) => plan.decals.push({ key, frame, x, y, sx: o.sx, sy: o.sy, alpha: o.alpha, tint: o.tint, flip: o.flip }),
-    blocker: (x, y, id, frame = 0, flip = false) => {
+    blocker: (x, y, bid, frame = 0, flip = false) => {
+      const id = roomProp(bid);
       const def = PROPS[id];
       if (!def || !freeStanding(x, y)) return;
       const frames = def.frames ?? 1;
@@ -988,6 +991,10 @@ const FLOOR_FEATURES: Record<ThemeId, { runner: number; dais: number; centre: nu
   fungal: { runner: 0.5, dais: 0.25, centre: 0.75, slabs: 0.15, edge: 0.7, wet: 0.07, crack: 0.03, hole: 0.03, grate: 0.006, scatter: 0.06, shafts: 2, fog: 0.9 },
   forge: { runner: 0.6, dais: 0.35, centre: 0.7, slabs: 0.6, edge: 0.6, wet: 0.05, crack: 0.07, hole: 0.03, grate: 0.025, scatter: 0.05, shafts: 1, fog: 0.7 },
   frost: { runner: 0.5, dais: 0.3, centre: 0.6, slabs: 0.4, edge: 0.85, wet: 0.06, crack: 0.05, hole: 0.02, grate: 0.008, scatter: 0.05, shafts: 3, fog: 0.8 },
+  // footpaths and sunbeams on the shard (its holes look down into the sky); rover tracks and craters; light strips
+  sky: { runner: 0.55, dais: 0.2, centre: 0.4, slabs: 0.25, edge: 0.75, wet: 0.04, crack: 0.03, hole: 0.015, grate: 0.004, scatter: 0.06, shafts: 3, fog: 0.7 },
+  moon: { runner: 0.5, dais: 0.3, centre: 0.65, slabs: 0.35, edge: 0.6, wet: 0.05, crack: 0.05, hole: 0.03, grate: 0.01, scatter: 0.07, shafts: 1, fog: 0.4 },
+  server: { runner: 0.8, dais: 0.4, centre: 0.6, slabs: 0.6, edge: 0.7, wet: 0.03, crack: 0.03, hole: 0.03, grate: 0.03, scatter: 0.06, shafts: 0, fog: 0.4 },
 };
 
 /**
@@ -1129,10 +1136,13 @@ function planFloorFeatures(
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (x >= 0 && y >= 0 && x < W && y < H && isFloor(x, y)) return false;
     return true;
   };
+  // a wall whose foot stands on the brink of a chasm (the sky shard's rim) hangs its slab face into the void too
+  const voidAt = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < W && y < H && !isFloor(x, y) && !isWall(x, y);
   for (const w of plan.walls) {
-    if (w.kind !== 'stub') continue;
-    const L = isWall(w.x, w.y + 1) && rockOnly(w.x, w.y + 1, w.x + 2, w.y + 3);
-    const R = isWall(w.x + 1, w.y) && rockOnly(w.x + 1, w.y, w.x + 3, w.y + 2);
+    if (w.kind !== 'stub' && w.kind !== 'block') continue;
+    const stub = w.kind === 'stub';
+    const L = (stub && isWall(w.x, w.y + 1) && rockOnly(w.x, w.y + 1, w.x + 2, w.y + 3)) || voidAt(w.x, w.y + 1);
+    const R = (stub && isWall(w.x + 1, w.y) && rockOnly(w.x + 1, w.y, w.x + 3, w.y + 2)) || voidAt(w.x + 1, w.y);
     if (L || R) plan.cliffs.push({ x: w.x, y: w.y, L, R, v: Math.floor(h(w.x, w.y, 940) * 3) });
   }
 

@@ -4,8 +4,9 @@ import { WALL_H, iso } from './iso';
 import { gfx } from '../gfx';
 
 // Ambient life for the dungeon (client-only, cosmetic, never touches the simulation): rats that scurry along the back
-// walls and bolt from heroes, bats crossing high overhead, flies over the dead, spiders lowering themselves from
-// cobwebs, smoke / steam / spores / embers rising from their sources, drips rippling into puddles and gusts of snow.
+// walls and bolt from heroes, bats (gulls on the sky island) crossing high overhead, flies over the dead, spiders
+// lowering themselves from cobwebs, smoke / steam / spores / embers / sparks from their sources, drips rippling into
+// puddles and gusts of snow or wind.
 // Everything is pooled and capped; offscreen sources do not emit and offscreen critters are not updated. Critters are
 // tiny, dark and quick so they never compete with enemies for attention. Graphics tier (game/gfx.ts): critters and gusts
 // need ambientLife, source smoke / embers / drips need animatedDecor, and the mote pool and emit rates scale with particles.
@@ -67,7 +68,7 @@ export class Ambient {
     this.life = k.ambientLife;
     this.gusts = k.ambientLife && hints.gusts;
     this.maxMotes = Math.round(MAX_MOTES * Math.min(1, k.particles));
-    this.sporeTint = hints.theme === 'fungal' ? [0x7af0d0, 0xff9ae8, 0x9afff0] : [0xd8c8a8];
+    this.sporeTint = hints.theme === 'fungal' ? [0x7af0d0, 0xff9ae8, 0x9afff0] : hints.theme === 'sky' ? [0xfff4c0, 0xffffff, 0xf0c0e0] : hints.theme === 'server' ? [0x50f0ff, 0xff70f0] : [0xd8c8a8];
     if (k.animatedDecor) {
       const rate = Math.min(1, k.particles);
       for (const e of hints.emitters) {
@@ -87,9 +88,11 @@ export class Ambient {
         this.rats.push({ spr, on: false, run: 0, t: 0, dir: 1, speed: 2, state: 'run', timer: 1500 + i * 2500 + Math.random() * 4000, alpha: 0 });
       }
     }
-    if (has('critter:bat') && hints.bats) {
+    // the sky shard's fliers are gulls riding the wind, not bats
+    const flier = hints.theme === 'sky' && has('critter:bird') ? 'critter:bird' : 'critter:bat';
+    if (has(flier) && hints.bats) {
       for (let i = 0; i < 3; i++) {
-        const spr = scene.add.image(0, 0, 'critter:bat', 0).setDepth(4790).setVisible(false).setAlpha(0.85);
+        const spr = scene.add.image(0, 0, flier, 0).setDepth(4790).setVisible(false).setAlpha(0.85);
         this.objs.push(spr);
         this.bats.push({ spr, on: false, x: 0, y: 0, vx: 0, vy: 0, t: 0, amp: 4, phase: 0 });
       }
@@ -184,6 +187,10 @@ export class Ambient {
       }
       case 'embers':
         this.spawn('amb:mote', e.sx + (r() - 0.5) * 10, e.sy, e.depth, { vx: (r() - 0.5) * 18, vy: -28 - r() * 22, life: 0.9 + r() * 0.9, s0: 1, s1: 0.5, peak: 1, a: 0.05, sway: 3, tint: r() < 0.5 ? 0xffa040 : 0xff6a1a, add: true, flicker: true });
+        break;
+      case 'sparks':
+        // a burst of electric sparks spat sideways that fall and die fast
+        for (let k = 0; k < 3; k++) this.spawn('amb:mote', e.sx + (r() - 0.5) * 4, e.sy, e.depth, { vx: (r() - 0.5) * 70, vy: -30 - r() * 30, ay: 220, life: 0.35 + r() * 0.35, s0: 0.9, s1: 0.4, peak: 1, a: 0.02, tint: r() < 0.6 ? 0x9af8ff : 0xffffff, add: true, flicker: true });
         break;
     }
   }

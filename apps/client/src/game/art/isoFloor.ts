@@ -66,7 +66,7 @@ export const DECO_TOP = 8;
 const RISE = 4;
 
 /** Which themes have unlit glowing floor pixels (lava seams, mycelium, sigils). */
-export const FLOOR_GLOW_THEMES: readonly ThemeId[] = ['forge', 'fungal', 'sanctum'];
+export const FLOOR_GLOW_THEMES: readonly ThemeId[] = ['forge', 'fungal', 'sanctum', 'server'];
 
 // ---------------------------------------------------------------- theme floor materials
 
@@ -154,11 +154,48 @@ export const FLOOR_MATS: Record<ThemeId, FloorMat> = {
     gloss: 0.8,
     groutDepth: 2,
   },
+  sky: {
+    stone: R(0x3a3428, 0x5a5040, 0x7c705a, 0xa09478, 0xc8bc9c),
+    alt: R(0x2e3424, 0x485238, 0x667050, 0x88926a, 0xaab48a),
+    mortar: 0x182010,
+    dust: 0x4a5a26,
+    growth: R(0x1a2a10, 0x2c4418, 0x44661e, 0x64902a, 0x90bc44),
+    water: R(0x163a5a, 0x2a6a94, 0x4a9ac4, 0x8ad0ee, 0xe0f8ff),
+    gloss: 0,
+    groutDepth: 1.6,
+  },
+  moon: {
+    stone: R(0x2a2b30, 0x3e4046, 0x56585f, 0x70727a, 0x9496a2),
+    alt: R(0x1e1f24, 0x2e3036, 0x42444c, 0x5a5c66, 0x787a86),
+    mortar: 0x0e0f13,
+    dust: 0x6a6c74,
+    growth: R(0x4a4c54, 0x6a6c76, 0x8e909a, 0xb4b6c0, 0xdcdee6),
+    water: R(0x10203a, 0x1c3a66, 0x3a6aa0, 0x7aa8d8, 0xc8e4ff),
+    gloss: 0.1,
+    groutDepth: 1.2,
+  },
+  server: {
+    stone: R(0x101318, 0x1a1e26, 0x262c38, 0x36404e, 0x4e5a6e),
+    alt: R(0x0c0d12, 0x14161c, 0x1e2128, 0x2a2e38, 0x3c4250),
+    mortar: 0x020304,
+    dust: 0x1a1e26,
+    growth: R(0x04303a, 0x08606e, 0x10a8b8, 0x50f0ff, 0xc8ffff),
+    water: R(0x02181e, 0x063a44, 0x0e7080, 0x30c8d8, 0xb0fcff),
+    gloss: 0.5,
+    groutDepth: 1.4,
+  },
 };
 
 export const LAVA = R(0x4a0a02, 0x9a2204, 0xf05a0a, 0xffa838, 0xfff0a0);
 export const MYCELIUM = R(0x123a34, 0x1e7064, 0x3ab8a0, 0x9af4dc, 0xe8fff8);
 export const GOLD = R(0x4a3008, 0x8a6418, 0xc89a30, 0xf0d070, 0xfff4c0);
+/** Riveted deck plate for the themes built of metal rather than stone (slabs, dais, steps, risers). */
+const PLATE: Partial<Record<ThemeId, Ramp>> = {
+  moon: R(0x2a2e36, 0x48505e, 0x6e7a8c, 0x9aa8bc, 0xd0dcec),
+  server: R(0x14171e, 0x262c38, 0x3a4256, 0x56607a, 0x8a96b0),
+};
+/** The server room's magenta curse-light (glyphs, warning marks). */
+export const CURSE = R(0x3a0838, 0x7a1070, 0xd020c0, 0xff70f0, 0xffd0ff);
 
 export interface FloorMacro {
   col: Uint32Array;
@@ -585,6 +622,148 @@ function macroFrost(): FloorMacro {
   return m;
 }
 
+/** Sky shard: windblown turf over the old sandstone paving that still breaks through in patches, wildflowers, bare earth. */
+function macroSky(): FloorMacro {
+  const seed = 9808;
+  const M = FLOOR_MATS.sky;
+  const m = flagstones('sky', seed, { sizes: 'big', wobble: 1.6, altP: 0.4, sunkP: 0.1, missP: 0.06, crackP: 0.2 });
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const pave = FB(seed + 11, [64, 32, 16])[i]!;
+      const turf = FB(seed + 12, [32, 16, 8, 4])[i]!;
+      const blade = hashi(x, y, seed + 13);
+      // paving shows where the turf is thin; grass always fills its joints
+      const grassy = pave < 0.52 || m.h[i]! < -0.4 || (pave < 0.58 && blade > 0.55);
+      if (!grassy) continue;
+      let v = 0.9 + turf * 2.5 + bayer(x, y) * 0.4;
+      // blades: a lit tip over a dark root, leaning with the wind (period 4 texels)
+      if (blade > 0.8) v += 1.1;
+      else if (blade < 0.12) v -= 0.8;
+      let c = tone(M.growth, v);
+      const bare = FB(seed + 14, [64, 32])[i]!;
+      if (bare > 0.7) c = mixc(c, tone(R(0x2a1e12, 0x44321e, 0x60482c, 0x7c623e, 0x9a7e54), 1.4 + turf * 2), Math.min(1, (bare - 0.7) * 5));
+      m.col[i] = c;
+      m.h[i] = (turf - 0.5) * 0.9 + (blade > 0.8 ? 0.5 : blade < 0.12 ? -0.4 : 0);
+    }
+  // wildflowers and clover in the turf
+  const rnd = rng(seed + 20);
+  for (let k = 0; k < 160; k++) {
+    const x = Math.floor(rnd() * S), y = Math.floor(rnd() * S);
+    const i = y * S + x;
+    if (FB(seed + 11, [64, 32, 16])[i]! >= 0.52) continue;
+    const c = rnd() < 0.45 ? 0xfff4b8 : rnd() < 0.5 ? 0xf0b0d8 : 0xffffff;
+    m.col[i] = c;
+    m.col[y * S + W(x + 1)] = mixc(c, 0x000000, 0.25);
+    m.col[W(y + 1) * S + x] = M.growth[1]!;
+    m.h[i] = 0.8;
+  }
+  return m;
+}
+
+/** Moon: regolith fine-grained and grey, dark mare basalt, impact craters with lit rims and shadowed bowls, scattered rocks. */
+function macroMoon(): FloorMacro {
+  const seed = 9909;
+  const M = FLOOR_MATS.moon;
+  const m: FloorMacro = { col: new Uint32Array(S * S), h: new Float32Array(S * S), glow: null };
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const g = FB(seed + 1, [32, 16, 8, 4])[i]!;
+      const mare = FB(seed + 2, [128, 64, 32])[i]!;
+      m.h[i] = (g - 0.5) * 1.2;
+      const ramp = mare > 0.6 ? M.alt : M.stone;
+      let c = tone(ramp, 1.5 + g * 2 + bayer(x, y) * 0.45 + (hashi(x, y, seed + 3) - 0.5) * 0.6);
+      if (mare > 0.56 && mare <= 0.6) c = mixc(c, M.alt[2]!, 0.5);
+      m.col[i] = c;
+    }
+  // craters (wrapping, so the macro stays seamless); the light comes from the north-west
+  const rnd = rng(seed + 10);
+  const craters: [number, number, number][] = [];
+  for (let k = 0; k < 14; k++) craters.push([rnd() * S, rnd() * S, k < 3 ? 14 + rnd() * 10 : 3 + rnd() * 7]);
+  for (const [cx, cy, r] of craters) {
+    const R0 = Math.ceil(r * 1.5);
+    for (let dy = -R0; dy <= R0; dy++)
+      for (let dx = -R0; dx <= R0; dx++) {
+        const d = Math.hypot(dx, dy) / r;
+        if (d > 1.45) continue;
+        const i = W(Math.round(cy + dy)) * S + W(Math.round(cx + dx));
+        const lit = (dx + dy) / (Math.hypot(dx, dy) + 0.001);   // + faces the light inside the bowl's far wall
+        if (d < 0.9) {
+          // the bowl: the near (north-west) inner wall in shadow, the far wall catching the light
+          const v = 1.2 + lit * 0.9 * (d / 0.9) + bayer(dx & 31, dy & 31) * 0.3 - (1 - d) * 0.5;
+          m.col[i] = tone(M.alt, v);
+          m.h[i] = -1.6 * (1 - d * d);
+        } else if (d < 1.12) {
+          m.col[i] = tone(M.stone, (lit < 0 ? 3.6 : 2.3) + bayer(dx & 31, dy & 31) * 0.4);
+          m.h[i] = 0.9;
+        } else {
+          // ejecta: pale dust thrown out in rays
+          const ray = Math.abs(Math.sin(Math.atan2(dy, dx) * 5 + cx)) > 0.7;
+          if (ray && hashi(dx, dy, seed + 11) > 0.4) m.col[i] = mixc(m.col[i]!, M.growth[3]!, 0.35);
+        }
+      }
+  }
+  // loose rocks: a lit top, a dark shadow to the south-east
+  for (let k = 0; k < 120; k++) {
+    const x = Math.floor(rnd() * S), y = Math.floor(rnd() * S);
+    const big = rnd() < 0.25;
+    m.col[y * S + x] = M.stone[4]!;
+    m.h[y * S + x] = 1;
+    if (big) { m.col[y * S + W(x + 1)] = M.stone[3]!; m.h[y * S + W(x + 1)] = 0.8; }
+    m.col[W(y + 1) * S + W(x + (big ? 2 : 1))] = M.mortar;
+  }
+  return m;
+}
+
+/** Server room: a raised access floor of 16-texel steel panels: perforated vents, cable cutouts, glowing seams below. */
+function macroServer(): FloorMacro {
+  const seed = 10010;
+  const M = FLOOR_MATS.server;
+  const m: FloorMacro = { col: new Uint32Array(S * S), h: new Float32Array(S * S), glow: new Uint32Array(S * S) };
+  const P = 16;
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const px = Math.floor(x / P), py = Math.floor(y / P), lx = x % P, ly = y % P;
+      const e = Math.min(lx, ly, P - 1 - lx, P - 1 - ly);
+      const kind = hashi(px, py, seed);
+      const ramp = hashi(px, py, seed + 1) < 0.3 ? M.alt : M.stone;
+      if (e === 0) {
+        // the seam: dark, and on some rows a strip of cyan light under the floor
+        const lightRow = (ly === 0 && hashi(Math.floor(x / 64), py, seed + 2) < 0.18) || (lx === 0 && hashi(px, Math.floor(y / 64), seed + 3) < 0.12);
+        m.col[i] = lightRow ? M.growth[3]! : M.mortar;
+        m.h[i] = -1.2;
+        if (lightRow) m.glow![i] = (0xc0000000 | M.growth[3]!) >>> 0;
+        continue;
+      }
+      let v = 2 + (FB(seed + 4, [32, 16])[i]! - 0.5) * 0.5 + bayer(x, y) * 0.22 + (e === 1 ? (lx === 1 || ly === 1 ? 0.9 : -0.6) : 0);
+      let h = e === 1 ? 0.3 : 0.6;
+      if (kind < 0.22 && e >= 3) {
+        // perforated vent panel: a grid of holes over the dark plenum
+        if ((lx - 3) % 2 === 0 && (ly - 3) % 2 === 0) { v = 0.2; h = -0.8; }
+      } else if (kind < 0.3 && e >= 3 && lx >= 4 && lx <= 11 && ly >= 5 && ly <= 10) {
+        // cable cutout with a brush grommet; the cables run on under the floor
+        v = 0.3;
+        h = -1;
+        if (ly === 7 || ly === 8) { m.col[i] = (lx % 3 === 0 ? 0x6a1c18 : lx % 3 === 1 ? 0x164a62 : 0x2a2a32); m.h[i] = -0.6; continue; }
+      } else if (kind > 0.93 && e >= 4 && lx >= 5 && lx <= 10 && ly >= 5 && ly <= 10) {
+        // a glowing grille: cold air rising through the floor
+        if ((lx + ly) % 2 === 0) { m.col[i] = M.growth[2]!; m.glow![i] = (0x70000000 | M.growth[2]!) >>> 0; m.h[i] = -0.6; continue; }
+        v = 0.4;
+      }
+      let c = tone(ramp, v);
+      // rivets in the panel corners, scuffs where boots and carts go
+      if ((lx === 2 || lx === P - 3) && (ly === 2 || ly === P - 3)) { c = M.stone[4]!; h = 0.9; }
+      const scuff = FB(seed + 5, [64, 32, 16])[i]!;
+      if (scuff > 0.66) c = mixc(c, 0x040506, (scuff - 0.66) * 1.6);
+      if (hashi(x, y, seed + 6) > 0.995) c = M.stone[4]!;
+      m.col[i] = c;
+      m.h[i] = h;
+    }
+  return m;
+}
+
 /** Blend a painted texel buffer (bones, skulls) into a macro, raising its height by luminance. */
 function stampPainted(m: FloorMacro, buf: PixelBuffer, k: number): void {
   for (let i = 0; i < S * S; i++) {
@@ -604,6 +783,9 @@ const MACROS: Record<ThemeId, () => FloorMacro> = {
   fungal: macroFungal,
   forge: macroForge,
   frost: macroFrost,
+  sky: macroSky,
+  moon: macroMoon,
+  server: macroServer,
 };
 
 const macroCache = new Map<ThemeId, FloorMacro>();
@@ -793,6 +975,22 @@ function paintHole(cv: TexCanvas, k: DecoKit, v: number): void {
       } else if (k.theme === 'fungal') {
         c = d > 0.85 ? 0x080503 : tone(k.M.growth, 0.6 + (1 - d) * 2 + bayer(x, y) * 0.5);
         h = -0.8 + (1 - d);
+      } else if (k.theme === 'sky') {
+        // a hole clean through the shard: earth and roots round the rim, open sky (and a cloud) far below
+        const cloud = pnoiseP(x, y, 8, 32, k.seed + 7 + v) > 0.6;
+        c = d > 0.86 ? tone(R(0x1e140c, 0x34241a, 0x4c3626, 0x684c36, 0x86664a), 1 + (1 - d) * 8) : cloud ? 0xe8f4ff : mixc(0x5a9ad8, 0xa8d4f4, (y / 32) * 0.7 + bayer(x, y) * 0.1);
+        h = d > 0.86 ? -0.8 : -3;
+        if (d > 0.7 && d <= 0.86 && hashi(x, y, v + 3) > 0.8) c = MATERIALS.root[2]!;
+      } else if (k.theme === 'moon') {
+        // a deep pit: shadowed to the north-west, the far wall lit
+        c = d > 0.88 ? tone(k.M.stone, y > cy ? 3.4 : 1.2) : tone(k.M.alt, 0.4 + Math.max(0, (x - cx + y - cy) / 12) * 1.6 + bayer(x, y) * 0.3);
+        h = d > 0.88 ? 0.4 : -2.4 * (1 - d);
+      } else if (k.theme === 'server') {
+        // a lifted floor panel: the plenum below, cable runs and a status light
+        const run = Math.floor(y / 3) % 4;
+        c = d > 0.84 ? 0x040508 : run === 1 ? 0x6a1c18 : run === 3 ? 0x164a62 : 0x0a0c10;
+        h = d > 0.84 ? -1.2 : -2.2;
+        if (hashi(x, y, v + 5) > 0.985 && d < 0.8) { c = k.M.growth[3]!; cv.glowAt(x, y, c, 230); }
       } else {
         // broken flagstone: dark gap ring, rubble and grit inside
         const pn = pnoiseP(x, y, 4, 32, k.seed + 3 + v);
@@ -814,7 +1012,7 @@ function paintHole(cv: TexCanvas, k: DecoKit, v: number): void {
 }
 
 function paintGrate(cv: TexCanvas, k: DecoKit): void {
-  const iron = k.theme === 'frost' ? R(0x24344a, 0x3e5878, 0x6a8cb0, 0xa8c8e8, 0xe0f4ff) : k.theme === 'sanctum' ? GOLD : MATERIALS.iron;
+  const iron = k.theme === 'frost' ? R(0x24344a, 0x3e5878, 0x6a8cb0, 0xa8c8e8, 0xe0f4ff) : k.theme === 'sanctum' ? GOLD : k.theme === 'sky' ? R(0x1c120e, 0x34221a, 0x523626, 0x725036, 0x8e6844) : k.theme === 'server' ? R(0x14171e, 0x262c38, 0x3a4256, 0x56607a, 0x8a96b0) : MATERIALS.iron;
   const glow = k.theme === 'forge';
   const wet = k.theme === 'flooded';
   for (let y = 4; y < 28; y++)
@@ -828,12 +1026,17 @@ function paintGrate(cv: TexCanvas, k: DecoKit): void {
         const c = tone(LAVA, 2 + pnoiseP(x, y, 4, 32, k.seed) * 2);
         cv.set(x, y, c, -2.5);
         cv.glowAt(x, y, c, 220);
-      } else if (wet) cv.set(x, y, tone(k.M.water, 0.5 + pnoiseP(x, y, 4, 32, k.seed) * 1.5), -2.5);
+      } else if (k.theme === 'server') {
+        const c = tone(k.M.growth, 1 + pnoiseP(x, y, 4, 32, k.seed) * 2.2);
+        cv.set(x, y, c, -2.5);
+        cv.glowAt(x, y, c, 170);
+      } else if (k.theme === 'sky') cv.set(x, y, mixc(0x5a9ad8, 0xc8e4f8, pnoiseP(x, y, 8, 32, k.seed) * 0.8), -2.5);
+      else if (wet) cv.set(x, y, tone(k.M.water, 0.5 + pnoiseP(x, y, 4, 32, k.seed) * 1.5), -2.5);
       else cv.set(x, y, 0x030303, -2.5);
     }
   // rivets + rust bleeding
   for (const [x, y] of [[5, 5], [26, 5], [5, 26], [26, 26]] as const) cv.set(x, y, iron[4] ?? iron[3]!, 1);
-  if (k.theme !== 'sanctum' && k.theme !== 'frost')
+  if (k.theme !== 'sanctum' && k.theme !== 'frost' && k.theme !== 'sky' && k.theme !== 'server')
     for (let i = 0; i < 6; i++) {
       const x = 4 + Math.floor(hashi(i, 1, k.seed) * 24), y = 27 + Math.floor(hashi(i, 2, k.seed) * 3);
       cv.set(x, y, MATERIALS.rust[1]!, 0, 180);
@@ -877,6 +1080,19 @@ function paintWet(cv: TexCanvas, k: DecoKit, v: number): void {
         case 'sanctum': {
           const c = d > 0.8 ? k.M.water[1]! : tone(k.M.water, 1 + (1 - d) * 1.5);
           cv.set(x, y, hashi(x, y, v) > 0.97 ? k.M.water[4]! : c, -0.2, 235);
+          break;
+        }
+        case 'moon': {
+          // a drift of fine pale dust, thickest in the middle
+          const pn = pnoiseP(x, y, 4, 32, k.seed + v);
+          cv.set(x, y, tone(k.M.growth, 1 + (1 - d) * 2 + pn + bayer(x, y) * 0.4), 0.2 + (1 - d) * 0.5, Math.round(255 * Math.min(1, (1 - d) * 2.2)));
+          break;
+        }
+        case 'server': {
+          // a coolant spill: glowing at its deepest, a dull film at the edge
+          const c = d > 0.8 ? k.M.water[1]! : tone(k.M.water, 1.4 + (1 - d) * 2);
+          cv.set(x, y, hashi(x, y, v) > 0.975 ? k.M.water[4]! : c, -0.3, 235);
+          if (d < 0.6) cv.glowAt(x, y, k.M.water[3]!, Math.round(150 * (1 - d / 0.6)));
           break;
         }
         default: {
@@ -936,6 +1152,28 @@ function paintEdge(cv: TexCanvas, k: DecoKit, sides: string, v: number): void {
             h = 0.4;
           } else c = mixc(k.M.mortar, k.M.dust, pn);
           break;
+        case 'sky':
+          // long grass and clover banked against the rim
+          c = tone(k.M.growth, 1 + (1 - t) * 2.6 + pn + (hashi(x, y, v + 2) > 0.8 ? 0.8 : 0) + bayer(x, y) * 0.4);
+          if (hashi(x, y, v + 3) > 0.985) c = 0xfff4b8;
+          h = 0.9 * (1 - t) + pn * 0.3;
+          break;
+        case 'moon':
+          // regolith drifted against the rock
+          c = tone(k.M.growth, 0.6 + (1 - t) * 2.4 + pn * 0.8 + bayer(x, y) * 0.4);
+          h = 0.8 * (1 - t);
+          break;
+        case 'server': {
+          // a cable bundle hugging the wall, one strand lit
+          const lane = Math.floor(d / 2);
+          if (d < 6 && !front) {
+            c = lane === 0 ? 0x0a0c10 : lane === 1 ? 0x2a2a32 : 0x164a62;
+            a = 255;
+            h = 0.6;
+            if (lane === 1 && hashi(Math.floor((x + y) / 6), v, 4) > 0.8) { c = k.M.growth[3]!; cv.glowAt(x, y, c, 200); }
+          } else c = mixc(k.M.mortar, k.M.dust, pn);
+          break;
+        }
         default:
           c = pn > 0.62 ? tone(k.M.stone, 2 + pn * 1.5 + bayer(x, y) * 0.4) : mixc(k.M.mortar, k.M.dust, 0.3 + pn * 0.6);
           if (pn > 0.75 && t > 0.3) c = tone(k.M.growth, 1.5 + pn);
@@ -958,7 +1196,7 @@ function paintEdge(cv: TexCanvas, k: DecoKit, sides: string, v: number): void {
 function paintSlab(cv: TexCanvas, k: DecoKit): void {
   const W2 = cv.w, H2 = cv.h;
   const horiz = W2 > H2;
-  const ramp = k.theme === 'sanctum' ? k.M.alt : k.theme === 'forge' ? MATERIALS.iron : k.theme === 'frost' ? k.M.alt : k.M.stone;
+  const ramp = k.theme === 'sanctum' ? k.M.alt : k.theme === 'forge' ? MATERIALS.iron : PLATE[k.theme] ? PLATE[k.theme]! : k.theme === 'frost' ? k.M.alt : k.M.stone;
   for (let y = 0; y < H2; y++)
     for (let x = 0; x < W2; x++) {
       const e = Math.min(x, y, W2 - 1 - x, H2 - 1 - y);
@@ -978,7 +1216,7 @@ function paintSlab(cv: TexCanvas, k: DecoKit): void {
     if (k.theme === 'sanctum') cv.glowAt(xi, yi, GOLD[3]!, 90);
     else cv.set(xi + 1, yi + 1, tone(ramp, 3.4), 0.7);
   };
-  if (k.theme === 'forge') {
+  if (k.theme === 'forge' || PLATE[k.theme]) {
     for (let i = 0; i < (horiz ? 6 : 3); i++) for (let j = 0; j < (horiz ? 3 : 6); j++) groove(6 + i * 10, 6 + j * 10);
     return;
   }
@@ -1135,6 +1373,68 @@ function paintCentre(cv: TexCanvas, k: DecoKit): void {
         }
       break;
     }
+    case 'sky': {
+      // a sun mosaic laid into the turf: gold rays round a pale sandstone disc
+      for (let y = 0; y < 64; y++)
+        for (let x = 0; x < 64; x++) {
+          const dx = x + 0.5 - c, dy = y + 0.5 - c;
+          const d = Math.hypot(dx, dy);
+          if (d > 30) continue;
+          const a = Math.atan2(dy, dx);
+          const ray = Math.abs(((a / (Math.PI * 2)) * 16 + 16) % 1 - 0.5) < 0.18;
+          if (d < 9) cv.set(x, y, tone(GOLD, 2.2 + (1 - d / 9) * 1.6 + bayer(x, y) * 0.3), 0.4);
+          else if (d < 10.5) cv.set(x, y, 0x3a2a14, -0.5);
+          else if (ray && d < 27) cv.set(x, y, tone(GOLD, 1.6 + (1 - d / 27) * 1.6 + bayer(x, y) * 0.3), 0.3);
+          else if (d > 27.5) cv.set(x, y, tone(k.M.stone, 2 + (dy < 0 ? 0.8 : -0.4) + bayer(x, y) * 0.3), 0.6);
+          else cv.set(x, y, tone(k.M.stone, 2.6 + (pnoiseP(x % 32, y % 32, 8, 32, 22) - 0.5) + bayer(x, y) * 0.3), 0.2);
+        }
+      break;
+    }
+    case 'moon': {
+      // a fresh crater two tiles across, its rim catching the light
+      for (let y = 0; y < 64; y++)
+        for (let x = 0; x < 64; x++) {
+          const dx = x + 0.5 - c, dy = y + 0.5 - c;
+          const d = Math.hypot(dx, dy * 1.05) / 25 + (pnoiseP(x % 32, y % 32, 8, 32, 23) - 0.5) * 0.08;
+          if (d > 1.18) continue;
+          const lit = (dx + dy) / (Math.hypot(dx, dy) + 0.001);
+          if (d < 0.86) cv.set(x, y, tone(k.M.alt, 0.6 + lit * 1.1 * (d / 0.86) + bayer(x, y) * 0.3 + (1 - d) * 0.3), -2.2 * (1 - d * d));
+          else cv.set(x, y, tone(k.M.stone, (lit < 0 ? 3.6 : 2.4) + bayer(x, y) * 0.4), 0.9, d > 1.08 ? 170 : 255);
+        }
+      break;
+    }
+    case 'server': {
+      // the data core's floor hatch: a ring of cyan light, a magenta curse-glyph burned into the lid
+      for (let y = 0; y < 64; y++)
+        for (let x = 0; x < 64; x++) {
+          const dx = x + 0.5 - c, dy = y + 0.5 - c;
+          const d = Math.hypot(dx, dy);
+          if (d > 29.5) continue;
+          const PL = PLATE.server!;
+          if (d > 26) cv.set(x, y, tone(PL, 2 + (dy < 0 ? 1 : -0.6) + bayer(x, y) * 0.3), 1);
+          else if (d > 23.5) { const g = k.M.growth[3]!; cv.set(x, y, g, 0.2); cv.glowAt(x, y, g, 220); }
+          else {
+            const seg = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * 8);
+            const seam = Math.abs(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * 8 - Math.round(((Math.atan2(dy, dx) + Math.PI) / (Math.PI * 2)) * 8)) < 0.06;
+            cv.set(x, y, seam ? 0x040508 : tone(PL, 1.6 + (seg % 2) * 0.4 + bayer(x, y) * 0.3), seam ? -0.6 : 0.4);
+          }
+        }
+      // the glyph: a broken triangle and an eye
+      const A = CURSE;
+      for (let s = 0; s < 3; s++) {
+        const a0 = (s / 3) * Math.PI * 2 - Math.PI / 2, a1 = ((s + 1) / 3) * Math.PI * 2 - Math.PI / 2;
+        for (let t = 0.08; t <= 0.92; t += 0.02) {
+          if (s === 1 && t > 0.42 && t < 0.58) continue;
+          const x = Math.round(c + Math.cos(a0) * 15 * (1 - t) + Math.cos(a1) * 15 * t), y = Math.round(c + Math.sin(a0) * 15 * (1 - t) + Math.sin(a1) * 15 * t);
+          cv.set(x, y, A[3]!, 0.2);
+          cv.glowAt(x, y, A[3]!, 230);
+        }
+      }
+      for (let a = 0; a < Math.PI * 2; a += 0.12) { const x = Math.round(c + Math.cos(a) * 4.5), y = Math.round(c + Math.sin(a) * 2.6); cv.set(x, y, A[2]!, 0.2); cv.glowAt(x, y, A[2]!, 200); }
+      cv.set(c, c, A[4]!, 0.3);
+      cv.glowAt(c, c, A[4]!, 255);
+      break;
+    }
     default: {
       // catacombs: a great engraved seal stone over a crypt
       for (let y = 0; y < 64; y++)
@@ -1246,6 +1546,33 @@ function paintRun(cv: TexCanvas, k: DecoKit, cap: 0 | 1 | 2, alongY: boolean): v
           }
           break;
         }
+        case 'sky': {
+          // a footpath worn into the turf: bare packed earth, grass crowding its edges
+          const t = ac / (half + 1);
+          if (pnoiseP(x, y, 8, 32, 40) < t * 1.1) continue;
+          cv.set(x, y, tone(R(0x2a1e12, 0x44321e, 0x60482c, 0x7c623e, 0x9a7e54), 2 + pnoiseP(x, y, 4, 32, 41) * 1.6 + bayer(x, y) * 0.3), -0.2, Math.round(235 * (1 - t * 0.5)));
+          break;
+        }
+        case 'moon': {
+          // rover tracks: two treaded ruts pressed into the regolith
+          const rut = Math.abs(ac - 5.5);
+          if (rut > 2) continue;
+          const tread = (along + (across < 0 ? 0 : 2)) % 4 < 2;
+          cv.set(x, y, tone(k.M.alt, (tread ? 1.2 : 2) + (rut > 1.4 ? 0.8 : 0) + bayer(x, y) * 0.3), tread ? -0.6 : -0.3);
+          break;
+        }
+        case 'server': {
+          // a light strip let into the floor between steel kerbs
+          if (ac > 4) continue;
+          if (ac > 2.5) cv.set(x, y, tone(PLATE.server!, ac > 3.5 ? 3.4 : 1.4), 0.4);
+          else {
+            const pulse = along % 8 < 1;
+            const c = pulse ? k.M.growth[4]! : k.M.growth[ac < 1 ? 3 : 2]!;
+            cv.set(x, y, c, 0.1);
+            cv.glowAt(x, y, c, pulse ? 255 : 190);
+          }
+          break;
+        }
         case 'ossuary': {
           // a bone mosaic border strip
           if (ac > half - 2) continue;
@@ -1266,7 +1593,7 @@ function paintRun(cv: TexCanvas, k: DecoKit, cap: 0 | 1 | 2, alongY: boolean): v
 
 /** Raised platform top (one big slab per tile). */
 function paintDais(cv: TexCanvas, k: DecoKit): void {
-  const ramp = k.theme === 'sanctum' ? k.M.stone : k.theme === 'forge' ? MATERIALS.iron : k.theme === 'frost' ? R(0x4a6a8a, 0x6a8cb0, 0x8cb0d0, 0xb8d4ec, 0xe4f2ff) : k.M.stone;
+  const ramp = k.theme === 'sanctum' ? k.M.stone : k.theme === 'forge' ? MATERIALS.iron : PLATE[k.theme] ? PLATE[k.theme]! : k.theme === 'frost' ? R(0x4a6a8a, 0x6a8cb0, 0x8cb0d0, 0xb8d4ec, 0xe4f2ff) : k.M.stone;
   for (let y = 0; y < 32; y++)
     for (let x = 0; x < 32; x++) {
       const e = Math.min(x, y, 31 - x, 31 - y);
@@ -1309,6 +1636,17 @@ function paintScatter(cv: TexCanvas, k: DecoKit, v: number): void {
       case 'flooded':
         P.ellipse(x, y, 1.6 + r(), 1.1 + r() * 0.6).fill(FLOOR_MATS.flooded.growth, { mode: 'sphere', inner: false, dither: true });
         break;
+      case 'sky':
+        if (i % 2) P.ellipse(x, y, 1.4 + r(), 1 + r() * 0.5).fill(FLOOR_MATS.sky.stone, { mode: 'sphere', light: 0.2, inner: false });
+        else P.circle(x, y, 0.9).fill(R(0x8a6a10, 0xc09a20, 0xf0d040, 0xfff090, 0xffffff), { mode: 'sphere', inner: false });
+        break;
+      case 'moon':
+        P.ellipse(x, y, 1.2 + r() * 1.6, 0.9 + r()).fill(FLOOR_MATS.moon.stone, { mode: 'sphere', light: 0.25, inner: false });
+        break;
+      case 'server':
+        if (i % 2) P.rect(x - 1.5, y - 1, 3, 2).fill(R(0x06200c, 0x0e3a18, 0x1a5a28, 0x2a7a3a, 0x48a058), { mode: 'emboss', inner: false });
+        else P.circle(x, y, 0.8).fill(PLATE.server!, { mode: 'sphere', inner: false });
+        break;
       default: {
         const L = 1.6 + r() * 2.2;
         if (v === 0 || i % 2) P.capsule(x - Math.cos(a) * L, y - Math.sin(a) * L, x + Math.cos(a) * L, y + Math.sin(a) * L, 0.75, 0.75).fill(MATERIALS.boneDry, { mode: 'emboss', inner: false, light: -0.1 });
@@ -1321,7 +1659,7 @@ function paintScatter(cv: TexCanvas, k: DecoKit, v: number): void {
 
 /** Three worn steps across a corridor mouth (alongY: the corridor runs along world y). */
 function paintSteps(cv: TexCanvas, k: DecoKit, alongY: boolean): void {
-  const ramp = k.theme === 'sanctum' ? k.M.alt : k.theme === 'forge' ? MATERIALS.iron : k.M.stone;
+  const ramp = k.theme === 'sanctum' ? k.M.alt : k.theme === 'forge' ? MATERIALS.iron : PLATE[k.theme] ? PLATE[k.theme]! : k.M.stone;
   for (let yy = 0; yy < 32; yy++)
     for (let xx = 0; xx < 32; xx++) {
       const along = alongY ? yy : xx;
@@ -1351,7 +1689,7 @@ function paintSteps(cv: TexCanvas, k: DecoKit, alongY: boolean): void {
 
 /** Screen-space risers below the shifted dais top. */
 function addRiser(f: DecoFrame, k: DecoKit, south: boolean, east: boolean): void {
-  const ramp = k.theme === 'sanctum' ? k.M.alt : k.theme === 'forge' ? MATERIALS.iron : k.theme === 'frost' ? R(0x2a4058, 0x3e5a78, 0x5a7c9c, 0x84a4c4, 0xc0d8f0) : k.M.stone;
+  const ramp = k.theme === 'sanctum' ? k.M.alt : k.theme === 'forge' ? MATERIALS.iron : PLATE[k.theme] ? PLATE[k.theme]! : k.theme === 'frost' ? R(0x2a4058, 0x3e5a78, 0x5a7c9c, 0x84a4c4, 0xc0d8f0) : k.M.stone;
   for (let u = 1; u < DW - 1; u++) {
     const left = u < 32;
     if ((left && !south) || (!left && !east)) continue;

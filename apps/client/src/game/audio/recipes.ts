@@ -8,7 +8,7 @@ import { mtof } from './music';
 import type { SfxId } from './sfx';
 import type { Synth } from './synth';
 
-export type Floor = 'stone' | 'wet' | 'bone' | 'carpet' | 'moss' | 'grate' | 'snow';
+export type Floor = 'stone' | 'wet' | 'bone' | 'carpet' | 'moss' | 'grate' | 'snow' | 'dust';
 
 export interface SfxEnv {
   floor: Floor;
@@ -21,6 +21,7 @@ export interface SfxEnv {
 
 export const FLOOR_FOR_THEME: Record<string, Floor> = {
   catacombs: 'stone', flooded: 'wet', ossuary: 'bone', sanctum: 'carpet', fungal: 'moss', forge: 'grate', frost: 'snow',
+  sky: 'moss', moon: 'dust', server: 'grate',
 };
 
 /** Pitch randomisation spread per cue (fraction); UI and big cinematic cues barely vary. */
@@ -64,6 +65,11 @@ function footstep(s: Synth, o: AudioNode, t: number, env: SfxEnv): number {
       for (let k = 0; k < 6; k++) s.noiseHit(o, t + k * (0.008 + r() * 0.012), { dur: 0.012, f: 3000 + r() * 2500, q: 2, gain: 0.025, attack: 0.001 });
       s.noiseHit(o, t, { dur: 0.08, type: 'lowpass', f: 600, gain: 0.05, attack: 0.01 });
       return 0.12;
+    case 'dust':
+      // fine regolith: a soft, dry, muffled crunch with almost no ring
+      s.noiseHit(o, t, { dur: 0.07, type: 'lowpass', f: 700 * side, gain: 0.07, attack: 0.008 });
+      for (let k = 0; k < 3; k++) s.noiseHit(o, t + 0.01 + k * (0.012 + r() * 0.01), { dur: 0.01, f: 1600 + r() * 900, q: 1.5, gain: 0.018, attack: 0.002 });
+      return s.tone(o, t, { f: 70, f2: 48, dur: 0.05, gain: 0.04 });
   }
 }
 
