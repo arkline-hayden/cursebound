@@ -983,6 +983,9 @@ const SPECS: FxSpec[] = [
       }
     },
   },
+  // tintable juice bits and shapes for class kits (fxJuice.ts), then the per-class sheets (art/fx/)
+  ...JUICE_SPECS,
+  ...CLASS_FX_SPECS,
 ];
 
 export const EFFECT_KEYS

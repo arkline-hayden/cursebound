@@ -570,7 +570,9 @@ export class CombatScene extends Phaser.Scene {
         // every moving skill snaps the local prediction; only the Arcanist rift ('rift' / no style) draws purple rings
         if (e.slot === me) { this.renderSelf.x = e.x; this.renderSelf.y = e.y; this.net.pred.x = e.x; this.net.pred.y = e.y; }
         const f = this.P(e.fx, e.fy), t = this.P(e.x, e.y);
-        if (!e.style || e.style === 'rift') {
+        const riftKit = !e.style || e.style === 'rift' ? SKILL_FX['teleport:rift'] : undefined;
+        if (riftKit) riftKit(this.fxCtx(e.slot === me), { slot: e.slot, skill: 'teleport:rift', x: e.x, y: e.y, dx: e.fx, dy: e.fy });
+        else if (!e.style || e.style === 'rift') {
           J.ring(f.x, f.y, 26, 0xb07aff, 200); J.ring(t.x, t.y, 32, 0xd7a8ff, 260);
           J.embersAt(t.x, t.y - 14, 12, 0xd7a8ff);
         } else {
