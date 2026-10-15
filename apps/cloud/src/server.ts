@@ -8,6 +8,7 @@ import { migrate } from './migrations';
 import { attachPresence, type PresenceHandle } from './presence';
 import { connectPg, type Sql } from './sql';
 import { PgAccountStore } from './store';
+import { CloudBountyJob, type CloudBountyOptions } from './bounty';
 
 // Wires the cloud service together: Postgres (migrated on boot) → account store → HTTP API + presence WebSocket.
 // Used by main.ts (Cloud Run), dev.ts (PGlite, no cloud) and the tests.
@@ -20,11 +21,13 @@ export interface CloudServer {
   sql: Sql;
   presence: PresenceHandle;
   log: CloudLog;
+  /** the daily bounty job (polled every minute; reads also check lazily) */
+  bounties: CloudBountyJob;
   /** stop accepting, finish in-flight requests, close presence sockets and the database */
   close(): Promise<void>;
 }
 
-export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log?: CloudLog; presence?: typeof attachPresence; fetchImpl?: typeof fetch } = {}): Promise<CloudServer> {
+export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log?: CloudLog; presence?: typeof attachPresence; fetchImpl?: typeof fetch; bounty?: CloudBountyOptions } = {}): Promise<CloudServer> {
   const env = opts.env ?? process.env;
   const cfg = loadCloudConfig(env);
   const log = opts.log ?? createCloudLogger({ build: cfg.build, level: env.LOG_LEVEL });
@@ -35,6 +38,7 @@ export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log
   }
   await migrate(sql, log);
   const store = new PgAccountStore(sql);
+  const bounties = new CloudBountyJob(store, log, opts.bounty);
 
   // presence registers one subscriber; every friendship change on the HTTP side is forwarded to it
   const friendSubscribers = new Set<(accountId: string) => void>();
@@ -45,7 +49,7 @@ export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log
   };
 
   let presence: PresenceHandle | null = null;
-  const api = createCloudApi({ cfg, store, log, friendsChanged, connections: () => presence?.connections() ?? 0, fetchImpl: opts.fetchImpl });
+  const api = createCloudApi({ cfg, store, log, friendsChanged, connections: () => presence?.connections() ?? 0, fetchImpl: opts.fetchImpl, bounties });
   const server = http.createServer((req, res) => { void api(req, res); });
   server.requestTimeout = 30_000;
   server.headersTimeout = 20_000;
@@ -72,11 +76,13 @@ export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log
     server.listen(cfg.port, cfg.host, () => { server.off('error', reject); resolve(); });
   });
   const port = (server.address() as AddressInfo).port;
+  bounties.start();
   log.info('cloud_started', { port, host: cfg.host, turn: !!(cfg.turnSecret && cfg.turnHost), corsOrigins: cfg.corsOrigins.length });
 
   let closing: Promise<void> | null = null;
   const close = () => (closing ??= (async () => {
     log.info('cloud_stopping', {});
+    bounties.stop();
     const stopped = new Promise<void>((r) => server.close(() => r()));
     server.closeIdleConnections();
     await presence!.close().catch((err) => log.warn('presence_close_failed', { err: err as Error }));
@@ -87,5 +93,5 @@ export async function startCloud(opts: { env?: NodeJS.ProcessEnv; sql?: Sql; log
     log.info('cloud_stopped', {});
   })());
 
-  return { cfg, server, port, store, sql, presence, log, close };
+  return { cfg, server, port, store, sql, presence, log, bounties, close };
 }

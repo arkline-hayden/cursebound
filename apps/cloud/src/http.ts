@@ -4,7 +4,10 @@ import {
   AccountStoreError, HttpError, ID_RE, Throttle, authenticateToken, bearerTransport, hashToken, readBody, registerAccountRoutes, routePattern,
   sanitizeDisplayName, type AuthState, type RouteCtx, type RouteFn,
 } from '@cursebound/accounts';
-import { RULES_VERSION, SCORE_VERSION, contentHash } from '@cursebound/content';
+import {
+  BOUNTY_BY_ID, BOUNTY_GRACE_MS, BOUNTY_MIN_DEPTH, RULES_VERSION, SCORE_VERSION, bountyView, contentHash, describeAward, progressFor, xpForRun,
+} from '@cursebound/content';
+import type { CloudBountyJob } from './bounty';
 import type { CloudConfig } from './config';
 import type { CloudLog } from './log';
 import type { PgAccountStore, RunSubmission } from './store';
@@ -80,6 +83,14 @@ function trimPlayers(v: unknown): { slot: number; name: string; classId: string;
   });
 }
 
+/** The optional daily bounty a submitted run carries: { id, modifierId } (the modifier must be real content). */
+export function parseRunBounty(v: unknown): { id: string; modifierId: string } | null {
+  if (v === null || v === undefined) return null;
+  const o = (typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  if (typeof o.id !== 'string' || !ID_RE.test(o.id) || typeof o.modifierId !== 'string' || !BOUNTY_BY_ID[o.modifierId]) throw new HttpError(400, 'INVALID_INPUT', 'invalid bounty');
+  return { id: o.id, modifierId: o.modifierId };
+}
+
 /** Validates a POST /runs body. Only the submitter's own account id is kept; other participants become guests. */
 export function parseRunSubmission(b: Record<string, unknown>, submitterId: string): RunSubmission {
   if (typeof b.runId !== 'string' || !ID_RE.test(b.runId)) throw new HttpError(400, 'INVALID_INPUT', 'invalid runId');
@@ -117,9 +128,11 @@ export interface CloudApiDeps {
   connections: () => number;
   /** injectable for tests (the download site fetches the latest installer) */
   fetchImpl?: typeof fetch;
+  /** the daily bounty (polled job + lazy check on read) */
+  bounties: CloudBountyJob;
 }
 
-export function createCloudApi({ cfg, store, log, friendsChanged, connections, fetchImpl }: CloudApiDeps) {
+export function createCloudApi({ cfg, store, log, friendsChanged, connections, fetchImpl, bounties }: CloudApiDeps) {
   const site = createSite({ cfg, log, fetchImpl });
   const idem = new Map<string, { at: number; status: number; body: unknown }>();
   setInterval(() => { const now = Date.now(); for (const [k, v] of idem) if (now - v.at > 10 * 60000) idem.delete(k); }, 60000).unref();
@@ -174,11 +187,35 @@ export function createCloudApi({ cfg, store, log, friendsChanged, connections, f
   route('POST', '/runs', async (_m, req, _url, ctx) => {
     const a = await ctx.requireAuth();
     if (runThrottle.blocked(a.account.id)) throw new HttpError(429, 'RATE_LIMITED', 'too many runs submitted — try again later');
-    const sub = parseRunSubmission((await readBody(req, RUN_BODY)) as Record<string, unknown>, a.account.id);
+    const body = (await readBody(req, RUN_BODY)) as Record<string, unknown>;
+    const sub = parseRunSubmission(body, a.account.id);
+    // progression: the submitter earns the run's XP once; a run with a bounty that is real, matches its modifier, is
+    // reported in time and cleared a round doubles the first such run of that bounty (bounty_completions)
+    const claimed = parseRunBounty(body.bounty);
+    let bountyId: string | null = null;
+    if (claimed && sub.depth >= BOUNTY_MIN_DEPTH) {
+      const b = await store.getBounty(claimed.id);
+      if (b && b.modifierId === claimed.modifierId && bounties.clock() <= b.expiresAt + BOUNTY_GRACE_MS) bountyId = b.id;
+    }
     runThrottle.hit(a.account.id);
-    const r = await store.submitRun(a.account.id, sub);
+    const r = await store.submitRun(a.account.id, sub, { baseXp: xpForRun({ scoreText: sub.scoreText, depth: sub.depth }), bountyId });
     if (!r.existing) log.info('run_submitted', { accountId: a.account.id, runId: sub.runId, n: sub.n, practice: sub.practice });
-    return { ok: true, runId: sub.runId, existing: r.existing, rank: r.rank, trust: 'client-reported' };
+    const award = r.award ? describeAward(r.award.baseXp, r.award.bounty, r.award.xpBefore) : null;
+    return { ok: true, runId: sub.runId, existing: r.existing, rank: r.rank, trust: 'client-reported', xp: award, progress: award ? progressFor(award.xpAfter) : null };
+  });
+
+  // ---------------------------------------------------------------- progression & daily bounty
+  route('GET', '/account/progress', async (_m, _req, _url, ctx) => {
+    const a = await ctx.requireAuth();
+    return progressFor(await store.accountXp(a.account.id));
+  });
+
+  // the current bounty (lazily rerolled when due, see bounty.ts) and, for a signed-in caller, whether they completed it
+  route('GET', '/bounty', async (_m, _req, _url, ctx) => {
+    const b = await bounties.current();
+    const who = await ctx.auth();
+    const completed = who ? await store.bountyCompleted(b.id, who.account.id) : null;
+    return { bounty: bountyView(b, completed, bounties.clock()) };
   });
 
   route('GET', '/boards', async (_m, _req, url, ctx) => {

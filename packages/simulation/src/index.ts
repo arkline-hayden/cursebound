@@ -22,3 +22,5 @@ export * from './afflictions';
 export * from './caches';
 export * from './doors';
 export * from './follow';
+export * from './bounty';
+export * from './bountyRules';

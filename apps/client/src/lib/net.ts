@@ -23,7 +23,7 @@ export interface PhaseData {
   players: { slot: number; name: string; classId: string; ranks: Record<string, number>; skillPoints: number; spentByBranch: Record<string, number>; mastery: { damage: number; health: number; recovery: number }; ready: boolean; hpT: string; mhpT: string; connected: boolean; life: string; canMastery: boolean }[];
 }
 
-export interface RoomInfo { roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null }
+export interface RoomInfo { roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null; /** daily bounty modifier of a bounty room */ bounty?: string | null }
 
 export interface Notice { id: number; level: 'info' | 'warn' | 'error'; code: string; text: string; at: number }
 
@@ -74,7 +74,7 @@ export class GameConnection {
   private voteSeq = 0;
   /** predicted own body (shared movement rules: predictMoveTick); dashAt = performance.now() of the last predicted dash start */
   pred = {
-    x: 0, y: 0, vx: 0, vy: 0, valid: false, dodgeTimer: 0, dodgeDirX: 1, dodgeDirY: 0, dodgeCharges: DODGE.charges, dodgeCooldown: 0,
+    x: 0, y: 0, vx: 0, vy: 0, valid: false, dodgeTimer: 0, dodgeDirX: 1, dodgeDirY: 0, dodgeCharges: DODGE.charges, dodgeCooldown: 0, dodgeMax: DODGE.charges,
     surgeTimer: 0, guardTimer: 0, speed: 4, rr: 1, prevDodge: false, dashAt: 0,
     /** afflictions (snapshot lk / teth / tk): movement-lock ticks, chain anchor + radius, chain ticks (same limits as the authority) */
     lock: 0, teth: null as [number, number, number] | null, tethT: 0,
@@ -199,7 +199,7 @@ export class GameConnection {
       const b = this.pred;
       b.x = me.x; b.y = me.y; b.vx = me.vx; b.vy = me.vy;
       b.dodgeTimer = me.dt; b.dodgeDirX = me.ddx; b.dodgeDirY = me.ddy;
-      b.dodgeCharges = me.dc ?? DODGE.charges; b.dodgeCooldown = me.dcd; b.surgeTimer = me.sg ?? 0; b.guardTimer = me.guard ? 1 : 0;
+      b.dodgeCharges = me.dc ?? DODGE.charges; b.dodgeMax = me.dcm ?? DODGE.charges; b.dodgeCooldown = me.dcd;   // dcm: a bounty may lower the max b.surgeTimer = me.sg ?? 0; b.guardTimer = me.guard ? 1 : 0;
       b.speed = me.spd; b.rr = me.rr ?? 1;
       b.lock = me.lk ?? 0; b.teth = me.teth ?? null; b.tethT = me.tk ?? 0;   // frozen / rooted / chained (afflictions.ts)
       let prev = this.ackDodge;
