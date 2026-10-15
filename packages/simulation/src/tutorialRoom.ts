@@ -11,7 +11,7 @@ import type { EnemyState, GuideState, MapState, PlayerState, SimEvent, SimState 
 // The guided first-run tutorial ("First Descent"; a tutorial room's run, server rooms.ts, never persisted or scored).
 // One small hand-built crypt — a spawn chamber, a short passage and a training hall — and six prompted steps that
 // advance when they are done (the client draws the prompt near the hero from the snapshot's `gd`):
-//   0 move    walk to the glowing mark at the mouth of the hall
+//   0 move    walk to the glowing mark in the passage to the hall
 //   1 attack  strike the straw-stuffed ghoul (a dummy: it never moves or attacks) until it falls
 //   2 skills  cast each hotbar skill once (bits 0..2; fresh dummies stand in the hall to aim at)
 //   3 dodge   a Bile Toad lobs telegraphed globs: dodge while one is coming and come out unhurt
@@ -37,8 +37,9 @@ const STEP_GAP = Math.round(0.6 * TICK_RATE);
 
 const DUMMY = 'pursuer';
 const TOAD = 'artillery';
-/** Authored spots (tile centres): the walk mark at the hall's mouth, the first dummy, the skill dummies, the toad. */
-const MARK = { x: 15.5, y: 11.5 };
+/** Authored spots (tile centres): the walk mark in the passage (on screen from the spawn), the first dummy, the skill
+ *  dummies, the toad. */
+const MARK = { x: 12.5, y: 11.5 };
 const DUMMY_AT = { x: 19.5, y: 11.5 };
 const SKILL_DUMMIES = [{ x: 21.5, y: 9.5 }, { x: 22.5, y: 11.5 }, { x: 21.5, y: 13.5 }];
 const TOAD_AT = { x: 28.5, y: 11.5 };
@@ -86,7 +87,7 @@ export function setupGuide(state: SimState, ev: SimEvent[]) {
   state.map = generateTutorialMap();
   state.enemies = []; state.projectiles = []; state.hazards = []; state.telegraphs = []; state.pendingSpawns = []; state.reactions = []; state.bossPhaseEvents = [];
   state.encounter = {
-    round: state.round, isBoss: false, bossId: null, bossEntityId: null, groups: [], wave: -1, waveCount: 1, waveTimer: 0,
+    round: state.round, isBoss: false, bossId: null, bossEntityId: null, groups: [], wave: 0, waveCount: 1, waveTimer: 0,   // no waves at all
     objectiveTotal: 0, completedWeight: 0, referenceTicks: referenceSec(1) * TICK_RATE, activeTicks: 0, budget: '0', pressure: ONE, phaseAddsSpawned: [],
   };
   state.players.forEach((p, i) => {

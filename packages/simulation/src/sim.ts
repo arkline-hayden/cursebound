@@ -503,7 +503,7 @@ export function step(state: SimState, inputs: (PlayerInput | null | undefined)[]
       if (retire) { state.endReason = 'retired'; enterFinalize(state, ev, false); break; }
       if (state.phaseTimer >= RULES.setupSec) {
         setPhase(state, ev, 'COMBAT');
-        spawnWave(state, ev, 0);   // boss rounds: boss_intro + cinematic hold (director.ts)
+        if (!state.guide) spawnWave(state, ev, 0);   // boss rounds: boss_intro + cinematic hold (director.ts); the tutorial has no waves
         if (!inCinematic(state)) hooks.onRoundStart(state, ev);   // held rounds start when the hold releases
       }
       break;
