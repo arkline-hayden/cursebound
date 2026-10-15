@@ -25,7 +25,7 @@ export default function HowTo() {
           <h2>The loop</h2>
           <ol>
             <li>Fight a finite encounter: defeat every budgeted enemy group. Every fifth round is a boss. Fallen foes sometimes drop healing potions.</li>
-            <li>Spend skill points (1 per round, 2 after a boss) in your class tree.</li>
+            <li>Spend skill points (1 per round, 2 after a boss) in your class tree. Gem-set sockets grant a <b>new skill</b>, sockets with an ember badge <b>upgrade</b> the skill shown on the badge, and plain sockets are <b>passives</b>.</li>
             <li>Three Fate Cards appear. Each has a gift and a price. The party votes; plurality wins and ties use a recorded seeded draw.</li>
             <li>The chosen card applies from the next round and stays forever. There is no final round — the run ends when the party wipes or retires.</li>
           </ol>

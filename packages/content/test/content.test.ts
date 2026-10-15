@@ -87,3 +87,54 @@ describe('content', () => {
     expect(canonicalJson({ b: 1, a: [2, { d: 1, c: 2 }] })).toBe('{"a":[2,{"c":2,"d":1}],"b":1}');
   });
 });
+
+describe('skill tree copy', () => {
+  // Nodes whose effect involves the class resource (pools, regen, costs). Their text is owned by the resource
+  // removal pass and is exempt from the copy rules until it is rewritten.
+  const RESOURCE_NODES = new Set([
+    'a_heat_sink', 'a_ash_recovery', 'a_charged_reserve', 'a_tempest', 'a_event_horizon',
+    'c_winter_tide', 'c_frozen_momentum',
+    'af_quick_fuse', 'af_pressure_valves', 'af_steam_engine', 'af_perpetual_engine',
+    'b_bounding', 'b_blood_brothers', 'b_deathless', 'b_endless_storm', 'b_red_harvest', 'b_warmonger',
+    'd_momentum_well', 'd_execution', 'd_riposte', 'd_reapers_path',
+    'h_blood_price', 'h_sanguine_lance', 'h_crimson_frenzy', 'h_soul_harvest',
+    't_momentum',
+    'v_guard_stance', 'v_sweeping_strike', 'v_executioner', 'v_rally_cry', 'v_war_banner', 'v_thunder_shout', 'v_warchief',
+    'w_spirit_bond',
+  ]);
+  const copyNodes = NODES.filter((n) => !RESOURCE_NODES.has(n.id));
+  const expand = (n: (typeof NODES)[number]) => n.description.replace(/\{value\}/g, n.modifiers[0]?.factorPerRank ?? '').replace(/\{rank\}/g, String(n.rankLimit));
+
+  it('every node name fits a socket label (at most 22 characters)', () => {
+    for (const n of NODES) expect(n.name.length, n.id).toBeLessThanOrEqual(22);
+  });
+  it('every description is one short sentence (at most 110 characters once templates expand)', () => {
+    for (const n of copyNodes) {
+      const d = expand(n);
+      expect(d, n.id).not.toMatch(/[{}]/);
+      expect(d.length, `${n.id}: ${d}`).toBeLessThanOrEqual(110);
+      expect(d, n.id).toMatch(/^[A-Z][^]*\.$/);
+      expect(d, `${n.id}: more than one sentence`).not.toMatch(/[.!?]\s/);
+      expect(d, `${n.id}: the tree already shows choice/keystone/evolution context`).not.toMatch(/^(Choice|Keystone|Evolution|Evolves?|Equip)\b/);
+    }
+  });
+  it('upgrade nodes are tagged and lead with "Upgrades <skill>:"', () => {
+    for (const n of copyNodes) {
+      expect(!!n.upgrades, `${n.id}: copy and tag disagree`).toBe(n.description.startsWith('Upgrades '));
+      // a node whose only modifiers scale one skill is an upgrade of that skill
+      const skills = new Set(n.modifiers.map((m) => (m.stat.startsWith('skill.') ? m.stat.split('.')[1] : '*')));
+      if (!n.grantsSkill && skills.size === 1 && !skills.has('*')) expect(n.upgrades, `${n.id} should be an upgrade`).toBeTruthy();
+    }
+    for (const n of NODES.filter((x) => x.upgrades)) expect(n.description.startsWith('Upgrades '), n.id).toBe(true);
+    expect(NODES.filter((n) => n.upgrades).length).toBeGreaterThanOrEqual(80);
+  });
+  it('keeps the shield wording the Forecast keys on (simulation forecast.ts generatesShields)', () => {
+    const shieldNodes = NODES.filter((n) => /\bshields?\b/i.test(n.description)).map((n) => n.id).sort();
+    expect(shieldNodes).toEqual([
+      'a_static_shell', 'af_aegis_protocol', 'c_heart_of_winter', 'c_rime_armor', 'd_perfect_guard', 'h_blood_ward', 'h_crimson_covenant',
+      't_aegis_charge', 't_benediction', 't_guardians_path', 't_intercession', 't_juggernaut', 't_living_bastion', 't_radiant_ward', 't_shield_charge', 't_shield_slam',
+      'v_guard_stance', 'v_last_stand', 'v_recovery_pulse', 'v_retaliate', 'v_shared_shelter', 'v_shield_charge', 'v_standard_bearer',
+      'w_barkskin', 'w_forest_heart',
+    ].sort());
+  });
+});

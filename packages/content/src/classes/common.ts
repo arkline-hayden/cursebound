@@ -29,9 +29,12 @@ export const DODGE = {
   surgeMult: 1.3,
 };
 
-export type NodeOpts = Partial<Pick<NodeDef, 'prereqs' | 'modifiers' | 'grantsSkill' | 'starting' | 'mechanics' | 'excludes'>> & { description: string };
+export type NodeOpts = Partial<Pick<NodeDef, 'prereqs' | 'modifiers' | 'grantsSkill' | 'upgrades' | 'starting' | 'mechanics' | 'excludes'>> & { description: string };
 
-/** Node authoring helper. `excludes` makes a choice node: owning it locks the listed nodes (and vice versa). */
+/**
+ * Node authoring helper. `excludes` makes a choice node: owning it locks the listed nodes (and vice versa).
+ * `upgrades` tags a node that modifies one skill (display only): its copy reads "Upgrades <Skill>: <what changes>".
+ */
 export const node = (
   id: string, classId: string, branch: string, name: string, rankLimit: number, tier: NodeDef['tier'], opts: NodeOpts,
 ): NodeDef => ({
@@ -39,4 +42,5 @@ export const node = (
   prereqs: opts.prereqs ?? [], modifiers: opts.modifiers ?? [], grantsSkill: opts.grantsSkill, starting: opts.starting,
   mechanics: opts.mechanics ?? [], description: opts.description, icon: `node:${id}`,
   ...(opts.excludes?.length ? { excludes: opts.excludes } : {}),
+  ...(opts.upgrades ? { upgrades: opts.upgrades } : {}),
 });

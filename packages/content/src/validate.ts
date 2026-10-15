@@ -114,6 +114,13 @@ export function validateContent(): string[] {
       if (!POS_DECIMAL.test(m.factorPerRank) || Number(m.factorPerRank) <= 0) errs.push(`${node.id}: invalid factor ${m.factorPerRank}`);
     }
     if (node.grantsSkill && !SKILL_BY_ID[node.grantsSkill]) errs.push(`${node.id}: unresolvable skill ${node.grantsSkill}`);
+    if (node.upgrades) {
+      const up = SKILL_BY_ID[node.upgrades];
+      if (!up) errs.push(`${node.id}: upgrades unknown skill ${node.upgrades}`);
+      else if (up.classId !== node.classId) errs.push(`${node.id}: upgrades a skill of another class`);
+      else if (!node.description.startsWith(`Upgrades ${up.name}: `)) errs.push(`${node.id}: upgrade copy must start "Upgrades ${up.name}: "`);
+      if (node.grantsSkill) errs.push(`${node.id}: a node either grants or upgrades a skill, not both`);
+    }
     for (const p of node.prereqs) {
       if (!NODE_BY_ID[p.node]) errs.push(`${node.id}: unknown prerequisite ${p.node}`);
       else if (NODE_BY_ID[p.node].classId !== node.classId) errs.push(`${node.id}: cross-class prerequisite`);
