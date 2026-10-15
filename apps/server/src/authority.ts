@@ -48,6 +48,8 @@ export interface AuthorityOptions {
   resume?: { persistSeq: number; chunkNo: number };
   /** training grounds (rooms.ts): nothing is persisted — no run record, events, commits, replay chunks, boards or records */
   training?: boolean;
+  /** guided first-run tutorial (rooms.ts, simulation tutorialRoom.ts): persisted exactly like training — never */
+  guided?: boolean;
   /** daily bounty id (local or cloud) a bounty run counts toward; its modifier is in the state (SimState.bounty) */
   bountyId?: string | null;
 }
@@ -61,6 +63,10 @@ export class RunAuthority {
   practice: boolean;
   /** training grounds run: never touches the store (see AuthorityOptions.training) */
   readonly training: boolean;
+  /** guided tutorial run (AuthorityOptions.guided) */
+  readonly guided: boolean;
+  /** never touches the store: training grounds and the guided tutorial */
+  get ephemeral(): boolean { return this.training || this.guided; }
   readonly bountyId: string | null;
   /** progression: XP awarded to each member's profile at finalization (by profile id), shown on RESULTS */
   private awards = new Map<string, XpAward>();
@@ -96,6 +102,7 @@ export class RunAuthority {
     this.boardKey = o.boardKey;
     this.practice = o.practice;
     this.training = !!o.training;
+    this.guided = !!o.guided;
     this.bountyId = o.bountyId ?? null;
     this.persistSeq = o.resume?.persistSeq ?? 0;
     this.chunkNo = o.resume?.chunkNo ?? 0;
@@ -104,7 +111,7 @@ export class RunAuthority {
     if (o.resume) this.journal.resumeFrom = { tick: o.state.tick };
     this.lastPhase = o.state.phase;
     for (let i = 0; i < o.state.n; i++) { this.queues.push([]); this.last.push(null); this.buckets.push({ tokens: LIMITS.inputBurst, at: Date.now() }); }
-    this.created = o.createParams && !this.training ? this.createRunRecord() : Promise.resolve();
+    this.created = o.createParams && !this.ephemeral ? this.createRunRecord() : Promise.resolve();
     if (o.resume && this.state.awaitingDurable === 'commit') {
       // the restored checkpoint already contains the committed card: acknowledge durability, never reapply
       this.pending.push({ cmd: { type: 'DURABLE', what: 'commit' } });
@@ -216,7 +223,7 @@ export class RunAuthority {
       this.incident(`Simulation error: ${(err as Error).message}`);
       return;
     }
-    if ((jIn.length || cmds.length) && !this.training) {   // training runs keep no replay journal
+    if ((jIn.length || cmds.length) && !this.ephemeral) {   // training / tutorial runs keep no replay journal
       const jt: JournalTick = { t: tickNo };
       if (jIn.length) jt.i = jIn;
       if (cmds.length) jt.c = cmds;
@@ -248,16 +255,25 @@ export class RunAuthority {
     this.lastPhase = this.state.phase;
     this.broadcast({ t: 'NOTICE', level: 'error', code: 'TECHNICAL_RECOVERY', text: `Technical recovery: ${reason}. Your run is checkpointed at the last safe intermission; this is not a defeat.` });
     this.sendPhase();
-    if (this.training) return;
+    if (this.ephemeral) return;
     void this.store.updateRunProgress({ id: this.state.runId, round: this.state.round, ticks: this.state.totalActiveTicks, scoreText: this.state.scoreText, status: 'pending_storage' }).catch(() => undefined);
   }
 
   // ---------------- Persistence pipeline ----------------
 
   private handleEvents(events: SimEvent[]) {
-    if (this.training) {
-      // training grounds: nothing is stored; leaving the yard (retire / abort) finalizes without a record
-      if (events.some((e) => e.t === 'domain' && e.type === 'run_finalized')) this.pending.push({ cmd: { type: 'DURABLE', what: 'finalize' } });
+    if (this.ephemeral) {
+      // training grounds / tutorial: nothing is stored; a commit (the tutorial's Fate door) and the finalize are
+      // acknowledged at once, so the run never waits on storage and never leaves a record, board entry or replay
+      for (const e of events) {
+        if (e.t !== 'domain') continue;
+        if (e.type === 'fate_committed') {
+          const p = e.payload;
+          this.broadcast({ t: 'COMMIT', eventId: this.state.eventSeq, offerId: p.offerId as string, cardId: p.cardId as string, cardSlot: p.cardSlot as number, tieEvidence: p.tieEvidence, newStateHash: p.resultingStateHash as string, durable: true });
+          this.pending.push({ cmd: { type: 'DURABLE', what: 'commit' } });
+        }
+        if (e.type === 'run_finalized') this.pending.push({ cmd: { type: 'DURABLE', what: 'finalize' } });
+      }
       return;
     }
     const s = this.state;
@@ -302,7 +318,7 @@ export class RunAuthority {
 
   private chain: Promise<unknown> = Promise.resolve();
   private persist(fn: () => Promise<unknown>) {
-    if (this.training) return;
+    if (this.ephemeral) return;
     this.chain = this.chain.then(() => this.created).then(fn).catch((err) => {
       this.log.error('persist_failed', { err: err as Error });
       this.storageNotice(err as Error);
@@ -387,6 +403,7 @@ export class RunAuthority {
       breakdown: runBreakdown(s),
       legendaries: s.lootFound ?? [],
       ...(this.training ? { training: true } : {}),
+      ...(this.guided ? { guided: true } : {}),   // guided tutorial: Results shows "You're ready"
       // daily bounty and progression (content bounties.ts / progression.ts): the XP award per slot (null until the
       // finalize transaction credited it, or for a profile this machine does not hold)
       bounty: s.bounty ? { id: this.bountyId, modifierId: s.bounty } : null,
@@ -472,7 +489,7 @@ export class RunAuthority {
       bossId: s.encounter?.bossId ?? null,
       round: s.round, phase: s.phase, deadlineTick: s.phaseDeadlineTick, tick: s.tick, scoreText: s.scoreText, retire: s.retireVotes,
       lastClear: s.lastClear, rounds: s.rounds.slice(-30), endReason: s.endReason, incident: s.incident, resumed: s.resumed,
-      storagePending: this.storagePending, practice: this.practice, boardKey: this.boardKey, training: this.training,
+      storagePending: this.storagePending, practice: this.practice, boardKey: this.boardKey, training: this.training, guided: !!s.guide,
       nextRound: s.round + 1, nextIsBoss: (s.round + 1) % RULES.bossEvery === 0,
       fate: s.commits.slice(-60).map((c) => ({ round: c.round, cardId: c.cardId })),
       deathRecaps: s.deathRecaps.filter((d) => d.round === s.round),

@@ -28,3 +28,4 @@ export * from './follow';
 export * from './bounty';
 export * from './bountyRules';
 export * from './runStats';
+export * from './tutorialRoom';

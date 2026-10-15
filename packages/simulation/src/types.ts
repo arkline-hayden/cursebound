@@ -519,6 +519,28 @@ export interface SimState {
   training?: TrainingState | null;
   /** Daily bounty modifier the run was created with (content bounties.ts, applied by bounty.ts). Absent = none. */
   bounty?: string | null;
+  /** Guided first-run tutorial (tutorialRoom.ts): present only in tutorial-room runs (never scored or recorded). */
+  guide?: GuideState | null;
+}
+
+/** Guided tutorial progress (tutorialRoom.ts GUIDE_STEPS). Plain data, part of the replayed state. */
+export interface GuideState {
+  /** current step (GUIDE_STEPS index) */
+  step: number;
+  /** tick the step began (or completed, while `done` is -1) */
+  at: number;
+  /** sub-goals done in this step (bit i), -1 = the step is complete and the next one is about to start */
+  done: number;
+  /** foes / ground items the step placed (entity ids) */
+  ids: number[];
+  /** walk mark (world units) of the move step */
+  mx?: number; my?: number;
+  /** dodge step: tick of a dodge made while a foe attack was on its way (0 none); tick the hero last took damage */
+  dodge: number; hurt: number;
+  /** damage taken so far (compact text), to notice new hits */
+  taken: string;
+  /** loot step: consecutive ticks stood beside the second legendary (its quick-compare) */
+  near: number;
 }
 
 /** Training-room switches (training.ts). Plain data, part of the replayed state. */

@@ -8,6 +8,7 @@ import { moveSpeedOf } from './players';
 import { gearSnapshot, lootSnapshot } from './gear';
 import { doorSnapshot, type SnapDoor } from './doors';
 import { playerDerived, toFloatClamped } from './stats';
+import { guideSnapshot, type SnapGuide } from './tutorialRoom';
 import type { SimState } from './types';
 
 // Bounded, stable-schema snapshot for clients (REQ NET01, PRD §19.2). Presentation only: clients never
@@ -80,6 +81,8 @@ export interface Snapshot {
   cu?: number;
   /** training grounds switches (training.ts); present only in training runs. ai: 1 = foes act, 0 = they stand still */
   tr?: { ai: 0 | 1 };
+  /** guided tutorial (tutorialRoom.ts); present only in tutorial runs: step, sub-goal bits (-1 = step done), walk mark */
+  gd?: SnapGuide;
 }
 
 export interface SnapLoot { i: number; it: string; x: number; y: number }
@@ -153,6 +156,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
     ...doorsField(state),
     ...(state.tick < (state.cinematicUntilTick ?? 0) ? { cu: state.cinematicUntilTick } : {}),
     ...(state.training ? { tr: { ai: state.training.ai ? 1 : 0 } as const } : {}),
+    ...(state.guide ? { gd: guideSnapshot(state) } : {}),
   };
 }
 
