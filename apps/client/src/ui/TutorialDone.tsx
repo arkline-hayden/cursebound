@@ -12,7 +12,7 @@ import { FireTitle } from './FireTitle';
 // The end of "First Descent" (a guided tutorial run; never recorded): a short "You're ready" card instead of the
 // results sheet, leading back to the title or straight into a real solo run with the same vessel.
 
-const LEARNED = ['Walk', 'Strike', 'Skills', 'Dodge', 'Legendaries', 'Fate doors'];
+const LEARNED = ['Walk', 'Strike', 'Skills', 'Dodge', 'Loot', 'Fate doors'];
 
 export function TutorialDone({ net, classId }: { net: GameConnection; classId: string }) {
   const [busy, setBusy] = useState(false);

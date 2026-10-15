@@ -42,7 +42,8 @@ function DamageList({ h }: { h: BreakdownHero }) {
   if (!rows.length) return <p className="faint bd-empty">No damage dealt.</p>;
   const parts = rows.map((s) => ratioOf(s.dmg, h.dealt));
   const max = Math.max(...parts);
-  return <ul className="bd-list">{rows.map((s, i) => <Row key={s.id || 'other'} icon={<SkillRowIcon id={s.id} size={24} />} name={skillName(s.id)} sub={big(s.kills).isZero() ? undefined : `${whole(s.kills)} kills`} part={parts[i]} max={max} total={s.dmg} />)}</ul>;
+  const kills = (k: string) => (big(k).isZero() ? undefined : `${whole(k)} ${whole(k) === '1' ? 'kill' : 'kills'}`);
+  return <ul className="bd-list">{rows.map((s, i) => <Row key={s.id || 'other'} icon={<SkillRowIcon id={s.id} size={24} />} name={skillName(s.id)} sub={kills(s.kills)} part={parts[i]} max={max} total={s.dmg} />)}</ul>;
 }
 
 function PartyList({ heroes, who }: { heroes: BreakdownHero[]; who: Who[] }) {

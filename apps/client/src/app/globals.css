@@ -1442,7 +1442,7 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
 .rc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-small); line-height: var(--lh-small); }
 .rc-foot .hchip { min-height: 28px; font-size: var(--fs-small); }
 /* live card while spectating: HUD type tokens, centred above the spectate bar */
-.frame.inset.rc-card { width: min(460px, 92vw); padding: var(--sp-1) var(--sp-3) var(--sp-2); margin-bottom: var(--sp-1); text-align: left; }
+.frame.inset.rc-card { width: min(540px, 92vw); padding: var(--sp-1) var(--sp-3) var(--sp-2); margin-bottom: var(--sp-1); text-align: left; }
 .rc-card .rc-head { font-size: var(--hud-body); line-height: var(--hud-label-lh); }
 .rc-card .rc-verb { font-size: var(--hud-label); }
 .rc-card .rc-hits li, .rc-card .rc-foot { font-size: var(--hud-label); line-height: var(--hud-label-lh); }

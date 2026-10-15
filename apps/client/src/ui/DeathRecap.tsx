@@ -41,7 +41,7 @@ export function RecapView({ recap, you, compact }: { recap: RecapEntry; you?: bo
       )}
       <div className="rc-foot">
         {recap.debuffs.map((d) => <span key={d} className="hchip neg" style={{ color: statusDef(d).color }}><StatusIcon id={d} size={18} /><span className="hc-l">{statusDef(d).label}</span></span>)}
-        <span className="faint">{whole(recap.total)} taken in {RECAP_WINDOW_SEC}s · {Math.round(recap.hp * 100)}% life before the blow</span>
+        <span className="faint">{whole(recap.total)} taken in {RECAP_WINDOW_SEC}s · {recap.hp > 0 && recap.hp < 0.01 ? '<1' : Math.round(recap.hp * 100)}% life before the blow</span>
       </div>
     </div>
   );
