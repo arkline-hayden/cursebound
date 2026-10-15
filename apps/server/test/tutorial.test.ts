@@ -5,7 +5,7 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { contentHash } from '@cursebound/content';
 import { PROTOCOL_VERSION, BUILD_ID, type ServerMessage } from '@cursebound/protocol';
-import { GUIDE_STEPS, guideLootIds } from '@cursebound/simulation';
+import { GUIDE_STEPS } from '@cursebound/simulation';
 import { startServer } from '../src/main';
 
 // "First Descent" over the wire: a tutorial room runs the guided crypt (simulation tutorialRoom.ts), its steps
@@ -119,7 +119,7 @@ describe('tutorial rooms', () => {
       await drive(20.5, 11.5 + (i % 120 < 60 ? -2 : 2), threat && i % 6 === 0 ? 32 : 0, 0.2);
     }
     expect(step()).toBe('loot');
-    const [itemA, itemB] = guideLootIds(a.state.players[0])!;
+    const [itemA, itemB] = a.state.guide!.items!;
     const item = (id: string) => (a.state.loot ?? []).find((it) => it.itemId === id);
     for (let i = 0; i < 60 * 10 && !(a.state.guide!.done & 1); i++) { const it = item(itemA); await drive(it?.x ?? null, it?.y ?? null, 0, 0.1); }
     for (let i = 0; i < 60 * 10 && step() === 'loot'; i++) { const it = item(itemB); await drive(it?.x ?? null, it?.y ?? null, 0, 1.2); }

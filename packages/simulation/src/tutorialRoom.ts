@@ -69,15 +69,18 @@ export function newGuide(): GuideState {
   return { step: 0, at: 0, done: 0, ids: [], dodge: 0, hurt: 0, taken: '0', near: 0 };
 }
 
-/** The first pair of legendaries for one gear slot this hero can wear (content order): what step 4 drops. */
+/** The first pair of legendaries for one gear slot this hero can wear (content order), preferring a slot the hero has
+ *  empty so the first one is worn by walking over it: what step 4 drops (remembered in GuideState.items). */
 export function guideLoot(p: PlayerState): [LegendaryDef, LegendaryDef] | null {
-  const bySlot = new Map<string, LegendaryDef[]>();
-  for (const d of LEGENDARIES) {
-    if (d.classId || !canEquip(p, d)) continue;
-    const l = bySlot.get(d.slot) ?? [];
-    l.push(d);
-    bySlot.set(d.slot, l);
-    if (l.length === 2) return [l[0], l[1]];
+  for (const emptyOnly of [true, false]) {
+    const bySlot = new Map<string, LegendaryDef[]>();
+    for (const d of LEGENDARIES) {
+      if (d.classId || !canEquip(p, d) || (emptyOnly && p.gear?.[d.slot])) continue;
+      const l = bySlot.get(d.slot) ?? [];
+      l.push(d);
+      bySlot.set(d.slot, l);
+      if (l.length === 2) return [l[0], l[1]];
+    }
   }
   return null;
 }
@@ -139,7 +142,7 @@ function readyHero(p: PlayerState) {
 function enter(state: SimState, ev: SimEvent[], g: GuideState, step: number) {
   for (const e of living(state, g)) dismiss(state, ev, e);
   g.step = step; g.at = state.tick; g.done = 0; g.ids = []; g.dodge = 0; g.near = 0;
-  delete g.mx; delete g.my;
+  delete g.mx; delete g.my; delete g.items;
   const p = state.players[0];
   if (p) readyHero(p);
   switch (GUIDE_STEPS[step]) {
@@ -155,7 +158,8 @@ function enter(state: SimState, ev: SimEvent[], g: GuideState, step: number) {
     }
     case 'loot': {
       const pair = p ? guideLoot(p) : null;
-      if (!p || !pair) { g.done = 3; break; }   // nothing wearable (cannot happen with current content): skip
+      if (!p || !pair) break;   // nothing wearable (cannot happen with current content): guideTick skips the step
+      g.items = [pair[0].id, pair[1].id];
       const it = dropLegendary(state, ev, p.x + p.aimX * 1.6, p.y + p.aimY * 1.6, 'enemy', pair[0].id);
       if (it) g.ids.push(it.id);
       break;
@@ -219,19 +223,18 @@ export function guideTick(state: SimState, ev: SimEvent[]): boolean {
       break;
     }
     case 'loot': {
-      const pair = guideLoot(p);
-      if (!pair) { finish(); break; }
-      const [a, b] = pair;
+      if (!g.items) { finish(); break; }
+      const [a, b] = g.items;
       for (const e of ev) {
         if (e.t !== 'equip' || e.slot !== p.slot) continue;
-        if (e.itemId === a.id && !(g.done & 1)) {
+        if (e.itemId === a && !(g.done & 1)) {
           g.done |= 1;
-          const it = dropLegendary(state, ev, p.x - p.aimX * 1.8, p.y - p.aimY * 1.8, 'enemy', b.id);
+          const it = dropLegendary(state, ev, p.x - p.aimX * 1.8, p.y - p.aimY * 1.8, 'enemy', b);
           if (it) g.ids.push(it.id);
-        } else if (e.itemId === b.id) g.done |= 2;                    // swapped: compared for sure
+        } else if (e.itemId === b) g.done |= 2;                       // swapped: compared for sure
       }
       if (g.done & 1 && !(g.done & 2)) {
-        const second = (state.loot ?? []).find((it) => it.itemId === b.id && g.ids.includes(it.id));
+        const second = (state.loot ?? []).find((it) => it.itemId === b && g.ids.includes(it.id));
         g.near = second && Math.hypot(p.x - second.x, p.y - second.y) <= GUIDE_COMPARE_RADIUS ? g.near + 1 : 0;
         if (g.near >= GUIDE_COMPARE_TICKS) g.done |= 2;
       }
@@ -259,8 +262,3 @@ export function guideSnapshot(state: SimState): SnapGuide | undefined {
   return out;
 }
 
-/** The legendary ids the loot step uses for a hero (tests). */
-export function guideLootIds(p: PlayerState): [string, string] | null {
-  const pair = guideLoot(p);
-  return pair ? [pair[0].id, pair[1].id] : null;
-}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TUTORIAL_CARD } from '@cursebound/content';
 import {
-  ACTION, GUIDE_COMPARE_TICKS, GUIDE_STEPS, buildSnapshot, deserializeState, guideLootIds, isWall, serializeState, stateHash, step,
+  ACTION, GUIDE_COMPARE_TICKS, GUIDE_STEPS, buildSnapshot, deserializeState, isWall, serializeState, stateHash, step,
   type Command, type PlayerInput, type SimEvent, type SimState,
 } from '@cursebound/simulation';
 import { newRun } from './run.helpers';
@@ -101,7 +101,7 @@ describe('guided tutorial', () => {
     expect(s.enemies.some((e) => e.id === toad.id && e.state !== 'dying')).toBe(false);   // it crumbled
 
     // 4 loot: walk over the legendary (worn), then stand by the second one (quick-compare)
-    const [a, b] = guideLootIds(pl.p)!;
+    const [a, b] = s.guide!.items!;
     const item = (id: string) => (s.loot ?? []).find((it) => it.itemId === id);
     expect(item(a)).toBeTruthy();
     expect(pl.until(() => Object.values(pl.p.gear ?? {}).includes(a), 60 * 10, () => { const it = item(a); pl.tick(it?.x, it?.y, 0, 0.1); })).toBe(true);

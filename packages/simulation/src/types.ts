@@ -541,6 +541,8 @@ export interface GuideState {
   taken: string;
   /** loot step: consecutive ticks stood beside the second legendary (its quick-compare) */
   near: number;
+  /** loot step: the two legendaries it drops (worn first, compared second) */
+  items?: [string, string];
 }
 
 /** Training-room switches (training.ts). Plain data, part of the replayed state. */
