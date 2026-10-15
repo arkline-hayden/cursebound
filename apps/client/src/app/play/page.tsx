@@ -25,6 +25,7 @@ import { ClearSummary } from '@/ui/ClearSummary';
 import { TutorialHints } from '@/ui/TutorialHints';
 import { Minimap } from '@/ui/Minimap';
 import { CinematicOverlay } from '@/ui/CinematicOverlay';
+import { TrainingPanel } from '@/ui/TrainingPanel';
 import type { AudioEngine } from '@/game/audio/AudioEngine';
 import { computeIntensity } from '@/game/audio/music';
 import { sharedAudio } from '@/game/audio/shared';
@@ -95,7 +96,7 @@ export default function Play() {
     const ph = phase?.phase;
     // recorded theme songs: the lobby keeps the title song; loadout, skill picks and the door walk share the loadout
     // song; boss rounds play the boss song; the end of a run plays the results song; ordinary combat stays synthesized
-    const bossRound = !!phase && (!!phase.bossId || phase.round % 5 === 0);
+    const bossRound = !!phase && !phase.training && (!!phase.bossId || phase.round % 5 === 0);
     audio.setSong(
       !room || room.stage === 'LOBBY' || !phase ? 'title'
         : ph === 'LOADOUT_LOCK' || ph === 'ROUND_CLEAR' || ph === 'SKILL_ALLOCATION' || ph === 'FATE_OFFER' || ph === 'VOTING' || ph === 'FATE_COMMIT' || ph === 'SAFE_CHECKPOINT' ? 'loadout'
@@ -104,6 +105,7 @@ export default function Play() {
         : null,
     );
     if (!room || room.stage === 'LOBBY' || !phase || ph === 'LOADOUT_LOCK') audio.setMusic('menu');
+    else if (phase.training && (ph === 'COMBAT' || ph === 'ROUND_SETUP')) audio.setMusic(phase.bossId ? 'boss' : 'explore');   // training grounds: calm yard
     else if (ph === 'COMBAT' || ph === 'ROUND_SETUP') audio.setMusic(phase.bossId || phase.round % 5 === 0 ? 'boss' : 'combat');
     else if (ph === 'ROUND_CLEAR' || ph === 'SKILL_ALLOCATION' || ph === 'FATE_OFFER' || ph === 'VOTING' || ph === 'FATE_COMMIT' || ph === 'SAFE_CHECKPOINT') audio.setMusic('explore');
     else if (ph === 'PARTY_WIPE' || ph === 'RETIRE_REQUEST' || ph === 'RESULTS' || ph === 'FINALIZE') audio.setMusic(null);
@@ -211,6 +213,7 @@ export default function Play() {
       {net && stage === 'RUN' && (ph === 'COMBAT' || ph === 'ROUND_SETUP') && <Hud net={net} onLedger={() => setShowLedger(true)} onPause={() => setPaused(true)} />}
       {net && stage === 'RUN' && (ph === 'COMBAT' || ph === 'ROUND_SETUP' || ph === 'VOTING' || ph === 'FATE_COMMIT' || ph === 'FATE_OFFER') && <Minimap net={net} audio={audio} />}
       {phase?.tutorial && <TutorialHints />}
+      {net && stage === 'RUN' && phase?.training && (ph === 'COMBAT' || ph === 'ROUND_SETUP') && <TrainingPanel net={net} />}
       <main id="main">{overlay}</main>
       {showLedger && net && <Ledger net={net} onClose={() => setShowLedger(false)} />}
       {(paused || (serverPaused.paused && serverPaused.reason !== 'client lost' && !showLedger)) && net && stage === 'RUN' && !results && (

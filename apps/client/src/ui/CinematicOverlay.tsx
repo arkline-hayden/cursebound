@@ -10,7 +10,7 @@ import { FONT_DISPLAY, FONT_LABEL, FONT_UI } from './fonts';
 
 const CSS = `
 .cine-root { position: absolute; inset: 0; z-index: 18; pointer-events: none; overflow: hidden; }
-.cine-fade { position: absolute; inset: 0; background: #000; opacity: 0; visibility: hidden; }
+.cine-root > .cine-fade { position: absolute; inset: 0; background: #000; opacity: 0; visibility: hidden; }
 .cine-bar { position: absolute; left: 0; right: 0; height: 0; background: #000; visibility: hidden; }
 .cine-bar.top { top: 0; box-shadow: 0 2px 0 #1e0d07, 0 4px 0 #0a0403; }
 .cine-bar.bottom { bottom: 0; box-shadow: 0 -2px 0 #1e0d07, 0 -4px 0 #0a0403; }

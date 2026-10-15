@@ -314,7 +314,7 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
   hooks.onTick(state, ev);
   // deaths -> progression
   if (state.bossPhaseEvents.length) {
-    for (const ph of state.bossPhaseEvents) {
+    if (!state.training) for (const ph of state.bossPhaseEvents) {   // training bosses carry no objective
       enc.completedWeight = Math.max(enc.completedWeight, ph);   // finishing phase i credits its fixed weight once
       ev.push({ t: 'objective', groupId: 0, weight: 1, completed: enc.completedWeight, total: enc.objectiveTotal });
       ev.push({ t: 'domain', type: 'objective_completed', payload: { round: state.round, completedWeight: enc.completedWeight, total: enc.objectiveTotal, bossPhase: ph } });

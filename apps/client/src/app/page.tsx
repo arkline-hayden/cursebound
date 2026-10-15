@@ -151,12 +151,13 @@ export default function Home() {
     return p;
   };
 
-  const start = async (kind: 'solo' | 'daily' | 'tutorial' | 'coop') => {
+  const start = async (kind: 'solo' | 'daily' | 'tutorial' | 'coop' | 'training') => {
     setBusy(kind); setErr(null);
     try {
       const p = await rename();
       const r = await api<{ roomId: string; code: string; seatToken: string; slot: number }>('POST', '/rooms', {
         profileId: p.id, mode: kind === 'coop' ? 'coop' : 'solo', classId, challenge: kind === 'daily' ? 'daily' : 'random', tutorial: kind === 'tutorial',
+        ...(kind === 'training' ? { training: true } : {}),   // training grounds: a sandbox, never scored or recorded
       });
       clearGuestSession();
       setSeat(r.roomId, r.seatToken, r.slot);
@@ -286,6 +287,7 @@ export default function Home() {
               <li><Link className="menu-item" href="/account">{signedIn ? 'Account' : 'Sign In'}</Link></li>
             </ul>
             <div className="title-links">
+              <button className="btn small ghost" disabled={offline || !!busy} onClick={() => start('training')} title={`Train as ${cls?.name ?? 'your vessel'}: spawn foes and bosses, swap classes, rank every skill`}>{busy === 'training' ? 'Opening…' : 'Training Grounds'}</button>
               <Link className="btn small ghost" href="/records">Records</Link>
               <Link className="btn small ghost" href="/howto">Rules</Link>
               {settings.tutorialDone && <button className="btn small ghost" disabled={offline || !!busy} onClick={() => openVessel('tutorial')}>Tutorial</button>}

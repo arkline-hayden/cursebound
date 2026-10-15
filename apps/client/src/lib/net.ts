@@ -1,5 +1,5 @@
 import { contentHash, DODGE, RULES } from '@cursebound/content';
-import { BUILD_ID, PROTOCOL_VERSION, type ServerMessage } from '@cursebound/protocol';
+import { BUILD_ID, PROTOCOL_VERSION, type ServerMessage, type TrainOp } from '@cursebound/protocol';
 import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type Snapshot, type SimEvent } from '@cursebound/simulation';
 import { wsTransport, type GameTransport } from './p2p/transport';
 import { roomWsUrl } from './runtime';
@@ -21,6 +21,8 @@ export interface PhaseData {
   fate: { round: number; cardId: string }[];
   deathRecaps: { slot: number; round: number; attack: string; source: string; amountText: string; hpFracBefore: number; contributingFactors: string[]; disconnected: boolean; final: boolean }[];
   players: { slot: number; name: string; classId: string; ranks: Record<string, number>; skillPoints: number; spentByBranch: Record<string, number>; mastery: { damage: number; health: number; recovery: number }; ready: boolean; hpT: string; mhpT: string; connected: boolean; life: string; canMastery: boolean }[];
+  /** training grounds run (simulation training.ts): no score, records or Fate; TRAIN tools available */
+  training?: boolean;
 }
 
 export interface RoomInfo { roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null }
@@ -263,6 +265,13 @@ export class GameConnection {
   pause(paused: boolean) { this.send({ t: 'PAUSE', paused }); }
   requestLedger(page = 0) { this.send({ t: 'LEDGER', page }); }
   debug(overlay: boolean) { this.send({ t: 'DEBUG', overlay }); }
+  /** Training grounds tool (accepted only in training rooms; simulation training.ts). */
+  train(op: TrainOp, arg?: string, tier?: number) { this.send({ t: 'TRAIN', op, ...(arg !== undefined ? { arg } : {}), ...(tier !== undefined ? { tier } : {}), requestId: crypto.randomUUID().slice(0, 32) }); }
+  /** Spend a Fate's Blessing on card `cardSlot` of the current offer (simulation blessing.ts). */
+  bless(cardSlot: number) {
+    const offer = netStore.get().offer;
+    if (offer) this.send({ t: 'BLESS', offerId: offer.offerId, slot: cardSlot, requestId: crypto.randomUUID().slice(0, 32) });
+  }
 
   /** Interpolated view of remote entities ~100 ms in the past. */
   interpolation(now: number, delayMs = 100): { a: Snapshot; b: Snapshot; t: number } | null {
@@ -295,6 +304,9 @@ function ackText(code: string): string {
     NO_POINTS: 'No skill points left.', TIER_LOCKED: 'Spend more points in this branch first.', PREREQ: 'A prerequisite node is required first.',
     MAX_RANK: 'That node is already at maximum rank.', RESPEC_LOCKED: 'Respec is only allowed before round 1.', MASTERY_LOCKED: 'Mastery unlocks once your tree is complete.',
     STALE_PHASE: 'That action is not available right now.',
+    NO_BLESSING: 'You carry no Fate’s Blessing.', ALREADY_BLESSED: 'That card is already blessed.', NO_CURSE: 'That card carries no price to lift.',
+    STALE_OFFER: 'That offer has passed.', NOT_TRAINING: 'Only the training grounds allow that.', YARD_FULL: 'The yard is full — clear some foes first.',
+    BOSS_ACTIVE: 'A boss already stands in the yard.',
   };
   return m[code] ?? `Action rejected (${code}).`;
 }

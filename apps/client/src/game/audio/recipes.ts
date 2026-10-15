@@ -282,6 +282,23 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.noiseHit(o, t + 0.1, { dur: 1.1, type: 'highpass', f: 6000, f2: 10000, gain: 0.05, attack: 0.35 });
       return 1.8;
     }
+    case 'fate_blessing': {
+      // prismatic: a soft rising swell, then a glassy lydian cascade climbing through every colour, two detuned choir
+      // tones under it and a long glittering tail
+      const pc = ((key % 12) + 12) % 12;
+      const k0 = 74 + pc - (pc > 5 ? 12 : 0);
+      s.noiseHit(o, t, { dur: 0.5, type: 'bandpass', f: 800, f2: 5000, q: 1.2, gain: 0.06, attack: 0.4 });
+      s.tone(o, t, { type: 'triangle', f: mtof(k0 - 24), dur: 1.6, gain: 0.07, attack: 0.25 });
+      s.tone(o, t, { type: 'triangle', f: mtof(k0 - 17), dur: 1.6, gain: 0.05, attack: 0.3, detune: 7 });
+      [0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19].forEach((d, k) => {
+        const tt = t + 0.12 + k * 0.055;
+        s.bell(o, tt, mtof(k0 + d), 1.1 - k * 0.05, 0.05, 1.5);
+        s.tone(o, tt, { f: mtof(k0 + d) * 1.006, dur: 0.6, gain: 0.014, detune: 12 });
+      });
+      for (let k = 0; k < 8; k++) s.bell(o, t + 0.85 + k * 0.07 + r() * 0.03, mtof(k0 + 24 + [0, 4, 7, 11][k % 4]), 0.5, 0.022, 1.6);
+      s.noiseHit(o, t + 0.3, { dur: 1.4, type: 'highpass', f: 7000, f2: 11000, gain: 0.045, attack: 0.5 });
+      return 2.2;
+    }
     case 'legendary_equip':
       s.tone(o, t, { f: 140, f2: 70, dur: 0.25, gain: 0.25 });
       s.noiseHit(o, t, { dur: 0.12, f: 1800, gain: 0.12 });

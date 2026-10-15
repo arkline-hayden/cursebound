@@ -421,7 +421,8 @@ function Detail({ me, cls, node, pending, onSpend, mastery }: { me: Player; cls:
 // screen
 // ---------------------------------------------------------------------------------------------------------------
 
-export function SkillTree({ net }: { net: GameConnection }) {
+/** `onClose`: shown as a closable sheet over the training grounds (free ranks and refunds; simulation training.ts). */
+export function SkillTree({ net, onClose }: { net: GameConnection; onClose?: () => void }) {
   const phase = useStore(netStore, (s) => s.phase);
   const slot = useStore(netStore, (s) => s.slot);
   const serverTick = useStore(netStore, (s) => s.serverTick);
@@ -464,6 +465,7 @@ export function SkillTree({ net }: { net: GameConnection }) {
   }, [importOpen, signedIn, myBuilds]);
   if (!phase || !me || !cls) return null;
   const loadout = phase.phase === 'LOADOUT_LOCK';
+  const training = !!onClose && !!phase.training;
   const focused = focus ? NODE_BY_ID[focus] ?? null : null;
   const spend = (id: string) => { if (pending) return; setPending(true); net.allocate(id); setTimeout(() => setPending(false), 1500); };
   const secs = deadlineSeconds(phase.deadlineTick, serverTick);
@@ -531,14 +533,14 @@ export function SkillTree({ net }: { net: GameConnection }) {
           <div className="tree-title">
             <ClassEmblem classId={me.classId as Parameters<typeof ClassEmblem>[0]['classId']} size={48} />
             <div>
-              <h2 id="tree-h" className="panel-title sm">{loadout ? 'Loadout' : `Round ${phase.round} cleared`}</h2>
+              <h2 id="tree-h" className="panel-title sm">{training ? 'Training Grounds' : loadout ? 'Loadout' : `Round ${phase.round} cleared`}</h2>
               <div className="panel-sub">{cls.name} · {cls.role}</div>
             </div>
           </div>
           <div className="row">
             {phase.lastClear && !loadout && <span className="chip good">+{score(phase.lastClear.points)} banked</span>}
             {secs !== null && <span className="chip warn" role="timer">{Math.ceil(secs)}s left</span>}
-            <span className="chip gold">Score {score(phase.scoreText)}</span>
+            {training ? <span className="chip good">Free ranks · free refunds</span> : <span className="chip gold">Score {score(phase.scoreText)}</span>}
           </div>
         </header>
 
@@ -555,21 +557,23 @@ export function SkillTree({ net }: { net: GameConnection }) {
 
         <footer className="sheet-foot tree-foot">
           <div className="tree-points" aria-label={`${me.skillPoints} skill point${me.skillPoints === 1 ? '' : 's'} to spend`}>
-            <span className={`pts ${me.skillPoints === 0 ? 'zero' : ''}`} aria-hidden="true">{me.skillPoints}</span>
+            <span className={`pts ${me.skillPoints === 0 ? 'zero' : ''}`} aria-hidden="true">{training ? '∞' : me.skillPoints}</span>
             <span className="lbl" aria-hidden="true">Skill<br />points</span>
           </div>
           <div className="tree-tools">
-            {loadout && <button className="btn small ghost" onClick={() => net.refund()} data-tip="Before round 1 only">Refund all</button>}
+            {(loadout || training) && <button className="btn small ghost" onClick={() => net.refund()} data-tip={training ? 'Free while training' : 'Before round 1 only'}>Refund all</button>}
             <button className="btn small ghost" onClick={exportBuild} aria-live="polite">{copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Copy failed' : 'Copy build'}</button>
             {signedIn && <button className="btn small ghost" disabled={savedState === 'saving'} onClick={saveToAccount} aria-live="polite" data-tip="Keep this build in your account">{savedState === 'ok' ? 'Saved' : savedState === 'fail' ? 'Save failed' : savedState === 'saving' ? 'Saving…' : 'Save build'}</button>}
-            {loadout && <button className="btn small ghost" aria-expanded={importOpen} aria-controls="import-pop" onClick={() => { setImportOpen((v) => !v); setImportErr(null); }}>Import…</button>}
+            {(loadout || training) && <button className="btn small ghost" aria-expanded={importOpen} aria-controls="import-pop" onClick={() => { setImportOpen((v) => !v); setImportErr(null); }}>Import…</button>}
           </div>
           <span className="grow" />
           {phase.players.length > 1 && <span className="foot-note">{readyCount}/{present} ready</span>}
-          <button className={`btn big ${me.ready ? '' : 'primary'}`} onClick={() => net.ready(!me.ready)}>
-            {me.ready ? 'Waiting… (undo)' : loadout ? 'Begin round 1' : 'Continue to Fate'}
-          </button>
-          {importOpen && loadout && (
+          {training ? <button className="btn big primary" onClick={onClose}>Back to the yard <span className="kbd">K</span></button> : (
+            <button className={`btn big ${me.ready ? '' : 'primary'}`} onClick={() => net.ready(!me.ready)}>
+              {me.ready ? 'Waiting… (undo)' : loadout ? 'Begin round 1' : 'Continue to Fate'}
+            </button>
+          )}
+          {importOpen && (loadout || training) && (
             <div id="import-pop" className="frame import-pop" role="dialog" aria-label="Import build">
               <label className="engraved" htmlFor="imp">Paste build text</label>
               <div className="row">

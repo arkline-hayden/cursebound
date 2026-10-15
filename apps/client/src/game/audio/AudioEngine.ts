@@ -60,7 +60,7 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   ui_click: 4, skill_guard: 4, skill_sweep: 4, skill_rally: 4, skill_fireline: 4, skill_arc: 4, skill_phase: 4,
   signature_slam: 6, signature_nova: 6, wave_spawn: 6, boss_charge: 7, boss_ring: 7, boss_phase: 8,
   player_revived: 8, round_clear: 8, level_up: 6, ui_confirm: 5, ui_error: 5, vote_cast: 6, vote_lock: 7, fate_commit: 8,
-  legendary_drop: 9, legendary_equip: 7, potion_glug: 5, chest_open: 5, minimap_ping: 3,
+  legendary_drop: 9, legendary_equip: 7, fate_blessing: 9, potion_glug: 5, chest_open: 5, minimap_ping: 3,
   chain_throw: 3, chain_bind: 5, chain_break: 5, freeze_build: 3, freeze: 6, ice_shatter: 5, poison_spit: 2, poisoned: 4,
   blind_burst: 6, web_spit: 2, rooted: 5, silenced: 6,
   door_appear: 6, door_hum: 2, door_open: 7, door_choose: 7, portal_open: 8, portal_enter: 8,
@@ -77,7 +77,7 @@ const PER_ID_CAP: Partial<Record<SfxId, number>> = {
 /** Big moments that briefly pull the music down: [dB, hold s, release s]. */
 const SFX_DUCK: Partial<Record<SfxId, [number, number, number]>> = {
   boss_ring: [-6, 0.3, 0.8], signature_slam: [-4, 0.15, 0.5], title_boom: [-10, 0.8, 1.5], boss_roar: [-9, 0.8, 1],
-  boss_emerge: [-8, 1, 1.2], stag_cry: [-6, 0.8, 1], bell_toll: [-5, 1, 1.5], legendary_drop: [-6, 0.6, 1.2],
+  boss_emerge: [-8, 1, 1.2], stag_cry: [-6, 0.8, 1], bell_toll: [-5, 1, 1.5], legendary_drop: [-6, 0.6, 1.2], fate_blessing: [-6, 0.8, 1.2],
   player_downed: [-6, 0.6, 1], portal_enter: [-6, 0.6, 1], boss_phase: [-6, 0.8, 1],
 };
 

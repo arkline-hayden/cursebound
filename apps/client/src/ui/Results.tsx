@@ -13,7 +13,7 @@ import { fmt, score, whole } from '@/lib/format';
 import { CardIcon, ClassEmblem } from './icons';
 import { FireTitle } from './FireTitle';
 import { ItemIcon } from './itemIcons';
-import { LEGENDARY_BY_ID } from '@cursebound/content';
+import { FATES_BLESSING, LEGENDARY_BY_ID } from '@cursebound/content';
 
 // RESULTS (PRD §16.1, §13): collective score, clear depth, end reason, builds, Fate timeline, score breakdown
 // and death recap. Local records are labelled Local and never presented as verified competition.
@@ -39,7 +39,7 @@ export function Results({ net }: { net: GameConnection }) {
   // online mode: report the finished run to the cloud boards once (any participant may; the cloud dedupes)
   useEffect(() => {
     const acc = authStore.get().account;
-    if (!results || !online || !signedIn || !acc) return;
+    if (!results || !online || !signedIn || !acc || results.training) return;   // training grounds runs are never reported
     submitRunOnce(results as RunResults, mySlot, acc.id).then((x) => { if (x) setOnlineRank(x.rank); }).catch(() => undefined);
   }, [results, online, signedIn, mySlot]);
   useEffect(() => {
@@ -142,7 +142,7 @@ export function Results({ net }: { net: GameConnection }) {
                   return (
                     <div key={i} className="row" style={{ gap: 8, padding: 4, border: '2px solid #ff8a1e', background: 'var(--stone-0)' }} data-tip={def?.perk.description}>
                       <ItemIcon itemId={l.itemId} size={32} />
-                      <span style={{ color: '#ff8a1e' }}>{def?.name ?? l.itemId}</span>
+                      <span style={{ color: '#ff8a1e' }}>{def?.name ?? (l.itemId === FATES_BLESSING.id ? FATES_BLESSING.name : l.itemId)}</span>
                       <span className="faint">round {l.round}{l.source === 'boss' ? ' · boss' : l.source === 'elite' ? ' · elite' : ''}{owner ? ` · ${owner.name}` : ''}</span>
                     </div>
                   );

@@ -53,6 +53,9 @@ export function setupTraining(state: SimState, ev: SimEvent[]) {
 
 /** Per COMBAT tick (sim.ts combatTick, instead of the clear and wipe checks): fallen heroes stand straight back up. */
 export function trainingTick(state: SimState, ev: SimEvent[]) {
+  // a slain training boss leaves the boss bar
+  const enc = state.encounter;
+  if (enc?.bossEntityId != null && !state.enemies.some((e) => e.id === enc.bossEntityId && e.state !== 'dying')) { enc.isBoss = false; enc.bossId = null; enc.bossEntityId = null; }
   for (const p of state.players) {
     if (p.lifeState === 'alive') continue;
     p.lifeState = 'alive';
@@ -123,7 +126,7 @@ function spawnBoss(state: SimState, ev: SimEvent[], p: PlayerState, bossId: stri
   const e = createEnemy(state, bossId, x, y, ONE, { boss: true, objective: false, groupId: -1, summonerId: null });
   state.enemies.push(e);
   const enc = state.encounter!;
-  enc.bossId = bossId; enc.bossEntityId = e.id; enc.phaseAddsSpawned = []; enc.reinforce = [];
+  enc.isBoss = true; enc.bossId = bossId; enc.bossEntityId = e.id; enc.phaseAddsSpawned = []; enc.reinforce = [];
   ev.push({ t: 'spawn', id: e.id, kind: e.kind, x, y });
   return { ok: true };
 }
@@ -137,7 +140,7 @@ export function clearYard(state: SimState) {
   state.pendingSpawns = [];
   state.bossPhaseEvents = [];
   const enc = state.encounter;
-  if (enc) { enc.bossId = null; enc.bossEntityId = null; enc.phaseAddsSpawned = []; enc.reinforce = []; }
+  if (enc) { enc.isBoss = false; enc.bossId = null; enc.bossEntityId = null; enc.phaseAddsSpawned = []; enc.reinforce = []; }
 }
 
 function resetCooldowns(p: PlayerState) {
@@ -192,7 +195,13 @@ export function applyTraining(state: SimState, ev: SimEvent[], p: PlayerState, o
     case 'ai': {
       if (arg !== 'on' && arg !== 'off') { r = { ok: false, code: 'INVALID_INPUT' }; break; }
       state.training.ai = arg === 'on';
-      if (!state.training.ai) { for (const e of state.enemies) e.attack = null; state.telegraphs = []; }
+      if (!state.training.ai) {
+        // frozen foes: no attack in progress, nothing of theirs still in the air or on the ground
+        for (const e of state.enemies) e.attack = null;
+        state.telegraphs = [];
+        state.projectiles = state.projectiles.filter((pr) => pr.owner === 'player');
+        state.hazards = state.hazards.filter((h) => h.owner === 'player');
+      }
       r = { ok: true };
       break;
     }

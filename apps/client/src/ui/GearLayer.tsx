@@ -1,21 +1,56 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CLASS_BY_ID, GEAR_SLOTS, GEAR_SLOT_NAMES, LEGENDARY_BY_ID, LOOT_RULES } from '@cursebound/content';
+import { CLASS_BY_ID, FATES_BLESSING, GEAR_SLOTS, GEAR_SLOT_NAMES, LEGENDARY_BY_ID, LOOT_RULES } from '@cursebound/content';
 import { netStore, type GameConnection } from '@/lib/net';
 import { keyCap, settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
-import type { LegendaryUiEvent } from '@/game/render/LootRenderer';
+import type { BlessingUiEvent, LegendaryUiEvent } from '@/game/render/LootRenderer';
 import { GearPanel } from './GearPanel';
-import { ItemIcon } from './itemIcons';
+import { BlessingIcon, ItemIcon } from './itemIcons';
 import { ORANGE } from './gearText';
+import { compareLegendary, type GearCompare } from './gearCompare';
+import { GearCompareTip } from './GearCompareTip';
 
 // Legendary overlay layer (mounted once on the play page): the gear panel (key I / 'cursebound:inventory'),
 // "LEGENDARY" toasts on drops and equips (fed by LootRenderer's 'cursebound:legendary' window event) and the
 // "[G] Equip <item> (replaces <old>)" prompt, derived client-side from the snapshot while standing on loot.
+// Quick-compare: the legendary under the pointer ('cursebound:loothover' from LootRenderer), else the nearest one
+// within COMPARE_NEAR tiles, is shown beside what the hero wears in its slot (GearCompareTip) without equipping it.
+// Fate's Blessing toasts (dropped, taken, spent on a card) come from 'cursebound:blessing'.
 
-interface Toast { id: number; itemId: string; title: string; sub: string; at: number }
+interface Toast { id: number; itemId: string; title: string; sub: string; at: number; prism?: boolean }
 let nextToast = 1;
+
+/** Tiles within which a legendary on the ground is compared without pointing at it (keyboard and controller play). */
+const COMPARE_NEAR = 2.6;
+
+function useLootCompare(): GearCompare | null {
+  const snap = useStore(netStore, (s) => s.hud);
+  const slot = useStore(netStore, (s) => s.slot);
+  const [hover, setHover] = useState<number | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => { const id = (e as CustomEvent<{ id: number | null }>).detail?.id; setHover(typeof id === 'number' ? id : null); };
+    window.addEventListener('cursebound:loothover', on);
+    return () => window.removeEventListener('cursebound:loothover', on);
+  }, []);
+  if (!snap || snap.phase !== 'COMBAT' || !snap.lt?.length) return null;
+  const me = snap.players[slot];
+  if (!me || me.life !== 'alive') return null;
+  let pick = hover !== null ? snap.lt.find((it) => it.i === hover && LEGENDARY_BY_ID[it.it]) : undefined;
+  if (!pick) {
+    let bd = COMPARE_NEAR;
+    for (const it of snap.lt) {
+      if (!LEGENDARY_BY_ID[it.it]) continue;
+      const d = Math.hypot(it.x - me.x, it.y - me.y);
+      if (d < bd) { bd = d; pick = it; }
+    }
+  }
+  const def = pick ? LEGENDARY_BY_ID[pick.it] : undefined;
+  if (!def) return null;
+  const worn = me.gr?.[GEAR_SLOTS.indexOf(def.slot)];
+  return compareLegendary(def, worn ? LEGENDARY_BY_ID[worn] ?? null : null, me.c);
+}
 
 function useEquipPrompt(): { itemId: string; text: string } | null {
   const snap = useStore(netStore, (s) => s.hud);
@@ -47,6 +82,8 @@ export function GearLayer({ net }: { net: GameConnection }) {
   const openRef = useRef(false);
   openRef.current = open;
   const prompt = useEquipPrompt();
+  const compare = useLootCompare();
+  const keys = useStore(settingsStore, (s) => s.s.keys);
 
   // open / close: inventory key (all phases), the pause menu and pad button ('cursebound:inventory'), Escape closes
   useEffect(() => {
@@ -75,18 +112,33 @@ export function GearLayer({ net }: { net: GameConnection }) {
   useEffect(() => {
     const on = (e: Event) => {
       const d = (e as CustomEvent).detail as LegendaryUiEvent;
+      if (d.itemId === FATES_BLESSING.id) {
+        if (d.kind === 'drop') push({ id: nextToast++, itemId: d.itemId, title: FATES_BLESSING.name, sub: 'On the ground. Touch it to take it.', at: Date.now(), prism: true });
+        return;
+      }
       const def = LEGENDARY_BY_ID[d.itemId];
       if (!def) return;
       let sub = '';
       if (d.kind === 'drop') sub = `${GEAR_SLOT_NAMES[def.slot]} — on the ground`;
       else if (d.kind === 'carry') sub = 'Carried over — it awaits the party';
       else if (d.kind === 'equip') sub = d.mine ? `Equipped${d.replaced ? ` (replaced ${LEGENDARY_BY_ID[d.replaced]?.name ?? d.replaced})` : ''}` : `${d.who ?? 'An ally'} equipped it`;
-      const t: Toast = { id: nextToast++, itemId: def.id, title: def.name, sub, at: Date.now() };
+      push({ id: nextToast++, itemId: def.id, title: def.name, sub, at: Date.now() });
+    };
+    const push = (t: Toast) => {
       setToasts((ts) => [...ts.slice(-2), t]);
       setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== t.id)), 4800);
     };
+    const onBless = (e: Event) => {
+      const d = (e as CustomEvent).detail as BlessingUiEvent;
+      const held = netStore.get().hud?.players[netStore.get().slot]?.bl ?? 0;
+      const sub = d.kind === 'pickup'
+        ? (d.mine ? `In your pack${held > 1 ? ` (${held})` : ''}. Bless a Fate card at the doors (B).` : `${d.who ?? 'An ally'} took it.`)
+        : `${d.mine ? 'You' : d.who ?? 'An ally'} blessed ${d.card ?? 'a card'}: its price is lifted.`;
+      push({ id: nextToast++, itemId: FATES_BLESSING.id, title: FATES_BLESSING.name, sub, at: Date.now(), prism: true });
+    };
     window.addEventListener('cursebound:legendary', on);
-    return () => window.removeEventListener('cursebound:legendary', on);
+    window.addEventListener('cursebound:blessing', onBless);
+    return () => { window.removeEventListener('cursebound:legendary', on); window.removeEventListener('cursebound:blessing', onBless); };
   }, []);
 
   return (
@@ -94,14 +146,19 @@ export function GearLayer({ net }: { net: GameConnection }) {
       {toasts.length > 0 && (
         <div role="status" aria-live="polite" className="cine-fade" style={{ position: 'fixed', top: '16%', left: '50%', transform: 'translateX(-50%)', zIndex: 'var(--z-toast)' as unknown as number, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', pointerEvents: 'none' }}>
           {toasts.map((t) => (
-            <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '48px auto', gap: 12, alignItems: 'center', padding: '8px 16px 8px 8px', background: 'rgba(11,8,7,0.94)', border: `2px solid ${ORANGE}`, boxShadow: '4px 4px 0 #000', animation: 'fadeIn 0.15s steps(3)' }}>
-              <div style={{ width: 48, height: 48, display: 'grid', placeItems: 'center', border: '2px solid #3a1a00', background: '#0b0807' }}><ItemIcon itemId={t.itemId} size={32} /></div>
+            <div key={t.id} className={t.prism ? 'prism-border' : undefined} style={{ display: 'grid', gridTemplateColumns: '48px auto', gap: 12, alignItems: 'center', padding: '8px 16px 8px 8px', background: 'rgba(11,8,7,0.94)', border: `2px solid ${ORANGE}`, boxShadow: '4px 4px 0 #000', animation: t.prism ? undefined : 'fadeIn 0.15s steps(3)' }}>
+              <div style={{ width: 48, height: 48, display: 'grid', placeItems: 'center', border: '2px solid #3a1a00', background: '#0b0807' }}>{t.prism ? <BlessingIcon size={32} /> : <ItemIcon itemId={t.itemId} size={32} />}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontFamily: 'var(--font-label)', fontSize: 'var(--fs-label)', lineHeight: 'var(--lh-label)', color: ORANGE, textShadow: '2px 2px 0 #000' }}>LEGENDARY: {t.title}</span>
+                <span className={t.prism ? 'prism-text' : undefined} style={{ fontFamily: 'var(--font-label)', fontSize: 'var(--fs-label)', lineHeight: 'var(--lh-label)', color: ORANGE, textShadow: '2px 2px 0 #000' }}>LEGENDARY: {t.title}</span>
                 <span style={{ fontSize: 'var(--fs-body)', lineHeight: 'var(--lh-body)', color: 'var(--text-2)' }}>{t.sub}</span>
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {compare && !open && (
+        <div className="cine-fade" style={{ position: 'fixed', left: '50%', bottom: `calc(${prompt ? 196 : 150}px * var(--hud-zoom, 1))`, transform: 'translateX(-50%)', zIndex: 'var(--z-hint)' as unknown as number }}>
+          <GearCompareTip c={compare} hint={!prompt && compare.equipped && !compare.identical && compare.wearable ? `Step onto it, then ${keyCap(keys.interact?.[0] ?? "KeyG")} swaps` : undefined} />
         </div>
       )}
       {prompt && !open && (

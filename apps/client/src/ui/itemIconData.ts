@@ -1,4 +1,4 @@
-import { LEGENDARY_BY_ID, type GearSlot } from '@cursebound/content';
+import { FATES_BLESSING, LEGENDARY_BY_ID, type GearSlot } from '@cursebound/content';
 
 // Procedural 16×16 pixel icons for legendary items (DOM-free: used by the React UI and by Phaser textures).
 // One hand-drawn silhouette per gear slot (weapons have a sword and a mace variant), recoloured per item: the
@@ -201,6 +201,7 @@ function render(sprite: string[], pal: Record<string, string>): IconPixels {
 export function itemIconPixels(itemId: string): IconPixels {
   const hit = cache.get(itemId);
   if (hit) return hit;
+  if (itemId === FATES_BLESSING.id) { const px = blessingPixels(0); cache.set(itemId, px); return px; }
   const def = LEGENDARY_BY_ID[itemId];
   const slot: GearSlot = def?.slot ?? 'ring';
   const accent = def?.accent ?? LEGENDARY_ORANGE;
@@ -215,6 +216,44 @@ export function itemIconPixels(itemId: string): IconPixels {
   const px = render(sprite, pal);
   cache.set(itemId, px);
   return px;
+}
+
+/** HSV (h in turns, s / v in 0..1) to #rrggbb. */
+export function hsvHex(h: number, s: number, v: number): string {
+  const f = (n: number) => {
+    const k = (n + h * 6) % 6;
+    return Math.round((v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255).toString(16).padStart(2, '0');
+  };
+  return `#${f(5)}${f(3)}${f(1)}`;
+}
+
+/**
+ * Fate's Blessing: a prismatic four-pointed star (an astroid) whose colour wheels around its centre, white-hot at the
+ * heart, with four pin sparkles. `phase` (turns) rotates the hue, so animated renderers can cycle it in steps.
+ */
+export function blessingPixels(phase: number): IconPixels {
+  const out: IconPixels = [];
+  const inside = (x: number, y: number) => Math.sqrt(Math.abs(x - 7.5)) + Math.sqrt(Math.abs(y - 7.5)) <= 2.75;
+  for (let y = 0; y < 16; y++) {
+    const row: (string | null)[] = [];
+    for (let x = 0; x < 16; x++) {
+      if (inside(x, y)) {
+        const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy);
+        const h = ((Math.atan2(dy, dx) / (Math.PI * 2) + phase) % 1 + 1) % 1;
+        row.push(r < 1.3 ? '#ffffff' : r < 2.4 ? hsvHex(h, 0.35, 1) : hsvHex(h, 0.85, 1 - Math.min(0.25, r / 40)));
+      } else {
+        const edge = inside(x - 1, y) || inside(x + 1, y) || inside(x, y - 1) || inside(x, y + 1);
+        row.push(edge ? OUTLINE : null);
+      }
+    }
+    out.push(row);
+  }
+  for (const [sx, sy, k] of [[2, 2, 0.1], [13, 2, 0.35], [2, 13, 0.6], [13, 13, 0.85]] as const) {
+    const c = hsvHex((k + phase) % 1, 0.5, 1);
+    out[sy]![sx] = '#ffffff';
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!out[sy + oy]![sx + ox]) out[sy + oy]![sx + ox] = c;
+  }
+  return out;
 }
 
 /** Dim silhouette for an empty gear slot. */

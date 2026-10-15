@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CLASS_BY_ID, DUNGEON_THEMES } from '@cursebound/content';
+import { CLASS_BY_ID, DUNGEON_THEMES, TRAINING_THEME } from '@cursebound/content';
 import { netStore, type GameConnection, type PhaseData } from '@/lib/net';
 import { useStore } from '@/lib/store';
 import { settingsStore, keyCap } from '@/lib/settings';
@@ -386,7 +386,7 @@ export function Minimap({ net, audio = null }: { net: GameConnection; audio?: Au
   }, [map, net, large, bigSize]);
 
   if (!map) return null;
-  const theme = DUNGEON_THEMES.find((t) => t.id === map.theme)?.name ?? 'The Depths';
+  const theme = map.theme === TRAINING_THEME.id ? TRAINING_THEME.name : DUNGEON_THEMES.find((t) => t.id === map.theme)?.name ?? 'The Depths';
 
   /** Click on a canvas: art px under the cursor → world tile → nearest floor tile → move-to. */
   const onClick = (which: 'small' | 'big') => (e: React.MouseEvent<HTMLCanvasElement>) => {
