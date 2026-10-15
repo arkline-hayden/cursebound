@@ -60,7 +60,8 @@ describe('impact push rule (content KNOCKBACK_RULES)', () => {
   const hp = B(1000);
   it('light basic hits do not push; crits push a modest share of the damage type distance', () => {
     expect(impactPush('v_cleave', 'physical', false, B(100), hp)).toBe(0);
-    expect(impactPush('v_cleave', 'physical', true, B(100), hp)).toBeCloseTo(K.byDamageType.physical! * K.critOnlyFactor, 9);
+    expect(impactPush('v_cleave', 'physical', true, B(100), hp)).toBeCloseTo(K.byDamageType.physical! * K.critOnlyFactor * K.meleeFactor, 9);
+    expect(impactPush('a_spark', 'ember', true, B(100), hp)).toBeCloseTo(K.byDamageType.ember! * K.critOnlyFactor, 9);
     expect(impactPush('c_ice_shard', 'frost', true, B(100), hp)).toBeCloseTo(K.byDamageType.frost! * K.critOnlyFactor, 9);
     // procs and pets' nips (below critMinCoef or unknown) do not crit-push
     expect(impactPush('w_wolf_bite', 'physical', true, B(100), hp)).toBe(0);
@@ -74,9 +75,12 @@ describe('impact push rule (content KNOCKBACK_RULES)', () => {
   });
 
   it('heavy skills (by coefficient), circle slams and blasts push by damage type; heavy crits push further', () => {
-    expect(Number(SKILL_BY_ID.v_executioner!.damageCoef)).toBeGreaterThanOrEqual(K.heavyCoef);
-    expect(impactPush('v_executioner', 'physical', false, B(100), hp)).toBeCloseTo(K.byDamageType.physical!, 9);
-    expect(impactPush('v_executioner', 'physical', true, B(100), hp)).toBeCloseTo(K.byDamageType.physical! * K.critMult, 9);
+    expect(Number(SKILL_BY_ID.d_execution!.damageCoef)).toBeGreaterThanOrEqual(K.heavyCoef);
+    expect(impactPush('d_execution', 'physical', false, B(100), hp)).toBeCloseTo(K.byDamageType.physical!, 9);
+    expect(impactPush('d_execution', 'physical', true, B(100), hp)).toBeCloseTo(K.byDamageType.physical! * K.critMult, 9);
+    // a heavy melee swing staggers the foe back without shoving it out of reach
+    expect(SKILL_BY_ID.v_executioner!.shape.kind).toBe('arc');
+    expect(impactPush('v_executioner', 'physical', false, B(100), hp)).toBeCloseTo(K.byDamageType.physical! * K.meleeFactor, 9);
     expect(SKILL_BY_ID.w_thornburst!.shape.kind).toBe('circle');
     expect(impactPush('w_thornburst', 'physical', false, B(100), hp)).toBeCloseTo(K.byDamageType.physical!, 9);
     expect(impactPush('c_comet', 'frost', false, B(100), hp)).toBe(K.bySkill.c_comet);
@@ -237,7 +241,7 @@ describe('knockback in the simulation', () => {
     const [fx, fy] = nearestFloor(s.map!, p.x + 1.2, p.y);
     let e = dummy(s, 'guardian', fx, fy);
     e.cohort.unitHp = e.cohort.unitHp.mul(B(50));   // survives the hit
-    hitEnemy(s, [], e, B(10), B(1), { dtype: 'physical', srcSlot: 0, skillId: 'v_executioner', fromX: p.x, fromY: p.y, allowCrit: true });
+    hitEnemy(s, [], e, B(10), B(1), { dtype: 'physical', srcSlot: 0, skillId: 'd_execution', fromX: p.x, fromY: p.y, allowCrit: true });
     for (let i = 0; i < 30; i++) {
       if (i === checkpointAt) { s = deserializeState(serializeState(s)); e = s.enemies.find((o) => o.id === e.id)!; }
       step(s, [null]);
@@ -252,7 +256,7 @@ describe('knockback in the simulation', () => {
     const e = dummy(s, 'guardian', fx, fy);
     e.cohort.unitHp = e.cohort.unitHp.mul(B(50));
     const d0 = Math.hypot(e.x - p.x, e.y - p.y);
-    hitEnemy(s, [], e, B(10), B(1), { dtype: 'physical', srcSlot: 0, skillId: 'v_executioner', fromX: p.x, fromY: p.y, allowCrit: false });
+    hitEnemy(s, [], e, B(10), B(1), { dtype: 'physical', srcSlot: 0, skillId: 'd_execution', fromX: p.x, fromY: p.y, allowCrit: false });
     expect(Math.hypot(e.knockX, e.knockY)).toBeGreaterThan(0);
     for (let i = 0; i < 20; i++) step(s, [null]);
     expect(Math.hypot(e.x - p.x, e.y - p.y)).toBeGreaterThan(d0 + 0.2);

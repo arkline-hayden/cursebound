@@ -254,7 +254,8 @@ export const AFFLICTION_RULES = {
  *    takes heavyFrac of a unit's health and it survives;
  *  - distance: bySkill[skill] ?? byDamageType[type] ?? defaultPush, x critMult on a heavy crit; a crit that is not
  *    heavy pushes critOnlyFactor of that, and only from a skill of at least critMinCoef (procs and pets' nips do not);
- *  - channelled aura skills (whirlwinds, blizzards, swarms) never push unless listed in bySkill;
+ *  - channelled aura skills (whirlwinds, blizzards, swarms) never push unless listed in bySkill, and melee swings (arc
+ *    shapes) push meleeFactor as far, so a heavy swing staggers a foe back without shoving it out of reach;
  *  - skills whose kits already knock back (SkillDef.knockback) keep their own push, and an authored knockback in the
  *    same tick supersedes the slide (no double shove);
  *  - champions and rares take eliteFactor[tier] of every knockback (authored ones too); bosses are immune.
@@ -276,6 +277,7 @@ export const KNOCKBACK_RULES = {
   critMult: 1.25,
   critOnlyFactor: 0.5,
   critMinCoef: 0.8,
+  meleeFactor: 0.6,
   maxPush: 0.8,
   /** [ordinary, champion, rare] */
   eliteFactor: [1, 0.5, 0.35] as number[],

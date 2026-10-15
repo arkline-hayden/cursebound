@@ -42,7 +42,9 @@ export function impactPush(skillId: string, dtype: DamageType, crit: boolean, pe
   const heavy = authored !== undefined || coef >= (area ? K.areaHeavyCoef : K.heavyCoef) || (!unitHp.isZero() && perUnit.gte(unitHp.mul(HEAVY_FRAC)));
   // a crit on its own pushes only from a real strike (a skill of at least critMinCoef), not from procs and pets' nips
   if (!heavy && !(crit && coef >= K.critMinCoef)) return 0;
-  const base = authored ?? K.byDamageType[dtype] ?? K.defaultPush;
+  let base = authored ?? K.byDamageType[dtype] ?? K.defaultPush;
+  // melee swings (arc shapes) stagger a foe back rather than shoving it out of the swing's reach
+  if (authored === undefined && def?.shape.kind === 'arc') base *= K.meleeFactor;
   const d = heavy ? base * (crit ? K.critMult : 1) : base * K.critOnlyFactor;
   return Math.min(K.maxPush, d);
 }
