@@ -21,8 +21,10 @@ import type { EnemyState, PendingSpawn, PlayerState, SimEvent, SimState } from '
 // were), the director turns one population pack whose site lies in a proper room far from the heroes into a mini-boss
 // pack: a theme foe (a pack lead of the floor's theme) plus RULES.miniBossEscorts escorts. makeMiniBoss gives the lead a
 // generated name ("Grimtooth the Unbowed", content minibosses.ts), one or two signature mechanics, mini-boss health
-// (RULES.miniBossHealth, round-scaled like any foe: tougher than a rare, far below a boss), damage, armour and size.
-// It idles with its pack until found; waking it announces it ('miniboss' event 'awake'). Its death drops rare-tier
+// (max(RULES.miniBossHealth, its rare's health x miniBossRareFactor), round-scaled like any foe: tougher than a rare,
+// far below a boss), damage, armour and size. The pack stands in for RULES.miniBossTakesReinforcements reinforcement
+// packs, so a round's work stays about the same. It idles with its pack until found; waking it announces it
+// ('miniboss' event 'awake'). Its death drops rare-tier
 // potions and a haste orb, rolls a legendary at RULES.miniBossLegendaryChance (outside the per-round drop cap) and pays
 // RULES.miniBossScorePercent% of the round's base points x score pressure at once. Mechanics (all telegraphed):
 //   slam    - marks a circle around itself, channels, then a shockwave: damage + knockback (i-frames avoid both)

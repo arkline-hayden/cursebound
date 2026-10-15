@@ -663,6 +663,12 @@ function rapidAttack(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAtt
   e.rapidWork = e.rapidWork.sub(Big.from(k));
   startAttack(state, ev, e, a, target);
   releaseAttack(state, ev, e, a, Big.from(k));
+  if (a.kind === 'leap' && e.attack) {
+    // theme foes: at a sub-tick cadence the leap lands at once (no airborne window to glide through)
+    const r = moveCircle(state.map!, e.x, e.y, e.attack.tx - e.x, e.attack.ty - e.y, Math.min(e.radius, 0.6));
+    e.x = r.x; e.y = r.y;
+    landLeap(state, ev, e, a);
+  }
   e.attack = null;
   e.state = 'attack';
   // keep a one-tick telegraph envelope visible

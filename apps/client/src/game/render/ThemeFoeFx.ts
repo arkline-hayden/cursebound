@@ -159,7 +159,7 @@ export class ThemeFoeFx {
     if (!crown) { crown = this.scene.add.image(0, 0, 'mb:crown').setOrigin(0.5, 1); this.crowns.set(e.i, crown); }
     const top = Math.round(sprite.height * sprite.originY * sprite.scaleY);
     // between the health bar (CombatScene: max(40, top + 2) over the feet) and the nameplate
-    crown.setPosition(Math.round(px), Math.round(py - Math.max(40, top + 2) - 2 + Math.sin(now / 300 + e.i))).setDepth(4505).setVisible(sprite.visible);
+    crown.setPosition(Math.round(px), Math.round(py - Math.max(40, top + 2) - 2 + Math.sin(now / 300 + e.i))).setScale(2).setDepth(4505).setVisible(sprite.visible);   // 2x pixels: reads at play zoom
     // embers rising off it
     const st = this.per.get(e.i) ?? { lastFx: 0 };
     this.per.set(e.i, st);

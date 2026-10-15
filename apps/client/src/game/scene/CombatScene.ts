@@ -1346,7 +1346,7 @@ export class CombatScene extends Phaser.Scene {
       const base = (e.boss ? BOSS_BY_ID[e.k]?.name : undefined) ?? ENEMY_BY_ID[e.k]?.name ?? e.k;
       const prio = e.boss ? 3 : e.mb ? 2.5 : v.elite ? 2 : 0;
       const color = e.boss ? '#ff6a5e' : e.mb ? MINIBOSS_CSS : v.elite === 2 ? '#ffd36a' : v.elite ? '#7cc0ff' : e.obj ? '#e8c66a' : '#ebe0c8';
-      const ny = e.boss ? py - Math.max(64, top + 6) : py - Math.max(40, top + 2) - 2 - (e.mb ? 9 : 0);   // a mini-boss plate clears its crown
+      const ny = e.boss ? py - Math.max(64, top + 6) : py - Math.max(40, top + 2) - 2 - (e.mb ? 15 : 0);   // a mini-boss plate clears its crown
       this.nameReq.push({ key, text: e.mb ? e.mb : v.elite ? eliteName(base, e.af) : base, color, x: px, y: ny, prio, hurt: e.hp < 0.999, hitAt: this.lastHit.get(e.i)?.at ?? -1e9, badge: e.cnt ? v.badge : undefined });
     }
     if (e.sh && !(e.af ?? []).includes('shielding')) v.bar.lineStyle(2, 0x9fd8ff, 0.9).strokeEllipse(Math.round(px), Math.round(py - 14), iso.rx(e.r) * 2 + 12, iso.ry(e.r) * 2 + 20);

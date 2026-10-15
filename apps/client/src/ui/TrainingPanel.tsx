@@ -24,6 +24,13 @@ function packName(lead: string): string {
   return ENEMY_BY_ID[lead]?.name ?? lead;
 }
 
+/** Button label: long foe names (the theme foes' 'Moon-spawn Crawler', 'Maintenance Drone') keep their last word so the
+ *  two-column grid never clips them; the tooltip keeps the full name. */
+function packLabel(lead: string): string {
+  const n = packName(lead);
+  return n.length > 14 ? n.split(/[\s-]+/).pop() ?? n : n;
+}
+
 export function TrainingPanel({ net }: { net: GameConnection }) {
   const [open, setOpen] = useState(true);
   const [tree, setTree] = useState(false);
@@ -68,7 +75,7 @@ export function TrainingPanel({ net }: { net: GameConnection }) {
           </div>
           <div style={grid(2)}>
             {PACK_TEMPLATES.map((p) => (
-              <button key={p.id} className="btn small" style={tight} title={`${packName(p.lead)} pack`} onClick={() => net.train('spawn', p.id, tier)}>{packName(p.lead)}</button>
+              <button key={p.id} className="btn small" style={tight} title={`${packName(p.lead)} pack`} onClick={() => net.train('spawn', p.id, tier)}>{packLabel(p.lead)}</button>
             ))}
           </div>
 
