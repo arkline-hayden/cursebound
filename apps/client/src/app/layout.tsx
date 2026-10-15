@@ -10,6 +10,7 @@ import './globals.css';
 import { SkinInstaller } from '@/ui/SkinInstaller';
 import { GamepadRoot } from '@/ui/GamepadRoot';
 import { UpdateToast } from '@/ui/UpdateToast';
+import { NoTextSelect } from '@/ui/NoTextSelect';
 
 export const metadata: Metadata = {
   title: 'CURSEBOUND',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <SkinInstaller />
         <GamepadRoot />
+        <NoTextSelect />
         <a className="skip-link" href="#main">Skip to content</a>
         {children}
         <UpdateToast />

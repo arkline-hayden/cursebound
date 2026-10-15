@@ -1,7 +1,14 @@
 /* In-world door vote (DoorPanel.tsx). Chrome comes from the pixel skin in globals.css (.frame, .btn, .chip, .kbd,
    .fv-section); this module only lays the pieces out. Fonts and sizes use the type tokens only. */
 
-.layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-overlay); }
+/* drawn at the in-game panel scale (globals.css: zoom 0.75, text one size up); viewport units divide by the zoom */
+.layer {
+  position: fixed; inset: 0; pointer-events: none; z-index: var(--z-overlay); zoom: var(--ui-zoom, 1);
+  --fs-small: 24px; --lh-small: 26px; --fs-label: 24px; --fs-label-lg: 28px; --lh-label: 28px;
+  --fs-body: 28px; --fs-body-lg: 32px; --lh-body: 32px; --lh-body-lg: 36px;
+}
+:global(:root[data-text-size="1"]) .layer, :global(:root[data-text-size="2"]) .layer { --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px; --fs-body: 32px; --fs-body-lg: 40px; --lh-body: 36px; --lh-body-lg: 44px; }
+@media (min-width: 2540px) and (min-height: 1400px) { .layer { --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px; --fs-body: 32px; --fs-body-lg: 40px; --lh-body: 36px; --lh-body-lg: 44px; } }
 .layer > * { pointer-events: auto; }
 
 .hint {
@@ -22,7 +29,7 @@
 
 .panel {
   position: absolute; right: var(--sp-4); top: 50%; transform: translateY(-50%);
-  width: min(440px, 92vw); max-height: calc(100vh - 220px); overflow: auto;
+  width: min(440px, calc(92vw / var(--ui-zoom, 1))); max-height: calc(100vh / var(--ui-zoom, 1) - 220px); overflow: auto;
   display: flex; flex-direction: column; gap: var(--sp-2);
   font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body);
   animation: doorPanelIn 0.16s steps(4) both;
@@ -58,7 +65,7 @@
 
 .strip {
   position: absolute; left: 50%; bottom: var(--sp-3); transform: translateX(-50%);
-  display: flex; gap: var(--sp-2); width: min(1180px, calc(100vw - 32px));
+  display: flex; gap: var(--sp-2); width: min(1180px, calc(100vw / var(--ui-zoom, 1) - 32px));
 }
 .entry {
   flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;

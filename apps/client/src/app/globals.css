@@ -1,6 +1,6 @@
 /* CURSEBOUND — gothic pixel interface (Diablo-era chrome). Every frame, plaque, socket, bar, ornament, scrollbar
    and control is drawn procedurally by ui/pixelSkin.ts and rendered nearest-neighbour at an integer scale (2x; the
-   HUD zooms to 1.5x at 1080p and 2x at 1440p). No soft gradients, no rounded corners, no blurred shadows: flat
+   HUD draws at 0.75x below 1080p, 1x at 1080p, 1.5x at 1440p; in-game panels at 0.75x). No soft gradients, no rounded corners, no blurred shadows: flat
    palette, hard pixel shadows, dithered vignettes. Contrast targets: 4.5:1 body text, 3:1 large text and controls.
 
    TYPE (readability pass). The blackletter faces are retired everywhere except the main-menu logo wordmark
@@ -20,7 +20,7 @@
      disp   --fs-disp 50 · --fs-disp-lg 70 · --fs-disp-xl 100                                    (Jersey 10)
    Larger text (Settings > Interface text size) and 2560x1440+ screens swap in the next tier of every token.
    The HUD has its own --hud-* tokens (label 20/20, body 20, heads 20/30/40, disp 50); it is scaled by --hud-zoom
-   (1x, 1.5x at 1080p, 2x at 1440p). Text on stone panels sits on a darkened (multiplied) stone texture with a hard
+   (0.75x below 1080p, 1x at 1080p, 1.5x at 1440p, 2x at 4K; see "HUD zoom" below). Text on stone panels sits on a darkened (multiplied) stone texture with a hard
    2px black shadow: bone text reaches >= 7:1, muted text >= 4.5:1.
    SPACING is an 8px grid: --sp-1 4 · --sp-2 8 · --sp-3 16 · --sp-4 24 · --sp-5 32 · --sp-6 48.
    (The root font-size stays 18px only for legacy rem rules in the Fate/Ledger blocks.) */
@@ -139,15 +139,22 @@
     --fs-disp: 100px; --fs-disp-lg: 120px; --fs-disp-xl: 140px;
   }
 }
-/* HUD zoom: 1080p-class screens show the 720p HUD at 1.5x, 1440p at 2x (integer art scale, on-grid HUD fonts) */
+/* HUD zoom (in-game size pass: about a quarter smaller than it was). Smaller-than-1080p windows draw the HUD at 0.75x
+   (the 2x pixel skin lands on a 1.5x grid: a half step, pixels stay square) with its text one size up so labels
+   stay >= 18px on screen; 1080p draws it at 1x (was 1.5x), 1440p at 1.5x (was 2x), 4K at 2x. */
+:root { --hud-zoom: 0.75; --hud-label: 24px; --hud-label-lh: 24px; --hud-body: 24px; --hud-goth-sm: 24px; }
+:root[data-text-size='1'], :root[data-text-size='2'] { --hud-label: 28px; --hud-label-lh: 28px; --hud-body: 28px; --hud-goth-sm: 30px; }
 @media (min-width: 1900px) and (min-height: 1000px) {
+  :root { --hud-zoom: 1; }
+  :root, :root[data-text-size='1'], :root[data-text-size='2'] { --hud-label: 20px; --hud-label-lh: 20px; --hud-body: 20px; --hud-goth-sm: 20px; --hud-goth: 20px; --hud-goth-lg: 40px; --hud-disp: 50px; }
+  :root[data-text-size='1'] { --hud-label: 24px; --hud-label-lh: 24px; --hud-body: 24px; }
+  :root[data-text-size='2'] { --hud-label: 28px; --hud-label-lh: 28px; --hud-body: 28px; }
+}
+@media (min-width: 2540px) and (min-height: 1400px) {
   :root { --hud-zoom: 1.5; }
   :root, :root[data-text-size='1'], :root[data-text-size='2'] { --hud-label: 20px; --hud-label-lh: 20px; --hud-body: 20px; --hud-goth-sm: 20px; --hud-goth: 20px; --hud-goth-lg: 40px; --hud-disp: 50px; }
 }
-@media (min-width: 2540px) and (min-height: 1400px) {
-  :root { --hud-zoom: 2; }
-  :root, :root[data-text-size='1'], :root[data-text-size='2'] { --hud-label: 20px; --hud-label-lh: 20px; --hud-body: 20px; --hud-goth-sm: 20px; --hud-goth: 30px; --hud-goth-lg: 40px; --hud-disp: 50px; }
-}
+@media (min-width: 3800px) and (min-height: 2100px) { :root { --hud-zoom: 2; } }
 @media (max-height: 760px) { :root { --ov-pad: 8px; } }
 
 * { box-sizing: border-box; }
@@ -167,6 +174,11 @@ body {
 button, a, [role='radio'], [role='tab'], label, select, summary { cursor: var(--px-cursor, pointer); }
 a { color: var(--ember-hi); }
 button, input, select { font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
+/* no text highlighting anywhere (menus included; ui/NoTextSelect.tsx also stops drag-selection and link / image
+   ghost drags). Text fields stay selectable and editable. */
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+img, a, canvas, svg { -webkit-user-drag: none; }
+input, textarea, select, [contenteditable]:not([contenteditable='false']) { -webkit-user-select: text; user-select: text; }
 ::selection { background: var(--blood); color: var(--bone); }
 :focus-visible { outline: 2px dashed var(--ember-hi); outline-offset: 4px; }
 [data-reduced-motion='true'] *, [data-reduced-motion='true'] *::before, [data-reduced-motion='true'] *::after { animation: none !important; transition: none !important; }
@@ -558,12 +570,10 @@ details[open] > summary::before { content: '\25BE'; }
 .banner .bn-sub::before, .banner .bn-sub::after { content: ''; width: 96px; height: 22px; background: var(--px-rule) 0 50% / 8px 22px repeat-x; image-rendering: pixelated; }
 .banner.danger .bn-text { color: var(--blood-hi); text-shadow: 4px 4px 0 var(--black), 8px 8px 0 #2a0406; }
 .banner.good .bn-text { color: var(--ember-hi); }
-@media (min-width: 1900px) and (min-height: 1000px) { .banner .bn-text { font-size: var(--fs-disp-xl); } .banner .bn-sub { font-size: var(--fs-goth-lg); } }
 .banner.callout { top: 14%; animation-duration: 1.4s; }
 .banner.callout .bn-text { font-family: var(--font-gothic); font-size: var(--fs-goth-xl); text-shadow: 2px 2px 0 var(--black), 4px 4px 0 #3a1a04; }
 .banner.info .bn-text { color: var(--champion); }
 .banner.callout.danger .bn-text { color: var(--rare); text-shadow: 2px 2px 0 var(--black), 4px 4px 0 #3a1a04; }
-@media (min-width: 1900px) and (min-height: 1000px) { .banner.callout .bn-text { font-size: var(--fs-goth-xxl); } }
 @keyframes bannerIn { 0% { opacity: 0; transform: translate(-50%, 0) scale(1.5); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 
 .vignette-hurt {
@@ -1311,3 +1321,37 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
 .td-change .meta { color: var(--bone-3); }
 .td-change .meta::before { content: '· '; }
 .td-reqs.inline { flex-direction: row; flex-wrap: wrap; column-gap: var(--sp-3); row-gap: var(--sp-1); }
+/* ---------- in-game panel scale ----------
+   Panels opened during a run (door vote, Fate Ledger, gear, skill tree, pause, results, round summary, lobby) and the
+   toast stack draw a quarter smaller than the menus: CSS zoom 0.75 puts the 2x pixel skin on a 1.5x grid (a half
+   step, so pixels stay square), while the text tokens step up one size inside them so body text stays ~21px and labels
+   ~18px on screen (1440p and the larger text settings step up to the top tier). Chromium scales vh / vw by the zoom,
+   so viewport-relative heights inside these panels divide by it. Title and menu pages are not affected. */
+.game-root { --ui-zoom: 0.75; }
+.game-root .overlay, .game-root .toast-stack { zoom: var(--ui-zoom); }
+.game-root .overlay, .game-root .toast-stack {
+  --fs-small: 24px; --lh-small: 26px; --fs-label: 24px; --fs-label-lg: 28px; --lh-label: 28px;
+  --fs-body: 28px; --fs-body-lg: 32px; --fs-body-xl: 40px; --lh-body: 32px; --lh-body-lg: 36px; --lh-body-xl: 44px;
+}
+:root[data-text-size='1'] .game-root :is(.overlay, .toast-stack), :root[data-text-size='2'] .game-root :is(.overlay, .toast-stack) {
+  --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px;
+  --fs-body: 32px; --fs-body-lg: 40px; --fs-body-xl: 48px; --lh-body: 36px; --lh-body-lg: 44px; --lh-body-xl: 52px;
+}
+@media (min-width: 2540px) and (min-height: 1400px) {
+  .game-root .overlay, .game-root .toast-stack {
+    --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px;
+    --fs-body: 32px; --fs-body-lg: 40px; --fs-body-xl: 48px; --lh-body: 36px; --lh-body-lg: 44px; --lh-body-xl: 52px;
+  }
+  /* the skill tree's fixed socket grid keeps the screen's own tier (the top tier clips its node labels) */
+  :root:not([data-text-size='1']):not([data-text-size='2']) .game-root .tree-overlay {
+    --fs-small: 24px; --lh-small: 26px; --fs-label: 24px; --fs-label-lg: 28px; --lh-label: 28px;
+    --fs-body: 28px; --fs-body-lg: 32px; --fs-body-xl: 40px; --lh-body: 32px; --lh-body-lg: 36px; --lh-body-xl: 44px;
+  }
+}
+.game-root .overlay > .sheet { max-height: calc(100vh / var(--ui-zoom) - 80px); }
+.game-root .overlay > .frame.sheet { max-height: none; }
+.game-root .overlay > .frame.sheet.fit { max-height: calc(100vh / var(--ui-zoom) - 2 * var(--ov-pad)); }
+.game-root .sheet-scroll { max-height: calc(100vh / var(--ui-zoom) - 160px); }
+.game-root .tree-sheet { height: min(calc(100vh / var(--ui-zoom) - 2 * var(--ov-pad)), 1120px); }
+/* the toast stack still clears the (unzoomed) HUD orbs */
+.game-root .toast-stack { bottom: calc((184px * var(--hud-zoom) + 16px) / var(--ui-zoom)); }
