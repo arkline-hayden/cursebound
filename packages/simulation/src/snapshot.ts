@@ -7,6 +7,7 @@ import { afflictionSnapshot } from './afflictions';
 import { moveSpeedOf } from './players';
 import { gearSnapshot, lootSnapshot } from './gear';
 import { doorSnapshot, type SnapDoor } from './doors';
+import { playerEventSnap, roomEventSnapshot, type SnapRoomEvent } from './roomEvents';
 import { playerDerived, toFloatClamped } from './stats';
 import type { SimState } from './types';
 
@@ -32,6 +33,8 @@ export interface SnapPlayer {
   lk?: number; tk?: number; chs?: number;
   /** Fate's Blessings carried (blessing.ts); absent = none */
   bl?: number;
+  /** room events (roomEvents.ts): cursed coins in the purse, seconds left on timed shrine blessings */
+  co?: number; rb?: Record<string, number>;
 }
 export interface SnapEnemy {
   i: number; g: number; k: string; x: number; y: number; fx: number; fy: number; st: string; hp: number; cnt: string | null;
@@ -80,6 +83,8 @@ export interface Snapshot {
   cu?: number;
   /** training grounds switches (training.ts); present only in training runs. ai: 1 = foes act, 0 = they stand still */
   tr?: { ai: 0 | 1 };
+  /** room events (roomEvents.ts): shrines, altars, the merchant and living treasure imps; absent when none */
+  rev?: SnapRoomEvent[];
 }
 
 export interface SnapLoot { i: number; it: string; x: number; y: number }
@@ -118,6 +123,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
         ...gearSnapshot(state, p),
         ...afflictionSnapshot(state, p),
         ...(p.bless ? { bl: p.bless } : {}),
+        ...playerEventSnap(state, p),
       };
     }),
     enemies: state.enemies.map((e) => {
@@ -153,6 +159,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
     ...doorsField(state),
     ...(state.tick < (state.cinematicUntilTick ?? 0) ? { cu: state.cinematicUntilTick } : {}),
     ...(state.training ? { tr: { ai: state.training.ai ? 1 : 0 } as const } : {}),
+    ...roomEventSnapshot(state),
   };
 }
 

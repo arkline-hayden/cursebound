@@ -1,7 +1,7 @@
 // Wire protocol (PRD §19.2). Clients send intentions only; the authority validates everything.
 // Schemas impose size, count, string length and nesting limits — transport safeguards, never Fate stat limits.
 
-export const PROTOCOL_VERSION = 3;   // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen; 3: TRAIN (training rooms only) and BLESS (Fate's Blessing)
+export const PROTOCOL_VERSION = 4;   // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen; 3: TRAIN (training rooms only) and BLESS (Fate's Blessing); 4: EVENT (room events: shrine, altar pact, merchant purchase), TRAIN op 'event'
 export const LIMITS = {
   inputBytes: 256,
   controlBytes: 8 * 1024,
@@ -38,10 +38,17 @@ export type ClientMessage =
   /** Training rooms only (the authority refuses it elsewhere): a training-grounds tool (simulation training.ts) */
   | { t: 'TRAIN'; op: TrainOp; arg?: string; tier?: number; requestId: string }
   /** Fate's Blessing: lift the price of card `slot` (0..2) of the current offer during the door vote */
-  | { t: 'BLESS'; offerId: string; slot: number; requestId: string };
+  | { t: 'BLESS'; offerId: string; slot: number; requestId: string }
+  /** Room events (simulation roomEvents.ts): activate shrine `id`, take pact `choice` (0..2) of altar `id`, or buy shelf
+   *  row `choice` of merchant `id`. The authority validates phase, range, stock and funds. */
+  | { t: 'EVENT'; op: EventOp; id: number; choice?: number; requestId: string };
+
+/** Room event interactions (simulation roomEvents.ts EVENT_OPS). */
+export const EVENT_OPS = ['shrine', 'altar', 'buy'] as const;
+export type EventOp = typeof EVENT_OPS[number];
 
 /** Training-grounds tools (simulation training.ts TRAINING_OPS). */
-export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level'] as const;
+export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level', 'event'] as const;
 export type TrainOp = typeof TRAIN_OPS[number];
 
 // ---------------- Server -> client ----------------
@@ -135,6 +142,10 @@ export function parseClientMessage(raw: string): ParseResult {
       return { ok: true, msg: m as unknown as ClientMessage };
     case 'BLESS':
       if (!isStr(m.offerId, 96, ID) || !isInt(m.slot, 0, 2) || !isStr(m.requestId, 64, ID)) return bad('bad BLESS');
+      return { ok: true, msg: m as unknown as ClientMessage };
+    case 'EVENT':
+      if (!(EVENT_OPS as readonly string[]).includes(m.op as string) || !isInt(m.id, 0, 2 ** 31) || !isStr(m.requestId, 64, ID)) return bad('bad EVENT');
+      if (m.choice !== undefined && !isInt(m.choice, 0, 15)) return bad('bad EVENT choice');
       return { ok: true, msg: m as unknown as ClientMessage };
     default:
       return bad('unknown message type');

@@ -14,6 +14,7 @@ import { Juice, GORE } from '../render/Juice';
 import { LootRenderer } from '../render/LootRenderer';
 import { EliteFx, ELITE_COLOR } from '../render/EliteFx';
 import { PickupRenderer } from '../render/Pickups';
+import { RoomEventRenderer } from '../render/RoomEvents';   // room events: shrines, altar, merchant, treasure imp, coins
 import { Outlines } from '../render/Outlines';
 import { AfflictionFx, foeActor, heroTint } from '../render/Afflictions';
 import { DoorRenderer } from '../render/Doors';
@@ -111,6 +112,8 @@ export class CombatScene extends Phaser.Scene {
   aff!: AfflictionFx;
   /** in-world door vote (render/Doors.ts) */
   doorsR: DoorRenderer | null = null;
+  /** room events: shrines, cursed altar, merchant, treasure imp, cursed coins (render/RoomEvents.ts) */
+  roomFx: RoomEventRenderer | null = null;
   private actors = new Map<string, ActorView>();
   private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number; color: number; look?: ProjectileLook; born: number }>();
   private hazardG!: Phaser.GameObjects.Graphics;
@@ -204,6 +207,7 @@ export class CombatScene extends Phaser.Scene {
     this.aff = new AfflictionFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
+    this.roomFx = new RoomEventRenderer(this, this.juice, this.dungeon, this.net, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.hazardG = this.add.graphics().setDepth(-80);
     this.teleG = this.add.graphics().setDepth(-70);
     this.fxG = this.add.graphics().setDepth(4700);
@@ -436,6 +440,7 @@ export class CombatScene extends Phaser.Scene {
     const pal = this.palette();
     const J = this.juice;
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
+    if (this.roomFx?.onEvent(e, me, snap)) return;   // room events and coin pickups (render/RoomEvents.ts)
     switch (e.t) {
       case 'hit': {
         const amount = dmgText(e.amount);
@@ -818,6 +823,7 @@ export class CombatScene extends Phaser.Scene {
       if (latest.phase === 'ROUND_SETUP') {
         for (const k of [...this.actors.keys()]) this.destroyView(k);
         this.renderSelf.init = false; this.combo = 0; this.lastHit.clear(); this.pickupsR.clear(); this.pendingBanners = [];
+        this.roomFx?.clear();
         this.clickFx?.clear();
         this.camSnap = 'cut';   // a new round starts the camera on the hero
         this.releaseNames();
@@ -832,6 +838,7 @@ export class CombatScene extends Phaser.Scene {
     this.elites.begin(this.time.now);
     this.outlines.begin();
     this.aff.begin(this.time.now);
+    this.roomFx?.begin(latest);
     this.focus.length = 0;
     if (!ip || !latest) { this.drawFx(); return; }
     const { a, b, t } = ip;
@@ -877,6 +884,7 @@ export class CombatScene extends Phaser.Scene {
     for (const eb of b.enemies) {
       const ea = a.enemies.find((x) => x.i === eb.i && x.g === eb.g) ?? eb;
       const x = ea.x + (eb.x - ea.x) * t, y = ea.y + (eb.y - ea.y) * t;
+      if (this.roomFx?.drawRunner(eb, x, y)) continue;   // the treasure imp has its own sprite (render/RoomEvents.ts)
       const key = `e${eb.i}:${eb.g}`;
       seen.add(key);
       this.drawEnemy(key, eb, x, y, delta);
@@ -915,6 +923,7 @@ export class CombatScene extends Phaser.Scene {
     this.drawTelegraphs(latest);
     this.pickupsR.update(latest.pickups, latest.tick, this.time.now, delta);
     this.aff.drawCaches(latest.pickups);   // cursed caches (render/Afflictions.ts)
+    this.roomFx?.update(latest, this.renderSelf.init ? this.renderSelf : null, delta);
     this.drawDebug(latest);
     this.drawFx();
     this.doorsR?.update(latest, this.renderSelf.init ? this.renderSelf : null, me, delta);
@@ -1046,6 +1055,13 @@ export class CombatScene extends Phaser.Scene {
 
   private sendInputs(delta: number, latest: Snapshot | null) {
     const s = this.input2.sample();
+    if (this.roomFx && latest) {
+      // room events: Interact near a shrine / altar / merchant, or a click on one (render/RoomEvents.ts)
+      const k = this.game.canvas.clientWidth / this.W || 1, cam = this.cameras.main;
+      const click = s.primaryEdge && !s.usingPad && this.input2.pointer.inside ? { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY } : null;
+      // a click that used / walks to an event is not also a ground click (the ground under a tall sprite lies behind it)
+      if (this.roomFx.input((s.pressed & 64) !== 0, click, this.renderSelf.init ? this.renderSelf : null)) { s.primaryEdge = false; s.primary = false; }
+    }
     this.inputAcc += delta;
     if (this.inputAcc > 100) this.inputAcc = 100;
     const out = this.driveInput(s, latest);

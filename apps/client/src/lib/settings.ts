@@ -13,7 +13,7 @@ export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'moveUp', label: 'Move up' }, { id: 'moveDown', label: 'Move down' }, { id: 'moveLeft', label: 'Move left' }, { id: 'moveRight', label: 'Move right' },
   { id: 'skill1', label: 'Skill 1' }, { id: 'skill2', label: 'Skill 2' }, { id: 'skill3', label: 'Skill 3' },
   { id: 'signature', label: 'Signature skill' }, { id: 'dodge', label: 'Dodge' }, { id: 'ledger', label: 'Fate Ledger' }, { id: 'pause', label: 'Pause / menu' },
-  { id: 'interact', label: 'Interact (swap legendary)' }, { id: 'inventory', label: 'Legendary gear' }, { id: 'minimap', label: 'Minimap' },
+  { id: 'interact', label: 'Interact (swap, shrine, trade)' }, { id: 'inventory', label: 'Legendary gear' }, { id: 'minimap', label: 'Minimap' },
   { id: 'cameraLock', label: 'Camera lock (toggle)' }, { id: 'cameraCenter', label: 'Center camera (hold)' }, { id: 'cameraSelf', label: 'Camera on you (hold)' },
   { id: 'cameraAlly1', label: 'Camera on ally 1 (hold)' }, { id: 'cameraAlly2', label: 'Camera on ally 2 (hold)' }, { id: 'cameraAlly3', label: 'Camera on ally 3 (hold)' }, { id: 'cameraAlly4', label: 'Camera on ally 4 (hold)' },
 ];

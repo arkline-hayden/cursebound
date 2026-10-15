@@ -520,6 +520,55 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.bigBell(o, t, 98, 4.5, 0.28);
       s.tone(o, t, { f: 49, dur: 3, gain: 0.12, attack: 0.02 });
       return 4.5;
+
+    // ---------------------------------------------------------------- room events
+    case 'coin_pickup':
+      // two bright coin chinks a hair apart
+      s.bell(o, t, 2900 + r() * 500, 0.22, 0.05, 1.4);
+      s.bell(o, t + 0.045, 3700 + r() * 600, 0.2, 0.035, 1.4);
+      return s.noiseHit(o, t, { dur: 0.015, f: 5200, q: 3, gain: 0.03, attack: 0.001 }) + 0.25;
+    case 'merchant_buy':
+      // a purse emptied onto the counter, then a pleased little chime in key
+      for (let k = 0; k < 6; k++) s.bell(o, t + k * 0.035 + r() * 0.02, 2400 + r() * 2200, 0.25, 0.03, 1.3);
+      s.drum('log', o, t + 0.02, 0.35);
+      [0, 7, 12].forEach((d, k) => s.bell(o, t + 0.28 + k * 0.07, mtof(72 + (((key % 12) + 12) % 12) + d), 0.6, 0.05, 1.2));
+      return 0.8;
+    case 'imp_jingle':
+      // a sack of coins bouncing at a run, with a cheeky little giggle on top
+      for (let k = 0; k < 5; k++) s.bell(o, t + k * 0.06 + r() * 0.02, 2600 + r() * 2400, 0.18, 0.03, 1.5);
+      s.tone(o, t + 0.05, { type: 'square', f: 880, f2: 1320, dur: 0.07, gain: 0.025, filter: 3000 });
+      s.tone(o, t + 0.14, { type: 'square', f: 990, f2: 1480, dur: 0.07, gain: 0.02, filter: 3000 });
+      return 0.45;
+    case 'imp_portal':
+      // a rising violet tear: filtered sweep, warbling fifth and a sucking tail
+      s.noiseHit(o, t, { dur: 1.2, type: 'bandpass', f: 300, f2: 3200, q: 2, gain: 0.08, attack: 0.6 });
+      s.tone(o, t, { type: 'triangle', f: 220, f2: 660, dur: 1.2, gain: 0.07, attack: 0.3, glide: 1.1 });
+      s.tone(o, t, { type: 'triangle', f: 330, f2: 990, dur: 1.2, gain: 0.04, attack: 0.3, glide: 1.1, detune: 14 });
+      return 1.3;
+    case 'shrine_activate': {
+      // a stone hum swelling into a radiant major chord and a shimmer
+      const pc = ((key % 12) + 12) % 12;
+      const k0 = 67 + pc - (pc > 5 ? 12 : 0);
+      s.tone(o, t, { f: 70, f2: 105, dur: 0.6, gain: 0.18, attack: 0.05 });
+      s.noiseHit(o, t, { dur: 0.5, type: 'bandpass', f: 600, f2: 4000, q: 1.2, gain: 0.06, attack: 0.3 });
+      [0, 4, 7, 12, 16].forEach((d, k) => s.bell(o, t + 0.12 + k * 0.06, mtof(k0 + d), 1.2 - k * 0.1, 0.06, 1.3));
+      s.tone(o, t + 0.1, { type: 'triangle', f: mtof(k0 - 12), dur: 1.2, gain: 0.06, attack: 0.15 });
+      s.noiseHit(o, t + 0.3, { dur: 0.9, type: 'highpass', f: 6500, gain: 0.035, attack: 0.3 });
+      return 1.5;
+    }
+    case 'altar_pact': {
+      // ominous: a low drone, a minor-second cluster, a heartbeat and a whispered bargain
+      const pc = ((key % 12) + 12) % 12;
+      const k0 = 48 + pc;
+      s.tone(o, t, { type: 'sawtooth', f: mtof(k0 - 12), dur: 1.8, gain: 0.08, filter: 420, q: 4, attack: 0.2 });
+      s.tone(o, t, { type: 'triangle', f: mtof(k0), dur: 1.6, gain: 0.07, attack: 0.25 });
+      s.tone(o, t, { type: 'triangle', f: mtof(k0 + 1), dur: 1.6, gain: 0.05, attack: 0.35, detune: -8 });
+      s.drum('muffled', o, t + 0.1, 0.8);
+      s.drum('muffled', o, t + 0.32, 0.55);
+      s.whisper(o, t + 0.2, 1.1, 0.06);
+      s.bell(o, t + 0.5, mtof(k0 + 25), 1.2, 0.03, 0.8);
+      return 1.9;
+    }
     default:
       return 0.1;
   }

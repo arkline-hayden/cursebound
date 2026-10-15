@@ -14,6 +14,7 @@ import { GearBar } from './GearBar';
 import { SpectateBar } from './Spectate';
 import { StatusIcon, sortStatuses, statusDef } from './icons/statusIcons';
 import { useCinematic } from './cinematic';
+import { CoinChip } from './RoomEvents';   // room events: the cursed coin purse
 
 // COMBAT HUD (PRD §16.1), Diablo-style: the health orb in the bottom corner (skills are purely cooldown-gated: no resource orb), a carved stone action bar
 // with skill sockets, cooldowns and key labels between them, the round medallion with wave/time wings and the boss
@@ -91,14 +92,15 @@ function ClassMeter({ kv }: { kv: Record<string, number> | undefined }) {
 
 /** Status chips beside the life orb (contract 4): debuffs first (blood-red frame), then buffs (gold frame); each a
  *  pixel glyph and a short name in the status colour. */
-function StatusChips({ buffs }: { buffs: string[] }) {
+function StatusChips({ buffs, timers }: { buffs: string[]; timers?: Record<string, number> }) {
   const ids = sortStatuses(buffs);
   if (!ids.length) return null;
   return (
     <div className="hud-status">
       {ids.map((id) => {
         const d = statusDef(id);
-        return <span key={id} className={`hchip ${d.kind === 'debuff' ? 'neg' : 'pos'}`} style={{ color: d.color }}><StatusIcon id={id} size={22} /><span className="hc-l">{d.label}</span></span>;
+        const sec = timers?.[id];   // room events: seconds left on a shrine blessing
+        return <span key={id} className={`hchip ${d.kind === 'debuff' ? 'neg' : 'pos'}`} style={{ color: d.color }}><StatusIcon id={id} size={22} /><span className="hc-l">{d.label}{sec !== undefined ? ` ${sec}s` : ''}</span></span>;
       })}
     </div>
   );
@@ -206,6 +208,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
           <span className="lbl">Score</span>
           <span className="val">{score(snap.scoreText)}</span>
         </div>}
+        <CoinChip />
         {!training && <button className="ledger-btn" onClick={onLedger} aria-label={`Open Fate Ledger. ${phase.fate.length} cards bound.`}>
           <span className="lhead"><span>Fate Ledger · {phase.fate.length}</span><span className="kbd">{cap('ledger', 'Tab')}</span></span>
           <span className="lcards">
@@ -223,7 +226,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
           <span className="oval">{whole(me.hpT)} / {whole(me.mhpT)}</span>
         </div>
         <Orb kind="life" value={me.hp} shield={me.sh} />
-        <StatusChips buffs={buffs} />
+        <StatusChips buffs={buffs} timers={me.rb} />
       </div>
 
       <div className="hud-center" aria-hidden="true">

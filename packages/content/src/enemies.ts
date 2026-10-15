@@ -1,4 +1,5 @@
 import type { BiomeDef, BossDef, EnemyAttackDef, EnemyDef } from './types';
+import { TREASURE_IMP } from './roomEvents';   // room events: the treasure imp (a non-objective runner)
 
 // Ordinary archetypes + a summon (PRD §14.2) and two boss templates (§14.3). First tuning proposals.
 // Individually weak, numerous foes (Diablo-style packs, director.ts); four archetypes impede heroes directly with
@@ -136,6 +137,8 @@ export const ENEMIES: EnemyDef[] = [
     ],
     weaknesses: { ember: '1.3' },
   },
+  // room events (roomEvents.ts): the treasure imp never attacks and is never part of a pack
+  TREASURE_IMP,
 ];
 
 export const ENEMY_BY_ID: Record<string, EnemyDef> = Object.fromEntries(ENEMIES.map((x) => [x.id, x]));

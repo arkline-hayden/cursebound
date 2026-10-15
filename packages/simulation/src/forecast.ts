@@ -8,6 +8,7 @@ import { offeredCard } from './blessing';
 import { effectiveFromAcc, formatMechanicValue, perCopyFactor } from './boons';
 import { nextInt, seedRng } from './rng';
 import { expectedFoeCount } from './director';
+import { ledgerPacts } from './roomEvents';
 import { B, ONE, breakdown, derivePlayer, enemyDamage, enemyUnitHealth, f, type PlayerDerived } from './stats';
 import type { PlayerState, SimState } from './types';
 
@@ -521,7 +522,7 @@ export interface LedgerStat {
   applicability: string;
   fateFactor: string;
   sources: { cardId: string; count: number; factor: string }[];
-  perPlayer: { slot: number; base: string; tree: string; mastery: string; fate: string; result: string; treeSources: { node: string; rank: number; factor: string }[]; /** legendary gear factor (gear.ts) */ gear?: string; gearSources?: { item: string; factor: string }[] }[];
+  perPlayer: { slot: number; base: string; tree: string; mastery: string; fate: string; result: string; treeSources: { node: string; rank: number; factor: string }[]; /** legendary gear factor (gear.ts) */ gear?: string; gearSources?: { item: string; factor: string }[]; /** altar pacts and merchant boons (roomEvents.ts) */ pact?: string; pactSources?: { id: string; src: string; factor: string }[] }[];
   representative: { label: string; value: string } | null;
   kind: ValueKind;
 }
@@ -545,6 +546,8 @@ export interface LedgerView {
   mechanicTimeline: { seq: number; round: number; cardId: string; mechanic: string; kind: 'boon' | 'bane'; magnitude: string }[];
   /** Commits whose price a Fate's Blessing lifted (blessing.ts): the card, the round and the hero who blessed it. */
   blessings?: { round: number; cardId: string; slot: number; name: string }[];
+  /** Altar pacts and merchant run boons (roomEvents.ts): who bound what, when, and the stat lines. */
+  pacts?: { round: number; slot: number; name: string; id: string; src: 'altar' | 'merchant'; item?: string; mods: { stat: string; factor: string }[] }[];
 }
 
 export const LEDGER_GROUP_NAMES: Record<LedgerGroup, string> = {
@@ -575,9 +578,9 @@ export function computeLedger(state: SimState, page = 0, pageSize = 50): LedgerV
     if (def.scope === 'player') {
       perPlayer = state.players.map((p) => {
         const b = breakdown(state, p, def.id);
-        return { slot: p.slot, base: S(b.base), tree: S(b.tree), mastery: S(b.mastery), fate: S(b.fate), result: S(b.result), treeSources: b.treeSources, gear: S(b.gear), gearSources: b.gearSources };
+        return { slot: p.slot, base: S(b.base), tree: S(b.tree), mastery: S(b.mastery), fate: S(b.fate), result: S(b.result), treeSources: b.treeSources, gear: S(b.gear), gearSources: b.gearSources, ...(b.pactSources.length ? { pact: S(b.pact), pactSources: b.pactSources } : {}) };
       });
-      if (!def.fateEligible && perPlayer.every((x) => x.tree === '1' && x.mastery === '1' && (x.gear ?? '1') === '1')) continue;
+      if (!def.fateEligible && perPlayer.every((x) => x.tree === '1' && x.mastery === '1' && (x.gear ?? '1') === '1' && (x.pact ?? '1') === '1')) continue;
     } else if (def.id === 'enemy.maxHealth') {
       representative = { label: `${ENEMY_BY_ID.pursuer.name} health at round ${r}`, value: S(enemyUnitHealth(state, ENEMY_BY_ID.pursuer.baseHealth, r, 1)) };
     } else if (def.id === 'enemy.damage') {
@@ -619,6 +622,7 @@ export function computeLedger(state: SimState, page = 0, pageSize = 50): LedgerV
     mechanics: ledgerMechanics(state),
     mechanicTimeline: (state.fate.mechanicEntries ?? []).map((m) => ({ seq: m.seq, round: m.round, cardId: m.cardId, mechanic: m.mechanic, kind: m.kind, magnitude: m.magnitude })),
     ...ledgerBlessings(state),
+    ...ledgerPacts(state),   // room events: altar pacts and merchant boons
   };
 }
 

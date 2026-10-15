@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CLASS_BY_ID, DUNGEON_THEMES, TRAINING_THEME } from '@cursebound/content';
+import { CLASS_BY_ID, DUNGEON_THEMES, RUNNER_KIND, TRAINING_THEME } from '@cursebound/content';
 import { netStore, type GameConnection, type PhaseData } from '@/lib/net';
 import { useStore } from '@/lib/store';
 import { settingsStore, keyCap } from '@/lib/settings';
@@ -135,6 +135,12 @@ function rasterise(map: MapInfo, k: number): HTMLCanvasElement {
 /** Tiny pixel sprites: each character is a palette key, '.' transparent. */
 const SKULL = ['..ppppp..', '.pooooop.', 'po#####op', 'po#o#o#op', 'po#####op', '.po###op.', '.po#h#op.', '..poooo..', '...ppp...'];
 const DOOR = ['.ooooo.', 'o#####o', 'o##h##o', 'o#ooo#o', 'o#o.o#o', 'o#o.o#o', 'ooooooo'];
+// room events (simulation roomEvents.ts): shrine obelisk, altar, merchant's pack, the treasure imp's star
+const SHRINE_MM = ['.o.', 'o#o', 'o#o', 'o#o', 'ooo'];
+const ALTAR_MM = ['o.o.o', 'ooooo', 'o###o', '.o.o.'];
+const PACK_MM = ['.ooo.', 'o###o', 'o#h#o', 'o###o', 'ooooo'];
+const STAR_MM = ['..o..', '.o#o.', 'o#h#o', '.o#o.', '..o..'];
+const SHRINE_MM_COL: Record<string, string> = { fury: '#ff6a3a', haste: '#5ae0ff', warding: '#9fb4ff', fortune: '#ffd23f', renewal: '#6aff8a' };
 function sprite(g: CanvasRenderingContext2D, rows: string[], cx: number, bottom: number, pal: Record<string, string>, sc = 1) {
   const x = Math.round(cx) - Math.floor((rows[0].length * sc) / 2), y = Math.round(bottom) - rows.length * sc;
   for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
@@ -318,6 +324,7 @@ export function Minimap({ net, audio = null }: { net: GameConnection; audio?: Au
         }
         // pickups and loot
         for (const pk of snap?.pickups ?? []) {
+          if (pk.k === 'coin') continue;   // cursed coins would only clutter the map
           const q = S(pk.x, pk.y);
           const col = pk.k === 'potion' ? '#ff5a7a' : pk.k === 'orb' ? '#6a8cff' : '#ffd36a';
           const x0 = Math.round(q.x), y0 = Math.round(q.y);
@@ -332,10 +339,19 @@ export function Minimap({ net, audio = null }: { net: GameConnection; audio?: Au
           g.fillStyle = '#ff8a1e'; g.fillRect(x0, y0 - hgt, 1, hgt);
           g.fillStyle = '#fff0a6'; g.fillRect(x0, y0 - hgt, 1, 1);
         }
+        // room events: shrines (dim once spent), the altar, the merchant; a pulsing gold star for a treasure imp
+        for (const ev of snap?.rev ?? []) {
+          const q = S(ev.x, ev.y);
+          const sc = big ? 2 : 1;
+          if (ev.k === 'runner') { if (!blinded) sprite(g, STAR_MM, q.x, q.y + 3 * sc, { o: '#000', '#': pulse % 4 < 2 ? '#ffd23f' : '#fff0a0', h: '#ffffff' }, sc); continue; }
+          if (ev.k === 'shrine') sprite(g, SHRINE_MM, q.x, q.y + 1, { o: '#000', '#': ev.u ? '#5a5466' : SHRINE_MM_COL[ev.t] ?? '#ffd23f' }, sc);
+          else if (ev.k === 'altar') sprite(g, ALTAR_MM, q.x, q.y + 1, { o: '#000', '#': ev.u ? '#4a3a3a' : '#c0182a' }, sc);
+          else sprite(g, PACK_MM, q.x, q.y + 1, { o: '#000', '#': '#c88a3a', h: '#ffd36a' }, sc);
+        }
         // enemies (hidden while the local hero is blinded)
         if (!blinded) {
           for (const e of snap?.enemies ?? []) {
-            if (e.st === 'dying') continue;
+            if (e.st === 'dying' || e.k === RUNNER_KIND) continue;   // the imp has its own star (room events above)
             const q = S(e.x, e.y);
             g.globalAlpha = seenAt(e.x, e.y) ? 1 : 0.6;
             if (e.boss) sprite(g, SKULL, q.x, q.y + (big ? 9 : 4), { p: ENEMY.boss, o: '#000', '#': '#ebe0c8', h: '#ff3b2f' }, big ? 2 : 1);

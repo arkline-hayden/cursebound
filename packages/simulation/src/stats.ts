@@ -30,6 +30,9 @@ export interface Breakdown {
   result: Big;
   treeSources: { node: string; rank: number; factor: string }[];
   gearSources: { item: string; factor: string }[];
+  /** Altar pacts and merchant run boons (roomEvents.ts): personal permanent factors after Fate (ONE when none). */
+  pact: Big;
+  pactSources: { id: string; src: string; factor: string }[];
 }
 
 export function playerBase(p: PlayerState, stat: string): Big {
@@ -103,13 +106,27 @@ export function gearFactor(p: PlayerState, stat: string): { factor: Big; sources
   return { factor, sources };
 }
 
+/** Room events (roomEvents.ts): a hero's altar pacts and merchant run boons for a stat (each record applies once). */
+export function pactFactor(p: PlayerState, stat: string): { factor: Big; sources: Breakdown['pactSources'] } {
+  let factor = ONE;
+  const sources: Breakdown['pactSources'] = [];
+  for (const r of p.pacts ?? []) for (const m of r.mods) {
+    if (m.stat !== stat) continue;
+    factor = factor.mul(B(m.factor));
+    sources.push({ id: r.id, src: r.src, factor: m.factor });
+  }
+  return { factor, sources };
+}
+
 export function breakdown(state: SimState, p: PlayerState, stat: string, fateOverride?: Record<string, Big>): Breakdown {
   const base = playerBase(p, stat);
   const t = treeFactor(p, stat);
   const mastery = masteryFactor(p, stat);
   const g = gearFactor(p, stat);
   const fate = fateOverride ? (fateOverride[stat] ?? ONE) : fateFactor(state, stat);
-  return { stat, base, tree: t.factor, mastery, fate, gear: g.factor, result: base.mul(t.factor).mul(mastery).mul(g.factor).mul(fate), treeSources: t.sources, gearSources: g.sources };
+  const pc = pactFactor(p, stat);   // room events: altar pacts / merchant boons (no records = untouched result)
+  const result = base.mul(t.factor).mul(mastery).mul(g.factor).mul(fate);
+  return { stat, base, tree: t.factor, mastery, fate, gear: g.factor, result: pc.sources.length ? result.mul(pc.factor) : result, treeSources: t.sources, gearSources: g.sources, pact: pc.factor, pactSources: pc.sources };
 }
 
 export interface PlayerDerived {

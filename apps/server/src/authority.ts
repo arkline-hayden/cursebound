@@ -31,7 +31,7 @@ export interface RunEndSummary { runId: string; endReason: string; scoreText: st
 interface JournalTick { t: number; i?: [number, number, number, number, number, number, number][]; c?: Command[] }
 interface Journal { v: 1; runId: string; header?: CreateRunParams; resumeFrom?: { tick: number }; ticks: JournalTick[] }
 
-const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training']);
+const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training', /* room events (simulation roomEvents.ts) */ 'room_event']);
 const MAX_EVENTS_PER_BATCH = 240;
 const SNAPSHOT_EVERY = Math.round(TICK_RATE / 20);
 const TICK_MS = 1000 / TICK_RATE;
