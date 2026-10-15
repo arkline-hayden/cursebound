@@ -5,6 +5,8 @@ import { bountyRules } from './bountyRules';
 import { B, ONE, fateFactor, playerDerived } from './stats';
 import type { Cohort, EnemyState, PlayerState, SimEvent, SimState } from './types';
 import { hooks, type HitMod } from './hooks';
+// post-run breakdown: observation only, kept outside the hashed state (runStats.ts)
+import { tallyDot, tallyDotTick, tallyEnemyHit, tallyFall, tallyHeal, tallyTaken } from './runStats';
 
 // Damage pipeline (REQ COMBAT01, PRD §5.2, §12.1, §12.2). All quantities canonical Big.
 // Grouped logical hits ("packets") preserve kill timing per unit via exact cohort arithmetic; crits on k identical
@@ -201,7 +203,8 @@ export function hitEnemy(state: SimState, ev: SimEvent[], e: EnemyState, perHit:
   applyPart(dBase, normal);
   e.hitFlash = 6;
   if (o.vuln) { e.vulnUntil = state.tick + Math.round(o.vuln.sec / TICK_SEC); e.vulnFactor = o.vuln.factor; }
-  if (o.dot && !res.dealt.isZero()) addDot(state, e, o.srcSlot, o.dot.type, perHit.mul(B(o.dot.fractionPerSec)).mul(o.dot.type === 'ember' && pd ? pd.burnRate : ONE).mul(o.coverage !== undefined ? ONE : mult), o.dot.durationSec);
+  const statSkill = tallyEnemyHit(state, o.srcSlot, o.skillId, res.dealt, res.kills);   // breakdown (runStats.ts)
+  if (o.dot && !res.dealt.isZero()) addDot(state, e, o.srcSlot, o.dot.type, perHit.mul(B(o.dot.fractionPerSec)).mul(o.dot.type === 'ember' && pd ? pd.burnRate : ONE).mul(o.coverage !== undefined ? ONE : mult), o.dot.durationSec, statSkill);
   if (o.stagger && e.boss) addStagger(state, ev, e, o.stagger);
   if (p) {
     p.stats.damageDealt = p.stats.damageDealt.add(res.dealt);
@@ -218,13 +221,15 @@ export function hitEnemy(state: SimState, ev: SimEvent[], e: EnemyState, perHit:
   return res;
 }
 
-export function addDot(state: SimState, e: EnemyState, src: number, type: DamageType, perSec: Big, durationSec: number) {
+/** `statSkill` (breakdown only, runStats.ts): the skill the damage over time counts for; absent = the attribution context. */
+export function addDot(state: SimState, e: EnemyState, src: number, type: DamageType, perSec: Big, durationSec: number, statSkill?: string) {
   if (perSec.isZero()) return;
   // Source-indexed aggregate bucketed by 0.25s expiry: additive rate, independent durations, bounded entries.
   const until = Math.ceil((state.tick + durationSec / TICK_SEC) / 15) * 15;
-  const ex = e.dots.find((x) => x.src === src && x.type === type && x.until === until);
+  let ex = e.dots.find((x) => x.src === src && x.type === type && x.until === until);
   if (ex) ex.perSec = ex.perSec.add(perSec);
-  else e.dots.push({ src, type, perSec, until });
+  else e.dots.push(ex = { src, type, perSec, until });
+  tallyDot(state, ex, src, type, statSkill, perSec);
   if (type === 'ember') e.burning = true;
 }
 
@@ -238,11 +243,13 @@ export function tickDots(state: SimState, ev: SimEvent[], e: EnemyState) {
     total = total.add(d.perSec);
     src = d.src;
   }
+  const ticked = e.dots;   // breakdown: the entries that fed this tick (runStats.ts)
   e.dots = e.dots.filter((d) => d.until > state.tick);
   e.burning = e.dots.some((d) => d.type === 'ember');
   if (total.isZero()) return;
   const amount = total.mul(dt).mul(mit);
   const r = applySingle(e.cohort, amount, ONE);
+  tallyDotTick(state, ticked, total, r.dealt, r.kills);
   const p = state.players[src];
   if (p) { p.stats.damageDealt = p.stats.damageDealt.add(r.dealt); p.dpsBucket = p.dpsBucket.add(r.dealt); }
   if (state.tick % 20 === 0) ev.push({ t: 'hit', target: e.id, targetKind: 'enemy', amount: total.mul(mit).toCompact(), crit: false, dtype: e.dots[0]?.type ?? 'ember', x: e.x, y: e.y });
@@ -313,6 +320,7 @@ export function healPlayer(state: SimState, ev: SimEvent[], p: PlayerState, amou
   const gained = p.hp.sub(before);
   if (!gained.isZero()) {
     p.stats.healing = p.stats.healing.add(gained);
+    tallyHeal(state, p, gained);   // breakdown (runStats.ts)
     ev.push({ t: 'heal', slot: p.slot, amount: gained.toCompact() });
   }
 }
@@ -335,7 +343,7 @@ export function hitPlayer(state: SimState, ev: SimEvent[], p: PlayerState, raw: 
     if (p.selfReviveChannel > 0) {
       p.selfReviveChannel = 0;
       p.lifeState = 'dead';
-      recordRecap(state, p, raw, o, true);
+      recordRecap(state, p, raw, o, true, ev);
       ev.push({ t: 'dead', slot: p.slot });
       ev.push({ t: 'domain', type: 'player_dead', payload: { slot: p.slot, round: state.round } });
     }
@@ -381,6 +389,7 @@ export function hitPlayer(state: SimState, ev: SimEvent[], p: PlayerState, raw: 
   const hpFracBefore = p.hp.ratio(p.maxHp);
   p.lastHitBy = o.source; p.lastHitAttack = o.attack; p.lastHitAmount = amount; p.lastHitHpFrac = hpFracBefore;
   p.stats.damageTaken = p.stats.damageTaken.add(amount);
+  tallyTaken(state, p, amount, o);   // breakdown: damage taken by source + the recap timeline (runStats.ts)
   p.reviveProgress = 0;
   ev.push({ t: 'hit', target: p.slot, targetKind: 'player', amount: amount.toCompact(), crit: false, dtype: o.dtype, x: p.x, y: p.y, sx: o.fromX, sy: o.fromY, frac: Math.min(1, amount.ratio(p.maxHp)) });
   hooks.onPlayerDamaged(state, ev, p, { dealt: amount, attack: o.attack, source: o.source, fromX: o.fromX, fromY: o.fromY, dtype: o.dtype, hazard: !!o.hazard, srcId: o.srcId });
@@ -393,7 +402,8 @@ export function hitPlayer(state: SimState, ev: SimEvent[], p: PlayerState, raw: 
   return amount;
 }
 
-function recordRecap(state: SimState, p: PlayerState, amount: Big, o: PlayerHitOpts, final: boolean) {
+function recordRecap(state: SimState, p: PlayerState, amount: Big, o: PlayerHitOpts, final: boolean, ev: SimEvent[]) {
+  ev.push(tallyFall(state, p, amount, o, final));   // breakdown: the full recap + the live "You died to…" card (runStats.ts)
   const contributing: string[] = [];
   for (const stat of ['enemy.damage', 'enemy.attackDamage', 'player.maxHealth', 'enemy.attackFrequency', 'enemy.projectileCount', 'encounter.spawnQuantity', 'enemy.movementSpeed', 'player.armor']) {
     const fv = fateFactor(state, stat);
@@ -415,7 +425,7 @@ export function downOrKill(state: SimState, ev: SimEvent[], p: PlayerState, amou
     p.stats.downs++;
     p.downTimer = RULES.downedSec * (bountyRules(state).downedSecFactor ?? 1);   // "Swift Death" bounty: halved
     p.reviveProgress = 0;
-    recordRecap(state, p, amount, o, false);
+    recordRecap(state, p, amount, o, false, ev);
     ev.push({ t: 'downed', slot: p.slot });
     ev.push({ t: 'domain', type: 'player_downed', payload: { slot: p.slot, round: state.round, attack: o.attack } });
     // Solo self revive: once per five-round block, automatic vulnerable channel after downing
@@ -428,7 +438,7 @@ export function downOrKill(state: SimState, ev: SimEvent[], p: PlayerState, amou
     }
   } else {
     p.lifeState = 'dead';
-    recordRecap(state, p, amount, o, true);
+    recordRecap(state, p, amount, o, true, ev);
     ev.push({ t: 'dead', slot: p.slot });
     ev.push({ t: 'domain', type: 'player_dead', payload: { slot: p.slot, round: state.round, attack: o.attack } });
   }

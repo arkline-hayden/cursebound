@@ -1,6 +1,7 @@
 import type { Big } from '@cursebound/numeric';
 import type { DamageType, GearSlot, TelegraphShape } from '@cursebound/content';
 import type { RngState } from './rng';
+import type { RecapEntry } from './runStats';
 
 // Authoritative simulation state (PRD §3.1, §17.2). Plain serializable data: Big values are immutable objects
 // encoded as {$b: compact} in checkpoints. Entity collections are arrays (deterministic iteration order).
@@ -608,4 +609,7 @@ export type SimEvent =
   /** Fate's Blessing (blessing.ts): a hero picked one up (id = ground item), or blessed card `card` of the current offer */
   | { t: 'blessing'; op: 'pickup' | 'apply'; slot: number; x: number; y: number; card?: number; id?: number }
   /** Training grounds (training.ts): a hero respawned in place ('respawn'), or used a tool (the TRAIN op) */
-  | { t: 'training'; op: string; slot: number; x: number; y: number };
+  | { t: 'training'; op: string; slot: number; x: number; y: number }
+  /** A hero fell (downed, slain, or a downed hero bled out): the death recap for the live "You died to…" card
+   *  (runStats.ts; presentation only, never part of the state) */
+  | { t: 'recap'; slot: number; recap: RecapEntry };
