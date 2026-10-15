@@ -48,16 +48,21 @@ export function arcTrail(ctx: FxCtx, x0: number, y0: number, x1: number, y1: num
   ctx.scene.tweens.add({ targets: g, alpha: 0, duration: ms, ease: 'Quad.easeIn', onComplete: () => g.destroy() });
 }
 
-/** Radial burst: ground rings, sparks, flash and light. `strong` shakes (and hit-stops for the caster). */
+/**
+ * Radial burst: a thick shockwave at the true radius, a hot inner ring, a starburst and bloom, sparks, flash and
+ * light. `strong` adds a trailing second wave and hit-stops for the caster (never camera shake).
+ */
 export function burst(ctx: FxCtx, x: number, y: number, R: number, color: number, inner: number, strong: boolean, sparks = 14) {
   const J = ctx.juice;
   const p = ctx.P(x, y);
-  J.ring(p.x, p.y, ctx.rx(R), color, 340);
+  J.shockwave(p.x, p.y, ctx.rx(R), color, 340);
   J.ring(p.x, p.y, ctx.rx(R * 0.6), inner, 230);
+  J.starburst(p.x, p.y - 12, inner, strong ? 1.6 : 1);
+  J.orb(p.x, p.y - 10, color, strong ? 1.1 : 0.7, 220);
   J.sparksAt(p.x, p.y - 12, strong ? sparks + 8 : sparks, color);
   J.impact(p.x, p.y - 14, inner, strong ? 2.2 : 1.3);
   ctx.dungeon.flashLight(p.x, p.y - 10, Math.max(120, ctx.rx(R) * 2.2), color, strong ? 2.6 : 1.8, strong ? 320 : 200);
-  if (strong) { J.shake(0.012, 220); if (ctx.mine) J.hitStop(70); }
+  if (strong) { J.shockwave(p.x, p.y, ctx.rx(R * 1.15), inner, 440, 70); if (ctx.mine) J.hitStop(70); }
 }
 
 /** A column of light crashing down onto a world point. */

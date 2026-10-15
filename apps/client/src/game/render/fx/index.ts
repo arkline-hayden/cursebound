@@ -11,4 +11,4 @@ import './cryomancer';
 import './ranger';
 import './templar';
 import './berserker';
-export { SKILL_FX, HAZARD_FX, HAZARD_LIGHT, PROJECTILE_FX } from './registry';
+export { SKILL_FX, HAZARD_FX, HAZARD_LIGHT, PROJECTILE_FX, KILL_FX } from './registry';

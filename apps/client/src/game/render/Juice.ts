@@ -24,6 +24,37 @@ export const GORE: Record<string, { color: number; decal: 'blood' | 'ichor' | 's
 
 export type NumberStyle = 'sm' | 'md' | 'lg' | 'crit' | 'heal';
 
+/**
+ * Themed particle bits (art/fxJuice.ts textures, tinted per call). Each kind has its own motion: feathers and leaves
+ * flutter down, gears and thorns fly and fall, runes, crosses, skulls, bubbles and motes rise and fade, ice and stars
+ * scatter, zaps flicker. Emitters are created on first use.
+ */
+export type BitKind = 'feather' | 'leaf' | 'gear' | 'rune' | 'ice' | 'star' | 'cross' | 'thorn' | 'skull' | 'zap' | 'bubble' | 'mote';
+
+/** Optional aim for a bit burst: screen-space angle and spread in degrees, speed multiplier. */
+export interface BitDir { angle?: number; spread?: number; speed?: number }
+
+type EmitterCfg = Phaser.Types.GameObjects.Particles.ParticleEmitterConfig;
+const velRot = { onEmit: () => 0, onUpdate: (p: Phaser.GameObjects.Particles.Particle) => Phaser.Math.RadToDeg(Math.atan2(p.velocityY, p.velocityX)) + 90 };
+const BIT_CFG: Record<BitKind, { key: string; depth: number; cfg: EmitterCfg }> = {
+  feather: { key: 'pfx:feather', depth: 4596, cfg: { frame: [0, 1], lifespan: { min: 600, max: 1100 }, speed: { min: 40, max: 130 }, gravityY: 70, rotate: { min: -40, max: 40 }, alpha: { start: 1, end: 0.2 } } },
+  leaf: { key: 'pfx:leaf', depth: 4596, cfg: { frame: [0, 1], lifespan: { min: 650, max: 1200 }, speed: { min: 30, max: 120 }, gravityY: 80, rotate: { start: 0, end: 360 }, alpha: { start: 1, end: 0.3 } } },
+  gear: { key: 'pfx:gear', depth: 4596, cfg: { frame: [0, 1, 2], lifespan: { min: 450, max: 850 }, speed: { min: 90, max: 230 }, gravityY: 520, rotate: { start: 0, end: 720 } } },
+  rune: { key: 'pfx:rune', depth: 4606, cfg: { frame: [0, 1, 2, 3], lifespan: { min: 500, max: 900 }, speed: { min: 10, max: 55 }, gravityY: -55, alpha: { start: 1, end: 0 }, blendMode: 'ADD' } },
+  ice: { key: 'pfx:ice', depth: 4597, cfg: { frame: [0, 1, 2], lifespan: { min: 380, max: 720 }, speed: { min: 100, max: 270 }, gravityY: 400, rotate: { start: 0, end: 360 } } },
+  star: { key: 'pfx:star', depth: 4608, cfg: { frame: [0, 1], lifespan: { min: 220, max: 520 }, speed: { min: 20, max: 150 }, scale: { start: 1.2, end: 0 }, blendMode: 'ADD' } },
+  cross: { key: 'pfx:cross', depth: 4606, cfg: { lifespan: { min: 500, max: 950 }, speed: { min: 10, max: 55 }, gravityY: -65, alpha: { start: 1, end: 0 }, blendMode: 'ADD' } },
+  thorn: { key: 'pfx:thorn', depth: 4596, cfg: { lifespan: { min: 320, max: 620 }, speed: { min: 120, max: 270 }, gravityY: 320, rotate: velRot } },
+  skull: { key: 'pfx:skull', depth: 4604, cfg: { lifespan: { min: 600, max: 1000 }, speed: { min: 10, max: 45 }, gravityY: -50, alpha: { start: 1, end: 0 } } },
+  zap: { key: 'pfx:zap', depth: 4609, cfg: { frame: [0, 1], lifespan: { min: 80, max: 190 }, speed: { min: 30, max: 130 }, scale: { start: 1.2, end: 0.6 }, blendMode: 'ADD' } },
+  bubble: { key: 'pfx:bubble', depth: 4598, cfg: { lifespan: { min: 500, max: 950 }, speed: { min: 10, max: 45 }, gravityY: -55, scale: { start: 0.6, end: 1.3 }, alpha: { start: 0.95, end: 0 } } },
+  mote: { key: 'pfx:spark', depth: 4607, cfg: { lifespan: { min: 600, max: 1200 }, speed: { min: 8, max: 45 }, gravityY: -32, scale: { start: 1, end: 0 }, blendMode: 'ADD' } },
+};
+
+/** Pooled cosmetic images alive at once before decorative extras (starbursts, orbs, beams, glyphs) are skipped. */
+const MAX_LIVE = 240;
+const MAX_LIVE_LOW = 110;
+
 /** Shake budget: total recent shake "energy" above which further shakes are damped, so chains never nauseate. */
 const SHAKE_CAP = 0.03;
 const SHAKE_BUDGET = 0.05;
@@ -39,6 +70,12 @@ export class Juice {
   private smoke!: Phaser.GameObjects.Particles.ParticleEmitter;
   private embers!: Phaser.GameObjects.Particles.ParticleEmitter;
   private emitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
+  private bitEm = new Map<BitKind, { e: Phaser.GameObjects.Particles.ParticleEmitter; aimed: boolean; speed: unknown }>();
+  /** pooled one-shot images per texture key (rings, flashes, slashes, glyphs, afterimages), recycled on fade-out */
+  private pool = new Map<string, Phaser.GameObjects.Image[]>();
+  private live = 0;
+  private popRect?: Phaser.GameObjects.Rectangle;
+  private popTween?: Phaser.Tweens.Tween;
   private texts: Phaser.GameObjects.Text[] = [];
   private textPool: Phaser.GameObjects.Text[] = [];
   private shakeEnergy = 0;
@@ -68,7 +105,7 @@ export class Juice {
     };
     this.sparks = add('pfx:streak', { lifespan: { min: 120, max: 260 }, speed: { min: 140, max: 320 }, angle: { min: 0, max: 360 }, scale: { start: 1, end: 0 }, blendMode: 'ADD', rotate: { onEmit: () => 0, onUpdate: (p) => Phaser.Math.RadToDeg(Math.atan2(p.velocityY, p.velocityX)) + 90 } }).setDepth(4600);
     this.drops = add('pfx:drop', { lifespan: { min: 260, max: 520 }, speed: { min: 60, max: 220 }, angle: { min: 0, max: 360 }, gravityY: 520, scale: { min: 0.8, max: 1.6 } }).setDepth(4590);
-    this.shards = add('pfx:shard', { lifespan: { min: 380, max: 720 }, speed: { min: 80, max: 240 }, angle: { min: 0, max: 360 }, gravityY: 420, rotate: { start: 0, end: 540 } }).setDepth(4595);
+    this.shards = add('pfx:shard', { frame: [0, 1, 2], lifespan: { min: 380, max: 720 }, speed: { min: 80, max: 240 }, angle: { min: 0, max: 360 }, gravityY: 420, rotate: { start: 0, end: 540 } }).setDepth(4595);
     this.smoke = add('pfx:smoke', { lifespan: { min: 380, max: 800 }, speed: { min: 10, max: 50 }, angle: { min: 0, max: 360 }, scale: { start: 0.6, end: 1.4 }, alpha: { start: 0.5, end: 0 } }).setDepth(4580);
     this.embers = add('pfx:ember', { lifespan: { min: 300, max: 800 }, speed: { min: 20, max: 90 }, angle: { min: 230, max: 310 }, gravityY: -40, scale: { start: 1.2, end: 0 }, blendMode: 'ADD' }).setDepth(4605);
   }
@@ -175,36 +212,213 @@ export class Juice {
     this.embers.explode(this.count(n), x, y);
   }
 
-  arc(x: number, y: number, angle: number, tint: number, scale = 1) {
+  /**
+   * Burst of themed bits (feathers, leaves, gears, runes, ice, stars, crosses, thorns, skulls, zaps, bubbles, motes).
+   * Count follows the graphics tier like every other burst; `dir` aims the spray (screen degrees) for cones and trails.
+   */
+  bits(kind: BitKind, x: number, y: number, n: number, tint: number, dir?: BitDir) {
+    if (this.reduced) return;
+    this.emitBits(kind, x, y, this.count(n), tint, dir);
+  }
+
+  /** A trail of bits strewn along a screen-space segment (travel paths of dashes, chains, thrown things). */
+  bitsAlong(kind: BitKind, x0: number, y0: number, x1: number, y1: number, n: number, tint: number, dir?: BitDir) {
+    if (this.reduced) return;
+    const k = this.count(n);
+    for (let i = 0; i < k; i++) {
+      const t = (i + Math.random()) / k;
+      this.emitBits(kind, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 1, tint, dir);
+    }
+  }
+
+  private emitBits(kind: BitKind, x: number, y: number, k: number, tint: number, dir?: BitDir) {
+    if (k <= 0) return;
+    const b = this.bitEmitter(kind);
+    if (!b) return;
+    const e = b.e;
+    if (dir?.angle !== undefined) {
+      const sp = dir.spread ?? 40;
+      e.ops.angle.loadConfig({ angle: { min: dir.angle - sp / 2, max: dir.angle + sp / 2 } });
+      b.aimed = true;
+    } else if (b.aimed) { e.ops.angle.loadConfig({ angle: { min: 0, max: 360 } }); b.aimed = false; }
+    const sk = e.ops.speedX.propertyKey;
+    if (dir?.speed !== undefined && dir.speed !== 1) {
+      const base = b.speed as { min: number; max: number };
+      e.ops.speedX.loadConfig({ [sk]: { min: base.min * dir.speed, max: base.max * dir.speed } });
+    } else if (e.ops.speedX.propertyValue !== b.speed) e.ops.speedX.loadConfig({ [sk]: b.speed });
+    e.setParticleTint(tint);
+    e.explode(k, x, y);
+  }
+
+  private bitEmitter(kind: BitKind) {
+    let b = this.bitEm.get(kind);
+    if (b) return b;
+    const spec = BIT_CFG[kind];
+    if (!this.scene.textures.exists(spec.key)) return undefined;
+    const e = this.scene.add.particles(0, 0, spec.key, { emitting: false, angle: { min: 0, max: 360 }, ...spec.cfg }).setDepth(spec.depth);
+    e.timeScale = this.dilation;
+    this.emitters.push(e);
+    b = { e, aimed: false, speed: e.ops.speedX.propertyValue };
+    this.bitEm.set(kind, b);
+    return b;
+  }
+
+  /** Cosmetic image budget: false when the pool is saturated (or effects are reduced), so decorative extras skip. */
+  private room(): boolean {
+    return !this.reduced && this.live < (this.low ? MAX_LIVE_LOW : MAX_LIVE);
+  }
+
+  /** A pooled one-shot image, reset to defaults (additive, centred, untinted); hand it to `fade` to recycle. */
+  private grab(key: string): Phaser.GameObjects.Image | null {
     const s = this.scene;
-    if (!s.textures.exists('pfx:slashArc')) return;
-    const img = s.add.image(x, y, 'pfx:slashArc').setRotation(angle).setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(4650).setScale(0.6 * scale).setAlpha(1);
-    s.tweens.add({ targets: img, scale: 1.15 * scale, alpha: 0, duration: 170, ease: 'Quad.easeOut', onComplete: () => img.destroy() });
+    if (!s.textures.exists(key)) return null;
+    const img = this.pool.get(key)?.pop() ?? s.add.image(0, 0, key);
+    this.live++;
+    return img.setVisible(true).setActive(true).setAlpha(1).setAngle(0).setScale(1).setOrigin(0.5, 0.5).setFlip(false, false).clearTint()
+      .setBlendMode(Phaser.BlendModes.ADD);
+  }
+
+  private release(img: Phaser.GameObjects.Image, poolKey: string) {
+    this.live--;
+    img.setVisible(false).setActive(false);
+    let list = this.pool.get(poolKey);
+    if (!list) { list = []; this.pool.set(poolKey, list); }
+    if (list.length < 48) list.push(img); else img.destroy();
+  }
+
+  /** Tween a pooled image and recycle it when the tween ends. */
+  private fade(img: Phaser.GameObjects.Image, props: Record<string, number>, ms: number, ease = 'Quad.easeOut', delay = 0, poolKey = img.texture.key) {
+    this.scene.tweens.add({ targets: img, ...props, duration: ms, delay, ease, onComplete: () => this.release(img, poolKey) });
+  }
+
+  arc(x: number, y: number, angle: number, tint: number, scale = 1) {
+    const img = this.grab('pfx:slashArc');
+    if (!img) return;
+    img.setPosition(x, y).setRotation(angle).setTint(tint).setDepth(4650).setScale(0.6 * scale);
+    this.fade(img, { scale: 1.15 * scale, alpha: 0 }, 170);
   }
 
   /** Shockwave lying flat on the iso ground plane; radiusPx is the horizontal (screen) radius. */
   ring(x: number, y: number, radiusPx: number, tint: number, ms = 300) {
-    const s = this.scene;
-    if (!s.textures.exists('pfx:ring')) return;
-    const img = s.add.image(x, y, 'pfx:ring').setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(4640).setScale(0.2, 0.1).setAlpha(1);
+    const img = this.grab('pfx:ring');
+    if (!img) return;
+    img.setPosition(x, y).setTint(tint).setDepth(4640).setScale(0.2, 0.1);
     const k = (radiusPx * 2) / 64;
-    s.tweens.add({ targets: img, scaleX: k, scaleY: k * 0.5, alpha: 0, duration: ms, ease: 'Cubic.easeOut', onComplete: () => img.destroy() });
+    this.fade(img, { scaleX: k, scaleY: k * 0.5, alpha: 0 }, ms, 'Cubic.easeOut');
+  }
+
+  /**
+   * Thick wave-front shockwave on the ground plane (hard outer edge, dimmer trailing bands). Carries area information,
+   * so it ignores the tier; reduced effects fall back to the thin ring. `delay` staggers multi-wave slams.
+   */
+  shockwave(x: number, y: number, radiusPx: number, tint: number, ms = 360, delay = 0) {
+    if (this.reduced) { this.ring(x, y, radiusPx, tint, ms); return; }
+    const img = this.grab('pfx:ringThick');
+    if (!img) return;
+    img.setPosition(x, y).setTint(tint).setDepth(4639).setScale(0.15, 0.075).setAlpha(delay ? 0 : 1);
+    const k = (radiusPx * 2) / 64;
+    if (delay) this.scene.tweens.add({ targets: img, alpha: 1, duration: 1, delay });
+    this.fade(img, { scaleX: k, scaleY: k * 0.5, alpha: 0 }, ms, 'Cubic.easeOut', delay);
   }
 
   impact(x: number, y: number, tint: number, scale = 1) {
-    const s = this.scene;
-    if (this.reduced || !s.textures.exists('pfx:flash')) return;
-    const img = s.add.image(x, y, 'pfx:flash').setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(4655).setScale(0.35 * scale).setRotation(Math.random() * Math.PI);
-    s.tweens.add({ targets: img, scale: 0.7 * scale, alpha: 0, duration: 110, onComplete: () => img.destroy() });
+    if (this.reduced) return;
+    const img = this.grab('pfx:flash');
+    if (!img) return;
+    img.setPosition(x, y).setTint(tint).setDepth(4655).setScale(0.35 * scale).setRotation(Math.random() * Math.PI);
+    this.fade(img, { scale: 0.7 * scale, alpha: 0 }, 110, 'Linear');
   }
 
-  afterimage(src: Phaser.GameObjects.Sprite, tint = 0x8fd8ff, alpha = 0.45, ms = 220) {
-    if (this.reduced) return;
-    const s = this.scene;
-    const img = s.add.image(src.x, src.y, src.texture.key, src.frame.name).setOrigin(src.originX, src.originY).setFlipX(src.flipX)
-      .setScale(src.scaleX, src.scaleY).setRotation(src.rotation).setTintFill(tint).setAlpha(alpha).setDepth(src.depth - 0.5).setBlendMode(Phaser.BlendModes.ADD);
-    s.tweens.add({ targets: img, alpha: 0, duration: ms, onComplete: () => img.destroy() });
+  /** Eight-point star flash that snaps open and fades (crits, hard impacts, holy smites, glints). Cosmetic. */
+  starburst(x: number, y: number, tint: number, scale = 1, ms = 170) {
+    if (!this.room()) return;
+    const img = this.grab('pfx:starburst');
+    if (!img) return;
+    img.setPosition(x, y).setTint(tint).setDepth(4656).setScale(0.25 * scale).setRotation(Math.random() < 0.5 ? 0 : Math.PI / 4);
+    this.fade(img, { scale: 0.9 * scale, alpha: 0, angle: img.angle + 20 }, ms, 'Cubic.easeOut');
   }
+
+  /** Banded glow bloom (cast flashes, orb pops, charge-ups). `grow` > 1 swells it while it fades. Cosmetic. */
+  orb(x: number, y: number, tint: number, scale = 1, ms = 220, grow = 1.6) {
+    if (!this.room()) return;
+    const img = this.grab('pfx:orb');
+    if (!img) return;
+    img.setPosition(x, y).setTint(tint).setDepth(4652).setScale(scale);
+    this.fade(img, { scale: scale * grow, alpha: 0 }, ms);
+  }
+
+  /** Rune circle flat on the ground under a cast: fades in, swells slightly, fades out. Cosmetic. */
+  glyph(x: number, y: number, radiusPx: number, tint: number, ms = 600) {
+    if (!this.room()) return;
+    const img = this.grab('pfx:glyph');
+    if (!img) return;
+    const k = (radiusPx * 2) / 64;
+    img.setPosition(x, y).setTint(tint).setDepth(-68).setScale(k * 0.8, k * 0.4).setAlpha(0);
+    this.scene.tweens.add({ targets: img, alpha: 0.95, duration: Math.min(120, ms * 0.25), ease: 'Quad.easeOut' });
+    this.fade(img, { scaleX: k * 1.05, scaleY: k * 0.525, alpha: 0 }, ms, 'Quad.easeIn', Math.min(120, ms * 0.25));
+  }
+
+  /** Vertical light column standing on a screen point (smites, summons, sky strikes): narrows as it fades. Cosmetic. */
+  beam(x: number, y: number, heightPx: number, widthPx: number, tint: number, ms = 320) {
+    if (!this.room()) return;
+    const img = this.grab('pfx:beam');
+    if (!img) return;
+    img.setPosition(x, y).setOrigin(0.5, 1).setTint(tint).setDepth(4661).setScale(widthPx / 16, heightPx / 64);
+    this.fade(img, { scaleX: 0, alpha: 0 }, ms, 'Cubic.easeIn');
+  }
+
+  /**
+   * Crisp crescent slash (pfx:slashThin) or the heavy arc (pfx:slashArc). `flip` mirrors it for backhands. Carries the
+   * swing's area, so like `arc` it ignores the tier.
+   */
+  slash(x: number, y: number, angle: number, tint: number, scale = 1, opts: { thin?: boolean; flip?: boolean; ms?: number } = {}) {
+    const img = this.grab(opts.thin ? 'pfx:slashThin' : 'pfx:slashArc');
+    if (!img) return;
+    img.setPosition(x, y).setRotation(angle).setTint(tint).setDepth(4651).setScale(0.7 * scale).setFlipY(!!opts.flip);
+    this.fade(img, { scale: 1.12 * scale, alpha: 0 }, opts.ms ?? 190);
+  }
+
+  /** Three raking claw marks along `angle` (talons, maws, fangs). */
+  claw(x: number, y: number, angle: number, tint: number, scale = 1, ms = 220) {
+    const img = this.grab('pfx:claw');
+    if (!img) return;
+    img.setPosition(x, y).setRotation(angle).setTint(tint).setDepth(4651).setScale(0.6 * scale, 1.1 * scale);
+    this.fade(img, { scaleX: 1.25 * scale, alpha: 0 }, ms);
+  }
+
+  /**
+   * Screen-space colour pop for big moments (keystones, signature detonations): a soft additive wash over the view,
+   * gentler than `flash` and in any colour. Respects the flashes and reduced-effects settings.
+   */
+  pop(color: number, alpha = 0.2, ms = 160) {
+    if (!this.flashOn || this.reduced) return;
+    const s = this.scene;
+    const cam = s.cameras.main;
+    if (!this.popRect) this.popRect = s.add.rectangle(0, 0, 8, 8, 0xffffff, 1).setScrollFactor(0).setDepth(4890).setBlendMode(Phaser.BlendModes.ADD).setVisible(false);
+    this.popTween?.stop();
+    const r = this.popRect.setPosition(cam.width / 2, cam.height / 2).setSize(cam.width * 3, cam.height * 3).setOrigin(0.5, 0.5)
+      .setFillStyle(color, 1).setAlpha(alpha).setVisible(true);
+    this.popTween = s.tweens.add({ targets: r, alpha: 0, duration: ms, ease: 'Quad.easeOut', onComplete: () => r.setVisible(false) });
+  }
+
+  afterimage(src: Phaser.GameObjects.Sprite, tint = 0x8fd8ff, alpha = 0.45, ms = 220, ox = 0, oy = 0) {
+    if (this.reduced) return;
+    const img = this.grab(src.texture.key);
+    if (!img) return;
+    img.setFrame(src.frame.name).setPosition(src.x + ox, src.y + oy).setOrigin(src.originX, src.originY).setFlipX(src.flipX)
+      .setScale(src.scaleX, src.scaleY).setRotation(src.rotation).setTintFill(tint).setAlpha(alpha).setDepth(src.depth - 0.5);
+    this.fade(img, { alpha: 0 }, ms, 'Linear');
+  }
+
+  /** A row of fading afterimages trailing back from a sprite along screen direction (ux, uy), `gap` px apart. */
+  ghosts(src: Phaser.GameObjects.Sprite, n: number, ux: number, uy: number, tint: number, gap = 8, alpha = 0.5, ms = 260) {
+    if (this.reduced) return;
+    const k = Math.max(1, Math.min(n, this.count(n)));
+    for (let i = 1; i <= k; i++) this.afterimage(src, tint, alpha * (1 - (i - 1) / (k + 1)), ms - i * 20, -ux * gap * i, -uy * gap * i);
+  }
+
+  /** Graphics-tier particle count for kits that spawn their own cosmetic sprites (same rounding as every burst). */
+  budget(n: number): number { return this.reduced ? 0 : this.count(n); }
 
   /** Floating pixel number. 'crit' pops large with an overshoot and a hot outline; 'heal' rises softly. */
   number(x: number, y: number, text: string, color: string, size: NumberStyle = 'sm') {
