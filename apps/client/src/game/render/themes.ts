@@ -54,7 +54,7 @@ const TUNING: Record<ThemeId, { ambient: number; floorTint: number; wallTint: nu
   frost: { ambient: 0x7088a8, floorTint: 0xd8ecff, wallTint: 0xc8e0ff, particleTint: 0xffffff, decalTint: 0xd8f0ff },
   sky: { ambient: 0xe0d4bc, floorTint: 0xffffff, wallTint: 0xffffff, particleTint: 0xfff0f6, decalTint: 0xffffff },
   moon: { ambient: 0x7a8498, floorTint: 0xdce4f0, wallTint: 0xd0d8e8, particleTint: 0xd0d8e8, decalTint: 0xe0e8f8 },
-  server: { ambient: 0x3a4458, floorTint: 0xc8d4e8, wallTint: 0xb8c4dc, particleTint: 0x50f0ff, decalTint: 0xd0f0ff },
+  server: { ambient: 0x56627c, floorTint: 0xc8d4e8, wallTint: 0xb8c4dc, particleTint: 0x50f0ff, decalTint: 0xd0f0ff },
 };
 
 /** Light colour of torches / braziers where the art's flame colour would drown the room in one hue (warm-cool contrast). */

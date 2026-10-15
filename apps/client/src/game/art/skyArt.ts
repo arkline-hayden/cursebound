@@ -197,7 +197,7 @@ export function moonBackdrop(): PixelBuffer {
     if (m > 0.985) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) b.set(x + dx, y + dy, 0x9aa8d8);
   }
   // the Earth: oceans, continents and cloud, lit from the right, a thin atmosphere on the lit limb
-  const ex = 252, ey = 44, er = 17;
+  const ex = 196, ey = 46, er = 17;
   for (let y = ey - er - 3; y <= ey + er + 3; y++)
     for (let x = ex - er - 3; x <= ex + er + 3; x++) {
       const dx = (x + 0.5 - ex) / er, dy = (y + 0.5 - ey) / er;

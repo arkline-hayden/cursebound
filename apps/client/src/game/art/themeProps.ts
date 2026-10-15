@@ -301,9 +301,10 @@ function flagPoleDraw(p: Painter, f: number): void {
   p.line(6, 7, 22, 7).fill(ALU, { mode: 'flat', tone: 3, inner: false });
   const FLAG = R(0x5a5a64, 0x8a8a96, 0xb4b4c0, 0xd8d8e2, 0xf4f4fa);
   p.poly([7, 8, 22, 8, 22, 18, 17, 17, 15, 19, 7, 18]).fill(FLAG, { mode: 'cyl', dither: true });
-  p.rect(8, 9, 5, 4).fill(R(0x14204a, 0x1e3070, 0x2c4498, 0x4a64c0, 0x7a90e0), { mode: 'emboss' });
-  for (let k = 0; k < 3; k++) p.line(13, 13 + k * 2, 21, 13 + k * 2);
-  p.fill(BEACON, { mode: 'flat', tone: 2, inner: false, alpha: 180 });
+  // the outpost's own sigil: a black ring round an orange star, a faded hazard band along the fly
+  p.ellipse(12, 12.5, 3, 3).fill(R(0x0a0a0c, 0x141418, 0x1e1e24, 0x2a2a32, 0x36363e), { mode: 'flat', tone: 1, inner: false });
+  p.px(12, 12, 0xe8902a).px(12, 13, 0xd07a1a).px(11, 12.5, 0xd07a1a).px(13, 12.5, 0xd07a1a);
+  p.line(16, 16, 21, 16).fill(R(0xa07018, 0xa07018, 0xa07018, 0xa07018, 0xa07018), { mode: 'flat', inner: false, alpha: 170 });
   void f;
 }
 

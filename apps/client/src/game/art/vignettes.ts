@@ -414,6 +414,7 @@ const SKY_SWAP: Record<string, string> = {
   shroom_giant: 'bush', shroom: 'wildflowers', shroom2: 'grass_tuft', sporepod: 'bush', mushroom_ring: 'wildflowers', shroom_tiny: 'wildflowers',
   pipe_outlet: 'ivy', crate: 'boulder', barrel: 'boulder', parchment: 'wildflowers', books_spilled: 'grass_tuft', bricks: 'grass_tuft',
   masonry_heap: 'boulder_big', rubble_big: 'boulder', bell_post: 'sky_obelisk', brazier_column: 'sky_obelisk',
+  rowboat: 'bush', piling: 'boulder', nets: 'grass_tuft', beam: 'grass_tuft',
 };
 const MOON_SWAP: Record<string, string> = {
   bookcase_free: 'rack_free', bookshelf: 'rack_hug', guardian: 'monolith', obelisk: 'monolith', statue: 'spacesuit', statue_broken: 'spacesuit',
@@ -424,6 +425,9 @@ const MOON_SWAP: Record<string, string> = {
   banner_pole: 'flag_pole', reading_table: 'terminal', lectern: 'terminal', parchment: 'debris_panel', books_spilled: 'debris_panel',
   rubble_big: 'moonrock', bricks: 'debris_panel', crate: 'data_crate', crate_broken: 'debris_panel', barrel: 'canister', barrel_broken: 'canister',
   campfire: 'flare', bedroll: 'debris_panel', bell_post: 'monolith', brazier_column: 'monolith',
+  rowboat: 'rover', piling: 'lamp_post_moon', nets: 'debris_panel', beam: 'debris_panel', lilies: 'debris_panel',
+  shroom_giant: 'moonrock', shroom: 'moonrock', shroom2: 'canister', sporepod: 'moonrock', mushroom_ring: 'debris_panel', shroom_tiny: 'debris_panel',
+  roots_floor: 'debris_panel', beam_broken: 'solar_panel', roots: 'cable_wall', glowmoss: 'porthole', wallshrooms: 'hull_vent', crack_roots: 'cable_wall',
   banner: 'porthole', tapestry: 'hull_vent', tapestry_red: 'hull_vent', shield_crest: 'porthole', sconce: 'lamp_moon', shelf_jars: 'hull_vent',
   chains: 'cable_wall', chainhooks: 'cable_wall', manacles: 'cable_wall', toolrack: 'cable_wall', runes: 'hull_vent', niche_urns: 'porthole',
 };
@@ -432,10 +436,13 @@ const SERVER_SWAP: Record<string, string> = {
   parchment: 'chip_debris', books_spilled: 'cable_coil', guardian: 'core_pylon', obelisk: 'core_pylon', statue: 'holo_statue', statue_broken: 'rack_small',
   sarcophagus: 'cold_storage', iron_maiden: 'containment_pod', pillory: 'rack_free', furnace: 'power_core', anvil: 'ups_unit', forge_hearth: 'power_core',
   quench: 'coolant_tank', orepile: 'cable_coil', minecart: 'server_cart', masonry_heap: 'rack_toppled', stalagmite: 'rack_toppled',
-  chest_gold: 'data_crate', chest_open: 'data_crate', coin_heap: 'chip_debris', urn: 'ups_unit', armor_stand: 'rack_small', weapon_barrel: 'ups_unit',
+  chest_gold: 'data_crate', chest_open: 'data_crate', coin_heap: 'chip_debris', urn: 'ups_unit', armor_stand: 'rack_free', weapon_barrel: 'ups_unit',
   well: 'coolant_tank', bucket: 'ups_unit', brazier_great: 'holo_pylon_m', brazier: 'holo_pylon', banner_pole: 'holo_pylon_m', lantern: 'holo_pylon',
   rubble_big: 'ups_unit', bricks: 'chip_debris', crate: 'data_crate', crate_broken: 'chip_debris', barrel: 'ups_unit', barrel_broken: 'ups_unit',
   table: 'server_cart', bedroll: 'cable_coil', campfire: 'holo_pylon', bell_post: 'core_pylon', brazier_column: 'core_pylon', beam_broken: 'rack_small',
+  rowboat: 'server_cart', piling: 'holo_pylon', nets: 'cable_coil', beam: 'cable_coil', lilies: 'chip_debris',
+  shroom_giant: 'rack_small', shroom: 'ups_unit', shroom2: 'terminal', sporepod: 'ups_unit', mushroom_ring: 'floor_vent', shroom_tiny: 'chip_debris',
+  roots_floor: 'cable_coil', roots: 'cable_wall', wallshrooms: 'rack_wall',
   banner: 'neon_magenta', tapestry: 'rack_wall', tapestry_red: 'neon_magenta', shield_crest: 'warning_sign', sconce: 'neon_cyan', shelf_jars: 'rack_wall',
   chains: 'cable_wall', chainhooks: 'cable_wall', manacles: 'cable_wall', toolrack: 'cable_wall', runes: 'warning_sign', tally: 'warning_sign',
   niche_urns: 'rack_wall', skullwall: 'rack_wall', bonecandle: 'warning_sign', crack_roots: 'cable_wall', glowmoss: 'neon_cyan',
