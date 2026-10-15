@@ -6,6 +6,7 @@ import { createStore, useStore } from '@/lib/store';
 import { netStore } from '@/lib/net';
 import { spectateCandidates, spectateTarget } from '@/game/spectate';
 import { ClassEmblem } from './icons';
+import { DeathRecapCard } from './DeathRecap';
 
 // SPECTATE: once your hero has fallen for the round (dead, not merely downed and waiting on a revive), the camera
 // follows a teammate who is still standing. The HUD bar names who you are watching; ◀ ▶ or Q / E (also the arrow
@@ -47,8 +48,11 @@ export function SpectateBar() {
   const mine = players.find((p) => p.s === me);
   if (mine?.life !== 'dead') return null;
   const watched = players.find((p) => p.s === target);
-  if (!watched) return <div className="hud-msg dead">Fallen until the round is won</div>;
+  if (!watched) return <><DeathRecapCard /><div className="hud-msg dead">Fallen until the round is won</div></>;
   return (
+    <>
+    {/* "You died to…": the killing blow and the seconds before it (simulation runStats.ts) */}
+    <DeathRecapCard />
     <div className="spectate-bar frame inset" role="status" aria-live="polite">
       <span className="spectate-label">Fallen · spectating</span>
       <div className="spectate-row">
@@ -61,5 +65,6 @@ export function SpectateBar() {
         <button type="button" className="btn small ghost" onClick={() => cycle(1)} disabled={cands.length < 2} aria-label="Next teammate"><span className="kbd">E</span> ▶</button>
       </div>
     </div>
+    </>
   );
 }

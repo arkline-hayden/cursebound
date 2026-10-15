@@ -15,6 +15,8 @@ import { CardIcon, ClassEmblem } from './icons';
 import { FireTitle } from './FireTitle';
 import { ItemIcon } from './itemIcons';
 import { FATES_BLESSING, LEGENDARY_BY_ID } from '@cursebound/content';
+import type { RunBreakdown } from '@cursebound/simulation';
+import { Breakdown } from './Breakdown';
 
 // RESULTS (PRD §16.1, §13): collective score, clear depth, end reason, builds, Fate timeline, score breakdown
 // and death recap. Local records are labelled Local and never presented as verified competition.
@@ -160,7 +162,8 @@ export function Results({ net }: { net: GameConnection }) {
               <div key={p.slot} className="res-player">
                 <div className="row" style={{ gap: 8 }}><ClassEmblem classId={p.classId} size={32} /> <b>{p.name}</b> <span className="faint">{CLASS_BY_ID[p.classId]?.name}</span></div>
                 <div className="faint">{Object.entries(p.ranks as Record<string, number>).map(([id, rk]) => `${NODE_BY_ID[id]?.name ?? id}${rk > 1 ? ' ' + rk : ''}`).join(' · ') || 'No nodes'}</div>
-                <div>Damage {whole(p.stats.damageDealt)} · taken {whole(p.stats.damageTaken)} · healed {whole(p.stats.healing)} · prevented {whole(p.stats.prevented)} · revives {p.stats.revives} · downs {p.stats.downs}</div>
+                {/* with a breakdown the totals live in its footer; older summaries keep the one-line tally */}
+                {!r.breakdown && <div>Damage {whole(p.stats.damageDealt)} · taken {whole(p.stats.damageTaken)} · healed {whole(p.stats.healing)} · prevented {whole(p.stats.prevented)} · revives {p.stats.revives} · downs {p.stats.downs}</div>}
               </div>
             ))}
             <p className="res-note">Contribution statistics are for learning only; the score is shared by the whole party.</p>
@@ -183,7 +186,14 @@ export function Results({ net }: { net: GameConnection }) {
               </div>
             </section>
           )}
-          {lastRecap.length > 0 && (
+          {/* post-run breakdown (simulation runStats.ts): damage by skill, damage taken by source, death recaps */}
+          {r.breakdown && (
+            <section className="well">
+              <h3>Breakdown</h3>
+              <Breakdown breakdown={r.breakdown as RunBreakdown} players={(r.players as any[]).map((p) => ({ slot: p.slot, name: p.name, classId: p.classId }))} mySlot={mySlot} />
+            </section>
+          )}
+          {!r.breakdown && lastRecap.length > 0 && (
             <section className="well">
               <h3>Death recap</h3>
               <ul>{lastRecap.map((d: any, i: number) => (

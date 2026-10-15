@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { contentHash } from '@cursebound/content';
+import type { RunBreakdown } from '@cursebound/simulation';
+import { Breakdown } from '@/ui/Breakdown';
 import { accountApi, api, onlineMode } from '@/lib/api';
 import { authStore } from '@/lib/auth';
 import { useStore } from '@/lib/store';
@@ -57,6 +59,19 @@ export default function Records() {
       .then((r) => { setRows(r.rows); setCursor(r.nextCursor); }).catch((e) => setErr((e as Error).message));
   };
   useEffect(() => { if (key) { setStack([]); load(key, null); } }, [key, practice, scope, scoped]);
+  // a past run's breakdown (local runs only; the cloud keeps no run detail)
+  const [open, setOpen] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Record<string, { breakdown: RunBreakdown; players: { slot: number; name: string; classId: string }[] } | null>>({});
+  const toggle = (runId: string) => {
+    setOpen((o) => (o === runId ? null : runId));
+    if (detail[runId] !== undefined) return;
+    api<{ breakdownJson?: string | null; summaryJson?: string | null; members?: { slot: number; displayName: string | null; classId: string }[] }>('GET', `/runs/${encodeURIComponent(runId)}`).then((run) => {
+      const breakdown = run.breakdownJson ? JSON.parse(run.breakdownJson) as RunBreakdown : null;
+      const sum = run.summaryJson ? JSON.parse(run.summaryJson) as { players?: { slot: number; name: string; classId: string }[] } : null;
+      const players = sum?.players?.map((p) => ({ slot: p.slot, name: p.name, classId: p.classId })) ?? (run.members ?? []).map((m) => ({ slot: m.slot, name: m.displayName ?? `Hero ${m.slot + 1}`, classId: m.classId }));
+      setDetail((d) => ({ ...d, [runId]: breakdown?.v === 1 ? { breakdown, players } : null }));
+    }).catch(() => setDetail((d) => ({ ...d, [runId]: null })));
+  };
   const d = key ? describe(key) : null;
   return (
     <>
@@ -94,15 +109,27 @@ export default function Records() {
             <thead><tr><th>#</th><th>Party</th><th className="num">Score</th><th className="num">Depth</th><th className="num">Active time</th><th>Date</th><th>Trust</th></tr></thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.runId}>
+                <Fragment key={r.runId}>
+                <tr>
                   <td className="gothic gold-text" style={{ fontSize: 'var(--fs-goth)', lineHeight: 1 }}>{r.rank}</td>
                   <td>{r.participants.map((p, i) => <span key={i} className="row" style={{ gap: 8, display: 'inline-flex', marginRight: 16 }}><ClassEmblem classId={p.classId as Parameters<typeof ClassEmblem>[0]['classId']} size={16} />{p.name}</span>)}{r.practice && <span className="chip warn">practice</span>}{!!r.accounts?.length && <div className="acct-names">{r.accounts.map((a) => '@' + a).join(' · ')}</div>}</td>
                   <td className="num"><b className="gold-text">{score(r.scoreText)}</b></td>
                   <td className="num">{r.depth}</td>
                   <td className="num">{Math.round(r.activeTicks / 60)}s</td>
                   <td>{new Date(r.completedAt).toLocaleString()}</td>
-                  <td><span className="chip">{fromCloud ? 'Online · client-reported' : `Local · ${r.verification}`}</span></td>
+                  <td><span className="chip">{fromCloud ? 'Online · client-reported' : `Local · ${r.verification}`}</span>
+                    {/* this machine's runs keep their post-run breakdown (runs.breakdown_json) */}
+                    {!fromCloud && <button className="btn small ghost" aria-expanded={open === r.runId} onClick={() => toggle(r.runId)}>{open === r.runId ? 'Hide' : 'Breakdown'}</button>}
+                  </td>
                 </tr>
+                {open === r.runId && (
+                  <tr><td colSpan={7}>
+                    {detail[r.runId] === undefined ? <span className="faint">Loading…</span>
+                      : detail[r.runId] === null ? <span className="faint">No breakdown was recorded for this run.</span>
+                      : <Breakdown breakdown={detail[r.runId]!.breakdown} players={detail[r.runId]!.players} mySlot={-1} />}
+                  </td></tr>
+                )}
+                </Fragment>
               ))}
               {!rows.length && <tr><td colSpan={7} className="muted">{scope === 'friends' && scoped ? 'No runs from you or your friends in this division yet.' : 'No finished runs in this division yet.'}</td></tr>}
             </tbody>
