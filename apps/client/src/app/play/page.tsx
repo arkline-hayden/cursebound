@@ -136,7 +136,8 @@ export default function Play() {
       const inWorld = netStore.get().phase?.phase === 'COMBAT' || netStore.get().phase?.phase === 'VOTING';
       if (keys.ledger.includes(e.code) && !inWorld) { e.preventDefault(); setShowLedger((v) => !v); }
       if (keys.pause.includes(e.code) && !inWorld) { setPaused((v) => !v); }
-      if (e.code === 'F3') { e.preventDefault(); updateSettings({ devOverlay: !settingsStore.get().s.devOverlay }); }
+      // Shift+F3: plain F3 is a camera key (ally 2)
+      if (e.code === 'F3' && e.shiftKey) { e.preventDefault(); updateSettings({ devOverlay: !settingsStore.get().s.devOverlay }); }
     };
     window.addEventListener('keydown', onKey);
     return () => {

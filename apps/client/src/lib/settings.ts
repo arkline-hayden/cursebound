@@ -6,13 +6,16 @@ import { deviceAutoTier, isTier, type GfxTier } from '../game/gfxProfile';
 // separate volumes, hold/toggle alternatives and complete keyboard/mouse/controller remapping.
 // Visual accessibility options never change simulation rules or invalidate scores.
 
-export type Action = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'attack' | 'forceAttack' | 'skill1' | 'skill2' | 'skill3' | 'signature' | 'dodge' | 'ledger' | 'pause' | 'interact' | 'inventory' | 'minimap';
+export type Action = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'attack' | 'forceAttack' | 'skill1' | 'skill2' | 'skill3' | 'signature' | 'dodge' | 'ledger' | 'pause' | 'interact' | 'inventory' | 'minimap'
+  | 'cameraLock' | 'cameraCenter' | 'cameraSelf' | 'cameraAlly1' | 'cameraAlly2' | 'cameraAlly3' | 'cameraAlly4';
 export const ACTIONS: { id: Action; label: string }[] = [
   { id: 'attack', label: 'Basic attack' }, { id: 'forceAttack', label: 'Attack in place (hold)' },
   { id: 'moveUp', label: 'Move up' }, { id: 'moveDown', label: 'Move down' }, { id: 'moveLeft', label: 'Move left' }, { id: 'moveRight', label: 'Move right' },
   { id: 'skill1', label: 'Skill 1' }, { id: 'skill2', label: 'Skill 2' }, { id: 'skill3', label: 'Skill 3' },
   { id: 'signature', label: 'Signature skill' }, { id: 'dodge', label: 'Dodge' }, { id: 'ledger', label: 'Fate Ledger' }, { id: 'pause', label: 'Pause / menu' },
   { id: 'interact', label: 'Interact (swap legendary)' }, { id: 'inventory', label: 'Legendary gear' }, { id: 'minimap', label: 'Minimap' },
+  { id: 'cameraLock', label: 'Camera lock (toggle)' }, { id: 'cameraCenter', label: 'Center camera (hold)' }, { id: 'cameraSelf', label: 'Camera on you (hold)' },
+  { id: 'cameraAlly1', label: 'Camera on ally 1 (hold)' }, { id: 'cameraAlly2', label: 'Camera on ally 2 (hold)' }, { id: 'cameraAlly3', label: 'Camera on ally 3 (hold)' }, { id: 'cameraAlly4', label: 'Camera on ally 4 (hold)' },
 ];
 export const ACTION_IDS: Action[] = ACTIONS.map((a) => a.id);
 const MOVE_ACTIONS: Action[] = ['moveUp', 'moveDown', 'moveLeft', 'moveRight'];
@@ -61,6 +64,11 @@ export interface Settings {
   controlsNotice: boolean;
   autoAttack: boolean;
   aimAssist: boolean;
+  /** League of Legends camera (game/cameraRig.ts): locked follows the hero, unlocked (default) stays where you leave
+   *  it; the pointer at the window edge pans at edgePanSpeed (x the base speed, 0.25-2) */
+  camLocked: boolean;
+  edgePan: boolean;
+  edgePanSpeed: number;
   keys: Record<Action, string[]>;
   pad: Record<Action, number[]>;
   devOverlay: boolean;
@@ -73,17 +81,27 @@ export interface Settings {
   graphicsAuto: boolean;
 }
 
+/**
+ * League of Legends camera keys (both layouts). Y toggles the lock, as in LoL. LoL centres on Space, but Space is our
+ * Dodge, so Center sits on C (for "centre"): free in both layouts and within reach of the left hand whether it rests
+ * on Q W E R or W A S D. F1 holds the camera on you and F2-F5 on teammates, as in LoL.
+ */
+const KEYS_CAMERA = {
+  cameraLock: ['KeyY'], cameraCenter: ['KeyC'], cameraSelf: ['F1'], cameraAlly1: ['F2'], cameraAlly2: ['F3'], cameraAlly3: ['F4'], cameraAlly4: ['F5'],
+} satisfies Partial<Record<Action, string[]>>;
+export const CAMERA_ACTIONS = Object.keys(KEYS_CAMERA) as Action[];
+
 /** Diablo layout: left click walks / attacks, Shift holds position, Q W E R the hotbar (R and right click: signature). */
 export const KEYS_CLICK: Record<Action, string[]> = {
   moveUp: ['ArrowUp'], moveDown: ['ArrowDown'], moveLeft: ['ArrowLeft'], moveRight: ['ArrowRight'],
   attack: ['Mouse0'], forceAttack: ['ShiftLeft', 'ShiftRight'], skill1: ['KeyQ'], skill2: ['KeyW'], skill3: ['KeyE'], signature: ['Mouse2', 'KeyR'],
-  dodge: ['Space'], ledger: ['Tab'], pause: ['Escape', 'KeyP'], interact: ['KeyG'], inventory: ['KeyI'], minimap: ['KeyM'],
+  dodge: ['Space'], ledger: ['Tab'], pause: ['Escape', 'KeyP'], interact: ['KeyG'], inventory: ['KeyI'], minimap: ['KeyM'], ...KEYS_CAMERA,
 };
 /** Classic layout: WASD walks, the mouse aims, Q E R skills. */
 export const KEYS_WASD: Record<Action, string[]> = {
   moveUp: ['KeyW', 'ArrowUp'], moveDown: ['KeyS', 'ArrowDown'], moveLeft: ['KeyA', 'ArrowLeft'], moveRight: ['KeyD', 'ArrowRight'],
   attack: ['Mouse0'], forceAttack: ['ShiftLeft', 'ShiftRight'], skill1: ['KeyQ'], skill2: ['KeyE'], skill3: ['KeyR'], signature: ['Mouse2', 'KeyF'],
-  dodge: ['Space'], ledger: ['Tab'], pause: ['Escape', 'KeyP'], interact: ['KeyG'], inventory: ['KeyI'], minimap: ['KeyM'],
+  dodge: ['Space'], ledger: ['Tab'], pause: ['Escape', 'KeyP'], interact: ['KeyG'], inventory: ['KeyI'], minimap: ['KeyM'], ...KEYS_CAMERA,
 };
 export const SCHEME_KEYS: Record<ControlScheme, Record<Action, string[]>> = { click: KEYS_CLICK, wasd: KEYS_WASD };
 
@@ -108,9 +126,13 @@ export const DEFAULT_SETTINGS: Settings = {
   controlsNotice: false,
   autoAttack: false,
   aimAssist: false,
+  camLocked: false,
+  edgePan: true,
+  edgePanSpeed: 1,
   keys: KEYS_CLICK,
   // Standard gamepad mapping: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 LT, 7 RT, 8 Back, 9 Start
-  pad: { moveUp: [12], moveDown: [13], moveLeft: [14], moveRight: [15], attack: [7], forceAttack: [], skill1: [2], skill2: [3], skill3: [1], signature: [5], dodge: [0, 4], ledger: [8], pause: [9], interact: [6], inventory: [], minimap: [] },
+  pad: { moveUp: [12], moveDown: [13], moveLeft: [14], moveRight: [15], attack: [7], forceAttack: [], skill1: [2], skill2: [3], skill3: [1], signature: [5], dodge: [0, 4], ledger: [8], pause: [9], interact: [6], inventory: [], minimap: [],
+    cameraLock: [], cameraCenter: [], cameraSelf: [], cameraAlly1: [], cameraAlly2: [], cameraAlly3: [], cameraAlly4: [] },
   devOverlay: false,
   tutorialDone: false,
   rumble: true,
@@ -155,6 +177,13 @@ export function normalizeSettings(raw: Partial<Settings>): { s: Settings; migrat
   // graphics arrived after version 1 saves: missing or unknown values fall back to Auto
   if (!isTier(s.graphics)) { s.graphics = DEFAULT_SETTINGS.graphics; s.graphicsAuto = true; }
   if (typeof s.graphicsAuto !== 'boolean') s.graphicsAuto = true;
+  if (!(s.edgePanSpeed >= 0.25 && s.edgePanSpeed <= 2)) s.edgePanSpeed = DEFAULT_SETTINGS.edgePanSpeed;
+  // actions newer than the save (the camera keys) take their defaults only where the player has not used that key
+  if (raw.keys) {
+    const fresh = ACTION_IDS.filter((a) => !raw.keys![a]);
+    const used = new Set(ACTION_IDS.filter((a) => !fresh.includes(a)).flatMap((a) => s.keys[a]));
+    for (const a of fresh) s.keys[a] = s.keys[a].filter((k) => !used.has(k));
+  }
   if ((raw.controlsRev ?? 0) >= CONTROLS_REV) {
     if (s.controlScheme !== 'click' && s.controlScheme !== 'wasd') s.controlScheme = 'click';
     return { s, migrated: false };

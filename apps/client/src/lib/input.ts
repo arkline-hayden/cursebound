@@ -1,4 +1,4 @@
-import { settingsStore, type Action } from './settings';
+import { CAMERA_ACTIONS, settingsStore, type Action } from './settings';
 
 // Input sampling (PRD §5.1, §16.2, §18.3): remappable keyboard + mouse + standard gamepad, hold/toggle attack,
 // held input cleared on blur (no stuck movement), escape reliably releases pointer capture.
@@ -31,6 +31,21 @@ const BIT: Partial<Record<Action, number>> = {
   skill1: BTN.SKILL1, skill2: BTN.SKILL2, skill3: BTN.SKILL3, signature: BTN.SIGNATURE, dodge: BTN.DODGE, interact: BTN.INTERACT,
 };
 
+/** Camera intents since the previous camera sample (CombatScene's League of Legends camera, game/cameraRig.ts). */
+export interface CameraSample {
+  /** the lock toggle was pressed */
+  lock: boolean;
+  /** Center camera held (or tapped since the last sample) */
+  center: boolean;
+  /** F1-F5 style focus held: 0 = you, 1-4 = teammates in party order; null when none */
+  focus: number | null;
+  /** middle-mouse drag since the last sample, in CSS px */
+  drag: { x: number; y: number };
+  /** pointer in window CSS px and the window size, when it is over the game view itself (not HUD / panels) */
+  edge: { x: number; y: number; w: number; h: number } | null;
+}
+const FOCUS_ACTIONS: Action[] = ['cameraSelf', 'cameraAlly1', 'cameraAlly2', 'cameraAlly3', 'cameraAlly4'];
+
 export class InputController {
   private down = new Set<string>();
   private edges = new Set<Action>();
@@ -43,6 +58,11 @@ export class InputController {
   usingPad = false;
   /** pointer in canvas CSS pixels; `inside` = the pointer is over the canvas itself (not over HUD / panels) */
   pointer = { x: 0, y: 0, inside: false };
+  /** pointer in window CSS pixels (edge panning) */
+  private client = { x: 0, y: 0 };
+  /** camera key presses not yet read by camera(), and the middle-mouse drag (accumulated CSS px) */
+  private camEdges = new Set<Action>();
+  private drag = { active: false, x: 0, y: 0, ax: 0, ay: 0 };
   /** a cinematic is playing (CINEMA's 'cursebound:cinematic' event) */
   cinematic = false;
   onAction: ((a: Action) => void) | null = null;
@@ -59,13 +79,23 @@ export class InputController {
       this.usingPad = false;
       this.track(e);
       if (this.cinematic) return;
+      // middle-mouse drag pans the camera (and never starts the browser's autoscroll)
+      if (e.button === 1) { e.preventDefault(); this.drag = { active: true, x: e.clientX, y: e.clientY, ax: 0, ay: 0 }; }
       this.press(`Mouse${e.button}`, true);
     }) as EventListener);
-    on(window, 'pointerup', ((e: PointerEvent) => this.press(`Mouse${e.button}`, false)) as EventListener);
+    on(el, 'mousedown', ((e: MouseEvent) => { if (e.button === 1) e.preventDefault(); }) as EventListener);
+    on(window, 'pointerup', ((e: PointerEvent) => {
+      if (e.button === 1) this.drag.active = false;
+      this.press(`Mouse${e.button}`, false);
+    }) as EventListener);
     // tracked on the window so a held click keeps steering while the pointer crosses the HUD
     on(window, 'pointermove', ((e: PointerEvent) => {
       this.track(e);
       if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) this.usingPad = false;
+      if (this.drag.active) {
+        if (!(e.buttons & 4)) this.drag.active = false;   // released outside the window
+        else { this.drag.ax += e.clientX - this.drag.x; this.drag.ay += e.clientY - this.drag.y; this.drag.x = e.clientX; this.drag.y = e.clientY; }
+      }
     }) as EventListener);
     on(el, 'pointerleave', (() => { this.pointer.inside = false; }) as EventListener);
     on(el, 'contextmenu', ((e: Event) => e.preventDefault()) as EventListener);
@@ -84,13 +114,14 @@ export class InputController {
     this.clear();
   }
 
-  clear() { this.down.clear(); this.edges.clear(); this.attackToggled = false; }
+  clear() { this.down.clear(); this.edges.clear(); this.camEdges.clear(); this.drag.active = false; this.attackToggled = false; }
 
   private track(e: PointerEvent) {
     const el = this.el;
     if (!el) return;
     const r = el.getBoundingClientRect();
     this.pointer = { x: e.clientX - r.left, y: e.clientY - r.top, inside: e.target === el };
+    this.client = { x: e.clientX, y: e.clientY };
   }
 
   private isTextTarget(e: Event) {
@@ -102,7 +133,8 @@ export class InputController {
     if (this.isTextTarget(e)) return;
     const keys = settingsStore.get().s.keys;
     const bound = (Object.keys(keys) as Action[]).some((a) => keys[a]?.includes(e.code));
-    if (bound && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow'))) e.preventDefault();
+    // bound function keys (camera F1-F5) must not open help, search or reload the page
+    if (bound && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow') || /^F\d{1,2}$/.test(e.code))) e.preventDefault();
     if (isDown && e.repeat) return;
     if (isDown && this.cinematic) return;
     this.usingPad = false;
@@ -116,6 +148,7 @@ export class InputController {
     for (const a of Object.keys(s.keys) as Action[]) {
       if (!s.keys[a]?.includes(code)) continue;
       this.edges.add(a);
+      if (CAMERA_ACTIONS.includes(a)) this.camEdges.add(a);
       if (a === 'attack' && s.attackMode === 'toggle' && s.controlScheme === 'wasd') this.attackToggled = !this.attackToggled;
       if (a === 'ledger' || a === 'pause') this.onAction?.(a);
     }
@@ -134,6 +167,25 @@ export class InputController {
       this.modal = typeof document !== 'undefined' && !!document.querySelector('[aria-modal="true"]');
     }
     return this.modal;
+  }
+
+  /**
+   * Camera intents, polled once per frame after sample(). Neutral while a cinematic plays or a modal panel is open;
+   * edge panning only reports while the pointer is over the game view itself (not the HUD or a panel) and the mouse,
+   * not a controller, is in use.
+   */
+  camera(): CameraSample {
+    const on = (a: Action) => this.held(a) || this.camEdges.has(a);
+    const lock = this.camEdges.has('cameraLock');
+    const center = on('cameraCenter');
+    const f = FOCUS_ACTIONS.findIndex(on);
+    const drag = { x: this.drag.ax, y: this.drag.ay };
+    this.drag.ax = 0; this.drag.ay = 0;
+    this.camEdges.clear();
+    if (this.cinematic || this.modalOpen()) return { lock: false, center: false, focus: null, drag: { x: 0, y: 0 }, edge: null };
+    const edge = this.pointer.inside && !this.usingPad && typeof window !== 'undefined'
+      ? { x: this.client.x, y: this.client.y, w: window.innerWidth, h: window.innerHeight } : null;
+    return { lock, center, focus: f < 0 ? null : f, drag, edge };
   }
 
   /** Poll once per frame. */
