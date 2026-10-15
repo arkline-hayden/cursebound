@@ -323,11 +323,13 @@ describe('potions and orbs', () => {
     const healed = [a, b].map((q) => q.hp.ratio(q.maxHp));
     expect(Math.max(...healed)).toBeCloseTo(0.75);
     expect(Math.min(...healed)).toBeCloseTo(0.5 + Number(RULES.potionAllyHealFrac));
-    a.resource = 0; b.resource = 0;
+   
+    // haste orb: only heroes with a recharging skill want it; it cuts every recharging cooldown
+    for (const q of [a, b]) { q.skills[3].charges = 0; q.skills[3].cooldown = 9; }
     const orb = dropPickup(s, 'orb', a.x, a.y, 0)!;
     orb.x = a.x; orb.y = a.y; orb.bornTick = s.tick - 60;
     stepPickups(s, ev);
-    expect(a.resource + b.resource).toBeGreaterThan(0);
+    expect(18 - a.skills[3].cooldown - b.skills[3].cooldown).toBeCloseTo(RULES.orbCooldownSec + RULES.orbAllyCooldownSec, 9);
   });
 
   it('drop table: champions always drop a potion, rares a potion and an orb', () => {

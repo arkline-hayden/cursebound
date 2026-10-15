@@ -83,11 +83,14 @@ export function botInput(state: SimState, slot: number, seq: number): PlayerInpu
     else if (d < want - 1.5) { moveX = -dx / d; moveY = -dy / d; }
     else { moveX = -dy / d * 0.6; moveY = dx / d * 0.6; }
     buttons |= ACTION.ATTACK;
-    if (d < 7) buttons |= ACTION.SKILL2 | ACTION.SKILL1;
-    // a guard stance blocks swinging while held: melee bots raise it only against a telegraph about to land (below)
-    if (melee) for (let i = 0; i < 2; i++) {
+    // the whole hotbar is owned from round 1 (base skills are starting grants): cast every active on cooldown,
+    // except a guard stance (it blocks swinging; melee bots raise it only against a telegraph, below) and a
+    // teleport (no blind blinks)
+    const bits = [ACTION.SKILL1, ACTION.SKILL2, ACTION.SKILL3];
+    if (d < 7) for (let i = 0; i < 3; i++) {
       const sid = p.skills[i]?.skillId;
-      if (sid && SKILL_BY_ID[sid].shape.kind === 'guard') buttons &= ~(i === 0 ? ACTION.SKILL1 : ACTION.SKILL2);
+      const kind = sid ? SKILL_BY_ID[sid].shape.kind : '';
+      if (sid && kind !== 'guard' && kind !== 'teleport') buttons |= bits[i];
     }
     if (d < 2.6) buttons |= ACTION.SIGNATURE;
   }
@@ -99,8 +102,8 @@ export function botInput(state: SimState, slot: number, seq: number): PlayerInpu
     if (d < 3) {
       moveX = dx / d; moveY = dy / d; buttons |= ACTION.DODGE;
       // out of dashes: a melee bot with a guard stance blocks instead
-      const g = CLASS_BY_ID[p.classId].melee && p.dodgeCharges <= 0 ? p.skills.findIndex((s, i) => i < 2 && s.skillId && SKILL_BY_ID[s.skillId].shape.kind === 'guard') : -1;
-      if (g >= 0) buttons |= g === 0 ? ACTION.SKILL1 : ACTION.SKILL2;
+      const g = CLASS_BY_ID[p.classId].melee && p.dodgeCharges <= 0 ? p.skills.findIndex((s, i) => i < 3 && s.skillId && SKILL_BY_ID[s.skillId].shape.kind === 'guard') : -1;
+      if (g >= 0) buttons |= [ACTION.SKILL1, ACTION.SKILL2, ACTION.SKILL3][g];
       break;
     }
   }

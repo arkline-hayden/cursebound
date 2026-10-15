@@ -13,7 +13,7 @@ const MARK_T2 = ['r_hunters_mark', 'r_keen_eye', 'r_keen_eye'];
 const WILDS_T2 = ['r_snare_trap', 'r_fleet_foot', 'r_fleet_foot'];
 
 function tough(e: EnemyState) { e.cohort.unitHp = Big.from(1e7); return e; }
-function ready(a: Arena, i: number) { const s = a.s.players[0].skills[i]; s.charges = s.maxCharges; s.cooldown = 0; a.s.players[0].resource = 999; }
+function ready(a: Arena, i: number) { const s = a.s.players[0].skills[i]; s.charges = s.maxCharges; s.cooldown = 0; }
 function mod(a: Arena, e: EnemyState, skillId: string): HitMod {
   const m: HitMod = { dmg: Big.ONE, critMul: Big.ONE, critDmg: Big.ONE, forceCrit: false };
   hooks.modifyHit(a.s, a.s.players[0], e, { skillId, dtype: 'physical', generation: 0 }, m);

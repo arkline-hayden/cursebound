@@ -1,11 +1,11 @@
 // Versioned tunable rules (PRD §3–§6, §11, §13, §19). Every constant here is a first proposal.
 // Changing anything that affects simulation outcomes requires bumping RULES_VERSION (and replay version).
 
-export const RULES_VERSION = 'rules-1.2.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas
+export const RULES_VERSION = 'rules-1.3.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes
 export const SCORE_VERSION = 'score-1.0.0';
-export const CONTENT_VERSION = 'content-1.1.0'; // 1.1: room kinds, theme room weights, boss arena designs
-export const SIM_VERSION = 'sim-1.1.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas)
-export const PROTOCOL_VERSION = 1;
+export const CONTENT_VERSION = 'content-1.2.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune
+export const SIM_VERSION = 'sim-1.2.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing)
+export const PROTOCOL_VERSION = 2;
 
 export const TICK_RATE = 60;
 export const TICK_SEC = 1 / TICK_RATE;
@@ -58,6 +58,17 @@ export const RULES = {
   lateHealthGrowth: '1.05',
   lateDamageGrowth: '1.035',
   bossAddBudgetFrac: 0.25,
+  /** Boss reinforcements (director.ts bossReinforcements): crossing each health threshold summons one wave of the
+   *  floor theme's foes, once per threshold. Wave = base + perHero x (N-1) + perRounds step, folded into cohorts. */
+  bossReinforceAt: [2 / 3, 1 / 3] as number[],
+  bossReinforceBase: 2,
+  bossReinforcePerHero: 1,
+  bossReinforceRoundStep: 10,
+  /** reinforcements are minions: numerous but individually weaker than the floor's packs */
+  bossReinforceHealth: '0.6',
+  bossReinforceDamage: '0.7',
+  /** seconds the summoning telegraph (client banner, rune circles) runs before the wave arrives */
+  bossReinforceWarnSec: 1.2,
   /** Global enemy ground-speed multiplier (applied at spawn, before Fate enemy.movementSpeed). Kit tests assume 1. */
   enemyMoveSpeedMult: 1,
 
@@ -77,7 +88,7 @@ export const RULES = {
   championRadius: 1.18,
   rareRadius: 1.35,
 
-  // Pickups (pickups.ts): potions heal, orbs restore resource. Collected by walking near (magnet), only by members
+  // Pickups (pickups.ts): potions heal, haste orbs cut the remaining cooldown of every skill. Collected by walking near (magnet), only by members
   // who need them, so a full-health hero leaves the potion for an ally.
   potionDropChance: 0.1,
   orbDropChance: 0.06,
@@ -86,8 +97,9 @@ export const RULES = {
   potionHealFracElite: '0.35',
   potionAllyHealFrac: '0.08',
   potionAllyRange: 5,
-  orbResourceFrac: 0.3,
-  orbAllyResourceFrac: 0.1,
+  /** seconds a haste orb cuts from each recharging skill (x1.5 from champion / rare drops); allies nearby get the ally share */
+  orbCooldownSec: 2,
+  orbAllyCooldownSec: 0.75,
   pickupMagnetRange: 1.2,
   pickupTouchRange: 0.45,
   pickupMagnetSpeed: 7,
@@ -126,6 +138,10 @@ export const RULES = {
   moveAccelBlend: 0.55,
   moveDecelBlend: 0.4,
   armorK: '100',
+  /** Rally (Vanguard Rally Cry, War Banner, Rallying Presence): skill cooldowns recover this many times as fast. */
+  rallyRecovery: 1.35,
+  /** Event Horizon (Arcanist): at most one pull field per this many seconds. */
+  eventHorizonGapSec: 3,
   enemyBaseRegenFrac: '0.0005', // 0.05% max health per second, regen-tagged only (D14)
   crowdControlResistSec: 4,
   shieldDecayPerSec: '0.05',
@@ -180,7 +196,7 @@ export function basePoints(r: number): bigint {
 export const MASTERY_CHOICES = [
   { id: 'mastery_damage', name: 'Mastery: Skill damage', stat: 'player.skillDamage', factor: '1.05' },
   { id: 'mastery_health', name: 'Mastery: Maximum health', stat: 'player.maxHealth', factor: '1.05' },
-  { id: 'mastery_regen', name: 'Mastery: Resource regeneration', stat: 'player.resourceRegen', factor: '1.05' },
+  { id: 'mastery_recovery', name: 'Mastery: Cooldown recovery', stat: 'player.recoveryRate', factor: '1.05' },
 ] as const;
 
 /**

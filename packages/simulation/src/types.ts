@@ -38,6 +38,8 @@ export interface SkillRuntime {
   cooldown: number;     // seconds remaining (scaled by recovery rate as it ticks)
   charges: number;
   maxCharges: number;
+  /** full length of the cooldown now recharging (cooldownOf at cast; snapshot fraction). Absent = the authored cooldown. */
+  full?: number;
   /** Return mark position (Arcanist) */
   mark?: { x: number; y: number; until: number } | null;
 }
@@ -77,7 +79,7 @@ export interface PlayerState {
   ranks: Record<string, number>;   // node id -> rank
   skillPoints: number;
   spentByBranch: Record<string, number>;
-  mastery: { damage: number; health: number; regen: number };
+  mastery: { damage: number; health: number; recovery: number };
   ready: boolean;
   // Body
   x: number; y: number;
@@ -88,7 +90,6 @@ export interface PlayerState {
   hp: Big;
   maxHp: Big;
   shield: Big;
-  resource: number;
   lifeState: 'alive' | 'downed' | 'dead';
   downTimer: number;               // seconds left while downed
   downsThisRound: number;
@@ -188,6 +189,10 @@ export interface EnemyState {
   perceiveIn: number;          // ticks until next perception update
   reactIn: number;             // reaction delay countdown for dodging projectiles
   strafeSign: number;
+  /** surround slot angle around the target hero (melee tactics, ai.ts); fleeing-until tick and once-only flag (cowards) */
+  slotAng?: number;
+  fleeUntil?: number;
+  fled?: number;
   cooldowns: Record<string, number>;
   attack: EnemyAttackState | null;
   // statuses (source indexed aggregates, PRD §5.3)
@@ -270,7 +275,7 @@ export interface Hazard {
   vars?: Record<string, number>;
 }
 
-/** Ground pickup (pickups.ts). Generic: `kind` 'potion' heals, 'orb' restores resource; other modules may add kinds. */
+/** Ground pickup (pickups.ts). Generic: `kind` 'potion' heals, 'orb' (haste orb) cuts skill cooldowns; other modules may add kinds. */
 /** A legendary item lying on the ground (gear.ts). Persists until picked up; unclaimed items settle at round clear. */
 export interface GroundLoot {
   id: number;
@@ -370,7 +375,10 @@ export interface EncounterState {
   activeTicks: number;
   budget: string;              // logical budget for disclosure
   pressure: Big;               // M_r at round start
+  /** boss reinforcement waves already called (1 = at 2/3 health, 2 = at 1/3; director.ts bossReinforcements) */
   phaseAddsSpawned: number[];
+  /** boss reinforcement waves telegraphed and on their way: they spawn at `tick` */
+  reinforce?: { tick: number; spawns: PendingSpawn[] }[];
   /** number of population + reinforcement packs this round (HUD) */
   packCount?: number;
 }
@@ -481,7 +489,7 @@ export interface SimState {
   reactions: Reaction[];
   pendingSpawns: PendingSpawn[];
   bossPhaseEvents: number[];
-  /** Ground pickups (potions, resource orbs). */
+  /** Ground pickups (potions, haste orbs). */
   pickups: Pickup[];
   /** Legendary items on the ground (gear.ts). Absent in pre-gear checkpoints. */
   loot?: GroundLoot[];
@@ -498,7 +506,7 @@ export interface SimState {
   cinematicUntilTick?: number;
 }
 
-export interface PendingSpawn { kind: string; x: number; y: number; count: Big; summonerId: number | null; objective: boolean; groupId: number; /** population pack and idle state inherited by rare minions */ pack?: number; dormant?: boolean }
+export interface PendingSpawn { kind: string; x: number; y: number; count: Big; summonerId: number | null; objective: boolean; groupId: number; /** population pack and idle state inherited by rare minions */ pack?: number; dormant?: boolean; /** minion scaling (boss reinforcements): unit health and damage multipliers */ hpMul?: string; dmgMul?: string }
 
 export interface Reaction { kind: 'inferno'; slot: number; x: number; y: number; amount: Big; tick: number; generation: number }
 
@@ -518,7 +526,7 @@ export interface DeathRecap {
 export type Command =
   | { type: 'ALLOCATE'; slot: number; nodeId: string }
   | { type: 'REFUND_ALL'; slot: number }
-  | { type: 'MASTERY'; slot: number; choice: 'damage' | 'health' | 'regen' }
+  | { type: 'MASTERY'; slot: number; choice: 'damage' | 'health' | 'recovery' }
   | { type: 'READY'; slot: number; ready: boolean }
   | { type: 'VOTE'; slot: number; offerId: string; seq: number; cardSlot: number | null; locked: boolean }
   | { type: 'RETIRE_VOTE'; slot: number; yes: boolean }
@@ -545,6 +553,9 @@ export type SimEvent =
   | { t: 'dead'; slot: number }
   | { t: 'teleport'; slot: number; fx: number; fy: number; x: number; y: number; /** presentation style: absent or 'rift' = Arcanist rings; others resolve SKILL_FX['teleport:<style>'] */ style?: string }
   | { t: 'boss_phase'; id: number; phase: number }
+  /** a boss calls reinforcement wave `wave` (1 at 2/3 health, 2 at 1/3): `n` foes arrive in RULES.bossReinforceWarnSec at
+   *  the summoning circles (telegraphs, attack 'reinforce') */
+  | { t: 'boss_adds'; id: number; wave: number; n: number; x: number; y: number }
   | { t: 'stagger'; id: number }
   | { t: 'wave'; wave: number }
   | { t: 'objective'; groupId: number; weight: number; completed: number; total: number }

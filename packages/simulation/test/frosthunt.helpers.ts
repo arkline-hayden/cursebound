@@ -1,5 +1,5 @@
 import { Big } from '@cursebound/numeric';
-import { contentHash } from '@cursebound/content';
+import { NODE_BY_ID, contentHash } from '@cursebound/content';
 import {
   ACTION, cohortTotalHp, createRun, devSpawn, rayDistance, step,
   type Command, type EnemyState, type PlayerInput, type SimEvent, type SimState,
@@ -18,7 +18,8 @@ export function arena(classId: string, nodes: string[], seed = 'KIT_TEST'): Aren
     roster: [{ slot: 0, profileId: 'p0', name: 'P0', classId }],
   });
   s.players[0].skillPoints = 99;
-  const cmds: Command[] = nodes.map((nodeId) => ({ type: 'ALLOCATE', slot: 0, nodeId }));
+  // base skills are free starting grants (owned from the start): only the rest is allocated
+  const cmds: Command[] = nodes.filter((id) => !NODE_BY_ID[id]?.starting).map((nodeId) => ({ type: 'ALLOCATE', slot: 0, nodeId }));
   const r = step(s, [], cmds);
   const bad = r.outcomes.filter((o) => !o.ok);
   if (bad.length) throw new Error('allocation failed: ' + JSON.stringify(bad));

@@ -62,8 +62,11 @@ export function parseBuild(b: Record<string, unknown>): SavedBuildInput {
   if (b.mastery !== undefined && b.mastery !== null) {
     const m = b.mastery as Record<string, unknown>;
     const ok = (x: unknown) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 999;
-    if (typeof m !== 'object' || !ok(m.damage ?? 0) || !ok(m.health ?? 0) || !ok(m.regen ?? 0)) throw new HttpError(400, 'INVALID_INPUT', 'invalid mastery');
-    mastery = JSON.stringify({ damage: m.damage ?? 0, health: m.health ?? 0, regen: m.regen ?? 0 });
+    // the third Mastery is cooldown recovery (sim 1.2); saved builds keep the legacy `regen` key for it (shared with the
+    // cloud service and older saves), and accept either name on input
+    const recovery = m.recovery ?? m.regen ?? 0;
+    if (typeof m !== 'object' || !ok(m.damage ?? 0) || !ok(m.health ?? 0) || !ok(recovery)) throw new HttpError(400, 'INVALID_INPUT', 'invalid mastery');
+    mastery = JSON.stringify({ damage: m.damage ?? 0, health: m.health ?? 0, regen: recovery });
   }
   return {
     name: str(b.name ?? '', 'name', 80),

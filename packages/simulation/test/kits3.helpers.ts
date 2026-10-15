@@ -1,5 +1,5 @@
 import { Big } from '@cursebound/numeric';
-import { contentHash } from '@cursebound/content';
+import { NODE_BY_ID, contentHash } from '@cursebound/content';
 import {
   ACTION, cohortTotalHp, createRun, devSpawn, rayDistance, step,
   type Command, type EnemyState, type PlayerInput, type SimEvent, type SimState,
@@ -17,7 +17,7 @@ export function kit(classId: string, nodes: string[], seed = 'KIT3_TEST', extraC
   const roster = [classId, ...extraClasses].map((c, i) => ({ slot: i, profileId: 'p' + i, name: 'P' + i, classId: c }));
   const s = createRun({ runId: 'run_' + seed, seed, mode: roster.length > 1 ? 'coop' : 'solo', trust: 'local', contentHash: contentHash(), roster });
   s.players[0].skillPoints = 99;
-  const r = step(s, [], nodes.map((nodeId): Command => ({ type: 'ALLOCATE', slot: 0, nodeId })));
+  const r = step(s, [], nodes.filter((id) => !NODE_BY_ID[id]?.starting).map((nodeId): Command => ({ type: 'ALLOCATE', slot: 0, nodeId })));   // base skills are starting grants
   const bad = r.outcomes.filter((o) => !o.ok);
   if (bad.length) throw new Error('allocation failed: ' + JSON.stringify(bad));
   step(s, [], s.players.map((p): Command => ({ type: 'READY', slot: p.slot, ready: true })));

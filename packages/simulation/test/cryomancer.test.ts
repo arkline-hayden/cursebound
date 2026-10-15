@@ -15,7 +15,7 @@ const WALL_T2 = ['c_ice_wall', 'c_hoarfrost', 'c_hoarfrost'];
 /** Make an enemy effectively unkillable so multi-hit chains can be observed. */
 function tough(e: EnemyState) { e.cohort.unitHp = Big.from(1e7); return e; }
 /** Reset charges / cooldown / resource of hotbar slot i. */
-function ready(a: Arena, i: number) { const s = a.s.players[0].skills[i]; s.charges = s.maxCharges; s.cooldown = 0; a.s.players[0].resource = 999; }
+function ready(a: Arena, i: number) { const s = a.s.players[0].skills[i]; s.charges = s.maxCharges; s.cooldown = 0; }
 function boss(a: Arena, dist: number): EnemyState {
   const p = a.s.players[0];
   const e = createEnemy(a.s, 'prismstag', p.x + a.dir[0] * dist, p.y + a.dir[1] * dist, Big.ONE, { boss: true, objective: false, groupId: -1, summonerId: null });

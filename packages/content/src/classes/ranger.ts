@@ -13,45 +13,45 @@ const sk = (s: Omit<SkillDef, 'classId' | 'compressionSupport' | 'icon'> & { ico
   ({ classId: 'ranger', compressionSupport: true, icon: s.icon ?? `node:${s.id}`, ...s });
 
 const hidden = (id: string, name: string, coef: string, dtype: SkillDef['damageType'], shape: SkillDef['shape'], description: string, icon: string): SkillDef =>
-  sk({ id, name, slot: 'active', damageType: dtype, damageCoef: coef, resourceCost: 0, cooldownSec: 0, charges: 1, shape, description, icon });
+  sk({ id, name, slot: 'active', damageType: dtype, damageCoef: coef, cooldownSec: 0, charges: 1, shape, description, icon });
 
 const ARROW = { kind: 'projectile', speed: 15, radius: 0.18, range: 9, pierce: 0, spreadDeg: 12 } as const;
 
 export const SKILLS: SkillDef[] = [
-  sk({ id: 'r_quick_shot', name: 'Quick Shot', slot: 'basic', damageType: 'physical', damageCoef: '1', resourceCost: 0, cooldownSec: 0, charges: 1,
+  sk({ id: 'r_quick_shot', name: 'Quick Shot', slot: 'basic', damageType: 'physical', damageCoef: '1', cooldownSec: 0, charges: 1,
     shape: { kind: 'projectile', speed: 16, radius: 0.18, range: 10, pierce: 0, spreadDeg: 8 }, description: 'A fast arrow loosed at your aim.' }),
-  sk({ id: 'r_rain_of_arrows', name: 'Rain of Arrows', slot: 'signature', damageType: 'physical', damageCoef: '0.45', resourceCost: 35, cooldownSec: 13, charges: 1,
+  sk({ id: 'r_rain_of_arrows', name: 'Rain of Arrows', slot: 'signature', damageType: 'physical', damageCoef: '0.45', cooldownSec: 9, charges: 1,
     shape: { kind: 'aura', radius: 3.2, duration: 3 },
     description: 'Darken the sky over the aimed point (up to 9 units, radius 3.2) for 3s: every 0.25s arrows strike every enemy inside for 0.45x physical damage (can critically strike). Builds boss stagger.' }),
   // ---- Volley ----
-  sk({ id: 'r_multishot', name: 'Multishot', slot: 'active', damageType: 'physical', damageCoef: '0.8', resourceCost: 15, cooldownSec: 3, charges: 1,
+  sk({ id: 'r_multishot', name: 'Multishot', slot: 'active', damageType: 'physical', damageCoef: '0.8', cooldownSec: 2, charges: 1,
     shape: { ...ARROW }, description: 'Fire a fan of 5 arrows (12 degrees apart), each dealing 0.8x physical damage.' }),
-  sk({ id: 'r_barrage', name: 'Barrage', slot: 'active', damageType: 'physical', damageCoef: '0.6', resourceCost: 20, cooldownSec: 5, charges: 1,
+  sk({ id: 'r_barrage', name: 'Barrage', slot: 'active', damageType: 'physical', damageCoef: '0.6', cooldownSec: 3.5, charges: 1,
     shape: { ...ARROW }, description: 'Loose three fans over 0.3s, each 5 arrows of 0.6x physical damage, re-aimed as you turn.' }),
-  sk({ id: 'r_longshot', name: 'Longshot', slot: 'active', damageType: 'physical', damageCoef: '2.8', resourceCost: 20, cooldownSec: 6, charges: 1,
+  sk({ id: 'r_longshot', name: 'Longshot', slot: 'active', damageType: 'physical', damageCoef: '2.8', cooldownSec: 4, charges: 1,
     shape: { kind: 'projectile', speed: 26, radius: 0.35, range: 16, pierce: 99, spreadDeg: 0 },
     description: 'A heavy arrow that flies 16 units and pierces everything for 2.8x physical damage, x1.6 against enemies more than 6 units away.' }),
   hidden('r_ricochet', 'Ricochet', '0.5', 'physical', { kind: 'projectile', speed: 16, radius: 0.18, range: 5, pierce: 0, spreadDeg: 0 }, 'Ricocheting Volley arrow.', 'node:r_ricochet'),
   hidden('r_explosion', 'Explosive Tip', '0.4', 'physical', { kind: 'circle', radius: 1.2, selfCentered: false, range: 0 }, 'Explosive Tips blast.', 'node:r_explosive_tips'),
   // ---- Marksman ----
-  sk({ id: 'r_hunters_mark', name: "Hunter's Mark", slot: 'active', damageType: 'physical', damageCoef: '1', resourceCost: 10, cooldownSec: 4, charges: 1,
+  sk({ id: 'r_hunters_mark', name: "Hunter's Mark", slot: 'active', damageType: 'physical', damageCoef: '1', cooldownSec: 3, charges: 1,
     shape: { kind: 'chain', range: 12, jumpRange: 0, jumps: 0 },
     description: 'Shoot the enemy nearest your aim (within 12 units) for 1x physical damage and Mark it for 8s: your hits against it have x3 critical tendency.' }),
-  sk({ id: 'r_power_shot', name: 'Power Shot', slot: 'active', damageType: 'physical', damageCoef: '3.5', resourceCost: 25, cooldownSec: 6, charges: 1,
+  sk({ id: 'r_power_shot', name: 'Power Shot', slot: 'active', damageType: 'physical', damageCoef: '3.5', cooldownSec: 4, charges: 1,
     shape: { kind: 'projectile', speed: 22, radius: 0.3, range: 13, pierce: 1, spreadDeg: 0 }, knockback: 1,
     description: 'A heavy arrow (pierces 1) for 3.5x physical damage that knocks enemies back 1 unit; always critically strikes Marked enemies with x1.5 critical damage and Marks the first enemy hit.' }),
-  sk({ id: 'r_deadeye', name: 'Deadeye', slot: 'active', damageType: 'physical', damageCoef: '1.6', resourceCost: 20, cooldownSec: 8, charges: 1,
+  sk({ id: 'r_deadeye', name: 'Deadeye', slot: 'active', damageType: 'physical', damageCoef: '1.6', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'chain', range: 12, jumpRange: 0, jumps: 2 },
     description: 'Mark the 3 enemies nearest your aim (within 12 units) for 8s and shoot each for 1.6x physical damage.' }),
   hidden('r_tumble_shot', 'Tumble Shot', '0.9', 'physical', { kind: 'projectile', speed: 16, radius: 0.18, range: 9, pierce: 0, spreadDeg: 14 }, 'Arrows loosed while dodging.', 'node:r_tumble_shot'),
   // ---- Wilds ----
-  sk({ id: 'r_snare_trap', name: 'Snare Trap', slot: 'active', damageType: 'physical', damageCoef: '2', resourceCost: 15, cooldownSec: 6, charges: 1,
+  sk({ id: 'r_snare_trap', name: 'Snare Trap', slot: 'active', damageType: 'physical', damageCoef: '2', cooldownSec: 4, charges: 1,
     shape: { kind: 'circle', radius: 1.6, selfCentered: false, range: 7 },
     description: 'Toss a trap that arms after 0.4s and lasts 15s; the first enemy to step on it springs it for 2x physical damage (radius 1.6) and Snares enemies for 1.5s.' }),
-  sk({ id: 'r_trap_volley', name: 'Trap Volley', slot: 'active', damageType: 'physical', damageCoef: '2', resourceCost: 25, cooldownSec: 8, charges: 1,
+  sk({ id: 'r_trap_volley', name: 'Trap Volley', slot: 'active', damageType: 'physical', damageCoef: '2', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'circle', radius: 1.6, selfCentered: false, range: 7 },
     description: 'Toss 3 Snare Traps in a fan (25 degrees apart); up to 6 traps at once.' }),
-  sk({ id: 'r_bait', name: "Hunter's Bait", slot: 'active', damageType: 'physical', damageCoef: '2', resourceCost: 25, cooldownSec: 10, charges: 1,
+  sk({ id: 'r_bait', name: "Hunter's Bait", slot: 'active', damageType: 'physical', damageCoef: '2', cooldownSec: 7, charges: 1,
     shape: { kind: 'circle', radius: 2.2, selfCentered: false, range: 8 },
     description: 'Throw bait to the aimed point: non-boss enemies within 6 units are lured to it for 2.5s, then it springs a trap burst (radius 2.2).' }),
   hidden('r_venom_cloud', 'Venom Cloud', '0.35', 'decay', { kind: 'aura', radius: 2, duration: 4 }, 'Toxic cloud from Venom Snare.', 'node:r_venom_snare'),
@@ -60,7 +60,7 @@ export const SKILLS: SkillDef[] = [
 
 export const NODES: NodeDef[] = [
   // ---- Ranger / Volley ----
-  n('r_multishot', 'volley', 'Multishot', 1, 0, { grantsSkill: 'r_multishot',
+  n('r_multishot', 'volley', 'Multishot', 1, 0, { starting: true, grantsSkill: 'r_multishot',
     description: 'Fires a fan of 5 arrows, each for 0.8× physical.' }),
   n('r_steady_draw', 'volley', 'Steady Draw', 3, 1, { modifiers: [{ stat: 'player.physicalDamage', factorPerRank: '1.08' }], description: 'Raises physical damage ×{value} per rank.' }),
   n('r_quick_hands', 'volley', 'Quick Hands', 3, 1, { modifiers: [{ stat: 'player.attackFrequency', factorPerRank: '1.07' }], description: 'Raises attack speed ×{value} per rank.' }),
@@ -85,7 +85,7 @@ export const NODES: NodeDef[] = [
     upgrades: 'r_multishot', description: 'Upgrades Multishot: ×1.5 damage within 3.5 units, and each cast springs you back 2.5.' }),
 
   // ---- Ranger / Marksman ----
-  n('r_hunters_mark', 'marksman', "Hunter's Mark", 1, 0, { grantsSkill: 'r_hunters_mark',
+  n('r_hunters_mark', 'marksman', "Hunter's Mark", 1, 0, { starting: true, grantsSkill: 'r_hunters_mark',
     description: 'Shoots and Marks an enemy for 8s; your hits on it get ×3 critical tendency.' }),
   n('r_keen_eye', 'marksman', 'Keen Eye', 3, 1, { modifiers: [{ stat: 'player.critTendency', factorPerRank: '1.12' }], description: 'Raises critical tendency ×{value} per rank.' }),
   n('r_lethality', 'marksman', 'Lethality', 3, 1, { modifiers: [{ stat: 'player.critPotency', factorPerRank: '1.08' }], description: 'Raises critical damage ×{value} per rank.' }),
@@ -111,7 +111,7 @@ export const NODES: NodeDef[] = [
     description: 'Makes your next 3 hits after a dodge crit for ×1.25; Tumble Shot fires 5 arrows.' }),
 
   // ---- Ranger / Wilds ----
-  n('r_snare_trap', 'wilds', 'Snare Trap', 1, 0, { grantsSkill: 'r_snare_trap',
+  n('r_snare_trap', 'wilds', 'Snare Trap', 1, 0, { starting: true, grantsSkill: 'r_snare_trap',
     description: 'Tosses a trap that springs for 2× physical and snares enemies for 1.5s (3 at once).' }),
   n('r_toxicology', 'wilds', 'Toxicology', 3, 1, { modifiers: [{ stat: 'player.decayDamage', factorPerRank: '1.1' }], description: 'Raises poison (decay) damage ×{value} per rank.' }),
   n('r_fleet_foot', 'wilds', 'Fleet Foot', 3, 1, { modifiers: [{ stat: 'player.movementSpeed', factorPerRank: '1.04' }], description: 'Raises movement speed ×{value} per rank.' }),
@@ -144,8 +144,7 @@ export const CLASS: ClassDef = {
     { id: 'marksman', name: 'Marksman', theme: 'Marks, critical strikes and executions' },
     { id: 'wilds', name: 'Wilds', theme: 'Traps, poison and a hawk companion' },
   ],
-  accent: '#6fa83c', role: 'Ranged hunter · precision',
-  resource: { name: 'Focus', max: 100, regenPerSec: 10 },
+  accent: '#6fa83c', role: 'Ranged hunter · precision',
   base: { maxHealth: 820, armor: 16, damage: 82, attackFrequency: 2.2, moveSpeed: 4.8, critTendency: '0.3', critMultiplier: '2', shieldCapacity: 0.6 },
   basicSkill: 'r_quick_shot', signatureSkill: 'r_rain_of_arrows',
   nodes: NODES.map((x) => x.id),

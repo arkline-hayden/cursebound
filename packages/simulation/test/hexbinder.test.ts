@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Big } from '@cursebound/numeric';
+import { SKILL_BY_ID } from '@cursebound/content';
 import { addDot, killEnemy, stateHash, type SimState } from '@cursebound/simulation';
 import { ACTION, aimAt, casts, damaged, dead, dist, kit, run, spawn } from './kits3.helpers';
 import { newRun, runBot } from './run.helpers';
@@ -131,25 +132,26 @@ describe('hexbinder: Sanguine', () => {
     expect(p.hp.gt(hp0)).toBe(true);
   });
 
-  it('Blood Price pays a Blood shortfall with health but never below 35%', () => {
+  it('Blood Price pays 3% health per cast for a x0.7 cooldown, never below 35%', () => {
     const k = kit('hexbinder', ['h_blood_tether', 'h_blood_price']);
     const p = k.s.players[0];
     const e = spawn(k, 'pursuer', 3, 0, '1000');
-    p.resource = 0;
-    const hp0 = p.hp;
+    const slot = p.skills.findIndex((x) => x.skillId === 'h_blood_tether');
     run(k, 1, ACTION.SKILL2, 1, aimAt(k, e));
     expect(casts(k, 'h_blood_tether')).toHaveLength(1);
     expect(casts(k, 'h_blood_price')).toHaveLength(1);
-    expect(p.hp.lt(hp0)).toBe(true);
-    expect(p.hp.ratio(p.maxHp)).toBeGreaterThan(0.8);
-    // at 40% health the 15 Blood cost would cross 35%: no cast
+    expect(p.hp.ratio(p.maxHp)).toBeCloseTo(0.97, 6);
+    expect(p.skills[slot].cooldown).toBeCloseTo(SKILL_BY_ID['h_blood_tether'].cooldownSec * 0.7, 6);
+    // at 37% health paying would cross 35%: the cast goes through unpaid, with the full cooldown
     const k2 = kit('hexbinder', ['h_blood_tether', 'h_blood_price']);
     const p2 = k2.s.players[0];
     const e2 = spawn(k2, 'pursuer', 3, 0, '1000');
-    p2.resource = 0; p2.hp = p2.maxHp.mul(Big.from('0.4'));
+    p2.hp = p2.maxHp.mul(Big.from('0.37'));
     run(k2, 1, ACTION.SKILL2, 1, aimAt(k2, e2));
-    expect(casts(k2, 'h_blood_tether')).toHaveLength(0);
-    expect(p2.hp.ratio(p2.maxHp)).toBeCloseTo(0.4, 6);
+    expect(casts(k2, 'h_blood_tether')).toHaveLength(1);
+    expect(casts(k2, 'h_blood_price')).toHaveLength(0);
+    expect(p2.hp.ratio(p2.maxHp)).toBeCloseTo(0.37, 6);
+    expect(p2.skills[slot].cooldown).toBeCloseTo(SKILL_BY_ID['h_blood_tether'].cooldownSec, 6);
   });
 
   it('Hemorrhage (evolution) rips and drags nearby enemies toward you and heals', () => {
@@ -187,7 +189,7 @@ describe('hexbinder: Sanguine', () => {
     const p = k.s.players[0];
     const e = spawn(k, 'pursuer', 3, 0, '1000');
     run(k, 1, ACTION.SKILL2, 1, aimAt(k, e));
-    expect(p.hp.ratio(p.maxHp)).toBeCloseTo(0.92, 6);
+    expect(p.hp.ratio(p.maxHp)).toBeCloseTo(0.97 * 0.92, 6);   // Blood Price (3%) then the Sacrament (8% of current)
     expect(p.vars.hx_lust).toBe(1);
     run(k, 200, 0, 0, aimAt(k, e));          // let the tether (and its healing) run out
     p.hp = p.maxHp.mul(Big.from('0.31'));
@@ -235,16 +237,16 @@ describe('hexbinder: Wraithcall', () => {
     expect(hazards(k2.s, 'hx_legion')).toHaveLength(3);
   });
 
-  it('Soul Harvest tears out orbiting Souls and Blood; Death Knell detonates fading wraiths', () => {
+  it('Soul Harvest tears out orbiting Souls and cuts cooldowns; Death Knell detonates fading wraiths', () => {
     const k = kit('hexbinder', ['h_summon_wraith', 'h_grave_strength', 'h_grave_strength', 'h_grave_strength', 'h_soul_harvest', 'h_death_knell']);
     const p = k.s.players[0];
     const weak = [3, 3.5].map((d, i) => spawn(k, 'pursuer', d, i * 20, '0.0001'));
     run(k, 1, ACTION.SKILL3);
-    p.resource = 10;
+    p.skills[3].charges = 0; p.skills[3].cooldown = 50;
     run(k, 90, ACTION.ATTACK, 90, aimAt(k, weak[0]));
     expect(weak.every(dead)).toBe(true);
     expect(hazards(k.s, 'hx_soul').length).toBe(2);
-    expect(p.resource).toBeGreaterThan(10 + 2);
+    expect(p.skills[3].cooldown).toBeLessThan(50 - 1.5 - 2 * 0.15 + 1e-6);   // 0.15s per kill (rank 1) on top of 1.5s recovery
     run(k, 8 * 60);
     expect(casts(k, 'h_death_knell')).toHaveLength(1);
   });

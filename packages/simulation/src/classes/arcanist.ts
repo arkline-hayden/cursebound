@@ -1,5 +1,5 @@
 import { Big } from '@cursebound/numeric';
-import { SKILL_BY_ID } from '@cursebound/content';
+import { RULES, SKILL_BY_ID } from '@cursebound/content';
 import { hitEnemy } from '../combat';
 import { registerClassHooks, registerGlobalHooks, type SimHooks } from '../hooks';
 import { inLine, norm, q, rayDistance } from '../geometry';
@@ -8,7 +8,7 @@ import { areaCoverage, knockback, livingEnemies, makeHazard, spawnPlayerProjecti
 import { nextFloat } from '../rng';
 import { B, ONE, hitDamage, playerDerived } from '../stats';
 import type { EnemyState, Hazard, PlayerState, SimEvent, SimState } from '../types';
-import { DT, aimPoint, baseHit, castEv, clearVars, enemiesNear, has, hitArea, isLive, pullToward, pushEnemy, spawnProj, ticks } from './kitHelpers';
+import { DT, aimPoint, baseHit, castEv, clearVars, enemiesNear, has, hitArea, isLive, pullToward, pushEnemy, rank, spawnProj, ticks } from './kitHelpers';
 
 // Arcanist deep tree + evolved skills (content: packages/content/src/classes/arcanist.ts). Spark, Astral Nova, Phase
 // Step, Inferno, Ash Recovery and the base Fireline/Arc Bolt remain inline in players.ts/combat.ts; Fireline and
@@ -37,8 +37,8 @@ function attuned(p: PlayerState, skillId: string): boolean {
 const attuneMult = (p: PlayerState, skillId: string) => (attuned(p, skillId) ? B('1.6') : ONE);
 
 function eventHorizon(state: SimState, p: PlayerState) {
-  if (!has(p, 'a_event_horizon') || p.resource < 15) return;
-  p.resource -= 15;
+  if (!has(p, 'a_event_horizon') || (p.vars.a_ehReady ?? 0) > state.tick) return;
+  p.vars.a_ehReady = state.tick + ticks(RULES.eventHorizonGapSec);   // at most one pull field per gap (shared with the inline Phase Step)
   state.hazards.push(makeHazard(state, {
     kind: 'horizon', owner: 'player', ownerId: p.slot, x: p.x, y: p.y, radius: 3, untilTick: state.tick + ticks(2),
     interval: ticks(0.25), damage: hitDamage(state, p, 'a_event_horizon_field', 'astral'), dtype: 'astral',
@@ -357,6 +357,7 @@ const arcanistHooks: SimHooks = {
     let n = 0;
     if (RIFT.has(skillId) && has(p, 'a_riftwalker')) n += 2;
     if ((skillId === 'a_blink_strike' || skillId === 'a_rift_gate') && has(p, 'a_temporal_reserve')) n += 1;   // inline covers a_phase_step
+    if (STORM.has(skillId)) n += rank(p, 'a_charged_reserve');
     return n;
   },
 

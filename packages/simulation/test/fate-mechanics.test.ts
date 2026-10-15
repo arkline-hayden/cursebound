@@ -216,11 +216,13 @@ describe('boons', () => {
     expect(p.attackWork).toBeCloseTo(playerDerived(s, p).attackFreq.toNumber() / 60 * 0.5, 9);
     expect(casts(ev, 'boon_bloodrush')).toBe(1);
   });
-  it('Soul Harvest restores resource per kill', () => {
+  it('Soul Harvest cuts recharging cooldowns per kill', () => {
     const s = arena(); bind(s, 'soul_harvest', '0.12');
-    const p = s.players[0]; p.resource = 0;
+    const p = s.players[0];
+    const k = p.skills[3];
+    k.charges = 0; k.cooldown = 5; k.full = 10;
     strike(s, [], foe(s, 1, 0, ONE, B(10)), B(1000));
-    expect(p.resource).toBeCloseTo(playerDerived(s, p).resourceMax * 0.12, 9);
+    expect(k.cooldown).toBeCloseTo(5 - 10 * 0.12, 9);
   });
   it('Echo refunds charges by the seeded combat stream (deterministic)', () => {
     const count = (bound: boolean) => {

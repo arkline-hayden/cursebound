@@ -7,6 +7,7 @@ import { findPath, nearestFloor, tileCenter } from './map';
 import { hooks } from './hooks';
 import { actMul, isFrozen, lureGoal, moveMul } from './cc';
 import { inCinematic } from './cinematic';
+import { bossReinforcements } from './director';
 import { makeHazard } from './players';
 import { nextFloat, nextInt } from './rng';
 import { B, ONE, fateFactor, toFloatClamped } from './stats';
@@ -15,11 +16,31 @@ import type { EnemyState, Hazard, PlayerState, Projectile, SimEvent, SimState, T
 // Enemy intelligence (PRD §14.2): deterministic utility selection above finite state actions, staggered
 // perception, A* paths with replanning and stuck recovery, blackboard target reservations, readable
 // windup -> release -> recovery attacks. AI never reads inputs, cursor or private loadouts — only visible state.
+// Tactics: focus the wounded and the isolated, surround instead of queueing, kite toward open floor, strafe at range,
+// casters behind the front line, cowards regroup when hurt, and nobody stands in a hero's fire (constants: AI).
 
 const DT = TICK_SEC;
 const DT_B = B(TICK_SEC);
 const ZERO = Big.ZERO;
 const MAX_PROJECTILE_SPEED = 1e6;
+
+/**
+ * Tactics tuning (sim 1.2). Target focus: + focusLowHp x missing health fraction, + focusIsolated when no other hero stands
+ * within isolatedR. Melee foes spread onto surround slots once within surroundFrom of their hero. Skirmishers strafe
+ * (orbit radians per perception). Casters hold range behind the nearest melee ally within backlineR. Cowards below
+ * cowardBelow health fall back to allies within regroupR for fleeSec, once. Foes leave hero ground effects with at
+ * least evadeMinTicks left.
+ */
+const AI = {
+  focusLowHp: 4, focusIsolated: 2, isolatedR: 4.5,
+  surroundFrom: 4.5, orbit: 0.45, backlineR: 7,
+  cowardBelow: 0.3, regroupR: 10, fleeSec: 2.5,
+  evadeMinTicks: 30,
+};
+/** Roles that break off and regroup when badly hurt (ranged casters and skirmishers; melee bruisers never do). */
+const COWARDS = new Set(['skirmisher', 'artillery', 'hexer', 'broodcaller', 'wraith', 'shade', 'weaver']);
+/** Roles that keep a melee ally between themselves and the hero. */
+const BACKLINE = new Set(['artillery', 'hexer', 'broodcaller', 'weaver']);
 
 function attackDefs(e: EnemyState): EnemyAttackDef[] {
   return e.boss ? BOSS_BY_ID[e.kind].attacks : ENEMY_BY_ID[e.kind].attacks;
@@ -53,6 +74,11 @@ function chooseTarget(state: SimState, e: EnemyState): PlayerState | null {
     if (e.targetSlot === p.slot) score += 3;            // hysteresis
     const r = reservations.get(p.slot) ?? 0;
     if (def && (def.role === 'pursuer' || def.role === 'summon') && r >= 3) score -= 5;
+    // predators: press the wounded and pick off heroes standing alone (visible state only: health bars, positions)
+    if (def && d <= sight) {
+      score += AI.focusLowHp * (1 - Math.min(1, p.hp.ratio(p.maxHp)));
+      if (alive.length > 1 && alive.every((o) => o === p || dist2(o.x, o.y, p.x, p.y) > AI.isolatedR * AI.isolatedR)) score += AI.focusIsolated;
+    }
     if (score > bestScore) { bestScore = score; best = p; }
   }
   return best;
@@ -111,6 +137,34 @@ function wardCandidate(state: SimState, e: EnemyState, range: number): EnemyStat
   return best;
 }
 
+/** Damaging player ground effect the enemy stands in (fireline, pools, storms, fields), nearest centre first; null if none. */
+function playerHazardAt(state: SimState, e: EnemyState): Hazard | null {
+  for (const h of state.hazards) {
+    if (h.owner !== 'player' || h.damage.isZero() || h.untilTick - state.tick < AI.evadeMinTicks) continue;
+    if (h.length > 0 && h.width > 0) { if (inLine(h.x, h.y, h.dx, h.dy, h.length, h.width / 2, e.x, e.y, e.radius)) return h; }
+    else if (h.radius > 0 && dist2(h.x, h.y, e.x, e.y) <= (h.radius + e.radius) ** 2) return h;
+  }
+  return null;
+}
+
+/**
+ * Surround slots: melee foes on the same hero spread around it instead of queueing in a conga line. Every melee foe
+ * on the target takes the angle of its rank (by id) around the hero, rotated to where the lowest-id member stands.
+ */
+function surroundSlot(state: SimState, e: EnemyState, target: PlayerState): number {
+  let k = 0, m = 0, lead: EnemyState | null = null;
+  for (const o of state.enemies) {
+    if (o.boss || o.state === 'dying' || o.dormant || o.targetSlot !== target.slot) continue;
+    const od = ENEMY_BY_ID[o.kind];
+    if (!od || od.preferredRange[1] > 2) continue;
+    if (!lead || o.id < lead.id) lead = o;
+    if (o.id < e.id) k++;
+    m++;
+  }
+  if (m <= 1 || !lead) return Math.atan2(e.y - target.y, e.x - target.x);
+  return Math.atan2(lead.y - target.y, lead.x - target.x) + (k / m) * Math.PI * 2;
+}
+
 function perceive(state: SimState, e: EnemyState) {
   const def = ENEMY_BY_ID[e.kind];
   const target = chooseTarget(state, e);
@@ -121,6 +175,10 @@ function perceive(state: SimState, e: EnemyState) {
   const u = def.utility;
   const engaged = state.enemies.filter((o) => o !== e && o.targetSlot === target.slot && o.state !== 'dying').length;
   const ready = readyAttack(state, e, target);
+  // cowards (casters and skirmishers) break off once, badly hurt, and fall back to their allies
+  const hurt = e.cohort.count.lte(ONE) && cohortFrac(e) < AI.cowardBelow;
+  const fleeing = (e.fleeUntil ?? 0) > state.tick;
+  const inFire = pmax > 2 ? playerHazardAt(state, e) : null;
   const scores: Record<string, number> = {
     pursue: (u.pursue ?? 0) * (d > pmax ? 1 : 0.1),
     retreat: (u.retreat ?? 0) * (d < pmin ? 1.2 : 0),
@@ -129,13 +187,32 @@ function perceive(state: SimState, e: EnemyState) {
     reposition: (u.reposition ?? 0) * (inAimLane(state, e) ? 1.4 : 0.05),
     guard: (u.guard ?? 0) * (state.enemies.some((o) => o !== e && !o.boss && o.state !== 'dying' && o.kind !== 'guardian') ? 0.7 : 0),
     rescue: (u.rescue ?? 0) * (ready && ready.kind === 'shield' ? 2 : 0),
+    // ranged foes step out of a hero's lingering fire / storm / pool (melee packs are mindless and charge through)
+    evade: inFire && pmax > 2 ? (0.3 + (u.reposition ?? 0)) * 1.8 : 0,
+    regroup: fleeing ? 9 : COWARDS.has(def.role) && hurt && !e.fled ? 3 : 0,
   };
   let best = 'pursue', bs = -1;
-  for (const k of ['cast', 'rescue', 'reposition', 'retreat', 'flank', 'guard', 'pursue']) {
+  for (const k of ['regroup', 'cast', 'rescue', 'evade', 'reposition', 'retreat', 'flank', 'guard', 'pursue']) {
     if ((scores[k] ?? 0) > bs) { bs = scores[k]; best = k; }
   }
+  if (best === 'regroup' && !fleeing) { e.fled = 1; e.fleeUntil = state.tick + Math.round(AI.fleeSec / DT); }
+  if (best === 'pursue' && pmax <= 2) e.slotAng = surroundSlot(state, e, target);
   e.utility = scores;
   e.action = best;
+}
+
+const cohortFrac = (e: EnemyState) => e.cohort.unitHp.sub(e.cohort.spread).sub(e.cohort.front).ratio(e.cohort.unitHp);
+
+/** Of a few headings away from (fx, fy), the one with the most open floor ahead (kiting never backs into a wall). */
+function openRetreat(state: SimState, e: EnemyState, fx: number, fy: number, dist: number): [number, number] {
+  let bx = e.x + fx * dist, by = e.y + fy * dist, bf = -1;
+  for (const a of [0, 0.7, -0.7, 1.4, -1.4]) {
+    const c = Math.cos(a), s = Math.sin(a);
+    const dx = fx * c - fy * s, dy = fx * s + fy * c;
+    const free = rayDistance(state.map!, e.x, e.y, dx, dy, dist);
+    if (free > bf + 0.25) { bf = free; bx = e.x + dx * Math.max(0.5, free - 0.4); by = e.y + dy * Math.max(0.5, free - 0.4); }
+  }
+  return nearestFloor(state.map!, bx, by);
 }
 
 function goalFor(state: SimState, e: EnemyState, target: PlayerState): [number, number] {
@@ -143,7 +220,32 @@ function goalFor(state: SimState, e: EnemyState, target: PlayerState): [number, 
   const [pmin, pmax] = def.preferredRange;
   const [tx, ty] = norm(target.x - e.x, target.y - e.y);
   switch (e.action) {
-    case 'retreat': return nearestFloor(state.map!, e.x - tx * 3, e.y - ty * 3);
+    case 'retreat': return openRetreat(state, e, -tx, -ty, 3);   // kite: back off toward open floor
+    case 'evade': {
+      const h = playerHazardAt(state, e);
+      if (!h) return [e.x, e.y];
+      let ox: number, oy: number, reach: number;
+      if (h.length > 0 && h.width > 0) {
+        // a line: step out sideways, on the side the foe already leans to
+        const side = (e.x - h.x) * -h.dy + (e.y - h.y) * h.dx >= 0 ? 1 : -1;
+        ox = -h.dy * side; oy = h.dx * side; reach = h.width / 2 + e.radius + 0.6;
+      } else {
+        [ox, oy] = norm(e.x - h.x, e.y - h.y);
+        if (ox === 0 && oy === 0) { ox = -tx; oy = -ty; }
+        reach = Math.max(0.5, h.radius + e.radius + 0.6 - Math.sqrt(dist2(e.x, e.y, h.x, h.y)));
+      }
+      return nearestFloor(state.map!, e.x + ox * reach, e.y + oy * reach);
+    }
+    case 'regroup': {
+      // fall back to the nearest allies (their centre), else straight away from the hero
+      let cx = 0, cy = 0, n = 0;
+      for (const o of state.enemies) {
+        if (o === e || o.boss || o.state === 'dying' || o.dormant || dist2(o.x, o.y, e.x, e.y) > AI.regroupR * AI.regroupR) continue;
+        if (dist2(o.x, o.y, target.x, target.y) <= dist2(e.x, e.y, target.x, target.y)) continue;   // only allies further back
+        cx += o.x; cy += o.y; n++;
+      }
+      return n ? nearestFloor(state.map!, cx / n, cy / n) : openRetreat(state, e, -tx, -ty, 5);
+    }
     case 'flank': {
       const r = (pmin + pmax) / 2 + 1;
       return nearestFloor(state.map!, target.x - ty * r * e.strafeSign - tx * 0.5, target.y + tx * r * e.strafeSign - ty * 0.5);
@@ -162,7 +264,33 @@ function goalFor(state: SimState, e: EnemyState, target: PlayerState): [number, 
     }
     default: {
       const want = def.preferredRange[1] > 2 ? (pmin + pmax) / 2 : 0;
-      return want > 0 ? nearestFloor(state.map!, target.x - tx * want, target.y - ty * want) : [target.x, target.y];
+      if (want <= 0) {
+        // melee: close in on an assigned surround slot (spread around the hero, no conga line); straight on when far
+        const d = Math.sqrt(dist2(e.x, e.y, target.x, target.y));
+        if (e.slotAng === undefined || d > AI.surroundFrom) return [target.x, target.y];
+        const ring = Math.max(0.6, Math.min(1.2, pmax + 0.2) + e.radius * 0.5);
+        const [sx, sy] = nearestFloor(state.map!, target.x + Math.cos(e.slotAng) * ring, target.y + Math.sin(e.slotAng) * ring);
+        return lineOfSight(state.map!, sx, sy, target.x, target.y) ? [sx, sy] : [target.x, target.y];
+      }
+      // casters stay behind their front line: hold range on the far side of the nearest melee ally
+      let ax = -tx, ay = -ty;
+      if (BACKLINE.has(def.role)) {
+        let front: EnemyState | null = null, fd = AI.backlineR * AI.backlineR;
+        for (const o of state.enemies) {
+          if (o === e || o.boss || o.state === 'dying' || o.dormant) continue;
+          const od = ENEMY_BY_ID[o.kind];
+          if (!od || od.preferredRange[1] > 2) continue;
+          const d2o = dist2(o.x, o.y, e.x, e.y);
+          if (d2o < fd) { fd = d2o; front = o; }
+        }
+        if (front) { const [fx, fy] = norm(front.x - target.x, front.y - target.y); if (fx || fy) { ax = fx; ay = fy; } }
+      } else {
+        // skirmishers circle at range (strafe), so they are never a standing target
+        const c = Math.cos(AI.orbit * e.strafeSign), s = Math.sin(AI.orbit * e.strafeSign);
+        const [rx, ry] = norm(e.x - target.x, e.y - target.y);
+        if (rx || ry) { ax = rx * c - ry * s; ay = rx * s + ry * c; }
+      }
+      return nearestFloor(state.map!, target.x + ax * want, target.y + ay * want);
     }
   }
 }
@@ -545,8 +673,14 @@ export function stepEnemy(state: SimState, ev: SimEvent[], e: EnemyState) {
     e.vx = 0; e.vy = 0;
     return;
   }
-  const [gx, gy] = lureGoal(state, e) ?? goalFor(state, e, target);   // decoys / bait lure movement (cc.ts)
+  const lure = lureGoal(state, e);
+  const [gx, gy] = lure ?? goalFor(state, e, target);   // decoys / bait lure movement (cc.ts)
+  const px = e.x, py = e.y;
   moveToward(state, e, gx, gy);
+  // ranged foes never walk into a hero's lingering fire (they evade out of it instead); lures still drag them
+  if (!lure && e.action !== 'evade' && ENEMY_BY_ID[e.kind].preferredRange[1] > 2 && !playerHazardAt(state, { ...e, x: px, y: py }) && playerHazardAt(state, e)) {
+    e.x = px; e.y = py; e.vx = 0; e.vy = 0;
+  }
   e.state = Math.abs(e.vx) + Math.abs(e.vy) > 0.01 ? 'move' : 'idle';
   // face the target while moving at range
   const [fx, fy] = norm(target.x - e.x, target.y - e.y);
@@ -568,6 +702,8 @@ function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
     ev.push({ t: 'boss_phase', id: e.id, phase });
     state.bossPhaseEvents.push(phase);
   }
+  // reinforcements: one wave per health threshold crossed (2/3, 1/3), each exactly once
+  RULES.bossReinforceAt.forEach((at, i) => { if (frac <= at) bossReinforcements(state, ev, e, i + 1); });
   if (e.staggerUntil > state.tick) { e.state = 'stagger'; e.attack = null; return; }
   if (e.state === 'stagger') e.state = 'idle';
   if (e.attack) { stepAttack(state, ev, e); return; }

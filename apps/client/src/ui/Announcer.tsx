@@ -8,7 +8,7 @@ import { useStore } from '@/lib/store';
 // Screen reader announcements for phase and vote changes (REQ ACCESS01) and captions for critical audio cues.
 
 const PHASE_TEXT: Record<string, string> = {
-  LOADOUT_LOCK: 'Loadout. Spend your starting skill point, then begin round 1.',
+  LOADOUT_LOCK: 'Loadout. Your skills are ready. Spend your point, then begin round 1.',
   ROUND_SETUP: 'Round starting.',
   COMBAT: 'Combat.',
   ROUND_CLEAR: 'Round cleared.',

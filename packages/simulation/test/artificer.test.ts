@@ -36,7 +36,7 @@ describe('artificer: Turrets', () => {
   it('only two turrets stand at once; the oldest is replaced', () => {
     const a = arena('artificer', ['af_turret']);
     const s = a.s.players[0].skills[0];
-    for (let i = 0; i < 3; i++) { s.charges = 1; s.cooldown = 0; a.s.players[0].resource = 100; run(a, 2, ACTION.SKILL1, 1, [a.dir[0] * (1 + i), a.dir[1] * (1 + i)]); }
+    for (let i = 0; i < 3; i++) { s.charges = 1; s.cooldown = 0; run(a, 2, ACTION.SKILL1, 1, [a.dir[0] * (1 + i), a.dir[1] * (1 + i)]); }
     expect(a.s.hazards.filter((h) => h.kind === 'af_turret').length).toBe(2);
   });
   it('Flame Turret evolution sprays fire that burns', () => {

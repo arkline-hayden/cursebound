@@ -218,7 +218,7 @@ describe('gear factors in the stat pipeline', () => {
 
   it('slot sigils add a charge and multiply the hotbar skill; signature items multiply the signature', () => {
     const s = newRun(['vanguard'], 'LG_SIGIL_SEED');
-    step(s, [], [{ type: 'ALLOCATE', slot: 0, nodeId: 'v_sweeping_strike' }]);   // cleaver = second branch (hotbar slot 2)
+    // Sweeping Strike is a starting grant: cleaver = second branch (hotbar slot 2)
     const p = s.players[0];
     const slot = p.skills.findIndex((x) => x.skillId === 'v_sweeping_strike');
     expect(slot).toBe(1);
@@ -277,7 +277,6 @@ describe('perks (sample)', () => {
 
   it('Hourglass: the next skill deals ×3 and the cast spends the charge of power', () => {
     const s = newRun(['vanguard'], 'LG_HOURGLASS_SEED');
-    step(s, [], [{ type: 'ALLOCATE', slot: 0, nodeId: 'v_sweeping_strike' }]);
     const p = s.players[0];
     const base = skillCoef(p, 'v_sweeping_strike');
     equipLegendary(s, [], p, 'lg_hourglass_of_the_patient_king');

@@ -143,7 +143,7 @@ function castSkill(state: SimState, ev: SimEvent[], p: PlayerState, skillId: str
         });
         if (low) {
           castEv(ev, p, 'v_execute', e.x, e.y, p.aimX, p.aimY);
-          if (!res.kills.isZero()) p.resource = Math.min(playerDerived(state, p).resourceMax, p.resource + 10);
+          if (!res.kills.isZero()) p.vars.vg_execKills = (p.vars.vg_execKills ?? 0) + 1;   // cooldown cut lands in onCast, after the core starts it
         }
         flinch(state, e, p.x, p.y, 0.5);
       }
@@ -285,9 +285,15 @@ const vanguardHooks: SimHooks = {
         p.vars.vg_ft = 0;
         aftershock(state, p, p.x + p.aimX * 1.2, p.y + p.aimY * 1.2, 2.2, hitDamage(state, p, 'v_sweeping_strike', 'physical'));
         break;
-      case 'v_executioner':
+      case 'v_executioner': {
+        // execution kills cut its cooldown (no resource refund); at most two kills count per chop
+        const ek = Math.min(2, p.vars.vg_execKills ?? 0);
+        p.vars.vg_execKills = 0;
+        const s = p.skills.find((x) => x.skillId === 'v_executioner');
+        if (s && ek > 0 && s.charges < s.maxCharges) s.cooldown -= 1.5 * ek;
         aftershock(state, p, p.x + p.aimX * 1.5, p.y + p.aimY * 1.5, 2.2, ssDmg(state, p, 'v_executioner'));
         break;
+      }
       case 'v_earthbreaker':
         if (!has(p, 'v_warlord_leap')) aftershock(state, p, p.x, p.y, 2.6, hitDamage(state, p, 'v_earthbreaker', 'physical'));
         break;

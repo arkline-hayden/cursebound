@@ -31,7 +31,7 @@ export function TutorialHints() {
   }
   if (hidden) return null;
   let text = '';
-  if (phase.phase === 'LOADOUT_LOCK') text = 'Pick one node to equip your first active skill (for example Guard Stance or Arc Bolt), then begin round 1.';
+  if (phase.phase === 'LOADOUT_LOCK') text = 'Your skills are ready. Spend your point, then begin round 1.';
   else if (phase.phase === 'COMBAT' && phase.round === 1) {
     const telegraph = (hud?.telegraphs.length ?? 0) > 0;
     text = telegraph

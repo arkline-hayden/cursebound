@@ -49,8 +49,8 @@ export interface SimHooks {
   hazardTick?(state: SimState, ev: SimEvent[], h: Hazard): boolean | undefined;
   /** Extra max charges for a skill. */
   extraCharges?(p: PlayerState, skillId: string): number;
-  /** Multiplier on a skill's resource cost (1 = unchanged). */
-  costFactor?(state: SimState, p: PlayerState, skillId: string): number;
+  /** Multiplier on a skill's full cooldown when it starts recharging (1 = unchanged; players.ts cooldownOf). */
+  cooldownFactor?(state: SimState, p: PlayerState, skillId: string): number;
   /** Combat begins for a round (after the map and first wave are set up). */
   onRoundStart?(state: SimState, ev: SimEvent[]): void;
   /** Once per combat tick (global), after enemies and projectiles stepped. */
@@ -98,9 +98,9 @@ export const hooks = {
     each(p, (h) => { n += h.extraCharges?.(p, skillId) ?? 0; });
     return n;
   },
-  costFactor(state: SimState, p: PlayerState, skillId: string): number {
+  cooldownFactor(state: SimState, p: PlayerState, skillId: string): number {
     let f = 1;
-    each(p, (h) => { f *= h.costFactor?.(state, p, skillId) ?? 1; });
+    each(p, (h) => { f *= h.cooldownFactor?.(state, p, skillId) ?? 1; });
     return f;
   },
   onRoundStart(state: SimState, ev: SimEvent[]) {

@@ -20,7 +20,7 @@ export interface PhaseData {
   map: (Pick<MapState, 'w' | 'h' | 'tiles' | 'topology' | 'decorSeed' | 'fallback' | 'theme' | 'layout' | 'rooms' | 'voids' | 'arena' | 'bossSpawn' | 'playerSpawns' | 'enemySpawns'>) | null;
   fate: { round: number; cardId: string }[];
   deathRecaps: { slot: number; round: number; attack: string; source: string; amountText: string; hpFracBefore: number; contributingFactors: string[]; disconnected: boolean; final: boolean }[];
-  players: { slot: number; name: string; classId: string; ranks: Record<string, number>; skillPoints: number; spentByBranch: Record<string, number>; mastery: { damage: number; health: number; regen: number }; ready: boolean; hpT: string; mhpT: string; connected: boolean; life: string; canMastery: boolean }[];
+  players: { slot: number; name: string; classId: string; ranks: Record<string, number>; skillPoints: number; spentByBranch: Record<string, number>; mastery: { damage: number; health: number; recovery: number }; ready: boolean; hpT: string; mhpT: string; connected: boolean; life: string; canMastery: boolean }[];
 }
 
 export interface RoomInfo { roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null }
@@ -256,7 +256,7 @@ export class GameConnection {
 
   allocate(nodeId: string) { this.send({ t: 'ALLOCATE', nodeId, requestId: crypto.randomUUID().slice(0, 32) }); }
   refund() { this.send({ t: 'REFUND', requestId: crypto.randomUUID().slice(0, 32) }); }
-  mastery(choice: 'damage' | 'health' | 'regen') { this.send({ t: 'MASTERY', choice, requestId: crypto.randomUUID().slice(0, 32) }); }
+  mastery(choice: 'damage' | 'health' | 'recovery') { this.send({ t: 'MASTERY', choice, requestId: crypto.randomUUID().slice(0, 32) }); }
   ready(ready: boolean) { this.send({ t: 'READY', ready }); }
   lobby(p: { classId?: string; ready?: boolean }) { this.send({ t: 'LOBBY', ...p }); }
   retire(yes: boolean) { this.send({ t: 'RETIRE', yes }); }

@@ -129,7 +129,6 @@ export function applyCard(state: SimState, cardId: string, offerId: string, ev: 
   const card = cardById(cardId);
   if (!card) throw new Error(`unknown card ${cardId}`);
   const beforeMax = state.players.map((p) => p.maxHp);
-  const beforeRes = state.players.map((p) => derivePlayer(state, p).resourceMax);
   let seq = state.fate.entries.length + (state.fate.mechanicEntries?.length ?? 0);
   for (const { effect: eff } of cardStatEffects(card)) {
     const factor = percentToFactor(eff.percent);
@@ -142,7 +141,6 @@ export function applyCard(state: SimState, cardId: string, offerId: string, ev: 
   state.players.forEach((p, i) => {
     const d = derivePlayer(state, p);
     refreshMaxHp(p, beforeMax[i], d.maxHp);
-    if (beforeRes[i] > 0) p.resource = Math.min(d.resourceMax, p.resource * (d.resourceMax / beforeRes[i]));
   });
   ev.push({ t: 'domain', type: 'fate_applied', payload: { cardId, offerId } });
 }

@@ -17,7 +17,7 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 export interface SnapPlayer {
   s: number; n: string; c: string; x: number; y: number; vx: number; vy: number; ax: number; ay: number; f: number;
   life: 'alive' | 'downed' | 'dead'; anim: string; hp: number; hpT: string; mhpT: string; sh: number; shT: string;
-  res: number; resMax: number; cd: [string, number, number, number][]; dodge: number; down: number; rev: number; self: number;
+  cd: [string, number, number, number][]; dodge: number; down: number; rev: number; self: number;
   con: boolean; guard: boolean; buffs: string[]; seq: number; downs: number; spd: number; dt: number; ddx: number; ddy: number; dcd: number;
   /** Optional kit counters for the HUD: every p.vars entry named ui_<key> appears as kv[<key>] (e.g. Duelist combo). */
   kv?: Record<string, number>;
@@ -100,11 +100,10 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
         s: p.slot, n: p.name, c: p.classId, x: r3(p.x), y: r3(p.y), vx: r3(p.vx), vy: r3(p.vy), ax: r3(p.aimX), ay: r3(p.aimY), f: p.facing,
         life: p.lifeState, anim, hp: r3(p.maxHp.isZero() ? 0 : p.hp.ratio(p.maxHp)), hpT: p.hp.toCompact(), mhpT: p.maxHp.toCompact(),
         sh: r3(p.maxHp.isZero() ? 0 : Math.min(1, p.shield.ratio(p.maxHp))), shT: p.shield.toCompact(),
-        res: r3(p.resource), resMax: r3(pd.resourceMax),
         cd: p.skills.map((s) => {
           if (!s.skillId) return ['', 0, 0, 0] as [string, number, number, number];
-          const base = SKILL_BY_ID[s.skillId].cooldownSec;
-          return [s.skillId, base > 0 && s.charges < s.maxCharges ? r3(Math.max(0, s.cooldown) / base) : 0, s.charges, s.maxCharges] as [string, number, number, number];
+          const base = s.full ?? SKILL_BY_ID[s.skillId].cooldownSec;
+          return [s.skillId, base > 0 && s.charges < s.maxCharges ? r3(Math.min(1, Math.max(0, s.cooldown) / base)) : 0, s.charges, s.maxCharges] as [string, number, number, number];
         }),
         dodge: r3(p.dodgeCooldown / DODGE.cooldownSec), down: r3(p.downTimer), rev: r3(p.reviveProgress / 3), self: r3(p.selfReviveChannel),
         con: p.connected, guard: p.guardTimer > 0, buffs: p.buffs.map((b) => b.id), seq: p.lastInputSeq, downs: p.downsThisRound,

@@ -1,7 +1,7 @@
 // Wire protocol (PRD §19.2). Clients send intentions only; the authority validates everything.
 // Schemas impose size, count, string length and nesting limits — transport safeguards, never Fate stat limits.
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;   // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen
 export const LIMITS = {
   inputBytes: 256,
   controlBytes: 8 * 1024,
@@ -26,7 +26,7 @@ export type ClientMessage =
   | { t: 'LOBBY'; classId?: string; ready?: boolean }
   | { t: 'ALLOCATE'; nodeId: string; requestId: string }
   | { t: 'REFUND'; requestId: string }
-  | { t: 'MASTERY'; choice: 'damage' | 'health' | 'regen'; requestId: string }
+  | { t: 'MASTERY'; choice: 'damage' | 'health' | 'recovery'; requestId: string }
   | { t: 'READY'; ready: boolean }
   | { t: 'VOTE'; offerId: string; seq: number; slot: number | null; locked: boolean }
   | { t: 'RETIRE'; yes: boolean }
@@ -95,7 +95,7 @@ export function parseClientMessage(raw: string): ParseResult {
       if (!isStr(m.requestId, 64, ID)) return bad('bad REFUND');
       return { ok: true, msg: m as unknown as ClientMessage };
     case 'MASTERY':
-      if (!['damage', 'health', 'regen'].includes(m.choice as string) || !isStr(m.requestId, 64, ID)) return bad('bad MASTERY');
+      if (!['damage', 'health', 'recovery'].includes(m.choice as string) || !isStr(m.requestId, 64, ID)) return bad('bad MASTERY');
       return { ok: true, msg: m as unknown as ClientMessage };
     case 'READY':
       if (typeof m.ready !== 'boolean') return bad('bad READY');

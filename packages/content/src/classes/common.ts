@@ -10,8 +10,12 @@ import type { NodeDef } from '../types';
  */
 export const MELEE_PASSIVES = `Melee: Close Quarters, you take ${Math.round((1 - Number(RULES.meleeDamageTakenMult)) * 100)}% less damage; a swing with no foe in reach lunges up to ${RULES.meleeLungeDist} units onto the nearest foe in its arc.`;
 
-/** Points that must already be spent in a branch to unlock each tier (tier 0..4). */
-export const BRANCH_TIER_POINTS = [0, 1, 3, 5, 8] as const;
+/**
+ * Points that must already be spent in a branch to unlock each tier (tier 0..4). Every branch's base active skill is a
+ * free starting grant (tier 0, `starting`), so tier 1 is open from the start and the later gates keep the old pacing
+ * (they were 1/3/5/8 when the base skill cost the first point).
+ */
+export const BRANCH_TIER_POINTS: readonly number[] = [0, 0, 2, 4, 7];
 
 export const DODGE = {
   travel: 2.6,          // world units per dash

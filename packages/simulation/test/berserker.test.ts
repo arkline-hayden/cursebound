@@ -12,10 +12,9 @@ const hit = (s: SimState, slot: number, amount: Big) => {
 };
 
 describe('berserker content', () => {
-  it('Fury resource without regeneration and three deep branches', () => {
+  it('no resource pool, purely cooldown-gated skills, and three deep branches', () => {
     const cls = CLASS_BY_ID[B_];
-    expect(cls.resource.name).toBe('Fury');
-    expect(cls.resource.regenPerSec).toBe(0);
+    expect('resource' in cls).toBe(false);
     for (const b of cls.branches) {
       const bn = NODES.filter((n) => n.classId === B_ && n.branch === b.id);
       expect(bn.length).toBeGreaterThanOrEqual(11);
@@ -30,23 +29,24 @@ describe('berserker content', () => {
 });
 
 describe('berserker kit', () => {
-  it('Fury starts at 0, builds from chops and damage taken, and decays out of combat', () => {
+  it('Rage: connecting chops and health lost cut active cooldowns, never the Avatar', () => {
     const s = arena([B_]);
     const p = s.players[0];
-    expect(p.resource).toBe(0);
+    for (const k of p.skills) { k.charges = 0; k.cooldown = 5; }
     const e = spawn(s, 11.4, 10, { hp: 1e7 });
     const ev = run(s, 60, () => [inp(BTN.ATTACK)]);
-    expect(casts(ev, 'b_chop').length).toBeGreaterThanOrEqual(2);
+    const swings = casts(ev, 'b_chop').length;
+    expect(swings).toBeGreaterThanOrEqual(2);
     expect(hitsOn(ev, e.id)).toBeGreaterThanOrEqual(4);                 // two strikes per swing
-    expect(p.resource).toBeGreaterThanOrEqual(10);
+    // 1s of natural recovery plus 0.1s per connecting swing on the actives; the signature only recovers naturally
+    expect(p.skills[0].cooldown).toBeCloseTo(5 - 1 - 0.1 * swings, 1);
+    expect(p.skills[3].cooldown).toBeCloseTo(4, 1);
     expect(p.vars.b_frenzy).toBeGreaterThanOrEqual(2);
     expect(buildSnapshot(s).players[0].kv?.frenzy).toBe(p.vars.b_frenzy);
-    const f0 = p.resource;
+    const c0 = p.skills[1].cooldown;
     hit(s, 0, p.maxHp.mul(Big.from('0.1')));
-    expect(p.resource).toBeCloseTo(f0 + 10 * (100 / 120) * Number(RULES.meleeDamageTakenMult), 3);   // +1 per 1% of maximum health lost (after armor 20 and Close Quarters)
-    const f1 = p.resource;
-    run(s, 60 * 5);                                                         // 3s grace, then 10/s decay
-    expect(p.resource).toBeLessThan(f1 - 15);
+    expect(p.skills[1].cooldown).toBeCloseTo(c0 - 0.02 * 10 * (100 / 120) * Number(RULES.meleeDamageTakenMult), 3);   // 0.02s per 1% of maximum health lost (after armor 20 and Close Quarters)
+    run(s, 60 * 5);
     expect(p.vars.b_frenzy).toBe(0);
   });
 
@@ -62,16 +62,15 @@ describe('berserker kit', () => {
     expect(swings(true)).toBeGreaterThan(swings(false) * 1.15);
   });
 
-  it('Avatar of Carnage consumes all Fury, scales with it and hardens the Berserker', () => {
+  it('Avatar of Carnage lasts 5s, grows with kills and hardens the Berserker', () => {
     const s = arena([B_]);
     const p = s.players[0];
     spawn(s, 11.5, 10, { hp: 1e7 });
-    p.resource = 100;
+   
     const ev = run(s, 1, () => [inp(BTN.SIG)]);
     const c = casts(ev, 'b_avatar')[0];
     expect(c).toBeTruthy();
-    expect(p.resource).toBeLessThanOrEqual(2);                             // all consumed; the roar's hits re-earn a little
-    expect(c.dx).toBeCloseTo(8, 5);                                        // 4s + 0.04s x 100 Fury
+    expect(c.dx).toBeCloseTo(5, 5);                                        // fixed 5s; kills extend it up to 7s
     expect(p.buffs.some((b) => b.id === 'avatar')).toBe(true);
     expect(s.hazards.some((h) => h.kind === 'b_avatar')).toBe(true);
     const hp0 = p.hp;
@@ -85,7 +84,7 @@ describe('berserker kit', () => {
     const s = arena([B_]);
     give(s, 0, { b_whirlwind: 1 });
     const p = s.players[0];
-    p.resource = 100;
+   
     const e = spawn(s, 12.3, 10, { hp: 1e7 });
     const d0 = dist(e, p);
     const ev = run(s, 150, (t) => [inp(t === 0 ? BTN.S2 | BTN.ATTACK : BTN.ATTACK)]);
@@ -99,7 +98,7 @@ describe('berserker kit', () => {
     const s = arena([B_]);
     give(s, 0, { b_leap: 1, b_aftershock: 2 });
     const p = s.players[0];
-    p.resource = 100;
+   
     const e = spawn(s, 15.8, 10.4, { hp: 1e7 });
     run(s, 1, () => [inp(BTN.S3, 5, 0)]);
     expect(p.iframes).toBeGreaterThan(0.4);
@@ -116,7 +115,7 @@ describe('berserker kit', () => {
     const s = arena([B_, 'vanguard']);
     give(s, 0, { b_leap: 1, b_iron_hide: 2, b_shout: 1 });
     const p = s.players[0];
-    p.resource = 50;
+   
     const e = spawn(s, 12, 10, { hp: 1e7, speed: 3 });
     const ev = run(s, 1, () => [inp(BTN.S3), null]);
     expect(casts(ev, 'b_shout').length).toBe(1);
@@ -131,7 +130,7 @@ describe('berserker kit', () => {
   it('Cataclysm sends three quake rings that stun', () => {
     const s = arena([B_]);
     give(s, 0, { b_leap: 1, b_heavy_landing: 2, b_cataclysm: 1 });
-    s.players[0].resource = 100;
+   
     const near = spawn(s, 15.5, 11, { hp: 1e7 });
     const far = spawn(s, 15, 14.2, { hp: 1e7 });
     const ev = run(s, 90, (t) => [inp(t === 0 ? BTN.S3 : 0, 5, 0)]);
@@ -143,7 +142,7 @@ describe('berserker kit', () => {
   it('Executioner\'s Cleave lunges and executes a single wounded enemy', () => {
     const s = arena([B_]);
     give(s, 0, { b_whirlwind: 1, b_brutality: 2, b_executioner: 1 });
-    s.players[0].resource = 100;
+   
     const e = spawn(s, 14.5, 10, { hp: 1e9 });
     e.cohort.front = Big.from('8.8e8');                                   // 12% health left
     const ev = run(s, 30, (t) => [inp(t === 0 ? BTN.S2 : 0, 1, 0)]);
@@ -156,7 +155,7 @@ describe('berserker kit', () => {
     const s = arena([B_]);
     give(s, 0, { b_bloodlust: 1 });
     const p = s.players[0];
-    p.resource = 100;
+   
     p.hp = p.maxHp.mul(Big.from('0.4'));
     spawn(s, 11.4, 10, { hp: 1e9 });
     run(s, 1, () => [inp(BTN.S1)]);
@@ -180,28 +179,28 @@ describe('berserker kit', () => {
     const s2 = arena([B_]);
     give(s2, 0, { b_bloodlust: 1, b_savagery: 3, b_red_mist: 3, b_deathless: 1 });
     const q = s2.players[0];
-    q.resource = 80;
+   
     const ev2: Parameters<typeof hitPlayer>[1] = [];
     q.iframes = 0;
     hitPlayer(s2, ev2, q, q.maxHp.mul(Big.from(3)), { attack: 'test', source: 'test', fromX: q.x + 1, fromY: q.y, dtype: 'physical' });
     expect(q.lifeState).toBe('alive');
-    expect(casts(ev2, 'b_deathless')[0]?.dx).toBe(30);                    // 50 Fury spent before the pain refuels it
-    q.resource = 10; q.iframes = 0; q.hp = q.maxHp;
+    expect(casts(ev2, 'b_deathless')[0]?.dx).toBe(40);                    // recharges in 40s
+    q.iframes = 0; q.hp = q.maxHp;
     hit(s2, 0, q.maxHp.mul(Big.from(3)));
     expect(q.lifeState).toBe('downed');
   });
 
-  it('Bounding Fury grants a second, free leap', () => {
+  it('Bounding Fury grants a second, harder-landing leap', () => {
     const s = arena([B_]);
     give(s, 0, { b_leap: 1, b_heavy_landing: 2, b_bounding: 1 });
     const p = s.players[0];
     expect(p.skills[2].maxCharges).toBe(2);
-    p.resource = 25;
+   
     run(s, 1, () => [inp(BTN.S3, 3, 0)]);
-    const after1 = p.resource;
+    expect(p.vars.b_bfEmp).toBe(0);
     run(s, 40);
     run(s, 1, () => [inp(BTN.S3, -3, 0)]);
-    expect(p.resource).toBeCloseTo(after1, 5);
+    expect(p.vars.b_bfEmp).toBe(1);                                         // the second leap within 3s lands for x1.3
     expect(p.skills[2].charges).toBe(0);
   });
 
@@ -249,11 +248,11 @@ describe('templar + berserker in real runs', () => {
     s.fate.factors['player.attackFrequency'] = Big.from('1e300');
     s.fate.factors['player.damage'] = Big.from('1e500');
     s.fate.factors['player.projectileCount'] = Big.from('1e40');
-    s.fate.factors['player.resourceRegen'] = Big.from('1e60');
+    s.fate.factors['player.recoveryRate'] = Big.from('1e60');
     s.fate.factors['enemy.damage'] = Big.from('1e400');
     s.stateVersion++;
     for (let i = 0; i < 8; i++) spawn(s, 12 + (i % 4), 9 + Math.floor(i / 4) * 3, { hp: 1e6, count: 1 + i * 100, speed: 2 });
-    s.players.forEach((p) => { p.iframes = 0; p.resource = 100; });
+    s.players.forEach((p) => { p.iframes = 0; });
     runBot(s, { maxTicks: 60 * 12 });
     const snap = JSON.stringify(buildSnapshot(s));
     expect(snap).not.toMatch(/NaN|Infinity/);

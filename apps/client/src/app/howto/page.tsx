@@ -60,7 +60,7 @@ export default function HowTo() {
                 <div className="row" style={{ gap: 16, flexWrap: 'nowrap' }}><ClassEmblem classId={c.id as Parameters<typeof ClassEmblem>[0]['classId']} size={32} /><h3 style={{ margin: 0 }}>{c.name}</h3></div>
                 <p className="howto-role">{c.role}</p>
                 <p className="muted">{c.tagline}</p>
-                <p>Life {wholeNum(c.base.maxHealth)} · armor {c.base.armor} · {c.resource.name} {c.resource.max}</p>
+                <p>Life {wholeNum(c.base.maxHealth)} · armor {c.base.armor}</p>
                 <p className="faint">Branches: {c.branches.map((b) => b.name).join(', ')}</p>
               </div>
             ))}

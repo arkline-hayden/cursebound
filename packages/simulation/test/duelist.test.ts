@@ -13,13 +13,14 @@ describe('duelist: basic attack', () => {
     const a = arena('duelist', []);
     const p = a.s.players[0];
     const e = spawnAt(a, 'guardian', 1.2, 0, 6);
-    p.resource = 0;
+    for (const k of p.skills) { k.charges = 0; k.cooldown = 30; }
+   
     run(a, 75, ACTION.ATTACK, 75, aimAt(a, e));
     expect(damaged(e)).toBe(true);
     const swings = casts(a, 'd_twin_fangs').length + casts(a, 'd_fang_finisher').length;
     expect(swings).toBeGreaterThanOrEqual(3);            // 3.2 attacks per second
     expect(casts(a, 'd_fang_finisher').length).toBeGreaterThanOrEqual(1);
-    expect(p.resource).toBeGreaterThan(7 * 1.25 + 4);      // regen alone gives ~8.75; hits add 2-4 per swing
+    expect(p.skills[0].cooldown).toBeLessThan(30 - 75 / 60 - 0.06 * swings + 1e-6);   // Momentum: 0.06s (0.12s on a crit) off per connecting swing
     expect(p.vars.ui_combo).toBeGreaterThanOrEqual(3);
     expect(buildSnapshot(a.s).players[0].kv?.combo).toBe(p.vars.ui_combo);
   });
@@ -109,13 +110,12 @@ describe('duelist: Shadow', () => {
     run(a, 120);
     expect(casts(a, 'd_fx_mark_burst')).toHaveLength(1);
   });
-  it('Shadow Clone mirrors basic attacks; Reaper\'s Path is free but costs health', () => {
+  it('Shadow Clone mirrors basic attacks; Reaper\'s Path costs health', () => {
     const a = arena('duelist', ['d_shadowstep', 'd_fleet', 'd_fleet', 'd_fleet', 'd_twin_shadows', 'd_umbral_edge', 'd_umbral_edge', 'd_umbral_edge', 'd_shadow_clone', 'd_reapers_path']);
     const p = a.s.players[0];
     const e = spawnAt(a, 'guardian', 3, 0, 6);
-    const res0 = p.resource, hp0 = p.hp;
+    const hp0 = p.hp;
     run(a, 2, ACTION.SKILL2, 1, aimAt(a, e));
-    expect(p.resource).toBeGreaterThanOrEqual(res0 - 1e-9);
     expect(p.hp.lt(hp0)).toBe(true);
     expect(a.s.hazards.some((h) => h.kind === 'd_clone')).toBe(true);
     run(a, 30, ACTION.ATTACK, 30, aimAt(a, e));
@@ -134,20 +134,20 @@ describe('duelist: Shadow', () => {
 });
 
 describe('duelist: Tempo', () => {
-  it('Riposte parries a melee windup: counter, stun, Momentum and Combo', () => {
+  it('Riposte parries a melee windup: counter, stun, cooldown cuts and Combo', () => {
     const a = arena('duelist', ['d_riposte']);
     const p = a.s.players[0];
     const e = spawnAt(a, 'pursuer', 1.0, 0, 4, false);
     e.cohort.unitHp = Big.from(600);   // sturdy test foe, independent of enemy tuning
     e.attack = { attackId: 'bite', stage: 'windup', timer: 0.2, ox: e.x, oy: e.y, dx: -a.dir[0], dy: -a.dir[1], tx: p.x, ty: p.y, hitSlots: [], telegraphId: 0 };
     e.state = 'windup';
-    p.resource = 40;
+   
     run(a, 2, ACTION.SKILL3, 1, aimAt(a, e));
     expect(casts(a, 'd_fx_parry')).toHaveLength(1);
     expect(damaged(e)).toBe(true);
     expect(e.staggerUntil).toBeGreaterThan(a.s.tick);
     expect(e.attack).toBeNull();
-    expect(p.resource).toBeGreaterThan(40 - 15 + 19);
+    expect(p.skills[0].cooldown).toBe(0);                       // nothing recharging to cut; parry still lands
     expect(p.vars.ui_combo).toBeGreaterThanOrEqual(3);
   });
   it('Riposte reflects an incoming projectile', () => {

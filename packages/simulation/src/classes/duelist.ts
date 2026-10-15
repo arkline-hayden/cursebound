@@ -4,7 +4,7 @@ import { addDot, addStagger, cohortHpFrac, healPlayer, hitEnemy, mitigationFacto
 import { inCone, inLine, moveCircle, norm, q, rayDistance } from '../geometry';
 import { registerClassHooks } from '../hooks';
 import { nearestFloor } from '../map';
-import { areaCoverage, cosHalf, flinch, knockback, livingEnemies, makeHazard } from '../players';
+import { areaCoverage, cosHalf, cutCooldowns, flinch, knockback, livingEnemies, makeHazard } from '../players';
 import { B, ONE, breakdown, hitDamage, playerDerived, toFloatClamped, treeFactor } from '../stats';
 import { ACTION, type EnemyState, type Hazard, type PlayerState, type Projectile, type SimEvent, type SimState } from '../types';
 
@@ -31,6 +31,8 @@ const FAMILY: Record<string, 'd_rend' | 'd_shadowstep' | 'd_riposte'> = {
   d_riposte: 'd_riposte', d_mirror_guard: 'd_riposte', d_hundred_fangs: 'd_riposte',
 };
 const SLOT = { d_rend: 0, d_shadowstep: 1, d_riposte: 2 } as const;
+/** Momentum: seconds cut from recharging skills by a connecting swing / critical swing / parry / Execution kill. */
+const MOMENTUM = { swing: 0.06, crit: 0.12, parry: 1, execution: 1 } as const;
 const MELEE_KINDS = new Set(['melee', 'charge', 'sweep', 'slam']);
 
 // ---------------- small helpers ----------------
@@ -72,9 +74,9 @@ function addCombo(state: SimState, p: PlayerState, n: number) {
   setCombo(p, Math.min(comboMax(p), combo(p) + n));
   p.vars.comboT = state.tick;
 }
-function gainMomentum(state: SimState, p: PlayerState, n: number) {
-  const max = playerDerived(state, p).resourceMax;
-  p.resource = Math.min(max, p.resource + n);
+/** Momentum (no resource): cut `sec` from every recharging skill except hotbar slot `except`. */
+function gainMomentum(p: PlayerState, sec: number, except = -1) {
+  cutCooldowns(p, sec, except);
 }
 
 function bleeding(state: SimState, e: EnemyState, slot: number) {
@@ -275,7 +277,7 @@ function onArrive(state: SimState, p: PlayerState) {
 function reaperCost(p: PlayerState) {
   if (has(p, 'd_reapers_path')) p.hp = p.hp.sub(p.hp.mul(B('0.05')));
 }
-const reaperMult = (p: PlayerState) => (has(p, 'd_reapers_path') ? B('1.4') : ONE);
+const reaperMult = (p: PlayerState) => (has(p, 'd_reapers_path') ? B('1.5') : ONE);
 
 // ---------------- Edge ----------------
 
@@ -466,7 +468,7 @@ function counter(state: SimState, ev: SimEvent[], p: PlayerState, e: EnemyState,
 }
 
 function onParry(state: SimState, ev: SimEvent[], p: PlayerState, x: number, y: number) {
-  gainMomentum(state, p, 20);
+  gainMomentum(p, MOMENTUM.parry, SLOT.d_riposte);
   addCombo(state, p, 3);
   if (has(p, 'd_perfect_guard')) {
     shieldPlayer(state, ev, p, p.maxHp.mul(B('0.12')));
@@ -659,7 +661,7 @@ registerClassHooks('duelist', {
     if (hits > 0) {
       v.fangChain = chain + 1;
       v.fangLast = t;
-      gainMomentum(state, p, 2 + (v.critT === t ? 2 : 0));
+      gainMomentum(p, v.critT === t ? MOMENTUM.crit : MOMENTUM.swing);
       addCombo(state, p, 1);
       if (ambush) v.ambushUntil = 0;
     }
@@ -715,7 +717,7 @@ registerClassHooks('duelist', {
     if (skillId === 'd_execution' && p.vars.execRefund) {
       p.vars.execRefund = 0;
       refundCharge(p, 'd_rend', true);
-      gainMomentum(state, p, 15);
+      gainMomentum(p, MOMENTUM.execution, SLOT.d_rend);
     }
   },
 
@@ -830,10 +832,6 @@ registerClassHooks('duelist', {
 
   extraCharges(p, skillId) {
     return FAMILY[skillId] === 'd_shadowstep' && has(p, 'd_twin_shadows') ? 1 : 0;
-  },
-
-  costFactor(_state, p, skillId) {
-    return FAMILY[skillId] === 'd_shadowstep' && has(p, 'd_reapers_path') ? 0 : 1;
   },
 
   onRoundStart(state) {

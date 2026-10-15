@@ -17,7 +17,7 @@ export const STATS: StatDef[] = [
   { id: 'player.critPotency', name: 'Critical damage potency', scope: 'player', representation: 'quantity', group: 'party_damage',
     affects: ['derived.expectedHit'], semantics: 'Multiplies the total critical multiplier (Appendix A2: x2 total becomes x6 with +200%).', applicability: 'Critical hits only', fateEligible: true },
   { id: 'player.recoveryRate', name: 'Player recovery rate', scope: 'player', representation: 'recovery', group: 'party_damage',
-    affects: ['derived.cooldown'], semantics: 'Cooldown recovery speed. +100% recovery halves cooldowns; resource costs still apply.', applicability: 'Active and signature skill cooldowns, dodge', fateEligible: true },
+    affects: ['derived.cooldown'], semantics: 'Cooldown recovery speed. +100% recovery halves cooldowns. Skills are purely cooldown-gated (no resource).', applicability: 'Active and signature skill cooldowns, dodge', fateEligible: true },
   { id: 'player.projectileCount', name: 'Player projectile count', scope: 'player', representation: 'count', group: 'mobility_projectiles',
     affects: ['derived.rawDps'], semantics: 'Logical projectile multiplicity per shot. Rendering shows representative projectiles; each carries its logical weight.', applicability: 'Projectile skills (Spark, Sundering path wave)', fateEligible: true },
   { id: 'player.decayDamage', name: 'Player decay damage', scope: 'player', representation: 'quantity', group: 'party_damage',
@@ -28,11 +28,7 @@ export const STATS: StatDef[] = [
     affects: ['derived.shieldCap'], semantics: 'Multiplies shield generation and the shield cap.', applicability: 'Shields from Guard, Static shell, Standard bearer', fateEligible: true },
   { id: 'player.armor', name: 'Player armor', scope: 'player', representation: 'armor', group: 'health_recovery',
     affects: ['derived.incomingFactor'], semantics: 'Armor A reduces incoming damage by factor K/(K+A). Doubling armor never grants immunity.', applicability: 'All incoming damage', fateEligible: true },
-  { id: 'player.resourceRegen', name: 'Player resource regeneration', scope: 'player', representation: 'rate', group: 'health_recovery',
-    affects: ['derived.castRate'], semantics: 'Resource regained per second.', applicability: 'Resolve (Vanguard) and Mana (Arcanist)', fateEligible: true },
   // Tree-only player stats
-  { id: 'player.maxResource', name: 'Player maximum resource', scope: 'player', representation: 'quantity', group: 'health_recovery',
-    affects: ['derived.castRate'], semantics: 'Resource pool size.', applicability: 'Resource', fateEligible: false },
   { id: 'player.physicalDamage', name: 'Player physical damage', scope: 'player', representation: 'quantity', group: 'party_damage',
     affects: ['derived.hitDamage'], semantics: 'Multiplies physical damage.', applicability: 'Physical damage', fateEligible: false },
   { id: 'player.emberDamage', name: 'Player ember damage', scope: 'player', representation: 'quantity', group: 'party_damage',
@@ -45,8 +41,6 @@ export const STATS: StatDef[] = [
     affects: ['derived.hitDamage'], semantics: 'Multiplies frost damage (including Frostbite).', applicability: 'Frost damage (Cryomancer)', fateEligible: false },
   { id: 'player.burnRate', name: 'Player burn rate', scope: 'player', representation: 'rate', group: 'party_damage',
     affects: ['derived.hitDamage'], semantics: 'Multiplies burn damage per second.', applicability: 'Burns', fateEligible: false },
-  { id: 'player.emberCost', name: 'Player ember resource cost', scope: 'player', representation: 'quantity', group: 'party_damage',
-    affects: ['derived.castRate'], semantics: 'Multiplies ember skill costs.', applicability: 'Ember skills', fateEligible: false },
   { id: 'player.reviveSpeed', name: 'Player revive speed', scope: 'player', representation: 'rate', group: 'health_recovery',
     affects: [], semantics: 'Revive channel speed.', applicability: 'Reviving allies', fateEligible: false },
   { id: 'player.guardHeal', name: 'Guard healing', scope: 'player', representation: 'quantity', group: 'health_recovery',
@@ -69,8 +63,6 @@ export const STATS: StatDef[] = [
   // Templar / Berserker (tree-only, base 1)
   { id: 'player.holyHealing', name: 'Holy healing', scope: 'player', representation: 'quantity', group: 'health_recovery',
     affects: ['derived.healAmount', 'derived.shieldCap'], semantics: 'Multiplies the healing and shields a Templar grants (consecrated ground, Dawnbreak, Beacon, Vows, Guardian\'s Path).', applicability: 'Templar healing and shields', fateEligible: false },
-  { id: 'player.furyGeneration', name: 'Fury generation', scope: 'player', representation: 'rate', group: 'party_damage',
-    affects: ['derived.castRate'], semantics: 'Multiplies Fury the Berserker gains from hits and damage taken (also scaled by Player resource regeneration factors).', applicability: 'Berserker Fury', fateEligible: false },
 
   // ---- Enemy ----
   { id: 'enemy.maxHealth', name: 'Enemy maximum health', scope: 'enemy', representation: 'quantity', group: 'enemy_health',
@@ -105,8 +97,8 @@ export const STAT_BY_ID: Record<string, StatDef> = Object.fromEntries(STATS.map(
 
 export function isKnownStat(id: string): boolean {
   if (STAT_BY_ID[id]) return true;
-  // skill-scoped stats: skill.<skillId>.<damage|cost|cooldown|radius>
-  return /^skill\.[a-z0-9_]+\.(damage|cost|cooldown|radius)$/.test(id);
+  // skill-scoped stats: skill.<skillId>.<damage|cooldown|radius>
+  return /^skill\.[a-z0-9_]+\.(damage|cooldown|radius)$/.test(id);
 }
 
 export const DERIVED_NODES: Record<string, { name: string; affects: string[] }> = {
@@ -115,7 +107,6 @@ export const DERIVED_NODES: Record<string, { name: string; affects: string[] }> 
   'derived.expectedHit': { name: 'Expected hit', affects: ['derived.rawDps'] },
   'derived.rawDps': { name: 'Raw DPS', affects: ['derived.netDps'] },
   'derived.cooldown': { name: 'Skill cooldowns', affects: ['derived.rawDps'] },
-  'derived.castRate': { name: 'Sustainable cast rate', affects: ['derived.rawDps'] },
   'derived.enemyHealth': { name: 'Enemy health', affects: ['derived.killTime', 'derived.enemyRegen'] },
   'derived.enemyRegen': { name: 'Enemy regeneration per second', affects: ['derived.netDps'] },
   'derived.enemyMitigation': { name: 'Enemy damage taken factor', affects: ['derived.netDps'] },

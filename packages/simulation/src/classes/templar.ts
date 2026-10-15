@@ -8,7 +8,7 @@ import { areaCoverage, cosHalf, flinch, livingEnemies, newProjectileId, revivePl
 import { B, ONE, playerDerived } from '../stats';
 import type { EnemyState, Hazard, PlayerState, Projectile, SimEvent, SimState } from '../types';
 import {
-  DT, MV_DASH, addHazard, castEv, endHazard, enemiesIn, enemyById, findHazard, followAttachment, gainResource, has, hitCircle, hitOne,
+  DT, MV_DASH, addHazard, castEv, endHazard, enemiesIn, enemyById, findHazard, followAttachment, has, hitCircle, hitOne,
   kitGlobal, landingPoint, moving, pull, rank, refundCooldown, registerFamily, shove, skillDmg, skyPoint, startDash, startLeap, statBig,
   stepMove, stun, subDmg, ticks, vuln,
 } from './tbkit';
@@ -34,7 +34,7 @@ const BR = { radiance: 0, judgment: 1, aegis: 2 } as const;
 const TAG = { CHARGE: 11, AEGIS: 12, INTERCESSION: 13 } as const;
 
 const T = {
-  basic: { range: 2.0, arc: 110, zeal: 4, every: 3, shockRange: 2.9, shockArc: 120, shockCoef: '0.9', shockStagger: 20 },
+  basic: { range: 2.0, arc: 110, every: 3, shockRange: 2.9, shockArc: 120, shockCoef: '0.9', shockStagger: 20 },
   jd: { range: 6, delay: 0.35, pullR: 3.5, pull: 2.0, radius: 3, stun: 1.5, stagger: 180, groundSec: 5 },
   ground: { every: 0.5, coef: '0.35', heal: '0.012', radius: 2.6, sec: 5 },
   blind: { stun: 1.0, stagger: 40, vuln: '1.15', sec: 4 },
@@ -45,7 +45,7 @@ const T = {
   hammer: { back: 16, catchR: 0.8, shepherd: 1.5, shepherdStagger: 25, hover: 1.2, spinEvery: 0.2, spinR: 1.5, spinCoef: '0.35', hitStagger: 15 },
   skyfall: { min: 2, max: 7, coef: '2.2', radius: 2, stun: 0.8, stagger: 50 },
   smite: { range: 9, near: 3.5, targets: 3, splash: 1.0, stun: 0.5, stagger: 30 },
-  condemn: { sec: 6, perRank: 0.8, radius: 1.8, verdictBelow: 0.35, verdict: '2.5', verdictStagger: 40, cd: 0.5, zeal: 3, maxInq: 3, spread: 3, spreadR: 3 },
+  condemn: { sec: 6, perRank: 0.8, radius: 1.8, verdictBelow: 0.35, verdict: '2.5', verdictStagger: 40, cd: 0.75, maxInq: 3, spread: 3, spreadR: 3 },
   heaven: { count: 3, range: 7, coef: '1', radius: 1.2, gap: 0.2 },
   charge: { dist: 5, speed: 18, hitR: 1.0, push: 1.2, stagger: 30, taken: 0.5, slamR: 1.8, slamCoef: 0.8, slamStun: 0.5, slamStagger: 30, pathShield: '0.1', pathR: 2, juggR: 2, juggCoef: '1' },
   dome: { radius: 3, sec: 4, taken: 0.6 },
@@ -154,7 +154,7 @@ function detonate(state: SimState, ev: SimEvent[], p: PlayerState, e: EnemyState
   hitCircle(state, ev, p, x, y, T.condemn.radius, dmg, { dtype: 'astral', skillId: 't_condemn', generation: 1, stagger: has(p, 't_final_verdict') ? T.condemn.verdictStagger : 10 });
   castEv(ev, p, 't_condemn_burst', x, y, stacks, verdict ? 1 : 0);
   const m = rank(p, 't_momentum');
-  if (m > 0) { refundCooldown(p, BR.judgment, T.condemn.cd * m); gainResource(state, p, T.condemn.zeal * m); }
+  if (m > 0) refundCooldown(p, BR.judgment, T.condemn.cd * m);
   if (has(p, 't_inquisitor')) {
     let n = 0;
     for (const o of enemiesIn(state, x, y, T.condemn.spreadR)) {
@@ -173,15 +173,12 @@ function basic(state: SimState, ev: SimEvent[], p: PlayerState, k: Big) {
   const hs = SKILL_BY_ID['t_hammer'].shape;
   const R = hs.kind === 'arc' ? hs.range : T.basic.range;
   const ch = cosHalf(hs.kind === 'arc' ? hs.arcDeg : T.basic.arc);
-  let hitAny = false;
   for (const e of livingEnemies(state)) {
     if (!inCone(p.x, p.y, p.aimX, p.aimY, R, ch, e.x, e.y, e.radius)) continue;
     hitEnemy(state, ev, e, dmg, k, { dtype: 'physical', srcSlot: p.slot, skillId: 't_hammer', fromX: p.x, fromY: p.y, coverage: areaCoverage(e, R), allowCrit: true });
     flinch(state, e, p.x, p.y, 0.2);
-    hitAny = true;
   }
   castEv(ev, p, 't_hammer', p.x, p.y, p.aimX, p.aimY, k.gt(ONE) ? k.toCompact() : undefined);
-  if (hitAny) gainResource(state, p, T.basic.zeal);
   // radiant shockwave on every third swing (grouped packets carry their share of shockwaves)
   let waves: Big;
   if (k.lte(B(1000000))) {

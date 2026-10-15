@@ -3,7 +3,7 @@ import {
   BRANCH_TIER_POINTS, CARD_BY_ID, CLASS_BY_ID, DODGE, cardById, cardMechanics, cardStatEffects, NODE_BY_ID, RULES, SKILL_BY_ID, TICK_RATE, TICK_SEC, TUTORIAL_CARD, defaultDeck, isBossRound,
 } from '@cursebound/content';
 import { separateEnemies, stepEnemy, stepEnemyHazard, stepEnemyProjectile } from './ai';
-import { bossPhaseAdds, createEnemy, flushPendingSpawns, setupRound, spawnWave } from './director';
+import { createEnemy, flushPendingSpawns, setupRound, spawnWave } from './director';
 import { addScore, applyCard, castVote, drawOffer, partialAward, refreshMaxHp, resolveVotes, roundAward, voteCounts, voteShouldResolve } from './fate';
 import { processReactions, stepPlayer, stepPlayerHazard, stepPlayerProjectile } from './players';
 import { seedRng } from './rng';
@@ -47,9 +47,9 @@ function newPlayer(e: RosterEntry): PlayerState {
   for (const id of cls.nodes) if (NODE_BY_ID[id].starting) ranks[id] = NODE_BY_ID[id].rankLimit;
   const p: PlayerState = {
     slot: e.slot, profileId: e.profileId, name: e.name, classId: e.classId, connected: true, disconnectedAtTick: null,
-    ranks, skillPoints: RULES.startingSkillPoints, spentByBranch: {}, mastery: { damage: 0, health: 0, regen: 0 }, ready: false,
+    ranks, skillPoints: RULES.startingSkillPoints, spentByBranch: {}, mastery: { damage: 0, health: 0, recovery: 0 }, ready: false,
     x: 0, y: 0, vx: 0, vy: 0, aimX: 1, aimY: 0, aimDist: 3, facing: 0,
-    hp: B(cls.base.maxHealth), maxHp: B(cls.base.maxHealth), shield: ZERO, resource: cls.resource.max,
+    hp: B(cls.base.maxHealth), maxHp: B(cls.base.maxHealth), shield: ZERO,
     lifeState: 'alive', downTimer: 0, downsThisRound: 0, selfReviveBlock: -1, selfReviveChannel: 0, reviveProgress: 0, reviverSlot: null,
     dodgeTimer: 0, dodgeCooldown: 0, dodgeCharges: DODGE.charges, surgeTimer: 0, dodgeDirX: 1, dodgeDirY: 0, iframes: 0, guardTimer: 0, guardMoved: false, guardAbsorbed: ZERO,
     attackWork: 0, attackAnim: 0, castAnim: 0, lastSkill: null, skills: [], buffs: [], vulnerability: 0, stormCasts: [], vars: {}, gear: {},
@@ -297,7 +297,6 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
   // deaths -> progression
   if (state.bossPhaseEvents.length) {
     for (const ph of state.bossPhaseEvents) {
-      bossPhaseAdds(state, ph);
       enc.completedWeight = Math.max(enc.completedWeight, ph);   // finishing phase i credits its fixed weight once
       ev.push({ t: 'objective', groupId: 0, weight: 1, completed: enc.completedWeight, total: enc.objectiveTotal });
       ev.push({ t: 'domain', type: 'objective_completed', payload: { round: state.round, completedWeight: enc.completedWeight, total: enc.objectiveTotal, bossPhase: ph } });

@@ -99,7 +99,7 @@ describe('boss grand entrance (cinematicUntilTick)', () => {
     s.projectiles.push({ id: s.nextId++, kind: 'lob', owner: 'enemy', ownerId: boss.id, x: p0.x + 4, y: p0.y, vx: 0, vy: 0, radius: 0.2, range: 8, damage: Big.from(40), weight: Big.ONE, dtype: 'ember', pierce: 0, hitIds: [], skillId: 'lob', crit: false, lobTarget: { x: p0.x, y: p0.y, radius: 1.2, landTick: s.tick + 30 }, bornTick: s.tick });
     s.telegraphs.push({ id: s.nextId++, ownerId: boss.id, shape: { kind: 'circle', radius: 2 }, x: p0.x, y: p0.y, dx: 1, dy: 0, startTick: s.tick, releaseTick: s.tick + 20, attack: 'slam' });
     const before = {
-      hp: s.players.map((p) => p.hp.toString()), pos: s.players.map((p) => [p.x, p.y]), res: s.players.map((p) => p.resource),
+      hp: s.players.map((p) => p.hp.toString()), pos: s.players.map((p) => [p.x, p.y]), cds: s.players.map((p) => p.skills.map((k) => k.cooldown)),
       boss: [boss.x, boss.y, boss.state, boss.cohort.spread.toString(), JSON.stringify(boss.cooldowns), boss.patternStep],
       proj: s.projectiles.map((pr) => [pr.x, pr.y, pr.range, pr.lobTarget ? pr.lobTarget.landTick - s.tick : -1]),
       hazLeft: s.hazards.map((h) => [h.untilTick - s.tick, h.nextTick - s.tick]),
@@ -114,7 +114,7 @@ describe('boss grand entrance (cinematicUntilTick)', () => {
     expect(seen.filter((e) => e.t === 'hit' || e.t === 'cast' || e.t === 'enemy_attack' || e.t === 'dodge' || e.t === 'downed')).toEqual([]);
     expect(s.players.map((p) => p.hp.toString())).toEqual(before.hp);
     expect(s.players.map((p) => [p.x, p.y])).toEqual(before.pos);
-    expect(s.players.map((p) => p.resource)).toEqual(before.res);
+    expect(s.players.map((p) => p.skills.map((k) => k.cooldown))).toEqual(before.cds);
     expect([boss.x, boss.y, boss.state, boss.cohort.spread.toString(), JSON.stringify(boss.cooldowns), boss.patternStep]).toEqual(before.boss);
     expect(s.projectiles.map((pr) => [pr.x, pr.y, pr.range, pr.lobTarget ? pr.lobTarget.landTick - s.tick : -1])).toEqual(before.proj);
     expect(s.hazards.map((h) => [h.untilTick - s.tick, h.nextTick - s.tick])).toEqual(before.hazLeft);

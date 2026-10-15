@@ -3,13 +3,14 @@ import { healPlayer } from './combat';
 import { registerGlobalHooks } from './hooks';
 import { nearestFloor } from './map';
 import { nextFloat } from './rng';
-import { B, playerDerived } from './stats';
+import { cutCooldowns } from './players';
+import { B } from './stats';
 import type { EnemyState, PlayerState, Pickup, SimEvent, SimState } from './types';
 
 // Ground pickups (generic `state.pickups`, `kind` string). Built-in kinds:
 //   'potion' — a healing potion: heals the member who walks over it by a solid fraction of max health and nearby
 //              allies a little. Dropped occasionally by ordinary foes, more often by champions, always by rares.
-//   'orb'    — a resource orb: restores resource the same way.
+//   'orb'    — a haste orb: cuts the remaining cooldown of every recharging skill (RULES.orbCooldownSec), allies a little.
 // Only members who need the effect attract or collect a pickup (a full-health hero leaves the potion for an ally).
 // The authority decides collection; clients only render and react to the 'pickup' event. Other modules may store
 // their own kinds here; this module ignores kinds it does not know except for expiry (untilTick > 0).
@@ -37,7 +38,7 @@ export function dropPickup(state: SimState, kind: string, x: number, y: number, 
 function needs(state: SimState, p: PlayerState, kind: string): boolean {
   if (p.lifeState !== 'alive') return false;
   if (kind === PICKUP_KINDS.potion) return p.hp.lt(p.maxHp);
-  if (kind === PICKUP_KINDS.orb) return p.resource < playerDerived(state, p).resourceMax - 1e-6;
+  if (kind === PICKUP_KINDS.orb) return p.skills.some((s) => s.skillId && s.charges < s.maxCharges);
   return false;
 }
 
@@ -51,15 +52,12 @@ function collect(state: SimState, ev: SimEvent[], pk: Pickup, p: PlayerState) {
       healPlayer(state, ev, a, a.maxHp.mul(B(RULES.potionAllyHealFrac)));
     }
   } else if (pk.kind === PICKUP_KINDS.orb) {
-    const give = (who: PlayerState, frac: number) => {
-      const max = playerDerived(state, who).resourceMax;
-      who.resource = Math.min(max, who.resource + max * frac);
-    };
-    give(p, RULES.orbResourceFrac * (pk.tier > 0 ? 1.5 : 1));
+    const give = (who: PlayerState, sec: number) => cutCooldowns(who, sec);
+    give(p, RULES.orbCooldownSec * (pk.tier > 0 ? 1.5 : 1));
     for (const a of state.players) {
       if (a === p || a.lifeState !== 'alive') continue;
       if ((a.x - pk.x) ** 2 + (a.y - pk.y) ** 2 > RULES.potionAllyRange ** 2) continue;
-      give(a, RULES.orbAllyResourceFrac);
+      give(a, RULES.orbAllyCooldownSec);
     }
   }
 }

@@ -15,49 +15,49 @@ const sk = (s: Omit<SkillDef, 'classId' | 'compressionSupport' | 'icon'> & { ico
 
 /** Internal follow-up effects (not slotted): own coefficients so tree modifiers can target them. */
 const hidden = (id: string, name: string, coef: string, shape: SkillDef['shape'], description: string, icon: string): SkillDef =>
-  sk({ id, name, slot: 'active', damageType: 'frost', damageCoef: coef, resourceCost: 0, cooldownSec: 0, charges: 1, shape, description, icon });
+  sk({ id, name, slot: 'active', damageType: 'frost', damageCoef: coef, cooldownSec: 0, charges: 1, shape, description, icon });
 
 export const SKILLS: SkillDef[] = [
-  sk({ id: 'c_ice_shard', name: 'Ice Shard', slot: 'basic', damageType: 'frost', damageCoef: '1', resourceCost: 0, cooldownSec: 0, charges: 1,
+  sk({ id: 'c_ice_shard', name: 'Ice Shard', slot: 'basic', damageType: 'frost', damageCoef: '1', cooldownSec: 0, charges: 1,
     shape: { kind: 'projectile', speed: 13, radius: 0.22, range: 9, pierce: 1, spreadDeg: 10 },
     description: 'A shard of ice that passes through 1 enemy and Chills targets by 30% for 1.5s.' }),
-  sk({ id: 'c_absolute_zero', name: 'Absolute Zero', slot: 'signature', damageType: 'frost', damageCoef: '3', resourceCost: 35, cooldownSec: 14, charges: 1,
+  sk({ id: 'c_absolute_zero', name: 'Absolute Zero', slot: 'signature', damageType: 'frost', damageCoef: '3', cooldownSec: 10, charges: 1,
     shape: { kind: 'circle', radius: 4.2, selfCentered: true, range: 0 },
     description: 'A blizzard nova (radius 4.2) deals 3x frost damage to every enemy. Frozen enemies Shatter first, then everything hit is Frozen for 1.6s. Leaves Permafrost (radius 4.2, 3s) that Chills by 40%. Bosses take 200 stagger.' }),
   // ---- Glacier ----
-  sk({ id: 'c_ice_wall', name: 'Ice Wall', slot: 'active', damageType: 'frost', damageCoef: '0.5', resourceCost: 20, cooldownSec: 8, charges: 1,
+  sk({ id: 'c_ice_wall', name: 'Ice Wall', slot: 'active', damageType: 'frost', damageCoef: '0.5', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'line', length: 5, width: 0.6, duration: 4, tickInterval: 0.5 },
     description: 'Raise a 5-unit wall of ice across your aim, 2.5 units ahead, for 4s. Enemies cannot walk through it (bosses can); enemies touching it take 0.5x frost damage every 0.5s and are Chilled 50% for 2s.' }),
-  sk({ id: 'c_glacial_prison', name: 'Glacial Prison', slot: 'active', damageType: 'frost', damageCoef: '0.5', resourceCost: 25, cooldownSec: 10, charges: 1,
+  sk({ id: 'c_glacial_prison', name: 'Glacial Prison', slot: 'active', damageType: 'frost', damageCoef: '0.5', cooldownSec: 7, charges: 1,
     shape: { kind: 'aura', radius: 2.6, duration: 4 },
     description: 'A ring of ice (radius 2.6) at the aimed point for 4s. Enemies inside when it forms are Frozen for 1.2s; the ring keeps enemies in and out, Chills 50% and deals 0.5x frost damage every 0.5s on contact.' }),
-  sk({ id: 'c_frost_effigy', name: 'Frost Effigy', slot: 'active', damageType: 'frost', damageCoef: '0.5', resourceCost: 25, cooldownSec: 10, charges: 1,
+  sk({ id: 'c_frost_effigy', name: 'Frost Effigy', slot: 'active', damageType: 'frost', damageCoef: '0.5', cooldownSec: 7, charges: 1,
     shape: { kind: 'line', length: 5, width: 0.6, duration: 4, tickInterval: 0.5 },
     description: 'Raise the Ice Wall, leave a Frost Effigy just beyond it and glide 2.5 units back. Enemies within 6 units are lured to the Effigy; when the wall fades it bursts for 2.5x frost damage (radius 2.5), Freezing for 1.2s.' }),
   hidden('c_effigy_burst', 'Effigy Burst', '2.5', { kind: 'circle', radius: 2.5, selfCentered: false, range: 0 }, 'Frost Effigy detonation.', 'node:c_frost_effigy'),
   hidden('c_glacier_shard', 'Glacier Shard', '0.8', { kind: 'projectile', speed: 12, radius: 0.22, range: 8, pierce: 0, spreadDeg: 0 }, 'Ice shard fired by a Living Glacier wall.', 'node:c_living_glacier'),
   // ---- Blizzard ----
-  sk({ id: 'c_blizzard', name: 'Blizzard', slot: 'active', damageType: 'frost', damageCoef: '0.45', resourceCost: 25, cooldownSec: 9, charges: 1,
+  sk({ id: 'c_blizzard', name: 'Blizzard', slot: 'active', damageType: 'frost', damageCoef: '0.45', cooldownSec: 6.5, charges: 1,
     shape: { kind: 'aura', radius: 2.8, duration: 5 },
     description: 'Call a storm (radius 2.8) at the aimed point for 5s: every 0.5s it deals 0.45x frost damage to enemies inside and Chills them 40%.' }),
-  sk({ id: 'c_whiteout', name: 'Whiteout', slot: 'active', damageType: 'frost', damageCoef: '0.5', resourceCost: 30, cooldownSec: 12, charges: 1,
+  sk({ id: 'c_whiteout', name: 'Whiteout', slot: 'active', damageType: 'frost', damageCoef: '0.5', cooldownSec: 8.5, charges: 1,
     shape: { kind: 'aura', radius: 3.4, duration: 6 },
     description: 'A larger storm (radius 3.4, 6s): 0.5x frost damage every 0.5s and Chill 40%. Enemies struck by 4 pulses of the same Whiteout are Frozen for 1.5s.' }),
-  sk({ id: 'c_frozen_orb', name: 'Frozen Orb', slot: 'active', damageType: 'frost', damageCoef: '0.6', resourceCost: 25, cooldownSec: 8, charges: 1,
+  sk({ id: 'c_frozen_orb', name: 'Frozen Orb', slot: 'active', damageType: 'frost', damageCoef: '0.6', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'projectile', speed: 4.5, radius: 0.7, range: 9, pierce: 99, spreadDeg: 0 },
     description: 'A slow orb (4.5 units/s, 9 units) deals 0.6x frost damage to each enemy it passes and sprays an ice shard every 0.15s in a spinning spiral, bursting into 8 shards at the end of its path.' }),
   hidden('c_orb_shard', 'Orb Shard', '0.4', { kind: 'projectile', speed: 11, radius: 0.2, range: 5, pierce: 0, spreadDeg: 0 }, 'Ice shard sprayed by Frozen Orb.', 'node:c_frozen_orb'),
   hidden('c_hail', 'Hailstone', '0.6', { kind: 'circle', radius: 0.8, selfCentered: false, range: 0 }, 'Hailstone from Hailstorm.', 'node:c_hailstorm'),
   hidden('c_comet', 'Glacial Comet', '4', { kind: 'circle', radius: 2.5, selfCentered: false, range: 0 }, 'Comet from the Glacial Comet keystone.', 'node:c_glacial_comet'),
   // ---- Shatter ----
-  sk({ id: 'c_frost_nova', name: 'Frost Nova', slot: 'active', damageType: 'frost', damageCoef: '1.2', resourceCost: 20, cooldownSec: 7, charges: 1,
+  sk({ id: 'c_frost_nova', name: 'Frost Nova', slot: 'active', damageType: 'frost', damageCoef: '1.2', cooldownSec: 5, charges: 1,
     shape: { kind: 'circle', radius: 3, selfCentered: true, range: 0 },
     description: 'Ice bursts around you (radius 3) for 1.2x frost damage and Freezes enemies for 1.2s. Frozen enemies hit Shatter first.' }),
-  sk({ id: 'c_glacial_spike', name: 'Glacial Spike', slot: 'active', damageType: 'frost', damageCoef: '2', resourceCost: 22, cooldownSec: 6, charges: 1,
+  sk({ id: 'c_glacial_spike', name: 'Glacial Spike', slot: 'active', damageType: 'frost', damageCoef: '2', cooldownSec: 4, charges: 1,
     shape: { kind: 'circle', radius: 1.8, selfCentered: false, range: 8 },
     description: 'Ice erupts at the aimed point: 2x frost damage (radius 1.8) and Freeze for 1.4s; 0.6s later it detonates for 1.2x frost damage (radius 2.4), Shattering enemies still Frozen.' }),
   hidden('c_spike_burst', 'Spike Detonation', '1.2', { kind: 'circle', radius: 2.4, selfCentered: false, range: 0 }, 'Glacial Spike detonation.', 'node:c_glacial_spike'),
-  sk({ id: 'c_cold_snap', name: 'Cold Snap', slot: 'active', damageType: 'frost', damageCoef: '1', resourceCost: 25, cooldownSec: 9, charges: 1,
+  sk({ id: 'c_cold_snap', name: 'Cold Snap', slot: 'active', damageType: 'frost', damageCoef: '1', cooldownSec: 6.5, charges: 1,
     shape: { kind: 'circle', radius: 9, selfCentered: true, range: 0 },
     description: 'Every Chilled enemy within 9 units takes 1x frost damage and is Frozen for 1.2s (Frozen ones Shatter first); a ring around you (radius 2.5) Chills everything else by 40%.' }),
   hidden('c_shatter', 'Shatter', '1.5', { kind: 'circle', radius: 0.5, selfCentered: false, range: 0 }, 'Bonus hit when a Freeze is broken.', 'node:c_frost_nova'),
@@ -67,7 +67,7 @@ export const SKILLS: SkillDef[] = [
 
 export const NODES: NodeDef[] = [
   // ---- Cryomancer / Glacier ----
-  n('c_ice_wall', 'glacier', 'Ice Wall', 1, 0, { grantsSkill: 'c_ice_wall',
+  n('c_ice_wall', 'glacier', 'Ice Wall', 1, 0, { starting: true, grantsSkill: 'c_ice_wall',
     description: 'Raises a 5-unit ice wall for 4s that blocks enemies and chills 50% on touch.' }),
   n('c_glacial_bulk', 'glacier', 'Glacial Bulk', 3, 1, { modifiers: [{ stat: 'player.maxHealth', factorPerRank: '1.07' }], description: 'Raises max health ×{value} per rank.' }),
   n('c_hoarfrost', 'glacier', 'Hoarfrost', 3, 1, { modifiers: [{ stat: 'player.armor', factorPerRank: '1.12' }], description: 'Raises armor ×{value} per rank.' }),
@@ -93,10 +93,10 @@ export const NODES: NodeDef[] = [
     upgrades: 'c_ice_wall', description: 'Upgrades Ice Wall: lasts twice as long and fires a 0.8× ice shard every second.' }),
 
   // ---- Cryomancer / Blizzard ----
-  n('c_blizzard', 'blizzard', 'Blizzard', 1, 0, { grantsSkill: 'c_blizzard',
+  n('c_blizzard', 'blizzard', 'Blizzard', 1, 0, { starting: true, grantsSkill: 'c_blizzard',
     description: 'Calls a storm (radius 2.8) for 5s that deals 0.45× frost every 0.5s and chills 40%.' }),
   n('c_bitter_cold', 'blizzard', 'Bitter Cold', 3, 1, { modifiers: [{ stat: 'player.frostDamage', factorPerRank: '1.08' }], description: 'Raises frost damage ×{value} per rank.' }),
-  n('c_winter_tide', 'blizzard', 'Winter Tide', 3, 1, { modifiers: [{ stat: 'player.resourceRegen', factorPerRank: '1.08' }], description: 'Frost regeneration x1.08 per rank.' }),
+  n('c_winter_tide', 'blizzard', 'Winter Tide', 3, 1, { modifiers: [{ stat: 'skill.c_blizzard.cooldown', factorPerRank: '0.93' }, { stat: 'skill.c_frozen_orb.cooldown', factorPerRank: '0.93' }, { stat: 'skill.c_whiteout.cooldown', factorPerRank: '0.93' }], upgrades: 'c_blizzard', description: 'Upgrades Blizzard: cooldown ×{value} per rank, evolutions too.' }),
   n('c_widening_gyre', 'blizzard', 'Widening Gyre', 2, 1, { prereqs: [{ node: 'c_blizzard', rank: 1 }], mechanics: ['widening_gyre'],
     upgrades: 'c_blizzard', description: 'Upgrades Blizzard: +0.35 radius and +1s per rank; Frozen Orb flies +2 units.' }),
   n('c_eye_of_the_storm', 'blizzard', 'Eye of the Storm', 1, 2, { prereqs: [{ node: 'c_blizzard', rank: 1 }], excludes: ['c_hailstorm'], mechanics: ['eye_of_the_storm'],
@@ -118,7 +118,7 @@ export const NODES: NodeDef[] = [
     upgrades: 'c_blizzard', description: 'Upgrades Blizzard: when a storm ends, a comet hits its centre for 4× and freezes.' }),
 
   // ---- Cryomancer / Shatter ----
-  n('c_frost_nova', 'shatter', 'Frost Nova', 1, 0, { grantsSkill: 'c_frost_nova',
+  n('c_frost_nova', 'shatter', 'Frost Nova', 1, 0, { starting: true, grantsSkill: 'c_frost_nova',
     description: 'Bursts ice around you (radius 3) for 1.2× frost and freezes enemies for 1.2s.' }),
   n('c_glacial_focus', 'shatter', 'Glacial Focus', 3, 1, { modifiers: [{ stat: 'player.critTendency', factorPerRank: '1.12' }], description: 'Raises critical tendency ×{value} per rank.' }),
   n('c_razor_ice', 'shatter', 'Razor Ice', 3, 1, { modifiers: [{ stat: 'player.critPotency', factorPerRank: '1.08' }], description: 'Raises critical damage ×{value} per rank.' }),
@@ -137,7 +137,7 @@ export const NODES: NodeDef[] = [
   n('c_ice_bloom', 'shatter', 'Ice Bloom', 1, 3, { mechanics: ['ice_bloom'],
     description: 'Makes chilled or frozen enemies you kill burst into 5 ice shards (0.6× each).' }),
   n('c_frozen_momentum', 'shatter', 'Frozen Momentum', 1, 3, { prereqs: [{ node: 'c_frost_nova', rank: 1 }], mechanics: ['frozen_momentum'],
-    description: 'Each Shatter restores 4 Frost and cuts 0.5s from your Shatter-branch skill\'s cooldown.' }),
+    description: 'Cuts 0.5s from your Shatter skill and 0.25s from all cooldowns on each Shatter.' }),
   n('c_shatterpoint', 'shatter', 'Shatterpoint', 1, 4, { excludes: ['c_zero_point'], mechanics: ['shatterpoint'],
     description: 'Makes your hits on frozen enemies always crit, and Shatters can crit.' }),
   n('c_zero_point', 'shatter', 'Zero Point', 1, 4, { excludes: ['c_shatterpoint'], mechanics: ['zero_point'],
@@ -152,7 +152,6 @@ export const CLASS: ClassDef = {
     { id: 'shatter', name: 'Shatter', theme: 'Freeze, critical strikes and chain detonations' },
   ],
   accent: '#7fe3ff', role: 'Ranged caster · control',
-  resource: { name: 'Frost', max: 110, regenPerSec: 11 },
   base: { maxHealth: 760, armor: 12, damage: 78, attackFrequency: 2.0, moveSpeed: 4.5, critTendency: '0.25', critMultiplier: '2', shieldCapacity: 0.6 },
   basicSkill: 'c_ice_shard', signatureSkill: 'c_absolute_zero',
   nodes: NODES.map((x) => x.id),

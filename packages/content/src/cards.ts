@@ -53,7 +53,7 @@ export const CARDS: CardDef[] = [
   c('shattered_crown', 'Shattered Crown', 'glass', ['player.critTendency', '100'], ['enemy.damage', '80'], 'Fortune favors the cracked.', ['crit']),
   c('chasing_thunder', 'Chasing Thunder', 'tempo', ['player.attackFrequency', '75'], ['enemy.movementSpeed', '100'], 'Lightning hands, lightning hunters.'),
   c('deep_renewal', 'Deep Renewal', 'growth', ['player.healing', '200'], ['enemy.maxHealth', '400'], 'Roots drink deep on both sides.', ['healing']),
-  c('thousand_footsteps', 'Thousand Footsteps', 'horde', ['player.resourceRegen', '100'], ['encounter.spawnQuantity', '200'], 'Power wells up as the ground trembles.'),
+  c('thousand_footsteps', 'Thousand Footsteps', 'horde', ['player.recoveryRate', '75'], ['encounter.spawnQuantity', '200'], 'Power wells up as the ground trembles.'),
   c('gilded_ruin', 'Gilded Ruin', 'gold', ['score.pressure', '150'], ['enemy.damage', '500'], 'A golden age, briefly.'),
   c('titan_offering', 'Titan Offering', 'titan', ['player.maxHealth', '300'], ['enemy.maxHealth', '600'], 'An offering the giants accept gladly.'),
   c('borrowed_tomorrow', 'Borrowed Tomorrow', 'time', ['player.recoveryRate', '100'], ['enemy.attackFrequency', '100'], 'Spend the future now.'),

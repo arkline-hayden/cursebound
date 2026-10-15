@@ -5,7 +5,7 @@ import { addDot, hitEnemy, shieldPlayer } from '../combat';
 import { moveCircle, norm, q, rayDistance } from '../geometry';
 import { registerClassHooks, type EnemyHitInfo } from '../hooks';
 import { nearestFloor } from '../map';
-import { areaCoverage, makeHazard, newProjectileId, spawnPlayerProjectiles } from '../players';
+import { areaCoverage, cutCooldowns, makeHazard, newProjectileId, spawnPlayerProjectiles } from '../players';
 import { nextFloat, nextInt } from '../rng';
 import { B, ONE, hitDamage, playerDerived } from '../stats';
 import type { EnemyState, Hazard, PlayerState, Projectile, SimEvent, SimState } from '../types';
@@ -107,8 +107,8 @@ function shatter(state: SimState, ev: SimEvent[], p: PlayerState, e: EnemyState,
   hitEnemy(state, ev, e, dmg, ONE, { dtype: 'frost', srcSlot: p.slot, skillId: 'c_shatter', fromX: e.x, fromY: e.y, allowCrit: has(p, 'c_shatterpoint'), generation: gen + 1, stagger: 30 });
   breakFreeze(state, e);
   if (has(p, 'c_frozen_momentum')) {
-    p.resource = Math.min(playerDerived(state, p).resourceMax, p.resource + 4);
     cutCooldown(p, SHATTER, 0.5);
+    cutCooldowns(p, 0.25);   // no resource: every Shatter also speeds the whole hotbar
   }
   if (has(p, 'c_zero_point')) cutCooldown(p, ['c_absolute_zero'], 1);
   if (has(p, 'c_chain_reaction')) {
