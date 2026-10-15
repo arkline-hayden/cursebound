@@ -1355,3 +1355,31 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
 .game-root .tree-sheet { height: min(calc(100vh / var(--ui-zoom) - 2 * var(--ov-pad)), 1120px); }
 /* the toast stack still clears the (unzoomed) HUD orbs */
 .game-root .toast-stack { bottom: calc((184px * var(--hud-zoom) + 16px) / var(--ui-zoom)); }
+
+/* ---------- progression: locked vessels, level + XP on the account plate, the daily bounty plaque, results XP ---------- */
+.vessel-tile.locked .vt-frame canvas { filter: grayscale(1) brightness(0.32); }
+.vessel-tile.locked .vt-name { color: var(--bone-3); }
+.vessel-tile.locked::after { background: var(--stone-3); }
+.vessel-tile .vt-lock { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; pointer-events: none; }
+.vessel-tile .vt-lock::before { content: ''; width: 14px; height: 16px; background: var(--px-lock) center / 14px 16px no-repeat; image-rendering: pixelated; filter: drop-shadow(2px 2px 0 #000); }
+.vessel-tile .vt-lock b { font-family: var(--font-label); font-size: var(--fs-tag); line-height: 1; font-weight: normal; text-transform: uppercase; color: var(--gold); text-shadow: var(--shadow-hard); }
+.vd-tag.locked { color: var(--warn); display: inline-flex; align-items: center; gap: var(--sp-1); }
+.vd-tag.locked::before { content: ''; width: 14px; height: 16px; background: var(--px-lock) center / 14px 16px no-repeat; image-rendering: pixelated; }
+.bar.xp { border-image-source: var(--px-bar-gold); }
+.bar.xp > i { background: var(--ember); box-shadow: inset 0 2px 0 var(--ember-hi), inset 0 -2px 0 #552a06; transition: width 0.4s steps(8); }
+.account-plate .ap-level { display: flex; flex-direction: column; gap: 2px; width: 120px; }
+.account-plate .ap-lv { display: flex; justify-content: space-between; gap: var(--sp-1); font-family: var(--font-label); font-size: var(--fs-small); line-height: 1; text-transform: uppercase; color: var(--gold); text-shadow: var(--shadow-hard); white-space: nowrap; }
+.account-plate .ap-lv span { color: var(--bone-3); }
+.bounty-plaque.frame.inset { padding: var(--sp-1) var(--sp-2) var(--sp-2); display: flex; flex-direction: column; gap: var(--sp-1); box-shadow: inset 0 4px 0 0 var(--bounty, var(--blood)); }
+.bounty-plaque .bp-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.bounty-plaque .bp-title { margin: 0; font-family: var(--font-label); font-size: var(--fs-small); line-height: var(--lh-small); font-weight: normal; text-transform: uppercase; color: var(--gold); text-shadow: var(--shadow-hard); }
+.bounty-plaque .bp-timer { font-family: var(--font-num); font-size: var(--fs-label); line-height: 1; color: var(--bone-2); text-shadow: var(--shadow-hard); font-variant-numeric: tabular-nums; }
+.bounty-plaque .bp-mod { margin: 0; display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.bounty-plaque .bp-mod b { font-family: var(--font-gothic); font-size: var(--fs-goth-sm); font-weight: normal; color: var(--bounty, var(--blood-hi)); text-shadow: var(--shadow-hard), 2px 2px 0 var(--blood-deep); }
+.bounty-plaque .bp-mod span { font-family: var(--font-body); font-size: var(--fs-small); line-height: var(--lh-small); color: var(--bone-2); text-shadow: var(--shadow-hard); }
+.bounty-plaque .bp-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.chip.done::before { width: 14px; height: 14px; background: var(--px-tick) center / 14px 14px no-repeat; box-shadow: none; image-rendering: pixelated; }
+.party-bounty { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-small); color: var(--bone-2); }
+.res-xp { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-1); }
+.res-xp .res-xp-gain { font-family: var(--font-gothic); font-size: var(--fs-goth-sm); line-height: 1; color: var(--ember-hi); text-shadow: var(--shadow-hard); }
+.res-xp .bar.xp { width: 160px; }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { DERIVED_NODES, LEGENDARY_BY_ID, MECHANIC_BY_ID, NODE_BY_ID, STAT_BY_ID, cardById } from '@cursebound/content';
+import { BOUNTY_BY_ID, DERIVED_NODES, LEGENDARY_BY_ID, MECHANIC_BY_ID, NODE_BY_ID, STAT_BY_ID, cardById } from '@cursebound/content';
 import type { LedgerMechanic, LedgerStat } from '@cursebound/simulation';
 import { netStore, type GameConnection } from '@/lib/net';
 import { useStore } from '@/lib/store';
@@ -14,7 +14,8 @@ import { CardIcon, StatIcon } from './icons';
 // or a scenario estimate. Fonts use the type tokens only.
 
 const GROUP_ICON: Record<string, string> = { party_damage: 'damage', health_recovery: 'health', enemy_health: 'enemy_health', enemy_offense: 'enemy_offense', mobility_projectiles: 'mobility', score_growth: 'score' };
-const cardName = (id: string) => cardById(id)?.name ?? id;
+// daily bounty effects are recorded as card 'bounty:<modifier>' (simulation bounty.ts)
+const cardName = (id: string) => cardById(id)?.name ?? (id.startsWith('bounty:') ? `Bounty: ${BOUNTY_BY_ID[id.slice(7)]?.name ?? id.slice(7)}` : id);
 
 function LogBar({ value }: { value: string }) {
   // normalized log-scale bar alongside the absolute value (explicitly labelled)

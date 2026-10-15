@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { CLASSES, CLASS_BY_ID, FUTURE_CLASSES, type ClassDef } from '@cursebound/content';
+import { CLASSES, CLASS_BY_ID, FUTURE_CLASSES, classUnlockLevel, isClassUnlocked, type ClassDef } from '@cursebound/content';
 import { wholeNum } from '@/lib/format';
 import { ClassPortrait } from './ClassPortrait';
 import { readableAccent } from './classTheme';
@@ -9,12 +9,17 @@ import { readableAccent } from './classTheme';
 // Vessel (class) picker shared by the title screen and the lobby: a 5-column grid of carved portrait tiles built
 // generically from CLASSES (ten heroes fit in two rows at 1280x720), plus a detail pane for the hovered or chosen
 // class. A radio group with roving focus: arrow keys move and choose, Home/End jump.
+// Progression (content progression.ts): with a `level`, classes above it show a padlock and "Unlocks at level N" and
+// cannot be chosen (focus still visits them so the detail pane can preview the class).
 
 const COLS = 5;
 
-export function ClassPicker({ value, onChange, disabled = false, labelledBy, idPrefix = 'vessel' }: {
+export function ClassPicker({ value, onChange, disabled = false, labelledBy, idPrefix = 'vessel', level = null }: {
   value: string; onChange: (id: string) => void; disabled?: boolean; labelledBy: string; idPrefix?: string;
+  /** the player's level (null = not known yet: nothing is shown locked; the authority still refuses locked classes) */
+  level?: number | null;
 }) {
+  const locked = (id: string) => level !== null && !isClassUnlocked(id, level);
   const [peek, setPeek] = useState<string | null>(null);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const shown = CLASS_BY_ID[peek ?? value] ?? CLASS_BY_ID[value] ?? CLASSES[0];
@@ -32,7 +37,7 @@ export function ClassPicker({ value, onChange, disabled = false, labelledBy, idP
     else return;
     e.preventDefault();
     refs.current[j]?.focus();
-    if (!disabled) onChange(CLASSES[j].id);
+    if (!disabled && !locked(CLASSES[j].id)) onChange(CLASSES[j].id);
   };
   const detailId = `${idPrefix}-detail`;
   return (
@@ -40,13 +45,14 @@ export function ClassPicker({ value, onChange, disabled = false, labelledBy, idP
       <div role="radiogroup" aria-labelledby={labelledBy} aria-describedby={detailId} className="vessel-grid" onMouseLeave={() => setPeek(null)}>
         {CLASSES.map((c, i) => {
           const sel = c.id === value;
+          const lock = locked(c.id);
           return (
-            <button key={c.id} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={sel} aria-disabled={disabled || undefined}
-              aria-label={`${c.name}: ${c.role}`} tabIndex={i === current ? 0 : -1}
-              className="vessel-tile" style={{ '--accent': readableAccent(c.accent) } as CSSProperties}
-              onClick={() => { if (!disabled) onChange(c.id); }} onMouseEnter={() => setPeek(c.id)} onFocus={() => setPeek(c.id)} onBlur={() => setPeek(null)}
+            <button key={c.id} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={sel} aria-disabled={disabled || lock || undefined}
+              aria-label={lock ? `${c.name}: unlocks at level ${classUnlockLevel(c.id)}` : `${c.name}: ${c.role}`} tabIndex={i === current ? 0 : -1}
+              className={`vessel-tile${lock ? ' locked' : ''}`} style={{ '--accent': readableAccent(c.accent) } as CSSProperties}
+              onClick={() => { if (!disabled && !lock) onChange(c.id); }} onMouseEnter={() => setPeek(c.id)} onFocus={() => setPeek(c.id)} onBlur={() => setPeek(null)}
               onKeyDown={(e) => onKey(e, i)}>
-              <span className="vt-frame"><ClassPortrait classId={c.id} size={96} animate={sel} /></span>
+              <span className="vt-frame"><ClassPortrait classId={c.id} size={96} animate={sel && !lock} />{lock && <span className="vt-lock" aria-hidden="true"><b>Lv {classUnlockLevel(c.id)}</b></span>}</span>
               <span className="vt-name">{c.name}</span>
             </button>
           );
@@ -58,12 +64,12 @@ export function ClassPicker({ value, onChange, disabled = false, labelledBy, idP
           </span>
         ))}
       </div>
-      <VesselDetail id={detailId} cls={shown} chosen={shown.id === value} />
+      <VesselDetail id={detailId} cls={shown} chosen={shown.id === value} unlockAt={locked(shown.id) ? classUnlockLevel(shown.id) : null} />
     </div>
   );
 }
 
-function VesselDetail({ id, cls, chosen }: { id: string; cls: ClassDef; chosen: boolean }) {
+function VesselDetail({ id, cls, chosen, unlockAt }: { id: string; cls: ClassDef; chosen: boolean; unlockAt: number | null }) {
   return (
     <div id={id} className={`vessel-detail ${chosen ? 'chosen' : ''}`} style={{ '--accent': readableAccent(cls.accent) } as CSSProperties}>
       <div className="vd-head">
@@ -71,7 +77,7 @@ function VesselDetail({ id, cls, chosen }: { id: string; cls: ClassDef; chosen: 
         <div className="vd-title">
           <span className="vd-name">{cls.name}</span>
           <span className="vd-role">{cls.role}</span>
-          <span className="vd-tag">{chosen ? 'Your vessel' : 'Preview'}</span>
+          <span className={`vd-tag${unlockAt !== null ? ' locked' : ''}`}>{unlockAt !== null ? `Unlocks at level ${unlockAt}` : chosen ? 'Your vessel' : 'Preview'}</span>
         </div>
       </div>
       <ul className="vd-branches" aria-label="Skill branches">

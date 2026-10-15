@@ -35,6 +35,15 @@ async function withLocalProfile(account: Account): Promise<Account> {
   return { ...account, profileId: linked.profileId };
 }
 
+/**
+ * Online mode: tell the local authority the linked account's cloud XP (lib/progress.ts), so its class gate for this
+ * profile matches the cloud level (it keeps the larger of local and cloud XP; docs/contracts/ONLINE_CONTRACT.md).
+ */
+export async function syncLinkedXp(cloudXp: number): Promise<void> {
+  if (!linked || !(await onlineMode())) return;
+  await api('POST', '/local/profiles/link', { accountId: linked.accountId, displayName: linked.displayName, cloudXp });
+}
+
 async function adopt(account: Account | null): Promise<Account | null> {
   const a = account ? await withLocalProfile(account) : null;
   setAccount(a);
