@@ -273,6 +273,8 @@ export interface Hazard {
   armTick?: number;
   /** Class-kit hazard counters (e.g. Warden spirit beasts: target, cooldowns, leap). Plain numbers, deterministic. */
   vars?: Record<string, number>;
+  /** Follower routing (follow.ts): remaining A* waypoints (tile indices) of a summon walking around walls / voids. */
+  route?: number[];
 }
 
 /** Ground pickup (pickups.ts). Generic: `kind` 'potion' heals, 'orb' (haste orb) cuts skill cooldowns; other modules may add kinds. */
@@ -576,4 +578,7 @@ export type SimEvent =
   /** one-shot presentation cue for foe attacks (shadow burst, web splat, venom splash, hook hit, frost shatter) */
   | { t: 'foe_fx'; id: number; fx: string; x: number; y: number; tx?: number; ty?: number; r?: number }
   /** an idle pack noticed the heroes (director.ts activation) */
-  | { t: 'aggro'; id: number; pack: number; x: number; y: number };
+  | { t: 'aggro'; id: number; pack: number; x: number; y: number }
+  /** a hero's summon / pet (hazard `id` of `kind`) lost its route and blinked from fx,fy back to x,y at its owner's
+   *  side (follow.ts leash): the client dissolves it at the origin and reforms it at the destination */
+  | { t: 'summon_blink'; slot: number; id: number; kind: string; fx: number; fy: number; x: number; y: number };

@@ -1,10 +1,10 @@
 // Versioned tunable rules (PRD §3–§6, §11, §13, §19). Every constant here is a first proposal.
 // Changing anything that affects simulation outcomes requires bumping RULES_VERSION (and replay version).
 
-export const RULES_VERSION = 'rules-1.3.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes
+export const RULES_VERSION = 'rules-1.4.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes; 1.4: all movement x0.8 (heroes, foes, bosses, summons and pets), follower routing
 export const SCORE_VERSION = 'score-1.0.0';
-export const CONTENT_VERSION = 'content-1.2.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune
-export const SIM_VERSION = 'sim-1.2.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing)
+export const CONTENT_VERSION = 'content-1.3.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune; 1.3: movement multipliers (hero 0.88, foe 0.8, minion 0.8), follower routing constants
+export const SIM_VERSION = 'sim-1.3.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing); 1.3: bosses take enemyMoveSpeedMult, minion speed multiplier, follower routing (A* path-follow, stuck detection, blink leash, spread)
 export const PROTOCOL_VERSION = 2;
 
 export const TICK_RATE = 60;
@@ -69,8 +69,9 @@ export const RULES = {
   bossReinforceDamage: '0.7',
   /** seconds the summoning telegraph (client banner, rune circles) runs before the wave arrives */
   bossReinforceWarnSec: 1.2,
-  /** Global enemy ground-speed multiplier (applied at spawn, before Fate enemy.movementSpeed). Kit tests assume 1. */
-  enemyMoveSpeedMult: 1,
+  /** Global enemy ground-speed multiplier (applied at spawn to foes AND bosses, before Fate enemy.movementSpeed).
+   *  0.8 since rules 1.4 (all movement x0.8). Charges are not scaled: they travel their telegraphed lane. */
+  enemyMoveSpeedMult: 0.8,
 
   // Champions and rares (elites.ts). Elite intensity C = base × (1 + perRound × (r − 1)) × encounter.eliteChance;
   // the per-group chance is q = C / (1 + C) (doubling never exceeds 100%).
@@ -132,8 +133,19 @@ export const RULES = {
 
   // Movement & combat (§5)
   playerRadius: 0.3,
-  /** Global hero ground-speed multiplier (derivePlayer moveSpeed); dodge distance is unaffected. */
-  playerMoveSpeedMult: '1.1',
+  /** Global hero ground-speed multiplier (derivePlayer moveSpeed); dodge distance is unaffected. 1.1 -> 0.88 in
+   *  rules 1.4 (all movement x0.8). Client prediction reads the resulting speed from the snapshot (`spd`). */
+  playerMoveSpeedMult: '0.88',
+  /** Speed multiplier for hero-owned summons and pets (Warden beasts, Hexbinder wraiths and locusts, Ranger hawks) on
+   *  top of their authored speeds. 0.8 since rules 1.4 (all movement x0.8). Attack lunges (wolf pounce, hawk dive) are
+   *  strikes, not movement, and stay as authored. */
+  minionMoveSpeedMult: 0.8,
+  /** Follower routing (simulation follow.ts): summons that follow their owner path around walls and chasm voids, and
+   *  blink back to the owner's side when the route fails, is far longer than the straight line, or progress stalls. */
+  followRepathTicks: 20,
+  followStuckTicks: 45,
+  followMaxPathTiles: 48,
+  followBlinkRange: 14,
   /** Light momentum (movementStep, shared with prediction): per-tick blend toward the wanted velocity. */
   moveAccelBlend: 0.55,
   moveDecelBlend: 0.4,
