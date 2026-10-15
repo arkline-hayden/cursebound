@@ -567,8 +567,13 @@ function fortuneExtras(state: SimState, ev: SimEvent[], e: EnemyState) {
 export function trainingRoomEvent(state: SimState, ev: SimEvent[], p: PlayerState, arg: string): { ok: true } | { ok: false; code: string } {
   const map = state.map;
   if (!map) return { ok: false, code: 'STALE_PHASE' };
-  const ahead = (dist: number) => nearestFloor(map, p.x + p.aimX * dist, p.y + p.aimY * dist);
   const list = eventState(state).list;
+  // fan successive spawns around the aim so they never stack (deterministic: the yard's event count)
+  const fan = ((list.length % 5) - 2) * 0.7;
+  const ahead = (dist: number, turn = fan) => {
+    const c = Math.cos(turn), s = Math.sin(turn);
+    return nearestFloor(map, p.x + (p.aimX * c - p.aimY * s) * dist, p.y + (p.aimX * s + p.aimY * c) * dist);
+  };
   if (arg !== 'runner' && arg !== 'coins' && list.length >= 8) list.splice(0, list.length - 7);   // the yard keeps the newest few
   if (arg.startsWith('shrine_')) {
     const type = arg.slice(7);
@@ -582,10 +587,10 @@ export function trainingRoomEvent(state: SimState, ev: SimEvent[], p: PlayerStat
     case 'merchant': { const [x, y] = ahead(2.5); newMerchant(state, ev, x, y, state.tick); return { ok: true }; }
     case 'runner': {
       if (state.enemies.some((e) => isRunner(e) && e.state !== 'dying')) return { ok: false, code: 'BOSS_ACTIVE' };
-      const [x, y] = ahead(5);
+      const [x, y] = ahead(5, 0);
       return spawnRunner(state, ev, { x, y }) ? { ok: true } : { ok: false, code: 'STALE_PHASE' };
     }
-    case 'coins': { const [x, y] = ahead(1.6); dropCoins(state, x, y, 30, 1.2); return { ok: true }; }
+    case 'coins': { const [x, y] = ahead(1.6, 0); dropCoins(state, x, y, 30, 1.2); return { ok: true }; }
     default: return { ok: false, code: 'INVALID_INPUT' };
   }
 }
