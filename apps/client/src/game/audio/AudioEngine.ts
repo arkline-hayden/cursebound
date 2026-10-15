@@ -65,6 +65,13 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   blind_burst: 6, web_spit: 2, rooted: 5, silenced: 6,
   door_appear: 6, door_hum: 2, door_open: 7, door_choose: 7, portal_open: 8, portal_enter: 8,
   cine_whoosh: 7, title_boom: 9, round_start: 8, boss_rumble: 8, boss_emerge: 9, boss_roar: 9, stag_cry: 9, bell_toll: 8,
+  // combat feel pass: impacts sit with hit_enemy, typed kills with kill, ability cues with the skills they replace
+  impact_light: 1, impact_heavy: 2, impact_fire: 1, impact_frost: 1, impact_storm: 1, impact_decay: 1, impact_astral: 1,
+  kill_burn: 4, kill_shatter: 4, kill_zap: 4, kill_squelch: 4, kill_chime: 4,
+  cast_fire: 3, cast_frost: 3, cast_storm: 3, cast_decay: 3, cast_holy: 4, cast_astral: 3, blink: 3,
+  blast_fire: 5, blast_frost: 5, zap_strike: 5, blast_decay: 5, smite: 5, slam_heavy: 5,
+  bow_shot: 2, gun_shot: 2, throw_whoosh: 2, blade_flurry: 3, shield_bash: 4, trap_snap: 4,
+  summon_rise: 4, beast_howl: 4, beast_roar: 4, mech_deploy: 4, steam_vent: 4,
 };
 
 /** At most this many simultaneous voices of one cue (oldest is stolen). */
@@ -72,6 +79,19 @@ const PER_ID_CAP: Partial<Record<SfxId, number>> = {
   kill: 4, hit_enemy: 4, enemy_death: 3, enemy_shoot: 3, enemy_bite: 3, footstep: 3, crit: 3, swing: 4, heal: 3,
   poisoned: 2, chain_throw: 3, chain_bind: 2, ice_shatter: 3, freeze: 2, web_spit: 3, poison_spit: 3, door_hum: 1,
   telegraph_warn: 4, move_click: 1, minimap_ping: 2, heartbeat: 1,
+  impact_light: 4, impact_heavy: 3, impact_fire: 4, impact_frost: 4, impact_storm: 4, impact_decay: 4, impact_astral: 3,
+  kill_burn: 3, kill_shatter: 3, kill_zap: 3, kill_squelch: 3, kill_chime: 2,
+  bow_shot: 4, gun_shot: 4, blade_flurry: 3, blast_fire: 3, blast_frost: 3, zap_strike: 3, blast_decay: 3, smite: 2, slam_heavy: 3,
+};
+
+/**
+ * Repeat window per cue (seconds, default 0.03): a repeat inside it folds into the playing voice (slightly louder)
+ * instead of starting another, so a pack-clearing AoE or a fast multi-hit never machine-guns the same layered impact.
+ */
+const MERGE_SEC: Partial<Record<SfxId, number>> = {
+  impact_light: 0.035, impact_heavy: 0.05, impact_fire: 0.04, impact_frost: 0.04, impact_storm: 0.04, impact_decay: 0.04, impact_astral: 0.05,
+  kill: 0.04, kill_burn: 0.05, kill_shatter: 0.05, kill_zap: 0.05, kill_squelch: 0.05, kill_chime: 0.08, crit: 0.06,
+  gun_shot: 0.045, bow_shot: 0.04, blade_flurry: 0.06,
 };
 
 /** Big moments that briefly pull the music down: [dB, hold s, release s]. */
@@ -79,6 +99,7 @@ const SFX_DUCK: Partial<Record<SfxId, [number, number, number]>> = {
   boss_ring: [-6, 0.3, 0.8], signature_slam: [-4, 0.15, 0.5], title_boom: [-10, 0.8, 1.5], boss_roar: [-9, 0.8, 1],
   boss_emerge: [-8, 1, 1.2], stag_cry: [-6, 0.8, 1], bell_toll: [-5, 1, 1.5], legendary_drop: [-6, 0.6, 1.2], fate_blessing: [-6, 0.8, 1.2],
   player_downed: [-6, 0.6, 1], portal_enter: [-6, 0.6, 1], boss_phase: [-6, 0.8, 1],
+  blast_fire: [-3, 0.1, 0.4], zap_strike: [-3, 0.1, 0.4], smite: [-3, 0.15, 0.5],
 };
 
 const MAX_VOICES = 32;
@@ -306,8 +327,9 @@ export class AudioEngine {
     const dist = Math.max(0, Number.isFinite(opts.dist) ? (opts.dist as number) : 0);
     if (!critical) {
       if (dist > 2.6 && priority < 6) return;
-      // burst merge: the same cue within 30 ms (an AoE killing a pack) becomes one louder voice
-      const recent = this.voices.find((v) => v.id === id && now - v.start < 0.03);
+      // burst merge: the same cue within its repeat window (30 ms default; MERGE_SEC) becomes one louder voice
+      const win = MERGE_SEC[id] ?? 0.03;
+      const recent = this.voices.find((v) => v.id === id && now - v.start < win);
       if (recent) {
         const g = recent.out.gain;
         g.setValueAtTime(Math.min(1.6, g.value * 1.12), now);

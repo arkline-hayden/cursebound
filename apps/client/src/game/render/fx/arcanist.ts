@@ -312,7 +312,7 @@ registerSkillFx({
     J.bits('mote', h.x, h.y, hot ? 3 : 2, hot ? 0xfff0c8 : E_GOLD, { angle: deg(h.ux, h.uy), spread: 50, speed: 1.6 });
     if (hot) J.embersAt(h.x, h.y, 2, E_RED);
     ctx.dungeon.flashLight(h.x, h.y, 70, 0xff9a3a, 0.9, 80);
-    sfx(ctx, 'attack_spark', e.x, e.y, 55, ctx.mine ? 2 : 1);
+    sfx(ctx, 'attack_spark', e.x, e.y, 55, ctx.mine ? 2 : 1);   // basics stay a short zip (ear fatigue); casts carry the element
   },
 
   a_astral_nova: (ctx, e) => {
@@ -344,7 +344,8 @@ registerSkillFx({
     J.bits('mote', h.x, h.y, 6, E_GOLD, { angle: deg(h.ux, h.uy), spread: 30, speed: 1.8 });
     J.embersAt(h.x, h.y, 6, EMBER.main);
     J.slash(h.x, h.y, Math.atan2(h.uy, h.ux), EMBER.main, 0.6, { thin: true, ms: 160 });
-    sfx(ctx, 'skill_fireline', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_fire', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'skill_fireline', e.x, e.y, 60, 1);
   },
 
   a_arc_bolt: (ctx, e) => {
@@ -369,7 +370,7 @@ registerSkillFx({
 
   a_phase_step: (ctx, e) => {
     castFlash(ctx, e.x, e.y, RIFT, 1.2, { glyph: true });
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blink', e.x, e.y, 120, ctx.mine ? 2 : 1);
   },
 
   /** Every rift teleport (Phase Step, Blink Strike, Rift Gate, gate walk-throughs): x,y arrival, dx,dy origin. */
@@ -396,6 +397,7 @@ registerSkillFx({
     J.shockwave(t.x, t.y, 34, RIFT.main, 300);
     J.embersAt(t.x, ty, 10, A_LILAC);
     ctx.dungeon.flashLight(t.x, ty, 150, 0xb07aff, 2, 220);
+    sfx(ctx, 'blink', e.x, e.y, 120, ctx.mine ? 2 : 1);   // gate walk-throughs; a rift cast's own blink dedupes this
     if (ctx.rank(e.slot, 'a_riftwalker') > 0) {
       // Riftwalker: a hexagon of astral shards flashing open as the ring fires
       const rx = ctx.rx(1.1), ry = ctx.ry(1.1), rot = Math.random() * 6.28;
@@ -427,7 +429,7 @@ registerSkillFx({
     J.glyph(t.x, t.y, ctx.rx(2.4), EMBER.main, 900);
     J.embersAt(h.x, h.y, 10, EMBER.main);
     ctx.dungeon.flashLight(h.x, h.y, 120, EMBER.main, 1.4, 200);
-    sfx(ctx, 'skill_fireline', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_fire', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   a_meteor_impact: (ctx, e) => {
     const J = ctx.juice;
@@ -441,8 +443,8 @@ registerSkillFx({
     J.bits('mote', p.x, p.y - 10, 16, E_GOLD);
     J.embersAt(p.x, p.y - 10, 30, EMBER.main);
     J.sparksAt(p.x, p.y - 8, 18, E_GOLD);
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, 3);
-    sfx(ctx, 'skill_fireline', e.x, e.y, 80, 1);
+    sfx(ctx, 'blast_fire', e.x, e.y, 80, 3);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 80, 1);
   },
   a_flame_wall: (ctx, e) => {
     const J = ctx.juice;
@@ -452,7 +454,8 @@ registerSkillFx({
     lob(ctx, h.x, h.y, t.x, t.y - 4, EMBER.main, 0xfff0c8, 34, 170);
     J.shockwave(t.x, t.y, ctx.rx(1.6), E_GOLD, 300, 170);
     J.embersAt(t.x, t.y - 6, 14, EMBER.main);
-    sfx(ctx, 'skill_fireline', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_fire', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'skill_fireline', e.dx, e.dy, 60, 1);
   },
   a_combustion: (ctx, e) => {
     const J = ctx.juice;
@@ -460,7 +463,7 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, R, EMBER, 1, { decal: 'scorch', decalTint: 0x1a0804 });
     oneShot(ctx, 'fx:arcanist:flame', p.x, p.y + 2, { scale: 1.5, originY: 0.95, depth: isoDepth(e.x, e.y) + 3, ms: 380, grow: 1.2 });
     J.embersAt(p.x, p.y - 10, 12, E_GOLD);
-    sfx(ctx, 'kill', e.x, e.y, 70, 1);
+    sfx(ctx, 'blast_fire', e.x, e.y, 90, 1);
   },
   a_pyroclasm: (ctx, e) => {
     const J = ctx.juice;
@@ -487,8 +490,8 @@ registerSkillFx({
     J.embersAt(p.x, p.y - 10, 36, EMBER.main);
     J.bits('mote', p.x, p.y - 12, 14, E_GOLD);
     if (ctx.mine) J.hitStop(70);
-    sfx(ctx, 'signature_nova', e.x, e.y, 80, 3);
-    sfx(ctx, 'skill_fireline', e.x, e.y, 80, 1);
+    sfx(ctx, 'blast_fire', e.x, e.y, 80, 3);
+    sfx(ctx, 'cast_fire', e.x, e.y, 80, 1);
   },
 
   // ---------------- storm evolutions ----------------
@@ -517,14 +520,14 @@ registerSkillFx({
     J.bits('zap', p.x, p.y - 12, 10, S_CYAN);
     starRays(ctx, e.x, e.y, R, 6, S_CYAN, 0xffffff, 260);
     if (ctx.mine) J.hitStop(40);
-    sfx(ctx, 'crit', e.x, e.y, 60, 2);
+    sfx(ctx, 'zap_strike', e.x, e.y, 60, 2);
   },
   a_ball_lightning: (ctx, e) => {
     const h = hand(ctx, e.x, e.y, e.dx, e.dy, 12);
     castFlash(ctx, e.x, e.y, STORM, 1.3, { dx: e.dx, dy: e.dy });
     ctx.juice.bits('zap', h.x, h.y, 6, S_CYAN, { angle: deg(h.ux, h.uy), spread: 70 });
     stormCastFx(ctx, e.slot, e.x, e.y);
-    sfx(ctx, 'skill_arc', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_storm', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   a_ball_zap: (ctx, e) => {
     ctx.bolt(e.x, e.y, e.dx, e.dy, S_VIOLET);
@@ -539,7 +542,7 @@ registerSkillFx({
     J.shockwave(p.x, p.y, ctx.rx(R), STORM.main, 300);
     J.starburst(p.x, p.y - 8, 0xffffff, 1.3);
     J.bits('zap', p.x, p.y - 8, 6, S_CYAN);
-    sfx(ctx, 'crit', e.x, e.y, 80, 1);
+    sfx(ctx, 'zap_strike', e.x, e.y, 80, 1);
   },
   a_stormcaller: (ctx, e) => {
     const J = ctx.juice;
@@ -547,7 +550,7 @@ registerSkillFx({
     skyZap(ctx, e.x, e.y, 0xc8b0ff, S_VIOLET, 240, 3.5, 2);
     J.shockwave(p.x, p.y, ctx.rx(R), S_VIOLET, 280);
     J.bits('zap', p.x, p.y - 6, 4, 0xc8b0ff);
-    sfx(ctx, 'skill_arc', e.x, e.y, 120, 1);
+    sfx(ctx, 'zap_strike', e.x, e.y, 120, 1);
   },
   a_attune: (ctx, e) => {
     const J = ctx.juice;
@@ -578,8 +581,8 @@ registerSkillFx({
     oneShot(ctx, 'fx:arcanist:nova', t.x, t.y - 16, { scale: 1.05, depth: 4657, ms: 260 });
     J.bits('star', t.x, t.y - 14, 8, A_LILAC);
     if (ctx.mine) J.hitStop(35);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'crit', e.x, e.y, 60, 1);
+    sfx(ctx, 'blink', e.x, e.y, 120, ctx.mine ? 2 : 1);
+    sfx(ctx, 'impact_astral', e.x, e.y, 60, 1);
   },
   a_rift_gate: (ctx, e) => {
     const J = ctx.juice;
@@ -593,7 +596,7 @@ registerSkillFx({
       J.bits('star', p.x, p.y - 14, 8, A_LILAC);
       ctx.dungeon.flashLight(p.x, p.y - 14, 180, 0xb07aff, 2, 400);
     }
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_astral', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   a_echo_burst: (ctx, e) => {
     const J = ctx.juice;
@@ -601,7 +604,8 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, R, RIFT, 2);
     oneShot(ctx, 'fx:arcanist:nova', p.x, p.y - 16, { scale: 1.2, depth: 4657, ms: 280 });
     J.bits('rune', p.x, p.y - 12, 4, A_LILAC);
-    sfx(ctx, 'signature_nova', e.x, e.y, 120, 1);
+    sfx(ctx, 'impact_astral', e.x, e.y, 120, 1);
+    sfx(ctx, 'cast_astral', e.x, e.y, 120, 0);
   },
   a_singularity: (ctx, e) => {
     const J = ctx.juice;
@@ -619,8 +623,8 @@ registerSkillFx({
         g.fillStyle(i % 3 ? A_LILAC : 0xffffff, a).fillRect(t.x + Math.cos(an) * rx * r - 1, t.y - 8 + Math.sin(an) * ry * r - 1, 2, 2);
       }
     }, { delay: 160 });
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'signature_nova', e.x, e.y, 80, 1);
+    sfx(ctx, 'cast_astral', e.x, e.y, 60, ctx.mine ? 3 : 2);
+    sfx(ctx, 'skill_phase', e.dx, e.dy, 80, 1);   // the well drawing in
   },
   a_singularity_collapse: (ctx, e) => {
     const J = ctx.juice;
@@ -637,7 +641,8 @@ registerSkillFx({
     starRays(ctx, e.x, e.y, R * 1.3, 14, A_LILAC, 0xffffff, 420);
     J.pop(0xd7a8ff, 0.22, 240);
     if (ctx.mine) { J.hitStop(90); J.dilate(0.6, 280); }
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, 3);
+    sfx(ctx, 'signature_nova', e.x, e.y, 80, 3);
+    sfx(ctx, 'impact_astral', e.x, e.y, 80, 2);
   },
 });
 

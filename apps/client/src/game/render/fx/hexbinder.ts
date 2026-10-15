@@ -222,7 +222,7 @@ registerSkillFx({
     J.bits('rune', hx, hy, multi ? 3 : 1, HEX, { angle: (Math.atan2(u.y, u.x) * 180) / Math.PI, spread: 50, speed: 0.6 });
     J.embersAt(hx, hy, 2, SICK);
     ctx.dungeon.flashLight(hx, hy, 70, SICK, 0.9, 80);
-    sfx(ctx, 'attack_spark', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'attack_spark', e.x, e.y, 60, ctx.mine ? 2 : 1);   // basics stay a short zip (ear fatigue); casts carry the element
   },
 
   // ---- signature: Grave Tide ----
@@ -242,8 +242,8 @@ registerSkillFx({
     ctx.dungeon.flashLight(p.x, p.y, 280, SICK, 2.8, 460);
     J.pop(SICK, 0.14, 200);
     if (ctx.mine) J.hitStop(55);
-    sfx(ctx, 'signature_nova', e.x, e.y, 80, 3);
-    sfx(ctx, 'poison_spit', e.x, e.y, 80, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 80, 3);   // the tide's wet roar
+    sfx(ctx, 'cast_decay', e.x, e.y, 80, 1);
   },
 
   // ---- Pestilence ----
@@ -264,9 +264,9 @@ registerSkillFx({
       J.dust(q.x, q.y, 10, 0x3a5a1a);
       ctx.dungeon.addDecal('slime', q.x, q.y + 2, ROT, R * 0.7);
       ctx.dungeon.flashLight(q.x, q.y - 10, ctx.rx(R) * 2.2, SICK, 2, 300);
-      sfx(ctx, 'poison_spit', e.dx, e.dy, 60, ctx.mine ? 2 : 1);
+      sfx(ctx, 'blast_decay', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // the flask bursting
     });
-    sfx(ctx, 'swing', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   h_blightbloom: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y, 16);
@@ -280,8 +280,9 @@ registerSkillFx({
       J.bits('thorn', q.x, q.y - 4, 5, HEX);
       J.dust(q.x, q.y, 6, 0x2a3a1a);
       ctx.dungeon.flashLight(q.x, q.y - 12, 150, SICK, 1.8, 300);
-      sfx(ctx, 'skill_rally', e.dx, e.dy, 60, ctx.mine ? 2 : 1);
+      sfx(ctx, 'summon_rise', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // the bloom sprouting
     });
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   h_blightbloom_burst: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -291,7 +292,7 @@ registerSkillFx({
     ctx.juice.bits('leaf', p.x, p.y - 14, 14, HEX, { angle: -90, spread: 200, speed: 1.3 });
     ctx.juice.bits('skull', p.x, p.y - 14, 4, SICK_HOT, { angle: -90, spread: 90 });
     ctx.juice.bleed('artillery', p.x, p.y - 10, 20);
-    sfx(ctx, 'signature_nova', e.x, e.y, 80, 2);
+    sfx(ctx, 'blast_decay', e.x, e.y, 80, 2);
   },
   h_locust_swarm: (ctx, e) => {
     const p = chestAt(ctx, e.x, e.y, 14);
@@ -300,7 +301,7 @@ registerSkillFx({
     ctx.juice.bits('mote', p.x, p.y, 16, 0x2a3418, { angle: deg, spread: 40, speed: 1.6 });
     ctx.juice.bits('mote', p.x, p.y, 8, SICK, { angle: deg, spread: 30, speed: 1.3 });
     ctx.juice.orb(p.x, p.y, ROT, 0.6, 180);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);   // its beating detuned drone reads as the swarm
   },
   // rot leaping corpse -> neighbour (also Black Death's spread every second): cheap
   h_contagion: (ctx, e) => {
@@ -315,7 +316,7 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, e.dx || 2, PEST, 2, { decal: 'slime', decalTint: ROT, dust: 4 });
     ctx.juice.bleed('artillery', p.x, p.y - 12, 14);
     ctx.juice.bits('skull', p.x, p.y - 16, 2, BONE, { angle: -90, spread: 80, speed: 1.2 });
-    sfx(ctx, 'kill', e.x, e.y, 70, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 70, 1);
   },
   h_rupture: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y, 14);
@@ -330,7 +331,7 @@ registerSkillFx({
     J.bleed('artillery', c.x, c.y, 14);
     ctx.dungeon.addDecal('ichor', p.x, p.y + 4, 0x3a1a50, 0.9);
     ctx.dungeon.flashLight(c.x, c.y, 140, HEX, 2, 200);
-    sfx(ctx, 'crit', e.x, e.y, 60, 2);
+    sfx(ctx, 'blast_decay', e.x, e.y, 60, 2);
   },
 
   // ---- Sanguine ----
@@ -340,7 +341,7 @@ registerSkillFx({
     const q = chestAt(ctx, e.dx, e.dy);
     ctx.juice.starburst(q.x, q.y, BLOOD_HOT, 1, 160);
     ctx.juice.bleed('player', q.x, q.y, 10);
-    sfx(ctx, 'chain_bind', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   h_hemorrhage: (ctx, e) => {
     const J = ctx.juice;
@@ -355,7 +356,8 @@ registerSkillFx({
     ctx.dungeon.flashLight(p.x, p.y - 10, 220, BLOOD, 2.4, 320);
     J.pop(BLOOD, 0.1, 160);
     if (ctx.mine) J.hitStop(45);
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 80, 1);   // the tendrils ripping in
   },
   // one tendril per victim (target x,y -> caster dx,dy)
   h_hemorrhage_t: (ctx, e) => {
@@ -375,14 +377,15 @@ registerSkillFx({
     J.bleed('player', c.x + u.x * 10, c.y + u.y * 6, 10, u.x, u.y);
     J.bits('mote', c.x, c.y, 6, BLOOD, { angle: (ang * 180) / Math.PI, spread: 30, speed: 1.6 });
     if (ctx.rank(e.slot, 'h_crimson_covenant') > 0) J.sparksAt(c.x, c.y, 6, 0xffd070);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, 1);   // the lance hurled
   },
   h_exsanguinate: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
     impactBurst(ctx, e.x, e.y, e.dx || 2, BLOODP, 2, { decal: 'blood', decalTint: 0x7a0a10 });
     ctx.juice.bleed('player', p.x, p.y - 12, 22);
     ctx.juice.bits('mote', p.x, p.y - 12, 10, BLOOD_HOT, { angle: -90, spread: 120, speed: 1.2 });
-    sfx(ctx, 'hit_enemy', e.x, e.y, 60, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 60, 1);
   },
   h_blood_price: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y);
@@ -406,22 +409,23 @@ registerSkillFx({
   },
 
   // ---- Wraithcall ----
-  h_summon_wraith: (ctx, e) => { rise(ctx, e, SPIRITP, 1.2); sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1); },
+  h_summon_wraith: (ctx, e) => { rise(ctx, e, SPIRITP, 1.2); sfx(ctx, 'summon_rise', e.x, e.y, 60, ctx.mine ? 2 : 1); },
   h_banshee: (ctx, e) => {
     rise(ctx, e, BANSHEEP, 1.8);
     const p = ctx.P(e.x, e.y);
     ctx.juice.shockwave(p.x, p.y, ctx.rx(3), LILAC, 420, 80);
     ctx.juice.pop(LILAC, 0.08, 160);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'boss_ring', e.x, e.y, 200, 1);
+    sfx(ctx, 'summon_rise', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'beast_howl', e.x, e.y, 200, 1);   // her wail
   },
-  h_grave_legion: (ctx, e) => { rise(ctx, e, { main: BONE, hot: SICK_HOT, deep: 0x3a3020, bits: 'skull' }, 0.9); sfx(ctx, 'skill_phase', e.x, e.y, 120, ctx.mine ? 2 : 1); },
+  h_grave_legion: (ctx, e) => { rise(ctx, e, { main: BONE, hot: SICK_HOT, deep: 0x3a3020, bits: 'skull' }, 0.9); sfx(ctx, 'summon_rise', e.x, e.y, 120, ctx.mine ? 2 : 1); },
   // Legion of the Damned raises one per kill: keep it light
   h_lesser_wraith: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
     ctx.juice.ring(p.x, p.y, 20, SPIRIT, 260);
     ctx.juice.bits('mote', p.x, p.y - 8, 5, SPIRIT, { angle: -90, spread: 60, speed: 0.8 });
     ctx.juice.orb(p.x, p.y - 14, SPIRIT, 0.4, 200);
+    sfx(ctx, 'summon_rise', e.x, e.y, 400, 0);
   },
   h_banshee_shriek: (ctx, e) => {
     const J = ctx.juice;
@@ -441,7 +445,7 @@ registerSkillFx({
       const k = s.scaleX;
       ctx.scene.tweens.add({ targets: s, scaleX: k * 1.25, scaleY: k * 1.25, duration: 90, yoyo: true, ease: 'Quad.easeOut', onComplete: () => s.setScale(k) });
     }
-    sfx(ctx, 'boss_ring', e.x, e.y, 200, 1);
+    sfx(ctx, 'beast_howl', e.x, e.y, 200, 1);   // the shriek
   },
   h_death_knell: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -451,7 +455,8 @@ registerSkillFx({
     shot(ctx, 'fx:hexbinder:bell', p.x, p.y - 40, { add: false, depth: 4662, scale: 1.2 });
     ctx.juice.beam(p.x, p.y, 110, 10, SPIRIT, 320);
     ctx.juice.bits('skull', p.x, p.y - 16, 5, SPIRIT_HOT, { angle: -90, spread: 140, speed: 1.2 });
-    sfx(ctx, 'bell_toll', e.x, e.y, 160, 2);
+    sfx(ctx, 'blast_decay', e.x, e.y, 160, 2);
+    sfx(ctx, 'bell_toll', e.x, e.y, 1500, 1);   // the long toll at most every 1.5s (lesser wraiths fade often)
   },
 });
 

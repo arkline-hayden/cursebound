@@ -90,21 +90,21 @@ registerSkillFx({
   boon_chain_reaction: (ctx, e) => {
     burst(ctx, e.x, e.y, Math.max(1, e.dx || 2.5), EMBER, FIRE_HI, true);
     ctx.juice.shake(0.006, 120);
-    sfx(ctx, 'signature_slam', e.x, e.y, 90, 1);
+    sfx(ctx, 'blast_fire', e.x, e.y, 90, 1);
   },
-  boon_thunderous_blows: (ctx, e) => { skyBolt(ctx, e.x, e.y, STORM); sfx(ctx, 'skill_arc', e.x, e.y, 70, ctx.mine ? 2 : 1); },
+  boon_thunderous_blows: (ctx, e) => { skyBolt(ctx, e.x, e.y, STORM); sfx(ctx, 'zap_strike', e.x, e.y, 70, ctx.mine ? 2 : 1); },
   boon_splitting_shots: (ctx, e) => { streak(ctx, e.x, e.y, e.dx, e.dy, PRISM, 3); const t = chest(ctx, e.dx, e.dy); ctx.juice.sparksAt(t.x, t.y, 4, PRISM); },
   boon_bloodrush: (ctx, e) => {
     const p = ctx.P(...point(e));
     ctx.juice.ring(p.x, p.y, ctx.rx(1.2), 0xff5a4a, 260); ctx.juice.embersAt(p.x, p.y - 16, 10, 0xff5a4a);
-    if (ctx.mine) sfx(ctx, 'crit', e.x, e.y, 400, 2);
+    if (ctx.mine) sfx(ctx, 'heartbeat', e.x, e.y, 400, 2);   // the blood rushing
   },
   boon_soul_harvest: (ctx, e) => wisp(ctx, e.x, e.y, e.dx, e.dy, SOUL),
   boon_echo: (ctx, e) => {
     const p = ctx.P(...point(e));
     ctx.juice.ring(p.x, p.y, ctx.rx(0.9), 0x6aa8ff, 200); ctx.juice.ring(p.x, p.y, ctx.rx(1.4), 0xdacaff, 320);
     ctx.juice.sparksAt(p.x, p.y - 20, 8, 0x6aa8ff);
-    sfx(ctx, 'skill_phase', e.x, e.y, 150, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_astral', e.x, e.y, 150, ctx.mine ? 2 : 1);   // the charge chiming back
   },
   boon_phoenix: (ctx, e) => {
     burst(ctx, e.x, e.y, 2.2, 0xffa53a, GOLD, true);
@@ -113,6 +113,7 @@ registerSkillFx({
     ctx.juice.flash(0xffa53a, 80);
     if (ctx.mine) ctx.juice.hitStop(90);
     sfx(ctx, 'player_revived', e.x, e.y, 200, 3);
+    sfx(ctx, 'cast_fire', e.x, e.y, 200, 2);   // the flames of rebirth
   },
   boon_warding_rune: (ctx, e) => {
     const p = ctx.P(...point(e));
@@ -124,7 +125,7 @@ registerSkillFx({
     const p = ctx.P(...point(e));
     ctx.juice.ring(p.x, p.y, ctx.rx(e.dx || 2.5), 0xc9a36b, 260);
     ctx.juice.dust(p.x, p.y, 6, 0x6a5a48);
-    sfx(ctx, 'hit_enemy', e.x, e.y, 120, 1);
+    sfx(ctx, 'impact_heavy', e.x, e.y, 250, 1);   // fires on every hit taken, so spaced out
   },
   boon_executioner: (ctx, e) => {
     const p = chest(ctx, e.x, e.y);
@@ -134,23 +135,24 @@ registerSkillFx({
       fade(ctx, g, 260);
     }
     ctx.juice.sparksAt(p.x, p.y, 10, BONE);
-    sfx(ctx, 'crit', e.x, e.y, 60, 1);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 60, 1);   // the crossing cut
   },
   bane_hexed_ground: (ctx, e) => {
     burst(ctx, e.x, e.y, e.dx || 1.4, HEX, 0xdacaff, true);
     ctx.juice.shake(0.008, 140);
-    sfx(ctx, 'signature_nova', e.x, e.y, 120, 2);
+    sfx(ctx, 'blast_decay', e.x, e.y, 120, 2);   // the curse erupting
   },
   bane_relentless: (ctx, e) => {
     const p = ctx.P(...point(e));
     ctx.juice.ring(p.x, p.y, ctx.rx(1), 0xff3d3d, 240);
     ctx.juice.embersAt(p.x, p.y - 18, 6, 0xff3d3d);
+    sfx(ctx, 'beast_roar', e.x, e.y, 300, 1);   // a foe enraging
   },
   bane_blood_moon: (ctx, e) => {
     ctx.juice.flash(BLOOD, 120);
     const p = ctx.P(...point(e));
     ctx.juice.number(p.x, p.y - 60, `BLOOD MOON ${Math.round(e.dx)}`, '#ff2a55', 'lg');
-    sfx(ctx, 'boss_phase', e.x, e.y, 500, 3);
+    sfx(ctx, 'heartbeat', e.x, e.y, 500, 3);
   },
   bane_brittle: (ctx, e) => {
     const p = chest(ctx, e.x, e.y);
@@ -162,7 +164,8 @@ registerSkillFx({
     ctx.juice.ring(p.x, p.y, ctx.rx(1.6), 0xb8b0c8, 500);
     ctx.juice.dust(p.x, p.y, 14, 0x2a2430);
     ctx.dungeon.flashLight(p.x, p.y - 20, 200, 0x8a7aa8, 2, 500);
-    sfx(ctx, 'boss_telegraph', e.x, e.y, 500, 3);
+    sfx(ctx, 'summon_rise', e.x, e.y, 500, 3);   // the Reaper rising
+    sfx(ctx, 'bell_toll', e.x, e.y, 500, 2);   // once a round: its knell
   },
 });
 

@@ -158,7 +158,7 @@ registerSkillFx({
     heroGhosts(ctx, e.slot, e.dx, e.dy, CRIMSON, 2, 7);
     ctx.dungeon.flashLight(tip.x, tip.y, 120, CRIMSON, 1.6, 160);
     stopFor(ctx, e.slot, 32);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   // Shadow clone mirroring a swing: a violet crescent from where it stands.
   d_clone_slash: (ctx, e) => {
@@ -197,7 +197,7 @@ registerSkillFx({
     J.orb(c.x, c.y, BLOOD, 0.7, 200);
     ctx.dungeon.addDecal('blood', p.x, p.y + 3, 0x5a0a10, 0.8);
     ctx.dungeon.flashLight(c.x, c.y, 100, BLOOD, 1.6, 200);
-    sfx(ctx, 'crit', e.x, e.y, 70, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 70, 1);   // a wet burst of blood
   },
   // Crimson Whirl cast: a crimson flash and glyph under the spinning Duelist (the spins are d_fx_whirl).
   d_crimson_whirl: (ctx, e) => {
@@ -231,7 +231,7 @@ registerSkillFx({
     const from = ctx.P(e.x, e.y);
     ctx.juice.dust(from.x, from.y, 5, 0x3a2a2a);
     ctx.juice.ring(from.x, from.y, 16, CRIMSON, 180);
-    sfx(ctx, 'skill_phase', e.dx, e.dy, 60, 2);
+    sfx(ctx, 'dodge', e.x, e.y, 60, 2);   // the lunge
   },
   // Execution connecting (on the enemy, aim in dx,dy): a lance clean through, white and crimson starbursts, hit-stop.
   d_fx_execute_hit: (ctx, e) => {
@@ -264,7 +264,7 @@ registerSkillFx({
     J.bleed('player', c.x, c.y, 18);
     ctx.dungeon.flashLight(c.x, c.y, 140, CRIMSON, 2.2, 220);
     stopFor(ctx, e.slot, 50);
-    sfx(ctx, 'kill', e.x, e.y, 80, 2);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 80, 2);   // the crossing cuts (the death plays the central kill cue)
   },
   // Open Veins (bleed jumping from a corpse at x,y to dx,dy): a thin blood thread with drops along it.
   d_fx_veins: (ctx, e) => {
@@ -285,7 +285,8 @@ registerSkillFx({
     const t = chestAt(ctx, e.dx, e.dy);
     ctx.juice.bits('mote', t.x, t.y, 5, SHADOW_HOT);
     stopFor(ctx, e.slot, 28);
-    sfx(ctx, 'skill_phase', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blink', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
+    sfx(ctx, 'swing', e.dx, e.dy, 45, 1);   // the arrival cut
   },
   // Phantom Rush cast: the Duelist dissolves into violet, a faint ring at the true 6 reach.
   d_phantom_rush: (ctx, e) => {
@@ -294,7 +295,7 @@ registerSkillFx({
     ctx.juice.ring(p.x, p.y, ctx.rx(6), SHADOW, 420);
     ctx.juice.bits('mote', p.x, p.y - 14, 8, SHADOW_HOT);
     if (ctx.mine) ctx.juice.pop(DUSK, 0.16, 160);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, 2);
+    sfx(ctx, 'blink', e.x, e.y, 60, 2);
   },
   // A rush / Thousand Cuts / plain blink (x,y -> dx,dy): ghost trail, a streak and a cut on arrival. Crimson during
   // Thousand Cuts, violet for Phantom Rush (r1.2 strike).
@@ -319,7 +320,7 @@ registerSkillFx({
     ctx.juice.bits('skull', t.x, t.y - 10, 2, CRIMSON);
     ctx.dungeon.flashLight(t.x, t.y, 150, CRIMSON, 2, 260);
     stopFor(ctx, e.slot, 30);
-    sfx(ctx, 'skill_phase', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blink', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
   },
   // Death Mark detonation (r in dx): a razor-sharp crimson and violet bloom, crossing cuts, skulls, a blood stain.
   d_fx_mark_burst: (ctx, e) => {
@@ -334,7 +335,8 @@ registerSkillFx({
     J.beam(p.x, p.y, 80, 10, SHADOW, 240);
     J.bits('skull', c.x, c.y - 6, 3, SHADOW_HOT);
     J.bleed('player', c.x, c.y, 14);
-    sfx(ctx, 'signature_nova', e.x, e.y, 80, 3);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 80, 3);
+    sfx(ctx, 'blast_decay', e.x, e.y, 80, 1);   // the blood bloom
   },
   // Phantom Dash (a dodge that cuts, x,y -> dx,dy): violet afterimages and a cut where the dash ends.
   d_fx_phantom: (ctx, e) => {
@@ -353,7 +355,7 @@ registerSkillFx({
     crossCut(ctx, c.x, c.y, SHADOW, 1, 200);
     ctx.juice.bits('skull', c.x, c.y, 1, SHADOW_HOT);
     stopFor(ctx, e.slot, 25);
-    sfx(ctx, 'hit_enemy', e.x, e.y, 60, 1);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 60, 1);
   },
 
   // ---- Tempo ----
@@ -376,7 +378,7 @@ registerSkillFx({
     ctx.dungeon.flashLight(mx, my, 170, 0xffffff, 2.6, 200);
     J.pop(0xffffff, 0.1, 120);
     stopFor(ctx, e.slot, 90, 0);
-    sfx(ctx, 'crit', e.x, e.y, 50, 3);
+    sfx(ctx, 'shield_bash', e.x, e.y, 50, 3);   // the parry clang
   },
   // Counter-thrust (player x,y -> enemy dx,dy): a lance through the attacker and stun stars over its head.
   d_fx_counter: (ctx, e) => {
@@ -387,6 +389,7 @@ registerSkillFx({
     ctx.juice.starburst(t.x, t.y, 0xffffff, 1.3, 180);
     ctx.juice.sparksAt(t.x, t.y, 10, SILVER);
     ctx.juice.bits('star', t.x, t.y - 22, 4, PARRY);
+    sfx(ctx, 'swing', e.x, e.y, 60, 1);   // the thrust (the parry clang plays with it)
   },
   // Counterstrike sweep (r in dx): six silver blades around the true radius, a silver wave, stun stars.
   d_fx_counter_sweep: (ctx, e) => {
@@ -403,6 +406,7 @@ registerSkillFx({
     J.starburst(c.x, c.y, 0xffffff, 1.4, 180);
     J.bits('star', c.x, c.y - 10, 8, PARRY, { angle: -90, spread: 200 });
     ctx.dungeon.flashLight(c.x, c.y, Math.max(130, ctx.rx(R) * 2), SILVER, 2, 220);
+    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   // An unused Riposte stance ends in a thrust (2.4 long): a lance at the true length.
   d_fx_thrust: (ctx, e) => {
@@ -424,7 +428,7 @@ registerSkillFx({
     const tx = c.x + Math.cos(ang + off) * 40, ty = c.y + Math.sin(ang + off) * 20;
     J.sparksAt(tx, ty, 2, flip ? 0xffffff : CRIMSON_HOT);
     if (Math.random() < 0.3) J.starburst(tx, ty, 0xffffff, 0.6, 120);
-    sfx(ctx, 'swing', e.x, e.y, 45, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 160, ctx.mine ? 2 : 1);   // one three-slash flurry per few cuts, never a machine gun
   },
 
   // ---- Signature ----
@@ -440,7 +444,7 @@ registerSkillFx({
     J.bits('star', p.x, p.y - 16, 6, CRIMSON_HOT);
     ctx.dungeon.flashLight(p.x, p.y - 10, 260, CRIMSON, 2.4, 600);
     if (ctx.mine) J.pop(0x5a0414, 0.14, 200);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, 3);
+    sfx(ctx, 'blink', e.x, e.y, 60, 3);
   },
   // Thousand Cuts finale burst (r in dx, x1.6 with Finale): the razor bloom. Eight radiating cuts, a crimson column,
   // waves at the true radius, blood, a pop and hit-stop.
@@ -466,7 +470,8 @@ registerSkillFx({
     if (s?.active) for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2 + Math.PI / 4; J.afterimage(s, i % 2 ? CRIMSON : SHADOW, 0.45, 260, Math.cos(a) * 16, Math.sin(a) * 8); }
     J.pop(CRIMSON, 0.16, 220);
     stopFor(ctx, e.slot, 90, 0);
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, 3);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 80, 3);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 80, 2);   // the knockback bloom
   },
 });
 

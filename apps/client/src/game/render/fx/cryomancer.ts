@@ -288,7 +288,7 @@ registerSkillFx({
     J.orb(h.x, h.y, ICE, 0.3, 110, 1.5);
     J.bits('ice', h.x, h.y, 2, PALE, { angle: deg(h.ux, h.uy), spread: 40, speed: 0.9 });
     ctx.dungeon.flashLight(h.x, h.y, 60, FROST, 0.8, 70);
-    sfx(ctx, 'attack_spark', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'attack_spark', e.x, e.y, 60, ctx.mine ? 2 : 1);   // basics stay a short zip (ear fatigue); casts carry the element
   },
 
   c_absolute_zero: (ctx, e) => {
@@ -315,7 +315,7 @@ registerSkillFx({
     J.pop(0xbfefff, 0.22, 260);
     if (ctx.mine) { J.hitStop(110); J.dilate(0.6, 320); }
     sfx(ctx, 'signature_nova', e.x, e.y, 0, 3);
-    sfx(ctx, 'freeze', e.x, e.y, 0, 2);
+    sfx(ctx, 'blast_frost', e.x, e.y, 0, 2);
   },
 
   // ---------------- glacier ----------------
@@ -329,8 +329,8 @@ registerSkillFx({
     J.dust(p.x, p.y, 10, 0xbfdcec);
     J.sparksAt(p.x, p.y - 8, 12, ICE);
     ctx.dungeon.flashLight(p.x, p.y - 10, 160, FROST, 1.8, 260);
-    sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'freeze', e.x, e.y, 200, 0);
+    sfx(ctx, 'cast_frost', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'freeze', e.x, e.y, 200, 1);   // the wall locking into place
   },
   c_frost_effigy: (ctx, e) => {
     const J = ctx.juice;
@@ -346,8 +346,8 @@ registerSkillFx({
     J.dust(p.x, p.y, 8, 0xbfdcec);
     // the glide back over the ice: afterimages once the caster is moving
     ctx.scene.time.delayedCall(70, () => heroGhosts(ctx, e.slot, -e.dy, e.dx, ICE, 5, 10));
-    sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, 1);
+    sfx(ctx, 'freeze', e.x, e.y, 200, ctx.mine ? 2 : 1);   // the wall
+    sfx(ctx, 'summon_rise', e.x, e.y, 60, 1);   // the Effigy rising
   },
   c_glacial_prison: (ctx, e) => {
     const J = ctx.juice;
@@ -361,7 +361,7 @@ registerSkillFx({
     J.starburst(p.x, p.y - 12, 0xffffff, 1.4);
     J.bits('ice', p.x, p.y - 10, 12, PALE);
     ctx.dungeon.flashLight(p.x, p.y - 10, 220, FROST, 2.2, 320);
-    sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'blast_frost', e.x, e.y, 60, ctx.mine ? 2 : 1);
     sfx(ctx, 'freeze', e.x, e.y, 120, 1);
   },
   c_effigy_burst: (ctx, e) => {
@@ -374,15 +374,15 @@ registerSkillFx({
     J.bits('star', p.x, p.y - 20, 6, 0xffffff);
     J.starburst(p.x, p.y - 20, 0xffffff, 2);
     if (ctx.mine) J.hitStop(60);
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, 2);
-    sfx(ctx, 'ice_shatter', e.x, e.y, 80, 2);
+    sfx(ctx, 'blast_frost', e.x, e.y, 80, 2);
+    sfx(ctx, 'ice_shatter', e.x, e.y, 80, 1);
   },
   c_wall_block: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y);
     ctx.juice.starburst(c.x, c.y, 0xffffff, 0.8, 140);
     ctx.juice.bits('ice', c.x, c.y, 4, PALE);
     ctx.juice.ring(c.x, c.y + 14, 14, ICE, 200);
-    sfx(ctx, 'shield', e.x, e.y, 120, 1);
+    sfx(ctx, 'impact_frost', e.x, e.y, 120, 1);
   },
   c_cryostasis: (ctx, e) => {
     const J = ctx.juice;
@@ -437,7 +437,7 @@ registerSkillFx({
     J.starburst(c.x, c.y, 0xffffff, 1.2, 160);
     J.bits('ice', c.x, c.y, 6, PALE, { angle: deg(ctx.U(e.dx, e.dy).x, ctx.U(e.dx, e.dy).y), spread: 70 });
     J.bits('star', c.x, c.y, 4, 0xffffff);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_frost', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   c_orb_burst: (ctx, e) => {
     const J = ctx.juice;
@@ -449,8 +449,7 @@ registerSkillFx({
     J.bits('star', c.x, c.y, 5, 0xffffff);
     spikeRing(ctx, e.x, e.y, 0.5, 1.2, 6, { stagger: 30, linger: 120, scale: 0.8 });
     ctx.dungeon.flashLight(c.x, c.y, 150, FROST, 2, 200);
-    sfx(ctx, 'crit', e.x, e.y, 60, 1);
-    sfx(ctx, 'ice_shatter', e.x, e.y, 80, 1);
+    sfx(ctx, 'blast_frost', e.x, e.y, 60, 1);
   },
   c_hail: (ctx, e) => {
     const J = ctx.juice;
@@ -466,8 +465,8 @@ registerSkillFx({
       J.impact(p.x, p.y - 8, WHITE, 0.8);
       J.bits('ice', p.x, p.y - 8, 4, PALE);
       J.ring(p.x, p.y, ctx.rx(0.8), ICE, 200);
+      sfx(ctx, 'impact_frost', e.x, e.y, 60, 0);   // on landing (fixed delay, so the throttle still spaces them)
     });
-    sfx(ctx, 'hit_enemy', e.x, e.y, 60, 0);
   },
   c_comet: (ctx, e) => {
     const J = ctx.juice;
@@ -489,8 +488,8 @@ registerSkillFx({
       J.beam(p.x, p.y, 150, 30, ICE, 340);
       J.bits('ice', p.x, p.y - 10, 26, PALE);
       J.bits('star', p.x, p.y - 12, 8, 0xffffff);
-      sfx(ctx, 'signature_slam', e.x, e.y, 0, 3);
-      sfx(ctx, 'freeze', e.x, e.y, 120, 1);
+      sfx(ctx, 'blast_frost', e.x, e.y, 0, 3);
+      sfx(ctx, 'slam_heavy', e.x, e.y, 0, 1);
     });
   },
 
@@ -504,7 +503,7 @@ registerSkillFx({
     frostCracks(ctx, e.x, e.y, R, 8, 520);
     J.bits('ice', p.x, p.y - 12, 16, PALE);
     if (ctx.mine) J.hitStop(50);
-    sfx(ctx, 'signature_nova', e.x, e.y, 60, 2);
+    sfx(ctx, 'blast_frost', e.x, e.y, 60, 2);
     sfx(ctx, 'freeze', e.x, e.y, 120, 1);
   },
   c_glacial_spike: (ctx, e) => {
@@ -517,7 +516,7 @@ registerSkillFx({
     J.bits('ice', p.x, p.y - 16, 12, PALE);
     J.dust(p.x, p.y, 8, 0xbfdcec);
     ctx.dungeon.flashLight(p.x, p.y - 20, 170, FROST, 2.2, 280);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_frost', e.x, e.y, 60, ctx.mine ? 2 : 1);
     sfx(ctx, 'freeze', e.x, e.y, 120, 1);
   },
   c_spike_burst: (ctx, e) => {
@@ -529,8 +528,8 @@ registerSkillFx({
     J.bits('ice', p.x, p.y - 12, 10, PALE);
     J.bits('star', p.x, p.y - 26, 6, 0xffffff);
     if (ctx.mine) J.hitStop(40);
-    sfx(ctx, 'crit', e.x, e.y, 60, 2);
-    sfx(ctx, 'ice_shatter', e.x, e.y, 80, 2);
+    sfx(ctx, 'blast_frost', e.x, e.y, 60, 2);
+    sfx(ctx, 'ice_shatter', e.x, e.y, 80, 1);
   },
   c_cold_snap: (ctx, e) => {
     const J = ctx.juice;
@@ -543,7 +542,7 @@ registerSkillFx({
     frostCracks(ctx, e.x, e.y, 2.5, 8, 480);
     ctx.dungeon.flashLight(p.x, p.y - 10, 260, FROST, 2, 300);
     if (ctx.mine) J.pop(0xd8f6ff, 0.1, 160);
-    sfx(ctx, 'skill_arc', e.x, e.y, 60, 2);
+    sfx(ctx, 'cast_frost', e.x, e.y, 60, 2);
     sfx(ctx, 'freeze', e.x, e.y, 120, 1);
   },
   c_cold_snap_hit: (ctx, e) => {
@@ -584,7 +583,7 @@ registerSkillFx({
     J.ring(p.x, p.y, ctx.rx(R * 0.55), 0xffffff, 200);
     spikeRing(ctx, e.x, e.y, R * 0.5, R, 7, { stagger: 25, linger: 100, scale: 0.75 });
     J.bits('ice', p.x, p.y - 10, 8, PALE);
-    sfx(ctx, 'crit', e.x, e.y, 70, 1);
+    sfx(ctx, 'blast_frost', e.x, e.y, 70, 1);
   },
 });
 
@@ -615,8 +614,8 @@ function stormCast(ctx: FxCtx, slot: number, x: number, y: number, whiteout: boo
   });
   ctx.dungeon.flashLight(p.x, p.y - 20, whiteout ? 240 : 180, FROST, whiteout ? 2.2 : 1.6, whiteout ? 480 : 400);
   if (whiteout && ctx.mine) J.pop(0xe8faff, 0.12, 200);
-  sfx(ctx, 'skill_phase', x, y, 60, ctx.mine ? 2 : 1);
-  if (whiteout) sfx(ctx, 'signature_nova', x, y, 200, 1);
+  sfx(ctx, 'cast_frost', x, y, 60, ctx.mine ? 2 : 1);
+  sfx(ctx, 'cine_whoosh', x, y, 200, whiteout ? 2 : 1);   // the storm's wind gathering
 }
 
 registerProjectileFx({
