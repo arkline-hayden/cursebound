@@ -28,7 +28,7 @@ export function TutorialGuide({ net }: { net: GameConnection }) {
   if (!gd || (phase !== 'COMBAT' && phase !== 'VOTING') || gd.s >= TOTAL) return null;
   // beside a legendary its quick-compare (GearLayer) takes the centre and does the teaching: step aside
   const me = snap.players[slot];
-  if (GUIDE_STEPS[gd.s] === 'loot' && gd.d >= 0 && me && (snap.lt ?? []).some((it) => Math.hypot(it.x - me.x, it.y - me.y) < 2.8)) return null;
+  if (GUIDE_STEPS[gd.s] === 'loot' && me &&(snap.lt ?? []).some((it) => Math.hypot(it.x - me.x, it.y - me.y) < 2.8)) return null;
   const cap = (a: Action) => (usingPad ? padGlyph(pad[a]?.[0], fam) : keyCap(keys[a]?.[0]));
   const key = (a: Action | null, done = false, label?: string) => <span key={label ?? a ?? ''} className={`kbd${done ? ' tg-done' : ''}`}>{label ?? (a ? cap(a) : '')}</span>;
   const step = GUIDE_STEPS[gd.s];
