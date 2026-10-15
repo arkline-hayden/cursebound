@@ -4,6 +4,7 @@ import { CLASSES, NODES, SKILLS, DODGE } from './classes';
 import { ARENA_DESIGNS, BIOMES, BOSSES, BOSS_ARENAS, DUNGEON_LAYOUTS, ENEMIES, PACK_TEMPLATES, ROOM_KINDS, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
 import { AFFIXES, AFFIX_RULES } from './affixes';
 import { LEGENDARIES, LOOT_RULES } from './legendaries';
+import { CONSUMABLES, MAX_BLESSINGS, TRAINING_THEME } from './consumables';
 import { canonicalJson, sha256Hex } from './hash';
 import { AFFLICTION_RULES, CONTENT_VERSION, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION } from './rules';
 import { STATS } from './stats';
@@ -16,6 +17,7 @@ export * from './classes';
 export * from './enemies';
 export * from './affixes';
 export * from './legendaries';
+export * from './consumables';
 export * from './rules';
 export * from './hash';
 export * from './validate';
@@ -45,6 +47,10 @@ export const CONTENT_MANIFEST = {
   afflictionRules: AFFLICTION_RULES,
   legendaries: LEGENDARIES,
   lootRules: LOOT_RULES,
+  // legendary consumables (Fate's Blessing) and the training grounds
+  consumables: CONSUMABLES,
+  maxBlessings: MAX_BLESSINGS,
+  training: TRAINING_THEME,
 };
 
 let cachedHash: string | null = null;

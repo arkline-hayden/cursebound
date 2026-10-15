@@ -4,6 +4,7 @@ import {
   basePoints, cardById, cardMechanics, cardRarity, cardStatEffects, isBossRound, mechanicText, referenceSec,
   type CardDef, type CardRarity, type LedgerGroup, type MechanicDef, type SkillDef,
 } from '@cursebound/content';
+import { offeredCard } from './blessing';
 import { effectiveFromAcc, formatMechanicValue, perCopyFactor } from './boons';
 import { nextInt, seedRng } from './rng';
 import { expectedFoeCount } from './director';
@@ -390,7 +391,7 @@ export function computeForecast(state: SimState): OfferForecast | null {
   if (!offer) return null;
   const nextRound = state.round + 1;
   const cards = offer.cards.map((cardId, slot) => {
-    const card = cardById(cardId)!;
+    const card = offeredCard(offer, slot) ?? cardById(cardId)!;   // a blessed card forecasts without its price (blessing.ts)
     const fo = factorsWithCard(state, card);
     const players: PlayerForecast[] = [];
     const refB = enemyRef(state, nextRound);
@@ -542,6 +543,8 @@ export interface LedgerView {
   mechanics: LedgerMechanic[];
   /** Every mechanic binding in order (seq shares the stat timeline ordering). */
   mechanicTimeline: { seq: number; round: number; cardId: string; mechanic: string; kind: 'boon' | 'bane'; magnitude: string }[];
+  /** Commits whose price a Fate's Blessing lifted (blessing.ts): the card, the round and the hero who blessed it. */
+  blessings?: { round: number; cardId: string; slot: number; name: string }[];
 }
 
 export const LEDGER_GROUP_NAMES: Record<LedgerGroup, string> = {
@@ -615,7 +618,14 @@ export function computeLedger(state: SimState, page = 0, pageSize = 50): LedgerV
     graph,
     mechanics: ledgerMechanics(state),
     mechanicTimeline: (state.fate.mechanicEntries ?? []).map((m) => ({ seq: m.seq, round: m.round, cardId: m.cardId, mechanic: m.mechanic, kind: m.kind, magnitude: m.magnitude })),
+    ...ledgerBlessings(state),
   };
+}
+
+/** Blessed commits for the Ledger (absent when the run has none, so older views are unchanged). */
+function ledgerBlessings(state: SimState): { blessings?: LedgerView['blessings'] } {
+  const list = state.commits.filter((c) => c.blessed !== undefined).map((c) => ({ round: c.round, cardId: c.cardId, slot: c.blessed!, name: state.players[c.blessed!]?.name ?? `P${c.blessed! + 1}` }));
+  return list.length ? { blessings: list } : {};
 }
 
 export interface LedgerMechanic {

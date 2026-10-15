@@ -1,8 +1,9 @@
 import { Big } from '@cursebound/numeric';
 import {
-  BOSS_BY_ID, CLASS_BY_ID, ENEMY_BY_ID, GEAR_SLOTS, LEGENDARIES, LEGENDARY_BY_ID, LOOT_RULES, NODE_BY_ID, RULES, SKILL_BY_ID, TICK_SEC,
+  BOSS_BY_ID, CLASS_BY_ID, ENEMY_BY_ID, FATES_BLESSING, GEAR_SLOTS, LEGENDARIES, LEGENDARY_BY_ID, LOOT_RULES, NODE_BY_ID, RULES, SKILL_BY_ID, TICK_SEC,
   perkParam, type DamageType, type GearSlot, type LegendaryDef,
 } from '@cursebound/content';
+import { isBlessingItem, settleBlessing, stepBlessingLoot } from './blessing';
 import { addDot, addStagger, applySingle, cohortHpFrac, cohortRadius, healPlayer, hitEnemy, killEnemy, shieldPlayer } from './combat';
 import { refreshMaxHp } from './fate';
 import { inCone, moveCircle, norm } from './geometry';
@@ -171,7 +172,8 @@ function randomDropsThisRound(state: SimState): number {
   return n;
 }
 
-/** Pick an item for the party: class-only items only for classes present; avoid items already equipped or on the ground. */
+/** Pick an item for the party: class-only items only for classes present; avoid items already equipped or on the ground.
+ *  Fate's Blessing (blessing.ts) is one more entry in the pool, so it is exactly as likely as any single legendary. */
 export function chooseLegendary(state: SimState): string | null {
   const classes = new Set(state.players.map((p) => p.classId));
   const eligible = LEGENDARIES.filter((d) => !d.classId || classes.has(d.classId));
@@ -181,13 +183,14 @@ export function chooseLegendary(state: SimState): string | null {
   for (const it of state.loot ?? []) taken.add(it.itemId);
   let pool = eligible.filter((d) => !taken.has(d.id));
   if (!pool.length) pool = eligible;
-  return pool[nextInt(lootRng(state), pool.length)].id;
+  const ids = [...pool.map((d) => d.id), FATES_BLESSING.id];
+  return ids[nextInt(lootRng(state), ids.length)];
 }
 
 /** Place a legendary on the ground near (x, y). */
 export function dropLegendary(state: SimState, ev: SimEvent[], x: number, y: number, source: LootRecord['source'], itemId?: string): GroundLoot | null {
   const id = itemId ?? chooseLegendary(state);
-  if (!id || !LEGENDARY_BY_ID[id]) return null;
+  if (!id || (!LEGENDARY_BY_ID[id] && !isBlessingItem(id))) return null;
   const rng = lootRng(state);
   const ang = nextFloat(rng) * Math.PI * 2;
   const r = 0.3 + nextFloat(rng) * 0.5;
@@ -283,6 +286,7 @@ export function stepLoot(state: SimState, ev: SimEvent[]) {
   const keep: GroundLoot[] = [];
   const swapTarget = state.players.map((p) => (edges[p.slot] ? swappableLoot(state, p) : null));
   for (const it of loot) {
+    if (isBlessingItem(it.itemId)) { if (!stepBlessingLoot(state, ev, it, delay)) keep.push(it); continue; }   // into a pack (blessing.ts)
     const def = LEGENDARY_BY_ID[it.itemId];
     if (!def) continue;
     if (it.carry || state.tick - it.bornTick < delay) { keep.push(it); continue; }
@@ -323,6 +327,7 @@ export function settleLoot(state: SimState, ev: SimEvent[]) {
   if (!loot?.length) return;
   const keep: GroundLoot[] = [];
   for (const it of loot) {
+    if (isBlessingItem(it.itemId)) { if (!settleBlessing(state, ev, it)) keep.push({ ...it, carry: true }); continue; }
     const def = LEGENDARY_BY_ID[it.itemId];
     if (!def) continue;
     let best: PlayerState | null = null;

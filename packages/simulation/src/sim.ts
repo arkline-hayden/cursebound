@@ -16,8 +16,10 @@ import './pickups';   // potions and resource orbs (global hooks)
 import './boons';     // Fate mechanics: boons and banes (global hooks)
 import { settleLoot } from './gear';   // legendary gear: drops, pickup/swap, perks (global hooks; after pickups)
 import { STATE_SCHEMA, stateHash } from './serialize';
+import { applyTraining, setupTraining, topUpTrainingPoints, trainingAiOff, trainingIdleEnemy, trainingTick } from './training';   // training grounds
+import { applyBlessing, blessingOn } from './blessing';   // Fate's Blessing
 import { B, ONE, derivePlayer } from './stats';
-import type { Command, Phase, PlayerInput, PlayerState, SimEvent, SimState, SkillRuntime } from './types';
+import type { Command, CommitRecord, Phase, PlayerInput, PlayerState, SimEvent, SimState, SkillRuntime } from './types';
 
 // Authoritative run state machine (PRD §3.1): LOADOUT_LOCK -> ROUND_SETUP -> COMBAT -> ROUND_CLEAR ->
 // SKILL_ALLOCATION -> FATE_OFFER -> VOTING -> FATE_COMMIT -> SAFE_CHECKPOINT -> ROUND_SETUP ...;
@@ -38,6 +40,8 @@ export interface CreateRunParams {
   roster: RosterEntry[];
   tutorial?: boolean;
   deck?: string[];
+  /** training grounds run (training.ts): courtyard sandbox, no score, records or Fate */
+  training?: boolean;
 }
 
 function newPlayer(e: RosterEntry): PlayerState {
@@ -106,6 +110,7 @@ export function createRun(params: CreateRunParams): SimState {
     reactions: [], pendingSpawns: [], bossPhaseEvents: [], pickups: [], loot: [], lootFound: [],
   };
   if (params.mode === 'coop') state.phaseDeadlineTick = null;
+  if (params.training) state.training = { ai: true };   // training grounds (training.ts)
   return state;
 }
 
@@ -157,8 +162,8 @@ function allocate(state: SimState, p: PlayerState, nodeId: string): AllocResult 
 }
 
 function refundAll(state: SimState, p: PlayerState): AllocResult {
-  // Respec permitted only before round 1 (proposed ranked rule, PRD §7.2)
-  if (state.phase !== 'LOADOUT_LOCK') return { ok: false, code: 'RESPEC_LOCKED' };
+  // Respec permitted only before round 1 (proposed ranked rule, PRD §7.2); training grounds refund freely
+  if (state.phase !== 'LOADOUT_LOCK' && !state.training) return { ok: false, code: 'RESPEC_LOCKED' };
   let refund = 0;
   for (const [id, r] of Object.entries(p.ranks)) {
     const n = NODE_BY_ID[id];
@@ -168,6 +173,7 @@ function refundAll(state: SimState, p: PlayerState): AllocResult {
   }
   p.spentByBranch = {};
   p.skillPoints += refund;
+  topUpTrainingPoints(state, p);
   state.stateVersion++;
   const before = p.maxHp;
   refreshMaxHp(p, before, derivePlayer(state, p).maxHp);
@@ -182,11 +188,13 @@ export interface CommandOutcome { cmd: Command; ok: boolean; code?: string }
 function applyCommand(state: SimState, ev: SimEvent[], cmd: Command): CommandOutcome {
   const p = 'slot' in cmd ? state.players[cmd.slot] : undefined;
   if ('slot' in cmd && !p) return { cmd, ok: false, code: 'INVALID_SLOT' };
-  const intermission = state.phase === 'LOADOUT_LOCK' || state.phase === 'SKILL_ALLOCATION';
+  // training grounds (training.ts): the tree stays open in combat
+  const intermission = state.phase === 'LOADOUT_LOCK' || state.phase === 'SKILL_ALLOCATION' || (!!state.training && state.phase === 'COMBAT');
   switch (cmd.type) {
     case 'ALLOCATE': {
       if (!intermission) return { cmd, ok: false, code: 'STALE_PHASE' };
       const r = allocate(state, p!, cmd.nodeId);
+      if (r.ok) topUpTrainingPoints(state, p!);
       return r.ok ? { cmd, ok: true } : { cmd, ok: false, code: r.code };
     }
     case 'REFUND_ALL': {
@@ -240,6 +248,14 @@ function applyCommand(state: SimState, ev: SimEvent[], cmd: Command): CommandOut
       state.endReason = 'aborted_infrastructure';
       enterFinalize(state, ev, state.phase === 'COMBAT');
       return { cmd, ok: true };
+    case 'TRAIN': {
+      const r = applyTraining(state, ev, p!, cmd.op, cmd.arg, cmd.tier);
+      return r.ok ? { cmd, ok: true } : { cmd, ok: false, code: r.code };
+    }
+    case 'BLESS': {
+      const r = applyBlessing(state, ev, p!, cmd.offerId, cmd.cardSlot);
+      return r.ok ? { cmd, ok: true } : { cmd, ok: false, code: r.code };
+    }
     case 'INCIDENT':
       state.incident = cmd.reason;
       setPhase(state, ev, 'RECOVERY');
@@ -262,7 +278,8 @@ function enterRoundSetup(state: SimState, ev: SimEvent[]) {
   state.retireVotes = [];
   state.doors = null;   // the threshold of the last intermission is gone (doors.ts)
   setPhase(state, ev, 'ROUND_SETUP');
-  setupRound(state, ev);
+  if (state.training) setupTraining(state, ev);   // the courtyard (training.ts)
+  else setupRound(state, ev);
   if (state.tutorial && state.round === 1) {
     // tutorial: a gentle first encounter teaching movement and one enemy attack
     const enc = state.encounter!;
@@ -291,7 +308,8 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
   for (const h of state.hazards) (h.owner === 'player' ? stepPlayerHazard : stepEnemyHazard)(state, ev, h);
   state.hazards = state.hazards.filter((h) => h.untilTick > state.tick);
   // statuses, AI and enemy attacks
-  for (const e of state.enemies) stepEnemy(state, ev, e);
+  const idle = trainingAiOff(state);   // training grounds: foes may stand still like dummies
+  for (const e of state.enemies) (idle ? trainingIdleEnemy : stepEnemy)(state, ev, e);
   separateEnemies(state);
   hooks.onTick(state, ev);
   // deaths -> progression
@@ -331,6 +349,7 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
       p.dpsBucket = ZERO;
     }
   }
+  if (state.training) { trainingTick(state, ev); return; }   // training grounds: no clear, no wipe (heroes respawn)
   // clear and wipe checks (simultaneous boss kill and wipe: objective credit first, then wipe)
   const cleared = enc.wave >= enc.waveCount - 1 && enc.groups.every((g) => g.defeated);
   const anyAlive = state.players.some((p) => p.lifeState === 'alive' || p.selfReviveChannel > 0);
@@ -425,26 +444,28 @@ function commitOffer(state: SimState, ev: SimEvent[], door?: number) {
     ? { cardSlot: door, tie: { tiedSlots: [door], draw: null, zeroVotes: false, counts } }
     : resolveVotes(state, counts);
   const cardId = offer.cards[cardSlot];
+  const blessedBy = blessingOn(offer, cardSlot)?.slot;   // Fate's Blessing: the price is lifted (blessing.ts)
   offer.resolved = true;
   setPhase(state, ev, 'FATE_COMMIT');
-  applyCard(state, cardId, offer.id, ev);
+  applyCard(state, cardId, offer.id, ev, blessedBy !== undefined);
   const chosen = chooseDoor(state, cardSlot);   // the next floor uses this door's theme
   if (chosen) ev.push(chosen);
   state.eventSeq++;
-  const record = { offerId: offer.id, round: state.round, cardId, cardSlot, tie, priorStateHash: prior, resultingStateHash: '', eventSeq: state.eventSeq, tick: state.tick };
+  const record: CommitRecord = { offerId: offer.id, round: state.round, cardId, cardSlot, tie, priorStateHash: prior, resultingStateHash: '', eventSeq: state.eventSeq, tick: state.tick };
+  if (blessedBy !== undefined) record.blessed = blessedBy;
   state.commits.push(record);
   if (state.commits.length > 1000) state.commits.splice(0, state.commits.length - 1000);
   record.resultingStateHash = stateHash(state);
   state.awaitingDurable = 'commit';
-  ev.push({ t: 'domain', type: 'fate_committed', payload: { offerId: offer.id, cardId, cardSlot, tieEvidence: tie, priorStateHash: prior, resultingStateHash: record.resultingStateHash, factors: CARD_FACTORS(cardId) } });
+  ev.push({ t: 'domain', type: 'fate_committed', payload: { offerId: offer.id, cardId, cardSlot, tieEvidence: tie, priorStateHash: prior, resultingStateHash: record.resultingStateHash, factors: CARD_FACTORS(cardId, blessedBy !== undefined), ...(blessedBy !== undefined ? { blessedBy } : {}) } });
 }
 
-function CARD_FACTORS(cardId: string) {
+function CARD_FACTORS(cardId: string, blessed = false) {
   const c = cardById(cardId);
   if (!c) return [];
   return [
-    ...cardStatEffects(c).map(({ effect: e }) => ({ stat: e.stat, percent: e.percent, factor: percentToFactor(e.percent).toString() })),
-    ...cardMechanics(c).map(({ effect: m }) => ({ mechanic: m.id, magnitude: m.magnitude })),
+    ...cardStatEffects(c).filter((x) => !blessed || x.side !== 'price').map(({ effect: e }) => ({ stat: e.stat, percent: e.percent, factor: percentToFactor(e.percent).toString() })),
+    ...cardMechanics(c).filter((x) => !blessed || x.side !== 'price').map(({ effect: m }) => ({ mechanic: m.id, magnitude: m.magnitude })),
   ];
 }
 
@@ -458,7 +479,8 @@ export function step(state: SimState, inputs: (PlayerInput | null | undefined)[]
   switch (state.phase) {
     case 'LOADOUT_LOCK':
       if (retire) { state.endReason = 'retired'; enterFinalize(state, ev, false); break; }
-      if (state.players.every((p) => p.ready || !p.connected) && state.players.some((p) => p.connected)) {
+      // training grounds open at once (no loadout to confirm)
+      if ((state.players.every((p) => p.ready || !p.connected) || state.training) && state.players.some((p) => p.connected)) {
         for (const p of state.players) p.ready = false;
         ev.push({ t: 'domain', type: 'run_started', payload: { n: state.n, seed: state.seed, roster: state.players.map((p) => ({ slot: p.slot, classId: p.classId, ranks: p.ranks })) } });
         enterRoundSetup(state, ev);

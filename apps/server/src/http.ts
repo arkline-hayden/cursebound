@@ -92,16 +92,18 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     return { ok: true };
   });
   route('POST', '/rooms', async (_m, req, _url, ctx) => {
-    const b = (await readBody(req)) as { profileId?: string; mode?: string; classId?: string; challenge?: string; tutorial?: boolean };
+    const b = (await readBody(req)) as { profileId?: string; mode?: string; classId?: string; challenge?: string; tutorial?: boolean; training?: boolean };
     const profile = await store.getProfile(assertId(String(b.profileId ?? ''), 'profile'));
     if (!profile) throw new HttpError(404, 'NOT_FOUND', 'profile not found');
     await assertProfileUse(profile.id, ctx);
     const mode = b.mode === 'coop' ? 'coop' : 'solo';
     const tutorial = !!b.tutorial && mode === 'solo';
     const challenge = b.challenge === 'daily' ? 'daily' : 'random';
-    const room = rooms.createRoom({ mode, challenge: tutorial ? 'tutorial' : challenge, tutorial });
+    // training grounds (rooms.ts): a sandbox room, never scored or recorded
+    const training = !!b.training && !tutorial;
+    const room = rooms.createRoom({ mode, challenge: tutorial ? 'tutorial' : challenge, tutorial, ...(training ? { training } : {}) });
     const { seat, token } = room.addSeat(profile.id, profile.displayName, CLASS_BY_ID[String(b.classId)] ? String(b.classId) : 'vanguard');
-    return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode };
+    return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode, ...(training ? { training } : {}) };
   });
   route('GET', '/rooms/:code', async (m) => {
     const room = rooms.byCode(m[1]);

@@ -120,6 +120,8 @@ export interface PlayerState {
   gear?: Partial<Record<GearSlot, string>>;
   /** Enemy-inflicted affliction bookkeeping (afflictions.ts): chill stacks, diminishing returns, chain anchor, poison. Created lazily. */
   aff?: PlayerAfflictions;
+  /** Fate's Blessings carried (blessing.ts; content FATES_BLESSING). Absent = none. */
+  bless?: number;
   lastInputSeq: number;
   prevButtons: number;
   lastHitBy: string | null;        // for death recap
@@ -408,6 +410,8 @@ export interface OfferState {
   resolved: boolean;
   /** Dungeon theme behind each card's door (doors.ts), one per card, distinct, never the current theme. Absent in pre-door checkpoints. */
   themes?: string[];
+  /** Fate's Blessings applied to this offer (blessing.ts): card slot and the hero who blessed it. At most one per card. */
+  blessed?: { card: number; slot: number }[];
 }
 
 /** One of the three doors of an intermission (doors.ts). (x, y): floor tile centre in front of the opening;
@@ -436,6 +440,8 @@ export interface CommitRecord {
   resultingStateHash: string;
   eventSeq: number;
   tick: number;
+  /** the committed card was blessed (blessing.ts): its price was not applied; value = the slot that blessed it */
+  blessed?: number;
 }
 
 export interface SimState {
@@ -504,6 +510,14 @@ export interface SimState {
    * grand entrance): no player actions, no AI, no damage, no hazard / projectile / wave progress. Absent = never held.
    */
   cinematicUntilTick?: number;
+  /** Training grounds (training.ts): present only in training runs (no scoring, no records, no Fate, no wipe). */
+  training?: TrainingState | null;
+}
+
+/** Training-room switches (training.ts). Plain data, part of the replayed state. */
+export interface TrainingState {
+  /** enemy AI runs (false = foes stand still like dummies) */
+  ai: boolean;
 }
 
 export interface PendingSpawn { kind: string; x: number; y: number; count: Big; summonerId: number | null; objective: boolean; groupId: number; /** population pack and idle state inherited by rare minions */ pack?: number; dormant?: boolean; /** minion scaling (boss reinforcements): unit health and damage multipliers */ hpMul?: string; dmgMul?: string }
@@ -534,7 +548,12 @@ export type Command =
   | { type: 'DISCONNECT'; slot: number }
   | { type: 'DURABLE'; what: 'commit' | 'finalize' }
   | { type: 'INCIDENT'; reason: string }
-  | { type: 'ABORT'; reason: string };
+  | { type: 'ABORT'; reason: string }
+  /** Training grounds only (training.ts): op spawn (arg pack id, tier 0 ordinary / 1 champion / 2 rare), boss (arg boss id),
+   *  clear, ai (arg 'on' | 'off'), cooldowns, heal, class (arg class id), level (arg foe level 1..99). */
+  | { type: 'TRAIN'; slot: number; op: string; arg?: string; tier?: number }
+  /** Fate's Blessing (blessing.ts): lift the price of card `cardSlot` of the current offer during VOTING. */
+  | { type: 'BLESS'; slot: number; offerId: string; cardSlot: number };
 
 export type SimEvent =
   | { t: 'phase'; phase: Phase; round: number }
@@ -576,4 +595,8 @@ export type SimEvent =
   /** one-shot presentation cue for foe attacks (shadow burst, web splat, venom splash, hook hit, frost shatter) */
   | { t: 'foe_fx'; id: number; fx: string; x: number; y: number; tx?: number; ty?: number; r?: number }
   /** an idle pack noticed the heroes (director.ts activation) */
-  | { t: 'aggro'; id: number; pack: number; x: number; y: number };
+  | { t: 'aggro'; id: number; pack: number; x: number; y: number }
+  /** Fate's Blessing (blessing.ts): a hero picked one up (id = ground item), or blessed card `card` of the current offer */
+  | { t: 'blessing'; op: 'pickup' | 'apply'; slot: number; x: number; y: number; card?: number; id?: number }
+  /** Training grounds (training.ts): a hero respawned in place ('respawn'), or used a tool (the TRAIN op) */
+  | { t: 'training'; op: string; slot: number; x: number; y: number };

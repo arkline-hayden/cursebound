@@ -31,7 +31,7 @@ export interface RunEndSummary { runId: string; endReason: string; scoreText: st
 interface JournalTick { t: number; i?: [number, number, number, number, number, number, number][]; c?: Command[] }
 interface Journal { v: 1; runId: string; header?: CreateRunParams; resumeFrom?: { tick: number }; ticks: JournalTick[] }
 
-const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro']);
+const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training']);
 const MAX_EVENTS_PER_BATCH = 240;
 const SNAPSHOT_EVERY = Math.round(TICK_RATE / 20);
 const TICK_MS = 1000 / TICK_RATE;
@@ -45,6 +45,8 @@ export interface AuthorityOptions {
   practice: boolean;
   createParams?: CreateRunParams;
   resume?: { persistSeq: number; chunkNo: number };
+  /** training grounds (rooms.ts): nothing is persisted — no run record, events, commits, replay chunks, boards or records */
+  training?: boolean;
 }
 
 export class RunAuthority {
@@ -54,6 +56,8 @@ export class RunAuthority {
   readonly host: AuthorityHost;
   readonly boardKey: string;
   practice: boolean;
+  /** training grounds run: never touches the store (see AuthorityOptions.training) */
+  readonly training: boolean;
   private queues: PlayerInput[][] = [];
   private last: (PlayerInput | null)[] = [];
   private buckets: { tokens: number; at: number }[] = [];
@@ -85,6 +89,7 @@ export class RunAuthority {
     this.host = o.host;
     this.boardKey = o.boardKey;
     this.practice = o.practice;
+    this.training = !!o.training;
     this.persistSeq = o.resume?.persistSeq ?? 0;
     this.chunkNo = o.resume?.chunkNo ?? 0;
     this.journal = { v: 1, runId: o.state.runId, ticks: [] };
@@ -92,7 +97,7 @@ export class RunAuthority {
     if (o.resume) this.journal.resumeFrom = { tick: o.state.tick };
     this.lastPhase = o.state.phase;
     for (let i = 0; i < o.state.n; i++) { this.queues.push([]); this.last.push(null); this.buckets.push({ tokens: LIMITS.inputBurst, at: Date.now() }); }
-    this.created = o.createParams ? this.createRunRecord() : Promise.resolve();
+    this.created = o.createParams && !this.training ? this.createRunRecord() : Promise.resolve();
     if (o.resume && this.state.awaitingDurable === 'commit') {
       // the restored checkpoint already contains the committed card: acknowledge durability, never reapply
       this.pending.push({ cmd: { type: 'DURABLE', what: 'commit' } });
@@ -204,7 +209,7 @@ export class RunAuthority {
       this.incident(`Simulation error: ${(err as Error).message}`);
       return;
     }
-    if (jIn.length || cmds.length) {
+    if ((jIn.length || cmds.length) && !this.training) {   // training runs keep no replay journal
       const jt: JournalTick = { t: tickNo };
       if (jIn.length) jt.i = jIn;
       if (cmds.length) jt.c = cmds;
@@ -236,12 +241,18 @@ export class RunAuthority {
     this.lastPhase = this.state.phase;
     this.broadcast({ t: 'NOTICE', level: 'error', code: 'TECHNICAL_RECOVERY', text: `Technical recovery: ${reason}. Your run is checkpointed at the last safe intermission; this is not a defeat.` });
     this.sendPhase();
+    if (this.training) return;
     void this.store.updateRunProgress({ id: this.state.runId, round: this.state.round, ticks: this.state.totalActiveTicks, scoreText: this.state.scoreText, status: 'pending_storage' }).catch(() => undefined);
   }
 
   // ---------------- Persistence pipeline ----------------
 
   private handleEvents(events: SimEvent[]) {
+    if (this.training) {
+      // training grounds: nothing is stored; leaving the yard (retire / abort) finalizes without a record
+      if (events.some((e) => e.t === 'domain' && e.type === 'run_finalized')) this.pending.push({ cmd: { type: 'DURABLE', what: 'finalize' } });
+      return;
+    }
     const s = this.state;
     let batch: { seq: number; tick: number; type: string; payloadJson: string }[] = [];
     const flush = () => {
@@ -284,6 +295,7 @@ export class RunAuthority {
 
   private chain: Promise<unknown> = Promise.resolve();
   private persist(fn: () => Promise<unknown>) {
+    if (this.training) return;
     this.chain = this.chain.then(() => this.created).then(fn).catch((err) => {
       this.log.error('persist_failed', { err: err as Error });
       this.storageNotice(err as Error);
@@ -364,6 +376,7 @@ export class RunAuthority {
       })),
       deathRecaps: s.deathRecaps.slice(-10),
       legendaries: s.lootFound ?? [],
+      ...(this.training ? { training: true } : {}),
       finalStateHash: stateHash(s),
       trustLabel: 'Local (unverified)',
     };
@@ -436,7 +449,7 @@ export class RunAuthority {
       bossId: s.encounter?.bossId ?? null,
       round: s.round, phase: s.phase, deadlineTick: s.phaseDeadlineTick, tick: s.tick, scoreText: s.scoreText, retire: s.retireVotes,
       lastClear: s.lastClear, rounds: s.rounds.slice(-30), endReason: s.endReason, incident: s.incident, resumed: s.resumed,
-      storagePending: this.storagePending, practice: this.practice, boardKey: this.boardKey,
+      storagePending: this.storagePending, practice: this.practice, boardKey: this.boardKey, training: this.training,
       nextRound: s.round + 1, nextIsBoss: (s.round + 1) % RULES.bossEvery === 0,
       fate: s.commits.slice(-60).map((c) => ({ round: c.round, cardId: c.cardId })),
       deathRecaps: s.deathRecaps.filter((d) => d.round === s.round),
@@ -498,6 +511,7 @@ export class RunAuthority {
   /** Called after intermission commands so all seats see allocation/ready/vote changes promptly. */
   afterCommand(kind: string) {
     if (kind === 'VOTE') this.sendVoteState();
+    else if (kind === 'BLESS') { this.sendPhase(); this.sendOffer(); }   // the blessed card's forecast drops its price
     else this.sendPhase();
   }
 

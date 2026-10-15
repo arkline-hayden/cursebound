@@ -1,7 +1,7 @@
 // Wire protocol (PRD §19.2). Clients send intentions only; the authority validates everything.
 // Schemas impose size, count, string length and nesting limits — transport safeguards, never Fate stat limits.
 
-export const PROTOCOL_VERSION = 2;   // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen
+export const PROTOCOL_VERSION = 3;   // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen; 3: TRAIN (training rooms only) and BLESS (Fate's Blessing)
 export const LIMITS = {
   inputBytes: 256,
   controlBytes: 8 * 1024,
@@ -34,7 +34,15 @@ export type ClientMessage =
   | { t: 'LEDGER'; page: number }
   | { t: 'FORECAST' }
   | { t: 'DEBUG'; overlay: boolean }
-  | { t: 'PING'; c: number };
+  | { t: 'PING'; c: number }
+  /** Training rooms only (the authority refuses it elsewhere): a training-grounds tool (simulation training.ts) */
+  | { t: 'TRAIN'; op: TrainOp; arg?: string; tier?: number; requestId: string }
+  /** Fate's Blessing: lift the price of card `slot` (0..2) of the current offer during the door vote */
+  | { t: 'BLESS'; offerId: string; slot: number; requestId: string };
+
+/** Training-grounds tools (simulation training.ts TRAINING_OPS). */
+export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level'] as const;
+export type TrainOp = typeof TRAIN_OPS[number];
 
 // ---------------- Server -> client ----------------
 
@@ -119,6 +127,14 @@ export function parseClientMessage(raw: string): ParseResult {
       return { ok: true, msg: m as unknown as ClientMessage };
     case 'PING':
       if (!isNum(m.c, 0, 1e15)) return bad('bad PING');
+      return { ok: true, msg: m as unknown as ClientMessage };
+    case 'TRAIN':
+      if (!(TRAIN_OPS as readonly string[]).includes(m.op as string) || !isStr(m.requestId, 64, ID)) return bad('bad TRAIN');
+      if (m.arg !== undefined && !isStr(m.arg, 32, /^[a-z0-9_]{1,32}$/)) return bad('bad TRAIN arg');
+      if (m.tier !== undefined && !isInt(m.tier, 0, 2)) return bad('bad TRAIN tier');
+      return { ok: true, msg: m as unknown as ClientMessage };
+    case 'BLESS':
+      if (!isStr(m.offerId, 96, ID) || !isInt(m.slot, 0, 2) || !isStr(m.requestId, 64, ID)) return bad('bad BLESS');
       return { ok: true, msg: m as unknown as ClientMessage };
     default:
       return bad('unknown message type');
