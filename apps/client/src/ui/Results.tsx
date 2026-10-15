@@ -17,6 +17,7 @@ import { ItemIcon } from './itemIcons';
 import { FATES_BLESSING, LEGENDARY_BY_ID } from '@cursebound/content';
 import type { RunBreakdown } from '@cursebound/simulation';
 import { Breakdown } from './Breakdown';
+import { TutorialDone } from './TutorialDone';
 
 // RESULTS (PRD §16.1, §13): collective score, clear depth, end reason, builds, Fate timeline, score breakdown
 // and death recap. Local records are labelled Local and never presented as verified competition.
@@ -62,7 +63,7 @@ export function Results({ net }: { net: GameConnection }) {
   // online mode: report the finished run to the cloud boards once (any participant may; the cloud dedupes)
   useEffect(() => {
     const acc = authStore.get().account;
-    if (!results || !online || !signedIn || !acc || results.training) return;   // training grounds runs are never reported
+    if (!results || !online || !signedIn || !acc || results.training || results.guided) return;   // training grounds / tutorial runs are never reported
     submitRunOnce(results as RunResults, mySlot, acc.id).then((x) => {
       if (!x) return;
       setOnlineRank(x.rank);
@@ -82,6 +83,8 @@ export function Results({ net }: { net: GameConnection }) {
     return <div className="overlay"><div className="frame ornate notice-panel" role="status">{phase?.storagePending ? 'Saving the final summary is pending — the result will appear once storage recovers.' : 'Recording the final run summary…'}</div></div>;
   }
   const r = results;
+  // First Descent (guided tutorial, never recorded): "You're ready" instead of the results sheet
+  if (r.guided) return <TutorialDone net={net} classId={(r.players as any[])[mySlot]?.classId ?? (r.players as any[])[0]?.classId ?? 'vanguard'} />;
   const doVerify = async () => {
     setVerify(null);
     try { setVerify(await api('POST', `/runs/${r.runId}/verify`)); } catch (e) { setVerify({ ok: false, reason: (e as Error).message, ms: 0 }); }

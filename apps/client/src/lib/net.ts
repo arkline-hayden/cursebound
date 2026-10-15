@@ -23,6 +23,8 @@ export interface PhaseData {
   players: { slot: number; name: string; classId: string; ranks: Record<string, number>; skillPoints: number; spentByBranch: Record<string, number>; mastery: { damage: number; health: number; recovery: number }; ready: boolean; hpT: string; mhpT: string; connected: boolean; life: string; canMastery: boolean }[];
   /** training grounds run (simulation training.ts): no score, records or Fate; TRAIN tools available */
   training?: boolean;
+  /** guided first-run tutorial (simulation tutorialRoom.ts): prompts from the snapshot's `gd`, never recorded */
+  guided?: boolean;
 }
 
 export interface RoomInfo { roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null; /** daily bounty modifier of a bounty room */ bounty?: string | null }

@@ -1446,3 +1446,20 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
 .rc-card .rc-head { font-size: var(--hud-body); line-height: var(--hud-label-lh); }
 .rc-card .rc-verb { font-size: var(--hud-label); }
 .rc-card .rc-hits li, .rc-card .rc-foot { font-size: var(--hud-label); line-height: var(--hud-label-lh); }
+
+/* ---------- First Descent: one prompt line just below the hero (the camera keeps the hero dead centre) ---------- */
+.tg { position: fixed; left: 50%; top: calc(50% + 72px * var(--hud-zoom)); z-index: var(--z-hint); transform: translateX(-50%) scale(var(--hud-zoom)); transform-origin: 50% 0;
+  display: flex; align-items: center; gap: var(--sp-2); max-width: calc(96vw / var(--hud-zoom)); padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-2); font-size: var(--hud-body); line-height: var(--hud-label-lh); }
+.tg-n { flex: none; font-family: var(--font-label); font-size: var(--hud-label); color: var(--text-3); text-shadow: var(--shadow-hard); }
+.tg-t { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); color: var(--bone); text-shadow: var(--shadow-hard); }
+.tg .kbd { line-height: var(--hud-label-lh); }
+.tg .kbd.tg-done { color: var(--good); }
+.tg .kbd.tg-done::after { content: ' \2713'; }
+.tg-ok { font-family: var(--font-display); font-weight: normal; font-size: var(--hud-goth-sm); color: var(--gold-hi); text-shadow: var(--shadow-hard), 2px 2px 0 #3a1a04; }
+.tg.ok { border-image-source: var(--px-frame-inset-gold); }
+.tg-skip { flex: none; margin-left: var(--sp-1); }
+[data-cinematic='true'] .tg { opacity: 0; pointer-events: none; }
+.tut-done { width: min(640px, 100%); display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); text-align: center; }
+.tut-learned { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-1); }
+.tut-done .muted { margin: 0; }
+.tut-done-foot { justify-content: center; gap: var(--sp-3); }
