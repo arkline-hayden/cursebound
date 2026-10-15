@@ -236,6 +236,16 @@ export const LEGENDARIES: LegendaryDef[] = [
     { id: 'phase_burst', magnitude: '1.8', params: { radius: 2.2, iframes: 0.5 },
       description: 'Phase Step arrival releases an astral burst (180% basic damage within 2.2 units) and grants 0.5s of invulnerability.' },
     'They never touch the ground on the way. Only at the end.', 'arcanist'),
+
+  // ---------------- Boss signatures (BossDef.loot: the boss drops its own while nobody wears it) ----------------
+  L('lg_overclocked_kernel', 'Overclocked Kernel', 'amulet', '#3ae8d8', [['player.recoveryRate', '1.08']],
+    { id: 'dodge_shade', magnitude: '3.2', params: { delay: 0.7, radius: 2.4 },
+      description: 'Dodging leaves a corrupted echo behind that bursts after 0.7s for 320% basic astral damage within 2.4 units.' },
+    'Torn from the Corrupted Core. It still dreams in static.'),
+  L('lg_heart_of_the_colossus', 'Heart of the Iron Colossus', 'chest', '#ff7a2a', [['player.armor', '1.2'], ['player.maxHealth', '1.1']],
+    { id: 'thorns_nova', magnitude: '2.4', params: { icd: 1, radius: 2.8 },
+      description: 'Taking a hit vents molten slag: 240% basic physical damage to enemies within 2.8 units (at most once per second).' },
+    'The forge-engine fell. The furnace inside never noticed.'),
 ];
 
 export const LEGENDARY_BY_ID: Record<string, LegendaryDef> = Object.fromEntries(LEGENDARIES.map((x) => [x.id, x]));

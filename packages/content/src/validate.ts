@@ -1,9 +1,9 @@
 import { CARDS, RARITY_WEIGHTS, TUTORIAL_CARD, cardRarity } from './cards';
 import { MECHANICS, MECHANIC_BY_ID, mechanicText } from './mechanics';
 import { BRANCH_TIER_POINTS, CLASSES, NODES, NODE_BY_ID, SKILLS, SKILL_BY_ID } from './classes';
-import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
+import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_BOSSES, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
 import { STAT_BY_ID, isKnownStat } from './stats';
-import { validateLegendaries } from './legendaries';
+import { LEGENDARY_BY_ID, validateLegendaries } from './legendaries';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { CLASS_UNLOCKS, STARTER_CLASSES } from './progression';
 import type { CardDef, NodeDef } from './types';
@@ -209,6 +209,12 @@ export function validateContent(): string[] {
   for (const e of [...ENEMIES, ...BOSSES]) for (const a of e.attacks) {
     if (a.inflict && !(a.inflict.sec > 0 && a.inflict.sec <= 4)) errs.push(`${e.id}/${a.id}: affliction durations must be short (0..4 s)`);
   }
+  // themed lairs: known themes and bosses; signature loot is a known legendary
+  for (const [t, list] of Object.entries(THEME_BOSSES)) {
+    if (!DUNGEON_THEMES.some((d) => d.id === t)) errs.push(`theme bosses: unknown theme ${t}`);
+    for (const id of list) if (!BOSSES.some((b) => b.id === id)) errs.push(`theme bosses ${t}: unknown boss ${id}`);
+  }
+  for (const b of BOSSES) if (b.loot && !LEGENDARY_BY_ID[b.loot]) errs.push(`${b.id}: unknown signature loot ${b.loot}`);
   errs.push(...validateLegendaries());
   errs.push(...validateProgression());
   return errs;

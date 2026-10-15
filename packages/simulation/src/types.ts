@@ -230,6 +230,8 @@ export interface EnemyState {
   pack?: number;
   /** Idle until heroes come close (director.ts activation): no AI beyond a periodic aggro check. */
   dormant?: boolean;
+  /** Scripted boss state (bosses/*): home point, arena radius, split / echo markers. Plain numbers, created lazily. */
+  bvars?: Record<string, number>;
 }
 
 export interface Projectile {

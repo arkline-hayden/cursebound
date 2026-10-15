@@ -215,8 +215,9 @@ export type AfflictionId = 'chained' | 'chill' | 'frozen' | 'poisoned' | 'blinde
 export interface EnemyAttackDef {
   id: string;
   name: string;
-  /** 'burst' = a telegraphed circle at the target point that detonates on release (no lingering hazard). */
-  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst';
+  /** 'burst' = a telegraphed circle at the target point that detonates on release (no lingering hazard).
+   *  'scripted' = resolved by its boss's own script (simulation bosses/*), not by the generic attack kinds. */
+  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst' | 'scripted';
   /** Affliction applied to heroes this attack hits: seconds, optional magnitude (slow fraction / chain radius). */
   inflict?: { status: AfflictionId; sec: number; value?: number };
   /** Projectile / lob presentation kind (snapshot `k`); defaults to 'shard' / 'orb' / 'lob'. */
@@ -279,6 +280,10 @@ export interface BossDef {
   /** Fraction of damage taken in stagger state multiplier (vulnerable core). */
   vulnerableMultiplier: string;
   staggerMeter: number;      // control converts to stagger
+  /** Signature legendary (content LEGENDARIES id) its kill drops while nobody wears it; otherwise a random one. */
+  loot?: string;
+  /** Script tunables (seconds, world units, counts, fractions) read by a scripted boss (simulation bosses/*). */
+  params?: Record<string, number>;
 }
 
 export interface BiomeDef {

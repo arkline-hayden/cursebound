@@ -1,4 +1,5 @@
 import { CLASS_BY_ID, NODE_BY_ID, SKILL_BY_ID } from '@cursebound/content';
+import { bossBotHint } from './bosses/registry';
 import { lineOfSight } from './geometry';
 import { canAllocate, hasSpendableNode } from './sim';
 import { ACTION, type Command, type EnemyState, type PlayerInput, type PlayerState, type SimState } from './types';
@@ -106,6 +107,15 @@ export function botInput(state: SimState, slot: number, seq: number): PlayerInpu
       if (g >= 0) buttons |= [ACTION.SKILL1, ACTION.SKILL2, ACTION.SKILL3][g];
       break;
     }
+  }
+  // scripted boss mechanics (bosses/*): walk to safe tiles, gaps and clear floor; a telegraph dodge already firing wins
+  // unless the hint knows this spot is safe (hold)
+  const hint = bossBotHint(state, p);
+  if (hint && (hint.dodge || hint.hold || !(buttons & ACTION.DODGE))) {
+    const hx = hint.x - p.x, hy = hint.y - p.y, hl = Math.sqrt(hx * hx + hy * hy);
+    if (hl > 0.15) { moveX = hx / hl; moveY = hy / hl; } else { moveX = 0; moveY = 0; }
+    if (hint.dodge) buttons |= ACTION.DODGE;
+    else if (hint.hold) buttons &= ~ACTION.DODGE;
   }
   // revive downed allies
   for (const a of state.players) {

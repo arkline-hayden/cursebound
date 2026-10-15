@@ -26,9 +26,10 @@ export function botTick(state: SimState, ctx: { seq: number; voteSeq: number }):
  * Skip ahead to the COMBAT phase of `round` with instant clears (heroes invulnerable, foes killed outright), the
  * bots still allocating points and voting, so the party arrives with a normal build and Fate history.
  */
-export function skipTo(state: SimState, round: number, ctx: { seq: number; voteSeq: number }) {
+export function skipTo(state: SimState, round: number, ctx: { seq: number; voteSeq: number }, theme: string | null = null) {
   for (let i = 0; i < 2_000_000 && state.phase !== 'RESULTS'; i++) {
     if (state.round === round && state.phase === 'COMBAT') break;
+    if (theme && state.round < round) state.nextTheme = { round, theme };   // force the target floor's theme (its boss)
     if (state.phase === 'COMBAT') {
       for (const p of state.players) p.iframes = 10;
       for (const e of state.enemies) if (e.state !== 'dying') killEnemy(state, [], e, 0);

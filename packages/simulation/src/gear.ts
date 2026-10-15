@@ -212,7 +212,11 @@ export function dropLegendary(state: SimState, ev: SimEvent[], x: number, y: num
 export function rollLoot(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (state.phase !== 'COMBAT') return;
   if (e.boss) {
-    for (let i = 0; i < LOOT_RULES.bossDrops; i++) dropLegendary(state, ev, e.x, e.y, 'boss');
+    if (e.summonerId !== null) return;   // a boss's echo (bosses/corruptCore.ts mirror split) carries no loot
+    // the boss's signature legendary (BossDef.loot) first, while nobody wears it and none lies on the ground
+    const sig = BOSS_BY_ID[e.kind]?.loot;
+    const taken = !!sig && (state.players.some((p) => Object.values(p.gear ?? {}).includes(sig)) || (state.loot ?? []).some((it) => it.itemId === sig));
+    for (let i = 0; i < LOOT_RULES.bossDrops; i++) dropLegendary(state, ev, e.x, e.y, 'boss', i === 0 && sig && !taken ? sig : undefined);
     return;
   }
   const roll = nextFloat(lootRng(state));

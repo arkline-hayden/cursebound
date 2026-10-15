@@ -1,7 +1,7 @@
 import { CARDS } from './cards';
 import { MECHANICS } from './mechanics';
 import { CLASSES, NODES, SKILLS, DODGE } from './classes';
-import { ARENA_DESIGNS, BIOMES, BOSSES, BOSS_ARENAS, DUNGEON_LAYOUTS, ENEMIES, PACK_TEMPLATES, ROOM_KINDS, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
+import { ARENA_DESIGNS, BIOMES, BOSSES, BOSS_ARENAS, DUNGEON_LAYOUTS, ENEMIES, PACK_TEMPLATES, ROOM_KINDS, THEME_BOSSES, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
 import { AFFIXES, AFFIX_RULES } from './affixes';
 import { LEGENDARIES, LOOT_RULES } from './legendaries';
 import { CONSUMABLES, MAX_BLESSINGS, TRAINING_THEME } from './consumables';
@@ -16,6 +16,7 @@ export * from './cards';
 export * from './mechanics';
 export * from './classes';
 export * from './enemies';
+export { SLAG_PATTERNS, slagLava } from './bosses/ironColossus';
 export * from './affixes';
 export * from './legendaries';
 export * from './consumables';
@@ -46,7 +47,7 @@ export const CONTENT_MANIFEST = {
   affixRules: AFFIX_RULES,
   packs: PACK_TEMPLATES,
   themePacks: THEME_PACKS,
-  dungeon: { layouts: DUNGEON_LAYOUTS, roomKinds: ROOM_KINDS, themeRooms: THEME_ROOM_WEIGHTS, arenas: ARENA_DESIGNS, bossArenas: BOSS_ARENAS },
+  dungeon: { layouts: DUNGEON_LAYOUTS, roomKinds: ROOM_KINDS, themeRooms: THEME_ROOM_WEIGHTS, arenas: ARENA_DESIGNS, bossArenas: BOSS_ARENAS, themeBosses: THEME_BOSSES },
   afflictionRules: AFFLICTION_RULES,
   legendaries: LEGENDARIES,
   lootRules: LOOT_RULES,
