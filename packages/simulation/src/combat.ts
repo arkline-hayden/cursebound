@@ -5,6 +5,7 @@ import { bountyRules } from './bountyRules';
 import { B, ONE, fateFactor, playerDerived } from './stats';
 import type { Cohort, EnemyState, PlayerState, SimEvent, SimState } from './types';
 import { hooks, type HitMod } from './hooks';
+import { impactKnock, impactPush } from './knock';
 
 // Damage pipeline (REQ COMBAT01, PRD §5.2, §12.1, §12.2). All quantities canonical Big.
 // Grouped logical hits ("packets") preserve kill timing per unit via exact cohort arithmetic; crits on k identical
@@ -100,6 +101,13 @@ export function applyArea(c: Cohort, d: Big, u: Big): CohortResult {
   const E2 = c.unitHp.sub(c.spread);
   if (c.front.gte(E2)) { c.count = c.count.sub(ONE); c.front = ZERO; return { kills: ONE, dealt }; }
   return { kills: ZERO, dealt };
+}
+
+/** One unit's share of a hit (x mult, e.g. the crit multiplier) against its maximum health, 0..1 to two decimals.
+ *  Presentation only (hit events): bigger hits flinch harder on the client. */
+function hitFrac(perUnit: Big, mult: Big, unitHp: Big): number {
+  if (unitHp.isZero()) return 1;
+  return Math.round(Math.min(1, perUnit.mul(mult).ratio(unitHp)) * 100) / 100;
 }
 
 export function cohortHpFrac(c: Cohort): number {
@@ -207,9 +215,14 @@ export function hitEnemy(state: SimState, ev: SimEvent[], e: EnemyState, perHit:
     p.stats.damageDealt = p.stats.damageDealt.add(res.dealt);
     p.dpsBucket = p.dpsBucket.add(res.dealt);
   }
-  ev.push({ t: 'hit', target: e.id, targetKind: 'enemy', amount: res.dealt.toCompact(), crit: !crits.isZero(), dtype: o.dtype, x: e.x, y: e.y, count: units.gt(ONE) ? units.toCompact() : undefined, sx: o.fromX, sy: o.fromY, kill: e.cohort.count.isZero() || !res.kills.isZero(), src: o.srcSlot });
+  // frac: one unit's share of the hit against its maximum health (presentation: bigger hits flinch harder)
+  ev.push({ t: 'hit', target: e.id, targetKind: 'enemy', amount: res.dealt.toCompact(), crit: !crits.isZero(), dtype: o.dtype, x: e.x, y: e.y, count: units.gt(ONE) ? units.toCompact() : undefined, sx: o.fromX, sy: o.fromY, kill: e.cohort.count.isZero() || !res.kills.isZero(), src: o.srcSlot, frac: hitFrac(dBase, crits.isZero() || !pd ? ONE : pd.critMult, e.cohort.unitHp) });
   if (!res.dealt.isZero()) hooks.onEnemyHit(state, ev, p, e, { dealt: res.dealt, crit: !crits.isZero(), kill: e.cohort.count.isZero() || !res.kills.isZero(), dtype: o.dtype, skillId: o.skillId, srcSlot: o.srcSlot, fromX: o.fromX, fromY: o.fromY, generation: o.generation ?? 0, kills: res.kills });
-  if (e.cohort.count.isZero()) killEnemy(state, ev, e, o.srcSlot);
+  // knockback (knock.ts, rules 1.6): heavy hits, slams, blasts and crits shove a surviving foe from the source (direct hits only)
+  if (!e.cohort.count.isZero() && !res.dealt.isZero() && (o.generation ?? 0) === 0) {
+    impactKnock(state, e, o.fromX, o.fromY, impactPush(o.skillId, o.dtype, !crits.isZero(), dBase, e.cohort.unitHp));
+  }
+  if (e.cohort.count.isZero()) killEnemy(state, ev, e, o.srcSlot, o.dtype);
   else if (!res.kills.isZero()) e.radius = cohortRadius(e.boss ? BOSS_BY_ID[e.kind].radius : ENEMY_BY_ID[e.kind].radius, e.cohort.count);
   // reactions are scheduled for the next simulation slice (generation based, PRD §12.4)
   if (p && o.dtype === 'ember' && (p.ranks['a_inferno'] ?? 0) > 0 && (o.generation ?? 0) === 0 && !res.dealt.isZero() && o.skillId !== 'inferno') {
@@ -246,7 +259,7 @@ export function tickDots(state: SimState, ev: SimEvent[], e: EnemyState) {
   const p = state.players[src];
   if (p) { p.stats.damageDealt = p.stats.damageDealt.add(r.dealt); p.dpsBucket = p.dpsBucket.add(r.dealt); }
   if (state.tick % 20 === 0) ev.push({ t: 'hit', target: e.id, targetKind: 'enemy', amount: total.mul(mit).toCompact(), crit: false, dtype: e.dots[0]?.type ?? 'ember', x: e.x, y: e.y });
-  if (e.cohort.count.isZero()) killEnemy(state, ev, e, src);
+  if (e.cohort.count.isZero()) killEnemy(state, ev, e, src, e.dots[0]?.type ?? 'ember');
 }
 
 export function addStagger(state: SimState, ev: SimEvent[], e: EnemyState, amount: number) {
@@ -262,13 +275,15 @@ export function addStagger(state: SimState, ev: SimEvent[], e: EnemyState, amoun
   }
 }
 
-export function killEnemy(state: SimState, ev: SimEvent[], e: EnemyState, bySlot: number) {
+/** Slay a foe. `dtype` (the killing blow's damage type, when known) picks the death animation on the client. */
+export function killEnemy(state: SimState, ev: SimEvent[], e: EnemyState, bySlot: number, dtype?: DamageType) {
   if (e.state === 'dying') return;
   e.state = 'dying';
   e.deathTimer = 0.6;
   e.attack = null;
   e.cohort.count = ZERO;
-  ev.push({ t: 'death', id: e.id, kind: e.kind, x: e.x, y: e.y, by: bySlot });
+  e.knockX = 0; e.knockY = 0;
+  ev.push({ t: 'death', id: e.id, kind: e.kind, x: e.x, y: e.y, by: bySlot, ...(dtype ? { dt: dtype } : {}) });
   // Ash Recovery (Arcanist): burning objective kills cut every recharging skill cooldown
   const p = state.players[bySlot];
   if (p && e.burning && e.objective && (p.ranks['a_ash_recovery'] ?? 0) > 0 && p.lifeState === 'alive') {

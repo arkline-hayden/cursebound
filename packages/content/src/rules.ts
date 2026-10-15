@@ -1,10 +1,10 @@
 // Versioned tunable rules (PRD §3–§6, §11, §13, §19). Every constant here is a first proposal.
 // Changing anything that affects simulation outcomes requires bumping RULES_VERSION (and replay version).
 
-export const RULES_VERSION = 'rules-1.5.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes; 1.4: all movement x0.8 (heroes, foes, bosses, summons and pets), follower routing, daily bounty modifiers (optional negative modifier per run); 1.5: Fate's Blessing (legendary consumable lifts a card's price), training grounds rooms, three more dungeon themes in the rotation (sky island, moon, server room)
+export const RULES_VERSION = 'rules-1.6.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes; 1.4: all movement x0.8 (heroes, foes, bosses, summons and pets), follower routing, daily bounty modifiers (optional negative modifier per run); 1.5: Fate's Blessing (legendary consumable lifts a card's price), training grounds rooms, three more dungeon themes in the rotation (sky island, moon, server room); 1.6: knockback (heavy hits, slams, blasts and crits shove ordinary foes, elites reduced, bosses immune; KNOCKBACK_RULES)
 export const SCORE_VERSION = 'score-1.0.0';
-export const CONTENT_VERSION = 'content-1.4.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune; 1.3: movement multipliers (hero 0.88, foe 0.8, minion 0.8), follower routing constants, bounty modifiers (bounties.ts) in the manifest; 1.4: Fate's Blessing consumable, training grounds theme, sky / moon / server themes (room weights, packs)
-export const SIM_VERSION = 'sim-1.4.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing); 1.3: bosses take enemyMoveSpeedMult, minion speed multiplier, follower routing (A* path-follow, stuck detection, blink leash, spread), bounty modifiers applied at run creation (bounty.ts); 1.4: blessing in the legendary drop pool + BLESS command, training mode (courtyard map, TRAIN commands), ten-theme rotation, sky floors drop into open-air voids
+export const CONTENT_VERSION = 'content-1.5.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune; 1.3: movement multipliers (hero 0.88, foe 0.8, minion 0.8), follower routing constants, bounty modifiers (bounties.ts) in the manifest; 1.4: Fate's Blessing consumable, training grounds theme, sky / moon / server themes (room weights, packs); 1.5: knockback rules (per damage type and per skill pushes, elite factors) in the manifest
+export const SIM_VERSION = 'sim-1.5.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing); 1.3: bosses take enemyMoveSpeedMult, minion speed multiplier, follower routing (A* path-follow, stuck detection, blink leash, spread), bounty modifiers applied at run creation (bounty.ts); 1.4: blessing in the legendary drop pool + BLESS command, training mode (courtyard map, TRAIN commands), ten-theme rotation, sky floors drop into open-air voids; 1.5: knockback slides (knock.ts: impact pushes from heavy hits, slams, blasts and crits, swept against walls and voids, stepped with the foe), elite-scaled authored knockback, killing damage type on death events
 export const PROTOCOL_VERSION = 3;
 
 export const TICK_RATE = 60;
@@ -244,4 +244,42 @@ export const AFFLICTION_RULES = {
   webPatchSec: 3,
   webPatchRadius: 1.2,
   webSlow: 0.35,
+};
+
+/**
+ * Knockback (simulation knock.ts, rules 1.6). Heavy hits, slams, explosions and crits shove ordinary foes a short way
+ * from the hit's source as a brief slide: a per-tick velocity that decays by slideDecay each tick and is swept against
+ * walls (chasm voids are wall tiles), so a foe never lands inside one. A hit pushes when it crits or is heavy:
+ *  - heavy: its skill's damageCoef is at least heavyCoef (areaHeavyCoef for circle-shaped slams and blasts), or one hit
+ *    takes heavyFrac of a unit's health and it survives;
+ *  - distance: bySkill[skill] ?? byDamageType[type] ?? defaultPush, x critMult on a heavy crit; a crit that is not
+ *    heavy pushes critOnlyFactor of that, and only from a skill of at least critMinCoef (procs and pets' nips do not);
+ *  - channelled aura skills (whirlwinds, blizzards, swarms) never push unless listed in bySkill;
+ *  - skills whose kits already knock back (SkillDef.knockback) keep their own push, and an authored knockback in the
+ *    same tick supersedes the slide (no double shove);
+ *  - champions and rares take eliteFactor[tier] of every knockback (authored ones too); bosses are immune.
+ * The slide is a feel rule: it sets no control resistance and interrupts nothing (authored knockback still does).
+ */
+export const KNOCKBACK_RULES = {
+  defaultPush: 0.3,
+  /** frost barely moves what it hits (it freezes), blasts of fire and plain force shove hardest */
+  byDamageType: { physical: 0.4, ember: 0.4, astral: 0.35, storm: 0.3, decay: 0.25, frost: 0.15 } as Record<string, number>,
+  /** per-skill overrides: big explosions without an authored knockback push harder; controls that hold foes in place
+   *  (snares, roots, lures, freezes) never push */
+  bySkill: {
+    c_comet: 0.45, c_effigy_burst: 0.35, t_judgment_day: 0.45, t_smite: 0.4, h_sanguine_lance: 0.4, h_hemorrhage: 0.3,
+    c_absolute_zero: 0, c_cold_snap: 0, r_snare_trap: 0, r_bait: 0, w_entangle: 0,
+  } as Record<string, number>,
+  heavyCoef: 1.8,
+  areaHeavyCoef: 1,
+  heavyFrac: '0.5',
+  critMult: 1.25,
+  critOnlyFactor: 0.5,
+  critMinCoef: 0.8,
+  maxPush: 0.8,
+  /** [ordinary, champion, rare] */
+  eliteFactor: [1, 0.5, 0.35] as number[],
+  slideDecay: 0.7,
+  /** the slide stops below this per-tick step (world units) */
+  minStep: 0.004,
 };

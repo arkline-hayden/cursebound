@@ -4,6 +4,7 @@ export * from './geometry';
 export * from './map';
 export * from './stats';
 export * from './combat';
+export * from './knock';
 export * from './players';
 export * from './ai';
 export * from './cc';

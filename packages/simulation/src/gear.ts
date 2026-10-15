@@ -378,7 +378,7 @@ function bonusDamage(state: SimState, ev: SimEvent[], p: PlayerState, e: EnemySt
   p.dpsBucket = p.dpsBucket.add(r.dealt);
   const dead = e.cohort.count.isZero();
   ev.push({ t: 'hit', target: e.id, targetKind: 'enemy', amount: r.dealt.toCompact(), crit: false, dtype, x: e.x, y: e.y, kill: dead || !r.kills.isZero(), src: p.slot });
-  if (dead) killEnemy(state, ev, e, p.slot);
+  if (dead) killEnemy(state, ev, e, p.slot, dtype);
   else if (!r.kills.isZero()) {
     const base = e.boss ? BOSS_BY_ID[e.kind]?.radius : ENEMY_BY_ID[e.kind]?.radius;
     if (base) e.radius = cohortRadius(base, e.cohort.count);

@@ -7,6 +7,7 @@ import { findPath, nearestFloor, tileCenter } from './map';
 import { hooks } from './hooks';
 import { actMul, isFrozen, lureGoal, moveMul } from './cc';
 import { inCinematic } from './cinematic';
+import { stepKnock } from './knock';
 import { bossReinforcements } from './director';
 import { makeHazard } from './players';
 import { nextFloat, nextInt } from './rng';
@@ -637,6 +638,7 @@ function dormantTick(state: SimState, ev: SimEvent[], e: EnemyState): boolean {
 export function stepEnemy(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (inCinematic(state)) return;   // boss grand entrance: AI holds (cinematic.ts)
   if (e.state === 'dying') { e.deathTimer -= DT; return; }
+  stepKnock(state, e);   // impact knockback slide (knock.ts), whatever the foe is doing
   if (e.dormant && !dormantTick(state, ev, e)) { e.vx = 0; e.vy = 0; return; }   // idle pack: nothing else to simulate
   e.hitFlash = Math.max(0, e.hitFlash - 1);
   for (const k of Object.keys(e.cooldowns)) if (e.cooldowns[k] > 0) e.cooldowns[k] = Math.max(0, e.cooldowns[k] - DT);

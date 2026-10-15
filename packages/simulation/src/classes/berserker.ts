@@ -229,7 +229,7 @@ function executeCleave(state: SimState, ev: SimEvent[], p: PlayerState) {
     hitEnemy(state, ev, e, dmg, ONE, { dtype: 'physical', srcSlot: p.slot, skillId: 'b_executioner', fromX: p.x, fromY: p.y, coverage: areaCoverage(e, range), allowCrit: true, stagger: K.exec.stagger });
     if (isLive(e) && !e.boss && e.cohort.count.lte(ONE) && cohortHpFrac(e.cohort) < K.exec.below) {
       castEv(ev, p, 'b_execute', e.x, e.y, p.aimX, p.aimY);
-      killEnemy(state, ev, e, p.slot);
+      killEnemy(state, ev, e, p.slot, 'physical');
     } else flinch(state, e, p.x, p.y, 0.5);
   }
   castEv(ev, p, 'b_execute_cleave', p.x, p.y, p.aimX, p.aimY);

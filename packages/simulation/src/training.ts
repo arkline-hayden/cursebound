@@ -1,6 +1,7 @@
 import { Big } from '@cursebound/numeric';
 import { BOSS_BY_ID, CLASS_BY_ID, DODGE, LEGENDARY_BY_ID, NODE_BY_ID, PACK_BY_ID, TICK_RATE, TICK_SEC, referenceSec, type GearSlot } from '@cursebound/content';
 import { tickDots } from './combat';
+import { stepKnock } from './knock';
 import { generateCourtyard } from './courtyard';
 import { createEnemy } from './director';
 import { makeElite } from './elites';
@@ -70,6 +71,7 @@ export function trainingTick(state: SimState, ev: SimEvent[]) {
 /** A foe with the yard's AI switched off: no movement, attacks or perception; damage over time and death still run. */
 export function trainingIdleEnemy(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (e.state === 'dying') { e.deathTimer -= DT; return; }
+  stepKnock(state, e);   // dummies still take knockback (knock.ts)
   e.hitFlash = Math.max(0, e.hitFlash - 1);
   e.vx = 0; e.vy = 0;
   if (e.attack) e.attack = null;

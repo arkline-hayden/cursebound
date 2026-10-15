@@ -3,6 +3,7 @@ import { RULES, SKILL_BY_ID, TICK_SEC, type DamageType } from '@cursebound/conte
 import { addStagger, hitEnemy, type CohortResult } from '../combat';
 import { hooks, registerGlobalHooks, type PlayerDamagedInfo } from '../hooks';
 import { moveCircle, norm, q, rayDistance } from '../geometry';
+import { cancelSlide, knockScale } from '../knock';
 import { nearestFloor } from '../map';
 import { areaCoverage, makeHazard } from '../players';
 import { B, ONE, breakdown, hitDamage, playerDerived, toFloatClamped, treeFactor } from '../stats';
@@ -154,7 +155,9 @@ export function pull(state: SimState, e: EnemyState, x: number, y: number, dist:
 
 /** Knockback with control resistance (same rule as the core); returns true when the enemy was slammed into a wall. */
 export function shove(state: SimState, e: EnemyState, dirX: number, dirY: number, dist: number): boolean {
+  dist *= knockScale(e);   // champions and rares are shoved less, bosses not at all (knock.ts, rules 1.6)
   if (dist <= 0 || e.boss || !isLive(e) || !state.map) return false;
+  cancelSlide(e);          // the authored shove supersedes an impact slide from the same hit
   let [nx, ny] = norm(dirX, dirY);
   if (nx === 0 && ny === 0) { nx = 1; ny = 0; }
   const d = e.ccResistUntil > state.tick ? dist * 0.3 : dist;

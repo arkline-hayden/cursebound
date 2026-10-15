@@ -6,6 +6,7 @@ import { STAT_BY_ID, isKnownStat } from './stats';
 import { validateLegendaries } from './legendaries';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { CLASS_UNLOCKS, STARTER_CLASSES } from './progression';
+import { KNOCKBACK_RULES } from './rules';
 import type { CardDef, NodeDef } from './types';
 
 // Authoring-time content validation (PRD §8.2, §15.3, §21.2). Invalid content is rejected during authoring,
@@ -209,6 +210,12 @@ export function validateContent(): string[] {
   for (const e of [...ENEMIES, ...BOSSES]) for (const a of e.attacks) {
     if (a.inflict && !(a.inflict.sec > 0 && a.inflict.sec <= 4)) errs.push(`${e.id}/${a.id}: affliction durations must be short (0..4 s)`);
   }
+  // knockback (rules.ts KNOCKBACK_RULES): per-skill pushes name real skills and stay short; elites never push further
+  for (const [id, d] of Object.entries(KNOCKBACK_RULES.bySkill)) {
+    if (!SKILL_BY_ID[id]) errs.push(`knockback: unknown skill ${id}`);
+    if (!(d >= 0 && d <= KNOCKBACK_RULES.maxPush)) errs.push(`knockback: ${id} push ${d} outside 0..${KNOCKBACK_RULES.maxPush}`);
+  }
+  if (KNOCKBACK_RULES.eliteFactor.some((f, i) => f < 0 || f > 1 || (i > 0 && f > KNOCKBACK_RULES.eliteFactor[i - 1]!))) errs.push('knockback: elite factors must fall from 1 by tier');
   errs.push(...validateLegendaries());
   errs.push(...validateProgression());
   return errs;

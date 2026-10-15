@@ -4,6 +4,7 @@ import { addStagger, cohortRadius, healPlayer, hitEnemy, shieldPlayer } from './
 import { breakChain } from './afflictions';
 import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { hooks } from './hooks';
+import { cancelSlide, knockScale } from './knock';
 import { dir8, inCone, inLine, isWallAt, moveCircle, norm, q, rayDistance } from './geometry';
 import { nearestFloor } from './map';
 import { nextFloat } from './rng';
@@ -494,7 +495,9 @@ export function stormCast(state: SimState, ev: SimEvent[], p: PlayerState, tx: n
 }
 
 export function knockback(state: SimState, e: EnemyState, fromX: number, fromY: number, dist: number) {
+  dist *= knockScale(e);   // champions and rares are pushed less, bosses not at all (knock.ts, rules 1.6)
   if (dist <= 0 || e.boss) return;
+  cancelSlide(e);          // the authored push supersedes an impact slide from the same hit
   if (e.ccResistUntil > state.tick) dist *= 0.3;   // temporary control resistance after repeated CC (base rule)
   const [nx, ny] = norm(e.x - fromX, e.y - fromY);
   const r = moveCircle(state.map!, e.x, e.y, nx * dist, ny * dist, Math.min(e.radius, 0.6));
