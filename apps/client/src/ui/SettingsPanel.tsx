@@ -142,7 +142,9 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
       <tbody>{rows.map(bindRow)}</tbody>
     </table>
   );
-  const half = Math.ceil(ACTIONS.length / 2);
+  // the play camera always stays centred on your hero, so the lock toggle and centre keys are not offered
+  const binds = ACTIONS.filter((a) => a.id !== 'cameraLock' && a.id !== 'cameraCenter');
+  const half = Math.ceil(binds.length / 2);
 
   const panels: Record<TabId, ReactNode> = {
     graphics: (
@@ -192,13 +194,7 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
           <span className={`chip ${pad.connected ? 'good' : ''}`}>{pad.connected ? 'Connected' : 'Not found'}</span>
         </div>
         <Toggle k="rumble" label="Controller rumble" hint="Vibrates on hits you take, going down and boss slams (controllers that support it)." />
-        <Toggle k="camLocked" label="Camera lock" hint={`Locked follows your hero. Unlocked (League of Legends style) stays where you leave it: push the pointer to a screen edge or drag with the middle mouse button to look around${s.keys.cameraCenter[0] ? `, hold ${keyLabel(s.keys.cameraCenter[0])} to centre on your hero` : ''}${s.keys.cameraLock[0] ? `. ${keyLabel(s.keys.cameraLock[0])} toggles the lock` : ''}. A controller always follows.`} />
-        <Toggle k="edgePan" label="Edge panning" hint="The unlocked camera pans while the pointer rests at the edge of the game window." />
-        <label className="set-row">
-          <span>Edge pan speed</span>
-          <input type="range" min={0.25} max={2} step={0.25} value={s.edgePanSpeed} disabled={!s.edgePan} onChange={(e) => updateSettings({ edgePanSpeed: Number(e.target.value) })} aria-valuetext={`${Math.round(s.edgePanSpeed * 100)} percent`} />
-        </label>
-        <div className="bind-grid">{bindTable(ACTIONS.slice(0, half))}{bindTable(ACTIONS.slice(half))}</div>
+        <div className="bind-grid">{bindTable(binds.slice(0, half))}{bindTable(binds.slice(half))}</div>
         <button className="btn small ghost" style={{ alignSelf: 'flex-start', marginTop: 12 }} onClick={() => { setBindNote(null); updateSettings({ keys: SCHEME_KEYS[s.controlScheme], pad: DEFAULT_SETTINGS.pad }); }}>Reset controls</button>
       </>
     ),

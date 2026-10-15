@@ -26,8 +26,8 @@ import { basicReach, pickEnemy, pickGround, type GroundThing } from '../input/ta
 import { ClickFx } from '../render/ClickFx';
 import { gameCursor, type GameCursor } from '@/ui/pixelCursors';
 import { cinematicHeld, movesIn, netStore, type GameConnection } from '@/lib/net';
-import { settingsStore, updateSettings } from '@/lib/settings';
-import { CAM, CameraRig, edgePanVelocity, type Pt } from '../cameraRig';
+import { settingsStore } from '@/lib/settings';
+import { CameraRig, type Pt } from '../cameraRig';
 import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 import { gfx, particleBudget, reportSlowFrames } from '../gfx';
 import { spectateStore } from '@/ui/Spectate';
@@ -854,7 +854,7 @@ export class CombatScene extends Phaser.Scene {
           }
           x = this.renderSelf.x; y = this.renderSelf.y;
         } else { x = lp.x; y = lp.y; this.renderSelf = { x, y, init: true }; }
-        this.camTarget = { x: x + lp.ax * 0.9, y: y + lp.ay * 0.9 };   // slight look-ahead toward aim
+        this.camTarget = { x, y };   // the hero sits dead centre (no aim look-ahead)
         // predicted dash: instant feedback without waiting for the authority's event
         if (this.net.pred.dashAt !== this.lastDashAt && this.net.pred.dashAt > 0) {
           this.lastDashAt = this.net.pred.dashAt;
@@ -944,17 +944,11 @@ export class CombatScene extends Phaser.Scene {
    * follows, spectating follows the watched teammate until you pan. Returns the ground point at the view centre.
    */
   private stepCamera(delta: number, s: Snapshot, me: number, watched: number | null, drawnAt: Map<number, Pt>, cine: Pt | null): Pt | null {
-    const set = this.settings();
     const ci = this.input2.camera();
-    if (ci.lock && !cine) {
-      updateSettings({ camLocked: !set.camLocked });   // persisted, like LoL's lock toggle
-      this.net.notice('info', 'CAMERA', set.camLocked ? 'Camera unlocked: edge-pan or middle-drag to look around' : 'Camera locked to your hero');
-    }
-    const k = this.game.canvas.clientWidth / this.W || 1;
     const dt = Math.min(0.1, delta / 1000);
-    const ev = set.edgePan && ci.edge ? edgePanVelocity(ci.edge.x, ci.edge.y, ci.edge.w, ci.edge.h, CAM.edgeMargin, CAM.edgeSpeed * set.edgePanSpeed) : { x: 0, y: 0 };
-    // grab-and-drag: the floor follows the middle-dragged pointer
-    const pan = { x: ev.x * dt - ci.drag.x / k, y: ev.y * dt - ci.drag.y / k };
+    // The play camera is locked to the hero, dead centre: no lock toggle, edge panning or middle-drag (the free
+    // League-style camera was dropped by player feedback). F1-F5 still hold the view on you / a teammate.
+    const pan = { x: 0, y: 0 };
     const follow = this.P(this.camTarget.x, this.camTarget.y);
     let hold: Pt | null = null;
     if (ci.focus !== null) {
@@ -967,8 +961,9 @@ export class CombatScene extends Phaser.Scene {
     // a pending cut waits for the hero to be placed this round (the follow point is stale until then)
     if (snap !== 'cut' || this.renderSelf.init) this.camSnap = 'none';
     return this.rig.step({
-      dt, follow, subject: `p${watched ?? me}`, spectating: watched !== null, locked: set.camLocked, forceFollow: this.input2.usingPad,
-      hold, pan, snap: snap === 'cut' && !this.renderSelf.init ? 'none' : snap, cine, reduced: set.reducedMotion,
+      dt, follow, subject: `p${watched ?? me}`, spectating: watched !== null, locked: true, forceFollow: this.input2.usingPad,
+      // reduced: true = no follow smoothing, so the hero never drifts off centre (renderSelf is already smoothed)
+      hold, pan, snap: snap === 'cut' && !this.renderSelf.init ? 'none' : snap, cine, reduced: true,
       map: this.net.map ? { w: this.net.map.w, h: this.net.map.h } : null,
     });
   }

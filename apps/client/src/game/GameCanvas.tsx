@@ -32,13 +32,14 @@ export function pixelZoom(w: number, h: number) {
 }
 
 /**
- * Play camera: a tighter Diablo-style framing than the menu backdrop. The logical view targets ~640x360
- * (3x at 1080p, 4x at 1440p, 2x on ~1280-1600 px windows), always an integer zoom so pixels stay square.
+ * Play camera: a tighter Diablo-style framing than the menu backdrop. The logical view targets ~720x405 (a little
+ * wider than the old 640x360). The zoom snaps down to quarter steps (2.5x at 1080p = 768x432, 3.5x at 1440p,
+ * 1.75x in a 720p window), so the nearest-neighbour pixel pattern stays regular.
  */
-export const PLAY_BASE_W = 640;
-export const PLAY_BASE_H = 360;
+export const PLAY_BASE_W = 720;
+export const PLAY_BASE_H = 405;
 export function playZoom(w: number, h: number) {
-  return Math.max(1, Math.floor(Math.min(w / PLAY_BASE_W, h / PLAY_BASE_H) + 0.15));
+  return Math.max(1, Math.floor(Math.min(w / PLAY_BASE_W, h / PLAY_BASE_H) * 4) / 4);
 }
 
 export async function waitForPixelFonts() {
