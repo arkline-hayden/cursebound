@@ -1251,6 +1251,7 @@ export class PersistenceDb {
     assertText(f.trust, 'trust', 64);
     assertJsonText(f.participantsJson, 'participantsJson', 16_384);
     assertJsonText(f.summaryJson, 'summaryJson', 262_144);
+    if (f.breakdownJson !== undefined && f.breakdownJson !== null) assertJsonText(f.breakdownJson, 'breakdownJson', 131_072);
     if (typeof f.practice !== 'boolean') throw new StoreError('INVALID_INPUT', 'practice must be boolean');
     if (f.progress !== undefined && (!f.progress || !Array.isArray(f.progress.members) || f.progress.members.length > 5)) throw new StoreError('INVALID_INPUT', 'invalid progress');
     return this.tx(() => {
@@ -1267,6 +1268,8 @@ export class PersistenceDb {
         f.status === 'pending_storage' ? null : now,
         f.runId,
       );
+      // post-run breakdown (schema v5), kept beside the summary
+      if (f.breakdownJson) this.run('UPDATE runs SET breakdown_json = ? WHERE id = ?', f.breakdownJson, f.runId);
       if (f.status === 'finalized') {
         this.run(
           `INSERT INTO board_entries(board_key, run_id, score_text, score_digits, depth, active_ticks, completed_at, verified_at, trust, participants_json, practice)
@@ -1427,6 +1430,7 @@ export class PersistenceDb {
       contentHash: str(r.content_hash),
       scoreVersion: str(r.score_version),
       summaryJson: strOrNull(r.summary_json),
+      breakdownJson: strOrNull(r.breakdown_json),
       verification: v ? (str(v.status) as VerificationStatus) : null,
       members,
       rounds,

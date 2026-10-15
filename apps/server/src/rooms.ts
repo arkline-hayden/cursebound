@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { CLASS_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, TICK_RATE, classUnlockLevel, contentHash, isClassUnlocked } from '@cursebound/content';
 import { BUILD_ID, LIMITS, PROTOCOL_VERSION, boardKey, parseClientMessage, quantizeInput, sanitizeName, type ClientMessage, type SeatView, type ServerMessage } from '@cursebound/protocol';
-import { createRun, deserializeState, type CreateRunParams, type SimState } from '@cursebound/simulation';
+import { createRun, deserializeState, restoreBreakdown, type CreateRunParams, type SimState } from '@cursebound/simulation';
 import { RunAuthority, type AuthorityHost, type SeatLink } from './authority';
 import type { ServerConfig } from './config';
 import type { Logger } from './persistence/logger';
@@ -303,8 +303,9 @@ export class RoomManager {
     if (!run.members.some((m) => m.profileId === profileId)) throw Object.assign(new Error('not a member of this run'), { code: 'UNAUTHORIZED' });
     const ck = await this.store.latestCheckpoint(runId);
     if (!ck) throw Object.assign(new Error('no safe checkpoint yet (runs resume from the last Fate commit)'), { code: 'NOT_FOUND' });
-    const wrap = JSON.parse(ck.stateBlob) as { v: number; persistSeq: number; chunkNo: number; state: string; boardKey: string; practice: boolean; bountyId?: string | null };
+    const wrap = JSON.parse(ck.stateBlob) as { v: number; persistSeq: number; chunkNo: number; state: string; boardKey: string; practice: boolean; bountyId?: string | null; breakdown?: unknown };
     const state = deserializeState(wrap.state);
+    if (wrap.breakdown) restoreBreakdown(state, wrap.breakdown);   // post-run breakdown carried outside the hashed state
     const room = new Room(this, { mode: 'solo', seed: state.seed, challengeId: state.challengeId, tutorial: state.tutorial, trust: 'local', bounty: state.bounty && wrap.bountyId ? { id: wrap.bountyId, modifierId: state.bounty } : null });
     const p = state.players[0];
     const { token } = room.addSeat(p.profileId, p.name, p.classId);

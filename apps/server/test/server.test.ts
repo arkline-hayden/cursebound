@@ -182,6 +182,13 @@ describe('server integration', () => {
     expect(c3.last('RESULTS')).toBeTruthy();
     const run = await api('GET', `/runs/${runId}`);
     expect(run.status).toBe('finalized');
+    // the post-run breakdown rides on RESULTS and is stored with the run record (runs.breakdown_json), carried
+    // across the crash + resume by the checkpoint wrapper
+    const res = c3.last('RESULTS')!.summary as { breakdown?: { v: number; heroes: { slot: number; skills: unknown[] }[] } };
+    expect(res.breakdown?.v).toBe(1);
+    expect(res.breakdown?.heroes[0].skills.length).toBeGreaterThan(0);
+    expect(JSON.parse(run.breakdownJson).heroes[0].skills.length).toBeGreaterThan(0);
+    expect(JSON.parse(run.summaryJson).breakdown).toBeUndefined();
     expect(run.resumed === true || run.resumed === false).toBe(true);
     const verify = await api('POST', `/runs/${runId}/verify`);
     expect(verify.reason).toBeTruthy();

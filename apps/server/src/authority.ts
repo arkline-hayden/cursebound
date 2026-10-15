@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { BOUNTY_MIN_DEPTH, CARD_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION, CONTENT_VERSION, TICK_RATE, contentHash, describeAward, xpForRun, type XpAward } from '@cursebound/content';
 import { BUILD_ID, LIMITS, type ServerMessage } from '@cursebound/protocol';
 import {
-  buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, serializeState, stateHash, step,
+  buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, runBreakdown, serializeState, stateHash, step,
   voteCounts, type Command, type CreateRunParams, type PlayerInput, type SimEvent, type SimState, STATE_SCHEMA,
 } from '@cursebound/simulation';
 import type { Logger } from './persistence/logger';
@@ -31,7 +31,8 @@ export interface RunEndSummary { runId: string; endReason: string; scoreText: st
 interface JournalTick { t: number; i?: [number, number, number, number, number, number, number][]; c?: Command[] }
 interface Journal { v: 1; runId: string; header?: CreateRunParams; resumeFrom?: { tick: number }; ticks: JournalTick[] }
 
-const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training']);
+// 'recap': a hero's death recap for the live "You died to…" card (simulation runStats.ts)
+const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training', 'recap']);
 const MAX_EVENTS_PER_BATCH = 240;
 const SNAPSHOT_EVERY = Math.round(TICK_RATE / 20);
 const TICK_MS = 1000 / TICK_RATE;
@@ -314,7 +315,8 @@ export class RunAuthority {
   }
 
   private checkpointBlob(): { blob: string; sum: string } {
-    const blob = JSON.stringify({ v: 1, persistSeq: this.persistSeq, chunkNo: this.chunkNo + 1, state: serializeState(this.state), boardKey: this.boardKey, practice: this.practice, bountyId: this.bountyId });
+    // `breakdown` (runStats.ts) lives outside the hashed state; the wrapper carries it so a resumed run keeps its totals
+    const blob = JSON.stringify({ v: 1, persistSeq: this.persistSeq, chunkNo: this.chunkNo + 1, state: serializeState(this.state), boardKey: this.boardKey, practice: this.practice, bountyId: this.bountyId, breakdown: runBreakdown(this.state) });
     return { blob, sum: checksum(blob) };
   }
 
@@ -381,6 +383,8 @@ export class RunAuthority {
         stats: { damageDealt: p.stats.damageDealt.toCompact(), damageTaken: p.stats.damageTaken.toCompact(), healing: p.stats.healing.toCompact(), prevented: p.stats.prevented.toCompact(), revives: p.stats.revives, downs: p.stats.downs },
       })),
       deathRecaps: s.deathRecaps.slice(-10),
+      // post-run breakdown: damage per skill, damage taken by source, death recaps (simulation runStats.ts)
+      breakdown: runBreakdown(s),
       legendaries: s.lootFound ?? [],
       ...(this.training ? { training: true } : {}),
       // daily bounty and progression (content bounties.ts / progression.ts): the XP award per slot (null until the
@@ -394,13 +398,14 @@ export class RunAuthority {
 
   private persistFinalize() {
     const s = this.state;
-    const sum = this.summary();
+    const { breakdown, ...sum } = this.summary();   // the breakdown is stored in its own column (runs.breakdown_json)
     const journal = this.takeJournal();
     const status = s.endReason === 'aborted_infrastructure' ? 'aborted' : s.endReason === 'invalidated' ? 'invalidated' : 'finalized';
     const input = {
       runId: s.runId, status: status as 'finalized' | 'aborted' | 'invalidated', endReason: s.endReason ?? 'retired', scoreText: s.scoreText,
       depth: clearedDepth(s), activeTicks: s.totalActiveTicks, boardKey: this.boardKey, trust: s.trust,
       participantsJson: JSON.stringify(s.players.map((p) => ({ name: p.name, classId: p.classId }))), summaryJson: JSON.stringify(sum), practice: this.practice,
+      breakdownJson: breakdown ? JSON.stringify(breakdown) : null,
       // progression: every member's profile earns the run's XP; a bounty run that cleared a round doubles each member's
       // first completion of that bounty
       progress: {
