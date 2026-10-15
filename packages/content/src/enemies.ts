@@ -1,5 +1,7 @@
 import type { BiomeDef, BossDef, EnemyAttackDef, EnemyDef } from './types';
 import { TREASURE_IMP } from './roomEvents';   // room events: the treasure imp (a non-objective runner)
+import { CORE_ADDS, CORRUPT_CORE } from './bosses/corruptCore';
+import { IRON_COLOSSUS } from './bosses/ironColossus';
 
 // Ordinary archetypes + a summon (PRD §14.2) and two boss templates (§14.3). First tuning proposals.
 // Individually weak, numerous foes (Diablo-style packs, director.ts); four archetypes impede heroes directly with
@@ -285,6 +287,7 @@ export const ENEMIES: EnemyDef[] = [
     ],
     weaknesses: { ember: '1.3' },
   },
+  ...CORE_ADDS,   // the Corrupted Core's drones and turrets (bosses/corruptCore.ts)
 ];
 
 /** Theme rosters (content 1.5): the foes native to each dungeon theme (EnemyDef.themes). Themes without natives use
@@ -331,6 +334,8 @@ export const BOSSES: BossDef[] = [
       { id: 'slam', name: 'Bell Slam', kind: 'slam', damageType: 'physical', damageCoef: '1.8', windupSec: 1.25, releaseSec: 0.15, recoverySec: 2.5, cooldownSec: 0, range: 3.6, telegraph: { kind: 'circle', radius: 3.6 } },
     ],
   },
+  CORRUPT_CORE,    // server theme (bosses/corruptCore.ts)
+  IRON_COLOSSUS,   // forge theme (bosses/ironColossus.ts)
 ];
 
 export const BOSS_BY_ID: Record<string, BossDef> = Object.fromEntries(BOSSES.map((x) => [x.id, x]));
@@ -423,13 +428,29 @@ export const ARENA_DESIGNS: { id: string; name: string }[] = [
   { id: 'ritual', name: 'Ghost-fire ritual circle' },
   { id: 'belltower', name: 'Bell tower over the void' },
   { id: 'colosseum', name: 'Sunken colosseum' },
+  { id: 'datavault', name: 'Cursed data vault' },
+  { id: 'foundry', name: 'Molten foundry' },
 ];
 
 /** Which arena designs a boss may fight in (unknown bosses draw from every design). */
 export const BOSS_ARENAS: Record<string, string[]> = {
   prismstag: ['nave', 'ritual'],
   bellroot: ['belltower', 'colosseum'],
+  corruptcore: ['datavault'],
+  ironcolossus: ['foundry'],
 };
+
+/** Themed lairs: the boss a boss floor of this dungeon theme spawns (themes not listed draw from BIOMES[0].bosses). */
+export const THEME_BOSSES: Record<string, string[]> = {
+  server: ['corruptcore'],
+  forge: ['ironcolossus'],
+};
+
+/** The boss pool of a floor theme: its own lairs, else the biome's classic bosses. */
+export function bossesForTheme(theme: string | null | undefined): string[] {
+  const own = (theme && THEME_BOSSES[theme]?.filter((id) => BOSS_BY_ID[id])) || [];
+  return own.length ? own : BIOMES[0].bosses;
+}
 
 // ---------------- Packs (director.ts population) ----------------
 

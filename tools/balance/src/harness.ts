@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { CLASS_BY_ID, TICK_RATE, isBossRound } from '@cursebound/content';
+import { BOSSES, CLASS_BY_ID, DUNGEON_THEMES, TICK_RATE, bossesForTheme, isBossRound } from '@cursebound/content';
 import type { SimState } from '@cursebound/simulation';
 import { CLASS_IDS, arg, botTick, f1, mean, newRun, pct, skipTo } from './common';
 
@@ -8,6 +8,7 @@ import { CLASS_IDS, arg, botTick, f1, mean, newRun, pct, skipTo } from './common
 //  - late:  solo, every class, skip to round 8 and play rounds 8..9
 //  - boss:  skip to a boss round (5 and 10) and fight it, solo per class and as mixed parties of three
 // Options: --seeds N (default 3), --classes a,b, --bench early,late,boss, --out file.json
+//          --boss <id> (boss bench on a floor theme that lairs that boss) or --theme <id> (boss floors of that theme)
 
 /** outcome: clear, wipe (party down), stall (bot found no path to the last foes before the time cap) */
 interface RoundStat { round: number; cleared: boolean; outcome: 'clear' | 'wipe' | 'stall'; sec: number; dmgTakenFrac: number; downs: number }
@@ -70,10 +71,10 @@ function benchSolo(cls: string, seeds: number, from: number, to: number) {
   };
 }
 
-function benchBoss(party: string[], round: number, seed: string) {
+function benchBoss(party: string[], round: number, seed: string, theme: string | null = null) {
   const st = newRun(party, seed);
   const ctx = { seq: 0, voteSeq: 1 };
-  skipTo(st, round, ctx);
+  skipTo(st, round, ctx, theme);
   const bossId = st.encounter?.bossId ?? '?';
   const r = playRounds(st, round, ctx, 240)[0];
   return { party: party.join('+'), round, bossId, win: !!r?.cleared, sec: r?.sec ?? 0, dmgTakenFrac: r?.dmgTakenFrac ?? 0, downs: r?.downs ?? 0 };
@@ -83,6 +84,8 @@ const seeds = Number(arg('seeds', '3'));
 const classes = arg('classes', CLASS_IDS.join(',')).split(',');
 const benches = arg('bench', 'early,late,boss').split(',');
 const result: Record<string, unknown> = {};
+const bossArg = arg('boss', '');
+const bossTheme = arg('theme', '') || (bossArg ? DUNGEON_THEMES.find((t) => bossesForTheme(t.id).includes(bossArg))?.id ?? null : null);
 const t0 = Date.now();
 
 for (const [name, from, to] of [['early', 1, 4], ['late', 8, 9]] as const) {
@@ -101,19 +104,19 @@ for (const [name, from, to] of [['early', 1, 4], ['late', 8, 9]] as const) {
 if (benches.includes('boss')) {
   const rows: ReturnType<typeof benchBoss>[] = [];
   for (const round of [5, 10]) {
-    for (const c of classes) for (let s = 0; s < seeds; s++) rows.push(benchBoss([c], round, `BOSS_${c}_${round}_${s}`));
+    for (const c of classes) for (let s = 0; s < seeds; s++) rows.push(benchBoss([c], round, `BOSS_${c}_${round}_${s}`, bossTheme));
     for (let s = 0; s < seeds * 2; s++) {
       const party = [0, 1, 2].map((k) => classes[(s * 3 + k) % classes.length]);
-      rows.push(benchBoss(party, round, `BOSSP_${round}_${s}`));
+      rows.push(benchBoss(party, round, `BOSSP_${round}_${s}`, bossTheme));
     }
   }
   result.boss = rows;
-  console.log(`\n== boss: rounds 5 and 10, solo per class x ${seeds} seeds + ${seeds * 2} parties of 3 ==`);
+  console.log(`\n== boss: rounds 5 and 10, solo per class x ${seeds} seeds + ${seeds * 2} parties of 3${bossTheme ? ` (${bossTheme} floors)` : ''} ==`);
   for (const round of [5, 10]) for (const kind of ['solo', 'party']) {
     const g = rows.filter((r) => r.round === round && (kind === 'solo' ? !r.party.includes('+') : r.party.includes('+')));
     const w = g.filter((r) => r.win);
     console.log(`round ${String(round).padStart(2)} ${kind.padEnd(5)}: win ${pct(g.length ? w.length / g.length : 0).padStart(4)} (${w.length}/${g.length}), kill time ${f1(mean(w.map((r) => r.sec)))}s, dmgTaken ${f1(mean(g.map((r) => r.dmgTakenFrac)))}x maxHP, downs ${mean(g.map((r) => r.downs)).toFixed(2)}`);
-    for (const b of ['prismstag', 'bellroot']) {
+    for (const b of BOSSES.map((x) => x.id)) {
       const gb = g.filter((r) => r.bossId === b);
       if (!gb.length) continue;
       const wb = gb.filter((r) => r.win);

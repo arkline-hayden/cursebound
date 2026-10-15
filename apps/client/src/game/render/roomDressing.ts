@@ -610,6 +610,40 @@ const ARENA_PLANS: Record<string, KindPlan> = {
   },
 };
 
+/** The Corrupted Core's data vault: a sigil on the raised core platform, pylons round it, rack rows on the arcs,
+ *  rack walls all round, power cores behind the platform, cable runs and neon on the walls. */
+ARENA_PLANS.datavault = (ctx, room) => {
+  const bx = ctx.boss ? Math.floor(ctx.boss.x) : Math.floor(room.cx), by = ctx.boss ? Math.floor(ctx.boss.y) : Math.floor(room.cy);
+  medallion(ctx, 'sigil', 6, bx, by, room);
+  room.blocks.forEach((b, k) => {
+    if (b.pair) ctx.blocker(b.x, b.y, 'rack_free', Math.floor(hash(b.x, b.y, ctx.seed + 811) * 4));
+    else ctx.blocker(b.x, b.y, Math.abs(b.x - bx) <= 4 && Math.abs(b.y - by) <= 4 ? 'core_pylon' : 'power_core', k % 4);
+  });
+  alongWalls(ctx, room, ['rack_hug'], { step: 2, hug: true, max: 16 });
+  alongWalls(ctx, room, ['terminal', 'holo_pylon', 'ups_unit'], { step: 4, max: 5, p: 0.9 });
+  scatter(ctx, room, ['cable_coil', 'chip_debris', 'floor_vent'], 7, { low: true, near: nearWalls(ctx, 2) });
+  for (let n = 0; n < Math.round(5 * ctx.density); n++) {
+    const t = room.tiles[Math.floor(room.rnd() * room.tiles.length)]!;
+    const [x, y] = xy(ctx, t);
+    if (Math.abs(x - bx) + Math.abs(y - by) > 4) ctx.decal('decal:cable', Math.floor(room.rnd() * 4), x + 0.5, y + 0.5, { alpha: 0.7, flip: room.rnd() < 0.5 });
+  }
+  ctx.emitter('sparks', bx + 0.5, by + 0.5, 30, 0.6);
+  wallDecor(ctx, room, ['neon_cyan', 'rack_wall', 'cable_wall', 'warning_sign', 'neon_magenta'], 0.45);
+};
+
+/** The Iron Colossus's foundry: the casting-pit dais, furnaces on the diagonals, anvil pairs, smithing kit along the
+ *  walls, ash on the floor, embers and smoke. Lava stays off the floor (the slag patterns are the only lava). */
+ARENA_PLANS.foundry = (ctx, room) => {
+  const bx = ctx.boss ? Math.floor(ctx.boss.x) : Math.floor(room.cx), by = ctx.boss ? Math.floor(ctx.boss.y) : Math.floor(room.cy);
+  if (!medallion(ctx, 'mos', 4, bx, by, room)) dais(ctx, bx, by);   // the casting pit's iron grate
+  blockers(ctx, room, 'furnace', 'anvil');
+  for (const b of room.blocks) if (!b.pair) ctx.emitter('embers', b.x + 0.5, b.y + 0.5, 24, 0.9);
+  sprinkle(ctx, room, ['ash0', 'ash1'], 0.22, (x, y) => Math.abs(x - bx) + Math.abs(y - by) > 2);
+  alongWalls(ctx, room, ['forge_hearth', 'quench', 'orepile', 'minecart', 'anvil'], { step: 3, max: 8, p: 0.95 });
+  wallDecor(ctx, room, ['toolrack', 'chainhooks', 'chains'], 0.35);
+  ctx.emitter('smoke', bx + 0.5, by + 0.5, 40, 0.5);
+};
+
 const arena: KindPlan = (ctx, room) => {
   const fn = ARENA_PLANS[ctx.arena ?? ''] ?? ARENA_PLANS.ritual!;
   fn(ctx, room);

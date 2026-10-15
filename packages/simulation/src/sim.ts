@@ -14,6 +14,7 @@ import './classes';
 import './elites';    // champion / rare monster affixes (global hooks)
 import './pickups';   // potions and resource orbs (global hooks)
 import './boons';     // Fate mechanics: boons and banes (global hooks)
+import './bosses';    // scripted bosses (bosses/*: their AI and hazards)
 import { settleLoot } from './gear';   // legendary gear: drops, pickup/swap, perks (global hooks; after pickups)
 import { applyRoomEvent, placeMerchant, resetRoomEvents, settleRoomEvents } from './roomEvents';   // room events: shrines, altar, merchant, treasure imps, coins (global hooks)
 import './minibosses';   // named mini-bosses: director slots, mechanics and loot (global hooks; after gear)

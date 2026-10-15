@@ -1,11 +1,12 @@
 import { Big } from '@cursebound/numeric';
-import { BIOMES, BOSS_BY_ID, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, RULES, THEME_PACKS, TICK_RATE, isBossRound, referenceSec } from '@cursebound/content';
+import { BOSS_BY_ID, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, RULES, THEME_PACKS, TICK_RATE, bossesForTheme, isBossRound, referenceSec } from '@cursebound/content';
 import { cohortRadius } from './combat';
 import { bossIntroTicks, holdCinematic, inCinematic } from './cinematic';
 import { dist2 } from './geometry';
 import { hooks } from './hooks';
 import './caches';   // cursed caches: breakable exploration rewards on ordinary floors
 import { generateMap, nearestFloor } from './map';
+import { pickBoss } from './mapgen';
 import { nextInt, seedRng, type RngState } from './rng';
 import { B, ONE, enemyDamage, enemyUnitHealth, fateFactor, partyBudgetMult, toFloatClamped } from './stats';
 import type { EncounterGroup, EnemyState, PendingSpawn, SimEvent, SimState } from './types';
@@ -75,7 +76,6 @@ export function setupRound(state: SimState, ev: SimEvent[]) {
   state.map = generateMap(state.seed, r, boss, state.nextTheme?.round === r ? state.nextTheme.theme : null);   // door choice (doors.ts)
   state.enemies = []; state.projectiles = []; state.hazards = []; state.telegraphs = []; state.pendingSpawns = []; state.reactions = []; state.bossPhaseEvents = [];
   const rng = seedRng(state.seed, 'encounter', r);
-  const biome = BIOMES[0];
   const M = fateFactor(state, 'encounter.spawnQuantity');
   const groups: EncounterGroup[] = [];
   let bossId: string | null = null;
@@ -84,9 +84,8 @@ export function setupRound(state: SimState, ev: SimEvent[]) {
   let planned = 0;
   const budgetF =RULES.baseBudget * (1 + Number(RULES.budgetLinear) * (r - 1)) * partyBudgetMult(state.n).toNumber();
   if (boss) {
-    // alternate templates; later bosses apply remix modules (more adds per phase)
-    const idx = Math.floor(r / RULES.bossEvery) - 1;
-    bossId = biome.bosses[(idx + nextInt(rng, 2)) % biome.bosses.length];
+    // the floor theme's own lair (content THEME_BOSSES) or the biome's classic bosses, alternating templates
+    bossId = pickBoss(bossesForTheme(state.map.theme), r, rng);
     const def = BOSS_BY_ID[bossId];
     const weight = def.phases.reduce((s, p) => s + p.weight, 0);
     groups.push({ id: 0, weight, archetype: bossId, wave: 0, spawned: false, defeated: false, countText: '1' });

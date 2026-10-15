@@ -51,6 +51,8 @@ export interface SnapEnemy {
   dor?: 1;
   /** named mini-boss (minibosses.ts): its name, signature mechanic ids, and whether it is enraged */
   mb?: string; mm?: string[]; enr?: 1;
+  /** a scripted boss's mirror echo (bosses/corruptCore.ts): a decoy body of the same kind */
+  echo?: 1;
   dbg?: { action: string; utility: Record<string, number>; target: number | null; path: number[]; attack: string | null };
 }
 export interface SnapProjectile { i: number; k: string; x: number; y: number; vx: number; vy: number; o: 0 | 1; w: string | null; lt: [number, number, number] | null }
@@ -143,6 +145,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
       if (e.ccVars) Object.assign(se, ccSnapFlags(state, e));
       if (e.dormant) se.dor = 1;
       if (e.mini) { se.mb = e.mini.name; se.mm = e.mini.mechs; if (e.mini.v.enr) se.enr = 1; }   // named mini-boss (minibosses.ts)
+      if (e.bvars?.echo) se.echo = 1;
       if (debug) se.dbg = { action: e.action, utility: Object.fromEntries(Object.entries(e.utility).map(([k, v]) => [k, r3(v)])), target: e.targetSlot, path: e.path.slice(0, 24), attack: e.attack ? `${e.attack.attackId}:${e.attack.stage}` : null };
       return se;
     }),

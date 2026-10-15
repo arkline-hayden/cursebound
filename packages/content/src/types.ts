@@ -217,8 +217,9 @@ export interface EnemyAttackDef {
   name: string;
   /** 'burst' = a telegraphed circle at the target point that detonates on release (no lingering hazard).
    *  Theme foes: 'quake' = a telegraphed circle around the attacker that detonates on release; 'leap' = a jump onto the
-   *  telegraphed circle at the target point, landing in a burst; 'blink' = a teleport onto the telegraphed point. */
-  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst' | 'quake' | 'leap' | 'blink';
+   *  telegraphed circle at the target point, landing in a burst; 'blink' = a teleport onto the telegraphed point.
+   *  'scripted' = resolved by its boss's own script (simulation bosses/*), not by the generic attack kinds. */
+  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst' | 'quake' | 'leap' | 'blink' | 'scripted';
   /** Knockback (world units): heroes this attack hits are shoved away from its centre (Gale Wisp gust). */
   push?: number;
   /** Only used against heroes at least this far away (leaps). */
@@ -292,6 +293,10 @@ export interface BossDef {
   /** Fraction of damage taken in stagger state multiplier (vulnerable core). */
   vulnerableMultiplier: string;
   staggerMeter: number;      // control converts to stagger
+  /** Signature legendary (content LEGENDARIES id) its kill drops while nobody wears it; otherwise a random one. */
+  loot?: string;
+  /** Script tunables (seconds, world units, counts, fractions) read by a scripted boss (simulation bosses/*). */
+  params?: Record<string, number>;
 }
 
 export interface BiomeDef {

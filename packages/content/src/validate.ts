@@ -1,10 +1,10 @@
 import { CARDS, RARITY_WEIGHTS, TUTORIAL_CARD, cardRarity } from './cards';
 import { MECHANICS, MECHANIC_BY_ID, mechanicText } from './mechanics';
 import { BRANCH_TIER_POINTS, CLASSES, NODES, NODE_BY_ID, SKILLS, SKILL_BY_ID } from './classes';
-import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_FOES, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
+import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_BOSSES, THEME_FOES, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
 import { MINIBOSS_EXCLUDED_ROLES, MINIBOSS_MECHANICS, MINIBOSS_NAMES } from './minibosses';
 import { STAT_BY_ID, isKnownStat } from './stats';
-import { validateLegendaries } from './legendaries';
+import { LEGENDARY_BY_ID, validateLegendaries } from './legendaries';
 import { validateRoomEvents } from './roomEvents';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { CLASS_UNLOCKS, STARTER_CLASSES } from './progression';
@@ -232,6 +232,12 @@ export function validateContent(): string[] {
     if (!(d >= 0 && d <= KNOCKBACK_RULES.maxPush)) errs.push(`knockback: ${id} push ${d} outside 0..${KNOCKBACK_RULES.maxPush}`);
   }
   if (KNOCKBACK_RULES.eliteFactor.some((f, i) => f < 0 || f > 1 || (i > 0 && f > KNOCKBACK_RULES.eliteFactor[i - 1]!))) errs.push('knockback: elite factors must fall from 1 by tier');
+  // themed lairs: known themes and bosses; signature loot is a known legendary
+  for (const [t, list] of Object.entries(THEME_BOSSES)) {
+    if (!DUNGEON_THEMES.some((d) => d.id === t)) errs.push(`theme bosses: unknown theme ${t}`);
+    for (const id of list) if (!BOSSES.some((b) => b.id === id)) errs.push(`theme bosses ${t}: unknown boss ${id}`);
+  }
+  for (const b of BOSSES) if (b.loot && !LEGENDARY_BY_ID[b.loot]) errs.push(`${b.id}: unknown signature loot ${b.loot}`);
   errs.push(...validateLegendaries());
   errs.push(...validateRoomEvents(isKnownStat));   // shrines, altar pacts, merchant wares
   errs.push(...validateProgression());

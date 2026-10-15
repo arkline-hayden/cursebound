@@ -18,7 +18,9 @@ const ORANGE = '#ff8a1e';
 const TIERS = [{ id: 0, name: 'Normal', color: 'var(--text-2)' }, { id: 1, name: 'Champion', color: '#6ab4ff' }, { id: 2, name: 'Rare', color: '#ffd23f' }] as const;
 const lab: CSSProperties = { fontFamily: 'var(--font-label)', fontSize: 'var(--fs-small)', lineHeight: 'var(--lh-small)', textTransform: 'uppercase', color: 'var(--text-3)' };
 const grid = (cols: number): CSSProperties => ({ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 4 });
-const tight: CSSProperties = { padding: '2px 6px', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+/** A boss button label that fits half the drawer: "The Corrupted Core" -> "Core" (the full name is the tooltip). */
+const bossLabel = (name: string): string => { const n = name.replace(/^The /, ''); return n.length > 12 ? n.split(' ').pop()! : n; };
+const tight: CSSProperties ={ padding: '2px 6px', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
 
 /** Room event spawns (TRAIN op 'event'): the five shrines, the altar, the merchant, a treasure imp, a heap of coins. */
 const ROOM_EVENT_TOOLS = [
@@ -97,7 +99,7 @@ export function TrainingPanel({ net }: { net: GameConnection }) {
 
           <span style={lab}>Bosses</span>
           <div style={grid(2)}>
-            {BOSSES.map((b) => <button key={b.id} className="btn small danger" style={tight} title={b.title} aria-label={`Spawn ${b.name}`} onClick={() => net.train('boss', b.id)}>{b.name.replace(/^The /, '')}</button>)}
+            {BOSSES.map((b) => <button key={b.id} className="btn small danger" style={tight} title={`${b.name}: ${b.title}`} aria-label={`Spawn ${b.name}`} onClick={() => net.train('boss', b.id)}>{bossLabel(b.name)}</button>)}
           </div>
 
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>

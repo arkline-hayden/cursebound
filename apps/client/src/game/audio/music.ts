@@ -355,6 +355,42 @@ export const BOSS_SONGS: Record<string, SongSpec> = {
     fill: '............xxxx',
     reverb: 0.7, echo: 0.1, level: 1, minIntensity: 0.62, introBars: 2, calmDensity: 1,
   },
+  // The Corrupted Core: a driving machine pulse, a stuttering arpeggio, glitch hits and a distorted bass in phrygian
+  corruptcore: {
+    id: 'boss:corruptcore', root: 40, scale: S.phrygian, bpm: 128, steps: 16, sevenths: true,
+    progressions: [[0, 1, 0, 6], [0, 5, 1, 0], [0, 1, 3, 1], [5, 6, 1, 0]],
+    drone: 'hum', pad: 'glass', motif: 'arp', motifOct: 24,
+    motifA: [[0, 0, 1], [2, 4, 1], [4, 7, 1], [6, 4, 1], [8, 0, 1], [10, 1, 1], [12, 4, 1], [14, 7, 1]],
+    motifB: [[0, 7, 1], [2, 4, 1], [4, 1, 1], [6, 0, 1], [8, 1, 1], [10, 4, 1], [12, 8, 2], [15, 7, 1]],
+    bass: 'dist', bassPattern: 'x.xx.xx.x.xx.xo.',
+    lead: 'reedDist', leadSteps: [0, 8],
+    perc: {
+      low: { kind: 'pulse', calm: 'x.......x.......', combat: 'x...x...x...x...', heavy: 'x...x...x..xx.x.' },
+      mid: { kind: 'tom', combat: '..........o.....', heavy: '....o.....o.o.oo' },
+      accent: { kind: 'glitch', calm: '..............g.', combat: '...x......x...o.', heavy: '..x.o.x...x.o.xo' },
+      tick: { kind: 'blip', combat: 'g.g.g.g.g.g.g.g.', heavy: 'gggggggggggggggg' },
+    },
+    fill: '............xoxx',
+    reverb: 0.45, echo: 0.35, level: 0.95, minIntensity: 0.62, introBars: 2, calmDensity: 1,
+  },
+  // The Iron Colossus: slow iron march, anvil strikes on the off-beats, low brass and a growling furnace drone
+  ironcolossus: {
+    id: 'boss:ironcolossus', root: 33, scale: S.phrygianDominant, bpm: 84, steps: 16,
+    progressions: [[0, 1, 0, 1], [0, 6, 5, 1], [0, 3, 1, 0], [5, 1, 0, 0]],
+    drone: 'growl', pad: 'lowBrass', motif: 'brassStab', motifOct: 24,
+    motifA: [[0, 0, 2], [4, 0, 1], [6, 1, 2], [10, 0, 1], [12, 4, 4]],
+    motifB: [[0, 4, 2], [4, 3, 1], [6, 1, 2], [10, 0, 1], [12, -1, 4]],
+    bass: 'dist', bassPattern: 'x...x.x.x...x.o.',
+    lead: 'brass', leadSteps: [0, 8],
+    perc: {
+      low: { kind: 'taiko', calm: 'x.......x.......', combat: 'x...x...x..x....', heavy: 'x.x.x...x.xxx.x.' },
+      accent: { kind: 'anvil', calm: '........g.......', combat: '......x.......x.', heavy: '..x...x...x...x.' },
+      mid: { kind: 'timpani', combat: '..........o.....', heavy: '...o......o.o.oo' },
+      tick: { kind: 'chain', combat: '...g.......g....', heavy: '.g.g.g.g.g.g.g.g' },
+    },
+    fill: '............xxox',
+    reverb: 0.55, echo: 0.08, level: 1, minIntensity: 0.62, introBars: 2, calmDensity: 1,
+  },
 };
 
 /** Fallback boss song for unknown bosses: the catacombs palette, darker and denser. */

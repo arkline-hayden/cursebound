@@ -9,6 +9,7 @@ import { actMul, isFrozen, lureGoal, moveMul } from './cc';
 import { inCinematic } from './cinematic';
 import { stepKnock } from './knock';
 import { bossReinforcements } from './director';
+import { bossScript } from './bosses/registry';
 import { makeHazard } from './players';
 import { nextFloat, nextInt } from './rng';
 import { B, ONE, fateFactor, toFloatClamped } from './stats';
@@ -777,6 +778,7 @@ export function stepEnemy(state: SimState, ev: SimEvent[], e: EnemyState) {
 // ---------------- Bosses (PRD §14.3) ----------------
 
 function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
+  if (bossScript(e.kind)?.step(state, ev, e)) return;   // scripted bosses run their own AI (bosses/*)
   const def = BOSS_BY_ID[e.kind];
   // phase transitions by health fraction
   const frac = e.cohort.unitHp.sub(e.cohort.spread).sub(e.cohort.front).ratio(e.cohort.unitHp);

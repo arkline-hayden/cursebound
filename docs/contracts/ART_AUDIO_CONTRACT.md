@@ -53,6 +53,9 @@ Animation key format: `${actor}:${state}:${dir}` e.g. `vanguard:run:se`. Texture
 | mite | 32x32 | idle 2, run 4, windup 2, attack 2, hit 1, death 4 | tiny glass beetle summon, pale pink |
 | prismstag (boss) | 128x128 | idle 4, run 6, windup 4, attack 6, stagger 3, death 8 | giant crystal stag, enormous branching prism antlers emitting light, white/cyan/rainbow refractions |
 | bellroot (boss) | 160x160 | idle 4, windup 4, attack 6, stagger 3, death 8 (dir `s` only; `run` may alias idle) | towering root colossus with a giant bronze bell for a torso and a glowing core (core visibly exposed in `stagger`), roots, moss, amber glow |
+| corruptcore (boss) | 160x160 | idle 6, windup 4, attack 6, stagger 3, hit 2, death 8 (5 views; `run` aliases idle) | floating gunmetal eye wrapped in a halo ring, flanking broken monitors, limp cables with live plugs; the eye looks the way it faces (the Mirror Split tell), cyan calm, magenta angry, red cracked when staggered |
+| coredrone / coreturret (summons) | 48x48 | idle 4, windup 4, attack 4, hit 2, death 6 (dir `s` only) | the Corrupted Core's hover eye-drone and tripod sentry turret |
+| ironcolossus (boss) | 176x176 | idle 4, run 6, windup 4, attack 6, stagger 3, hit 2, death 8 (dir `s` only) | towering riveted iron forge-engine: furnace chest, smokestack pauldrons, T-visor helm, piston fist, quake hammer; `stagger` = overheated, plates parted, weak points white-hot |
 
 Animation principles: anticipation in windup/attack, squash/stretch-ish pixel shifts, leg cycles in run, weapon trail frames in attack, dodge = roll/blur pose, hit = white flash frame tint baked into frame 1, death = shatter/dissolve into crystal shards.
 Weapon/silhouette must stay consistent across directions.

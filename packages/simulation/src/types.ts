@@ -249,6 +249,8 @@ export interface EnemyState {
   dormant?: boolean;
   /** Named mini-boss (minibosses.ts): generated name, signature mechanic ids and their timers. Absent = not one. */
   mini?: MiniBossState;
+  /** Scripted boss state (bosses/*): home point, arena radius, split / echo markers. Plain numbers, created lazily. */
+  bvars?: Record<string, number>;
 }
 
 /** A named mini-boss's identity and mechanic bookkeeping (minibosses.ts). Plain data, deterministic. */

@@ -73,6 +73,8 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   blast_fire: 5, blast_frost: 5, zap_strike: 5, blast_decay: 5, smite: 5, slam_heavy: 5,
   bow_shot: 2, gun_shot: 2, throw_whoosh: 2, blade_flurry: 3, shield_bash: 4, trap_snap: 4,
   summon_rise: 4, beast_howl: 4, beast_roar: 4, mech_deploy: 4, steam_vent: 4,
+  core_charge: 6, core_laser: 6, core_firewall: 7, core_glitch: 5, core_purge_alarm: 9, core_purge: 8, core_deploy: 5,
+  colossus_raise: 6, colossus_hammer: 8, colossus_stomp: 7, colossus_vent: 6, lava_vent: 4, lava_erupt: 6,
 };
 
 /** At most this many simultaneous voices of one cue (oldest is stolen). */
@@ -94,6 +96,7 @@ const MERGE_SEC: Partial<Record<SfxId, number>> = {
   impact_light: 0.035, impact_heavy: 0.05, impact_fire: 0.04, impact_frost: 0.04, impact_storm: 0.04, impact_decay: 0.04, impact_astral: 0.05,
   kill: 0.04, kill_burn: 0.05, kill_shatter: 0.05, kill_zap: 0.05, kill_squelch: 0.05, kill_chime: 0.08, crit: 0.06,
   gun_shot: 0.045, bow_shot: 0.04, blade_flurry: 0.06,
+  core_laser: 2, core_glitch: 3, core_deploy: 2,
 };
 
 /** Big moments that briefly pull the music down: [dB, hold s, release s]. */
@@ -103,6 +106,7 @@ const SFX_DUCK: Partial<Record<SfxId, [number, number, number]>> = {
   player_downed: [-6, 0.6, 1], portal_enter: [-6, 0.6, 1], boss_phase: [-6, 0.8, 1],
   shrine_activate: [-5, 0.5, 1], altar_pact: [-7, 0.8, 1.2],   // room events
   blast_fire: [-3, 0.1, 0.4], zap_strike: [-3, 0.1, 0.4], smite: [-3, 0.15, 0.5],
+  core_purge: [-7, 0.5, 1], colossus_hammer: [-5, 0.2, 0.6],
 };
 
 const MAX_VOICES = 32;

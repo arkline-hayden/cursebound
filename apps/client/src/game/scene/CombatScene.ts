@@ -18,6 +18,7 @@ import { RoomEventRenderer } from '../render/RoomEvents';   // room events: shri
 import { Outlines } from '../render/Outlines';
 import { AfflictionFx, foeActor, heroTint } from '../render/Afflictions';
 import { MINIBOSS_COLOR, MINIBOSS_CSS, MINIBOSS_SCALE, ThemeFoeFx, miniBossMechNames, miniBossTint } from '../render/ThemeFoeFx';   // theme foes + named mini-bosses
+import { BossFx } from '../render/bosses';
 import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
@@ -52,7 +53,7 @@ function hpNum(compact: string): string {
   return formatBig(b);
 }
 
-const BOSS_KINDS = new Set(['prismstag', 'bellroot']);
+const BOSS_KINDS = new Set(['prismstag', 'bellroot', 'corruptcore', 'ironcolossus']);
 /** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
 const CAM_LIFT = 22;
 /** Kill-streak milestones and their colours (escalating). */
@@ -118,6 +119,8 @@ export class CombatScene extends Phaser.Scene {
   /** theme foe cues and named mini-boss presentation (render/ThemeFoeFx.ts) */
   themeFx!: ThemeFoeFx;
   aff!: AfflictionFx;
+  /** scripted bosses' presentation (render/bosses) */
+  bossFx!: BossFx;
   /** in-world door vote (render/Doors.ts) */
   doorsR: DoorRenderer | null = null;
   /** room events: shrines, cursed altar, merchant, treasure imp, cursed coins (render/RoomEvents.ts) */
@@ -219,6 +222,10 @@ export class CombatScene extends Phaser.Scene {
     this.outlines = new Outlines(this);
     this.aff = new AfflictionFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.themeFx = new ThemeFoeFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y), (text, tone) => this.banner(text, tone));
+    this.bossFx = new BossFx({
+      scene: this, juice: this.juice, dungeon: this.dungeon, sfx: (id, x, y, priority = 1) => this.sfx(id as SfxId, x, priority, y),
+      banner: (text, tone) => this.banner(text, tone), reduced: () => this.settings().reducedEffects, me: () => netStore.get().slot,
+    });
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.roomFx = new RoomEventRenderer(this, this.juice, this.dungeon, this.net, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
@@ -456,6 +463,7 @@ export class CombatScene extends Phaser.Scene {
     const pal = this.palette();
     const J = this.juice;
     if (this.themeFx.onEvent(e, me, snap)) return;   // theme foe cues, mini-boss announcements (render/ThemeFoeFx.ts)
+    if (this.bossFx.onEvent(e, snap)) return;   // scripted bosses: beams, quakes, glitches, banners (render/bosses)
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
     if (this.roomFx?.onEvent(e, me, snap)) return;   // room events and coin pickups (render/RoomEvents.ts)
     switch (e.t) {
@@ -873,6 +881,7 @@ export class CombatScene extends Phaser.Scene {
     this.watchFrames(realNow, avgFrame, latest);
     this.loot?.update(latest, this.net.events);   // reads (does not consume) the event queue
     this.cine?.ingest(this.net.events, latest);   // cutscene triggers (reads, does not consume)
+    this.bossFx.sync(latest, this.net.map);   // which entities belong to scripted bosses (render/bosses)
     this.handleEvents(latest);
     J.update(delta / 1000);
     this.numbers.update();
@@ -970,6 +979,7 @@ export class CombatScene extends Phaser.Scene {
     this.guideMark?.update(latest, this.time.now, this.settings().reducedMotion);   // tutorial walk mark
     this.drawDebug(latest);
     this.drawFx();
+    this.bossFx.draw(this.time.now);
     this.doorsR?.update(latest, this.renderSelf.init ? this.renderSelf : null, me, delta);
     this.cine?.update(delta, latest, this.focus);
     this.dungeon.update(this.time.now, this.focus);
@@ -1340,6 +1350,7 @@ export class CombatScene extends Phaser.Scene {
     else v.sprite.clearTint();
     // frozen foes stop animating; everything else plays at normal speed
     if (e.fz) v.sprite.anims.pause(); else if (v.sprite.anims.isPaused) v.sprite.anims.resume();
+    if (e.boss) this.bossFx.drawEnemy(v.sprite, e, this.time.now);   // scripted bosses (e.g. the Core's echoes glitch)
     v.shadow.setAlpha(1).setScale(v.baseScale);
     const set = this.settings();
     void set;

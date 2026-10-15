@@ -1,4 +1,4 @@
-import { BIOMES, DUNGEON_LAYOUTS, DUNGEON_THEMES, RULES } from '@cursebound/content';
+import { DUNGEON_LAYOUTS, DUNGEON_THEMES, RULES, bossesForTheme } from '@cursebound/content';
 import { arenaDesign, generateArena } from './arenas';
 import { FLOOR, WALL, carve, corridor, ellipse, fill, idx, rect, ri, solid, type Gen, type Grid, type RoomSpec } from './mapgrid';
 import { assignKinds, finalRooms, furnish, partitionRooms } from './rooms';
@@ -663,17 +663,21 @@ export function layoutFor(seed: string, round: number, boss: boolean): string {
   return perm[r % n];
 }
 
-/**
- * The boss a boss round will spawn: the same first draw of the round's encounter stream the director makes
- * (director.setupRound), read here on a private copy so the arena can be built for its boss without the map
- * stream depending on the encounter stream's position.
- */
-export function bossForRound(seed: string, round: number): string | null {
-  const bosses = BIOMES[0].bosses;
-  if (!bosses.length) return null;
-  const rng = seedRng(seed, 'encounter', round);
+/** Pick a boss round's boss from a pool (alternating templates by round) with one draw of `rng`. */
+export function pickBoss(pool: readonly string[], round: number, rng: RngState): string {
   const i = Math.floor(round / RULES.bossEvery) - 1;
-  return bosses[(i + nextInt(rng, 2)) % bosses.length];
+  return pool[(i + nextInt(rng, 2)) % pool.length];
+}
+
+/**
+ * The boss a boss round will spawn on a floor of `theme` (a themed lair, content THEME_BOSSES, else the classic
+ * pair): the same first draw of the round's encounter stream the director makes (director.setupRound), read here on
+ * a private copy so the arena can be built for its boss without the map stream depending on the encounter stream.
+ */
+export function bossForRound(seed: string, round: number, theme: string = themeFor(seed, round)): string | null {
+  const bosses = bossesForTheme(theme);
+  if (!bosses.length) return null;
+  return pickBoss(bosses, round, seedRng(seed, 'encounter', round));
 }
 
 /** True for a known dungeon theme id (DUNGEON_THEMES). */
@@ -690,7 +694,7 @@ export function generateDungeon(seed: string, round: number, boss: boolean, them
   const theme = isTheme(themeOverride) ? themeOverride : themeFor(seed, round);
   const layout = layoutFor(seed, round, boss);
   const rng = seedRng(seed, 'map', round);
-  const design = boss ? arenaDesign(bossForRound(seed, round), rng) : null;
+  const design = boss ? arenaDesign(bossForRound(seed, round, theme), rng) : null;
   for (let attempt = 0; attempt < 12; attempt++) {
     let gen: Gen;
     if (design) gen = generateArena(design, rng);

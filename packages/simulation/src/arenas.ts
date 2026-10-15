@@ -1,6 +1,7 @@
 import { ARENA_DESIGNS, BOSS_ARENAS } from '@cursebound/content';
 import { FLOOR, WALL, block, carve, ellipse, idx, inner, rect, ri, solid, straight, type Gen, type Grid, type RoomSpec } from './mapgrid';
 import { nextFloat, nextInt, type RngState } from './rng';
+import { datavault, foundry } from './bosses/lairs';
 
 // Boss lairs (map generation, boss floors): every boss fights in a hand-designed arena that clearly differs from the
 // ordinary floors, procedurally varied per run (proportions, pillar rings, chapels, rim breaks, mirrored details).
@@ -151,7 +152,7 @@ function colosseum(rng: RngState): Gen {
   return { g, rooms: [ante.room, arena], start: ante.start, boss: idx(g, cx, cy), arena: 'colosseum' };
 }
 
-const ARENAS: Record<string, ArenaFn> = { nave, ritual, belltower, colosseum };
+const ARENAS: Record<string, ArenaFn> = { nave, ritual, belltower, colosseum, datavault, foundry };   // + scripted bosses' lairs (bosses/lairs.ts)
 
 /** The arena design for a boss (its own designs; any design for a boss without one), drawn from the map stream. */
 export function arenaDesign(bossId: string | null, rng: RngState): string {
