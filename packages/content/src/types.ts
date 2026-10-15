@@ -215,8 +215,16 @@ export type AfflictionId = 'chained' | 'chill' | 'frozen' | 'poisoned' | 'blinde
 export interface EnemyAttackDef {
   id: string;
   name: string;
-  /** 'burst' = a telegraphed circle at the target point that detonates on release (no lingering hazard). */
-  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst';
+  /** 'burst' = a telegraphed circle at the target point that detonates on release (no lingering hazard).
+   *  Theme foes: 'quake' = a telegraphed circle around the attacker that detonates on release; 'leap' = a jump onto the
+   *  telegraphed circle at the target point, landing in a burst; 'blink' = a teleport onto the telegraphed point. */
+  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst' | 'quake' | 'leap' | 'blink';
+  /** Knockback (world units): heroes this attack hits are shoved away from its centre (Gale Wisp gust). */
+  push?: number;
+  /** Only used against heroes at least this far away (leaps). */
+  minRange?: number;
+  /** Lingering line hazard kind of a 'rootwall' attack (default 'rootwall'; the Firewall Sentinel leaves 'firewall'). */
+  hazardKind?: string;
   /** Affliction applied to heroes this attack hits: seconds, optional magnitude (slow fraction / chain radius). */
   inflict?: { status: AfflictionId; sec: number; value?: number };
   /** Projectile / lob presentation kind (snapshot `k`); defaults to 'shard' / 'orb' / 'lob'. */
@@ -238,7 +246,10 @@ export interface EnemyAttackDef {
 export interface EnemyDef {
   id: string;
   name: string;
-  role: 'pursuer' | 'skirmisher' | 'artillery' | 'guardian' | 'hexer' | 'broodcaller' | 'summon' | 'jailer' | 'wraith' | 'shade' | 'weaver';
+  role: 'pursuer' | 'skirmisher' | 'artillery' | 'guardian' | 'hexer' | 'broodcaller' | 'summon' | 'jailer' | 'wraith' | 'shade' | 'weaver'
+    // theme foes (sky / moon / server): swarm = tiny numerous biters, brute = slow melee bruiser, leaper / blinker =
+    // gap closer / repositioner, gale / sentry = backline caster / turret, shambler = slow melee bruiser with a cast
+    | 'swarm' | 'brute' | 'leaper' | 'blinker' | 'gale' | 'sentry' | 'shambler';
   description: string;
   baseHealth: number;
   baseDamage: number;
@@ -246,7 +257,9 @@ export interface EnemyDef {
   cost: number;
   radius: number;
   moveSpeed: number;
-  tags: string[];            // 'regen' | 'objective' | 'summon' | 'flying'
+  tags: string[];            // 'regen' | 'objective' | 'summon' | 'flying' | 'frontal' (front shield, like the Bonewarden)
+  /** Dungeon themes this foe is native to (theme rosters, mini-boss picks); absent = a generic foe. */
+  themes?: string[];
   perception: { sight: number; hearing: number; reactionTicks: number };
   preferredRange: [number, number];
   utility: Record<string, number>;

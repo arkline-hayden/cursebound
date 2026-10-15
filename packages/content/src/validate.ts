@@ -1,7 +1,8 @@
 import { CARDS, RARITY_WEIGHTS, TUTORIAL_CARD, cardRarity } from './cards';
 import { MECHANICS, MECHANIC_BY_ID, mechanicText } from './mechanics';
 import { BRANCH_TIER_POINTS, CLASSES, NODES, NODE_BY_ID, SKILLS, SKILL_BY_ID } from './classes';
-import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
+import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_FOES, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
+import { MINIBOSS_EXCLUDED_ROLES, MINIBOSS_MECHANICS, MINIBOSS_NAMES } from './minibosses';
 import { STAT_BY_ID, isKnownStat } from './stats';
 import { validateLegendaries } from './legendaries';
 import { BOUNTY_MODIFIERS } from './bounties';
@@ -193,6 +194,20 @@ export function validateContent(): string[] {
     for (const id of Object.keys(w)) if (!PACK_BY_ID[id]) errs.push(`theme ${t.id}: unknown pack ${id}`);
     if (!Object.keys(w).some((id) => (PACK_BY_ID[id]?.minRound ?? 99) <= 1)) errs.push(`theme ${t.id}: no round-1 pack`);
   }
+  // theme foes (content 1.5): every native foe leads or fills one of its own theme's packs; mini-boss pools exist
+  for (const [theme, foes] of Object.entries(THEME_FOES)) {
+    if (!DUNGEON_THEMES.some((t) => t.id === theme)) errs.push(`theme foes: unknown theme ${theme}`);
+    const packs = Object.keys(THEME_PACKS[theme] ?? {}).map((id) => PACK_BY_ID[id]).filter(Boolean);
+    for (const f of foes) if (!packs.some((pk) => pk.lead === f || pk.fodder.includes(f))) errs.push(`theme ${theme}: native foe ${f} is in none of its packs`);
+  }
+  for (const pk of PACK_TEMPLATES) if (pk.extra !== undefined && !(Number.isInteger(pk.extra) && pk.extra >= 0 && pk.extra <= 4)) errs.push(`pack ${pk.id}: extra must be an integer 0..4`);
+  for (const t of DUNGEON_THEMES) {
+    const n = MINIBOSS_NAMES[t.id];
+    if (!n || !n.first.length || !n.second.length || !n.epithet.length) errs.push(`theme ${t.id}: no mini-boss name parts`);
+    const leads = Object.keys(THEME_PACKS[t.id] ?? {}).map((id) => ENEMY_BY_ID[PACK_BY_ID[id]?.lead ?? '']).filter((d) => d && !MINIBOSS_EXCLUDED_ROLES.includes(d.role));
+    if (!leads.length) errs.push(`theme ${t.id}: no pack lead can become a mini-boss`);
+  }
+  if (new Set(MINIBOSS_MECHANICS.map((m) => m.id)).size !== MINIBOSS_MECHANICS.length || MINIBOSS_MECHANICS.length < 2) errs.push('mini-boss mechanics: need at least two distinct ids');
   // dungeon structure (mapgen tiers): every theme weighs known room kinds, every boss has a known arena design
   const kinds = new Set(ROOM_KINDS.map((k) => k.id));
   for (const t of DUNGEON_THEMES) {

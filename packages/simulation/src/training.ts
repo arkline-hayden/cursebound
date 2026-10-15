@@ -1,11 +1,12 @@
 import { Big } from '@cursebound/numeric';
-import { BOSS_BY_ID, CLASS_BY_ID, DODGE, LEGENDARY_BY_ID, NODE_BY_ID, PACK_BY_ID, TICK_RATE, TICK_SEC, referenceSec, type GearSlot } from '@cursebound/content';
+import { BOSS_BY_ID, CLASS_BY_ID, DODGE, LEGENDARY_BY_ID, NODE_BY_ID, PACK_BY_ID, RULES, TICK_RATE, TICK_SEC, referenceSec, type GearSlot } from '@cursebound/content';
 import { tickDots } from './combat';
 import { generateCourtyard } from './courtyard';
 import { createEnemy } from './director';
 import { makeElite } from './elites';
+import { makeMiniBoss, miniBossPool } from './minibosses';
 import { nearestFloor } from './map';
-import { seedRng } from './rng';
+import { nextInt, seedRng } from './rng';
 import { rebuildSkills } from './sim';
 import { ONE, derivePlayer } from './stats';
 import type { EnemyState, PlayerState, SimEvent, SimState } from './types';
@@ -27,7 +28,7 @@ const DT = TICK_SEC;
 export const TRAINING_POINTS = 999;
 /** Most foes alive in the yard at once (spawn requests past it are refused). */
 export const TRAINING_MAX_ENEMIES = 72;
-export const TRAINING_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level'] as const;
+export const TRAINING_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level', /* named mini-boss (minibosses.ts) */ 'miniboss'] as const;
 export type TrainingOp = typeof TRAINING_OPS[number];
 
 export function isTraining(state: SimState): boolean {
@@ -119,6 +120,34 @@ function spawnPack(state: SimState, ev: SimEvent[], p: PlayerState, packId: stri
   return { ok: true };
 }
 
+/**
+ * A named mini-boss (minibosses.ts) with its escorts: the lead of pack `packId`, or (no arg) a pack lead drawn from
+ * every theme's mini-boss pool. Identity from a stream per run seed, tick and slot. At most one alive at a time.
+ */
+function spawnMiniBoss(state: SimState, ev: SimEvent[], p: PlayerState, packId: string | undefined): TrainResult {
+  if (state.enemies.some((e) => e.mini && e.state !== 'dying')) return { ok: false, code: 'MINIBOSS_ACTIVE' };
+  if (living(state) + 1 + RULES.miniBossEscorts > TRAINING_MAX_ENEMIES) return { ok: false, code: 'YARD_FULL' };
+  const rng = seedRng(state.seed, 'training-miniboss', state.tick, p.slot);
+  let t = packId ? PACK_BY_ID[packId] : undefined;
+  if (packId && !t) return { ok: false, code: 'UNKNOWN_PACK' };
+  if (!t) {
+    const pool = [...new Set(['sky', 'moon', 'server', 'catacombs'].flatMap((th) => miniBossPool(th, 99).map(([id]) => id)))];
+    t = PACK_BY_ID[pool[nextInt(rng, pool.length)]];
+  }
+  const [cx, cy] = spawnPoint(state, p, 5.5);
+  const units = [t.lead];
+  while (units.length < 1 + RULES.miniBossEscorts) units.push(t.fodder[nextInt(rng, t.fodder.length)]);
+  units.forEach((kind, k) => {
+    const ang = (k / units.length) * Math.PI * 2 + 0.4;
+    const [x, y] = k === 0 ? [cx, cy] : nearestFloor(state.map!, cx + Math.cos(ang) * 1.6, cy + Math.sin(ang) * 1.6);
+    const e = createEnemy(state, kind, x, y, ONE, { objective: false, groupId: -1, summonerId: null });
+    state.enemies.push(e);
+    ev.push({ t: 'spawn', id: e.id, kind: e.kind, x, y });
+    if (k === 0) makeMiniBoss(state, ev, e, rng);
+  });
+  return { ok: true };
+}
+
 function spawnBoss(state: SimState, ev: SimEvent[], p: PlayerState, bossId: string): TrainResult {
   if (!BOSS_BY_ID[bossId]) return { ok: false, code: 'UNKNOWN_BOSS' };
   if (state.enemies.some((e) => e.boss && e.state !== 'dying')) return { ok: false, code: 'BOSS_ACTIVE' };
@@ -191,6 +220,7 @@ export function applyTraining(state: SimState, ev: SimEvent[], p: PlayerState, o
   switch (op as TrainingOp) {
     case 'spawn': r = spawnPack(state, ev, p, arg ?? '', tier ?? 0); break;
     case 'boss': r = spawnBoss(state, ev, p, arg ?? ''); break;
+    case 'miniboss': r = spawnMiniBoss(state, ev, p, arg); break;
     case 'clear': clearYard(state); r = { ok: true }; break;
     case 'ai': {
       if (arg !== 'on' && arg !== 'off') { r = { ok: false, code: 'INVALID_INPUT' }; break; }

@@ -59,6 +59,16 @@ function cohortCount(rng: RngState, baseCount: number, M: Big): Big {
   return Big.from(n > 0n ? n : 1n);
 }
 
+/**
+ * Named mini-boss slots (minibosses.ts fills them when sim.ts imports it; empty = no mini-bosses). `plan` may turn
+ * one wave-0 pack of planPopulation into the round's mini-boss pack (returns its index or -1); `make` turns the
+ * spawned lead of that pack into the mini-boss.
+ */
+export const miniBossHooks: {
+  plan?: (state: SimState, packs: { wave: number; units: string[]; site: { x: number; y: number } | null }[]) => number;
+  make?: (state: SimState, ev: SimEvent[], e: EnemyState, groupId: number) => void;
+} = {};
+
 export function setupRound(state: SimState, ev: SimEvent[]) {
   const r = state.round;
   const boss = isBossRound(r);
@@ -155,7 +165,8 @@ export function spawnWave(state: SimState, ev: SimEvent[], wave: number) {
     if (g.pack !== undefined) { e.pack = g.pack; if (g.dormant) e.dormant = true; }
     state.enemies.push(e);
     ev.push({ t: 'spawn', id: e.id, kind: e.kind, x: s.x, y: s.y });
-    hooks.onEnemySpawn(state, ev, e);   // champion / rare rolls (elites.ts)
+    if (g.mini) miniBossHooks.make?.(state, ev, e, g.id);   // the round's named mini-boss (minibosses.ts)
+    hooks.onEnemySpawn(state, ev, e);   // champion / rare rolls (elites.ts; mini-bosses never roll)
   }
   ev.push({ t: 'wave', wave });
 }
@@ -242,7 +253,7 @@ function floorArea(map: MapS): number {
 }
 
 /** 4-neighbour BFS distances (tiles) over floor from several start points; -1 = unreachable. */
-function bfsFrom(map: MapS, starts: { x: number; y: number }[]): Int32Array {
+export function bfsFrom(map: MapS, starts: { x: number; y: number }[]): Int32Array {
   const { w, h, tiles } = map;
   const d = new Int32Array(w * h).fill(-1);
   const q: number[] = [];
@@ -393,12 +404,15 @@ function planPopulation(state: SimState, rng: RngState): { groups: EncounterGrou
     const lo = RULES.packUnits[0], hi = RULES.packUnits[1];
     let size = lo + nextInt(rng, hi - lo + 1) + grow;
     if (reinforce) size = Math.max(2, size - 1);
+    size += t.extra ?? 0;   // swarm packs of tiny theme foes come in bigger numbers (content 1.5)
     const units = [t.lead];
     while (units.length < size) units.push(t.fodder[nextInt(rng, t.fodder.length)]);
     return units;
   };
   for (const site of sites) packs.push({ wave: 0, units: roll(false), site });
   for (let w = 1; w < RULES.waveCount; w++) for (let k = 0; k < reinforcementPacksFor(r); k++) packs.push({ wave: w, units: roll(true), site: null });
+  // named mini-boss (minibosses.ts, own seeded stream): one wave-0 pack in a room far from the heroes may become it
+  const miniPack = miniBossHooks.plan?.(state, packs) ?? -1;
   // representative agent budget: beyond it, fodder of one archetype in a pack folds into cohort counts
   const totalUnits = packs.reduce((s, p) => s + p.units.length, 0);
   const fold = Math.max(1, Math.ceil(totalUnits / RULES.maxRepresentativeAgents));
@@ -414,6 +428,7 @@ function planPopulation(state: SimState, rng: RngState): { groups: EncounterGrou
     ents.forEach((en, k) => {
       const g: EncounterGroup = { id: groups.length, weight: 1, archetype: en.kind, wave: pk.wave, spawned: false, defeated: false, countText: String(en.count), pack: pi };
       if (pk.site) { [g.x, g.y] = memberSpot(state, pk.site.x, pk.site.y, k, ents.length); g.dormant = true; }
+      if (pi === miniPack && k === 0) g.mini = true;
       groups.push(g);
     });
   });

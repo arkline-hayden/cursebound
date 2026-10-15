@@ -1,10 +1,10 @@
 // Versioned tunable rules (PRD §3–§6, §11, §13, §19). Every constant here is a first proposal.
 // Changing anything that affects simulation outcomes requires bumping RULES_VERSION (and replay version).
 
-export const RULES_VERSION = 'rules-1.5.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes; 1.4: all movement x0.8 (heroes, foes, bosses, summons and pets), follower routing, daily bounty modifiers (optional negative modifier per run); 1.5: Fate's Blessing (legendary consumable lifts a card's price), training grounds rooms, three more dungeon themes in the rotation (sky island, moon, server room)
+export const RULES_VERSION = 'rules-1.6.0'; // 1.1: door chain (offer themes + walk-through hold), dense populations, afflictions; 1.2: tiered map generation (room kinds, furnishing) + boss arenas; 1.3: no resource (cooldown-only skills, cooldowns x0.7), full starting kit, boss reinforcements at 2/3 and 1/3 health, bosses ~20% easier, smarter foes; 1.4: all movement x0.8 (heroes, foes, bosses, summons and pets), follower routing, daily bounty modifiers (optional negative modifier per run); 1.5: Fate's Blessing (legendary consumable lifts a card's price), training grounds rooms, three more dungeon themes in the rotation (sky island, moon, server room); 1.6: theme foes for sky / moon / server, named mini-bosses (miniBoss* rules)
 export const SCORE_VERSION = 'score-1.0.0';
-export const CONTENT_VERSION = 'content-1.4.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune; 1.3: movement multipliers (hero 0.88, foe 0.8, minion 0.8), follower routing constants, bounty modifiers (bounties.ts) in the manifest; 1.4: Fate's Blessing consumable, training grounds theme, sky / moon / server themes (room weights, packs)
-export const SIM_VERSION = 'sim-1.4.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing); 1.3: bosses take enemyMoveSpeedMult, minion speed multiplier, follower routing (A* path-follow, stuck detection, blink leash, spread), bounty modifiers applied at run creation (bounty.ts); 1.4: blessing in the legendary drop pool + BLESS command, training mode (courtyard map, TRAIN commands), ten-theme rotation, sky floors drop into open-air voids
+export const CONTENT_VERSION = 'content-1.5.0'; // 1.1: room kinds, theme room weights, boss arena designs; 1.2: resource removed (skill costs, pools, resource stats and nodes reworked), cooldowns x0.7, base skills are starting grants, boss retune; 1.3: movement multipliers (hero 0.88, foe 0.8, minion 0.8), follower routing constants, bounty modifiers (bounties.ts) in the manifest; 1.4: Fate's Blessing consumable, training grounds theme, sky / moon / server themes (room weights, packs); 1.5: twelve theme foes (sky / moon / server rosters and packs), mini-boss names and mechanics (minibosses.ts)
+export const SIM_VERSION = 'sim-1.5.0'; // 1.1: mapgen tiers (layout archetypes, typed rooms, furnishing, chasm voids, boss arenas); 1.2: cooldown-only casting, boss reinforcement waves, enemy AI (kiting, surrounds, focus, AoE dodge, retreat, spacing); 1.3: bosses take enemyMoveSpeedMult, minion speed multiplier, follower routing (A* path-follow, stuck detection, blink leash, spread), bounty modifiers applied at run creation (bounty.ts); 1.4: blessing in the legendary drop pool + BLESS command, training mode (courtyard map, TRAIN commands), ten-theme rotation, sky floors drop into open-air voids; 1.5: quake / leap / blink attacks and knockback for theme foes, swarm pack sizes, named mini-bosses (minibosses.ts) + TRAIN miniboss
 export const PROTOCOL_VERSION = 3;
 
 export const TICK_RATE = 60;
@@ -88,6 +88,28 @@ export const RULES = {
   rareDamage: '1.35',
   championRadius: 1.18,
   rareRadius: 1.35,
+
+  // Named mini-bosses (simulation minibosses.ts, content minibosses.ts; rules 1.6). On ordinary rounds from
+  // miniBossMinRound, with chance miniBossChance (own seeded stream per round), one population pack in a room far from
+  // the heroes becomes a named mini-boss (a theme foe) with miniBossEscorts escorts. Tougher than a rare, far below a
+  // boss: unit health = max(miniBossHealth, rare health x miniBossRareFactor) (round-scaled like any foe), damage = max(own, miniBossMinDamage) x
+  // miniBossDamage, radius x miniBossRadius, plus miniBossArmor. Loot: guaranteed rare-tier potions and a haste orb, a
+  // legendary at miniBossLegendaryChance (outside the per-round drop cap) and miniBossScorePercent% of the round's
+  // base points (x score pressure) at once.
+  miniBossChance: 0.75,
+  miniBossMinRound: 2,
+  miniBossHealth: 1200,
+  /** ...and never below miniBossRareFactor x the rare version of its own kind (base health x rareHealth) */
+  miniBossRareFactor: 1.15,
+  /** reinforcement packs (waves 1+) the mini-boss pack stands in for, so a round's work stays about the same */
+  miniBossTakesReinforcements: 1,
+  miniBossDamage: '1.45',
+  miniBossMinDamage: 20,
+  miniBossArmor: 10,
+  miniBossRadius: 1.45,
+  miniBossEscorts: 2,
+  miniBossLegendaryChance: 0.4,
+  miniBossScorePercent: 15,
 
   // Pickups (pickups.ts): potions heal, haste orbs cut the remaining cooldown of every skill. Collected by walking near (magnet), only by members
   // who need them, so a full-health hero leaves the potion for an ally.

@@ -41,7 +41,7 @@ export type ClientMessage =
   | { t: 'BLESS'; offerId: string; slot: number; requestId: string };
 
 /** Training-grounds tools (simulation training.ts TRAINING_OPS). */
-export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level'] as const;
+export const TRAIN_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level', /* named mini-boss */ 'miniboss'] as const;
 export type TrainOp = typeof TRAIN_OPS[number];
 
 // ---------------- Server -> client ----------------

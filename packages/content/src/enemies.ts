@@ -136,7 +136,160 @@ export const ENEMIES: EnemyDef[] = [
     ],
     weaknesses: { ember: '1.3' },
   },
+  // ---- theme foes (content 1.5): the sky island, the dead moon and the server room each field their own roster.
+  // Same budget as the catacomb foes (individually weak, numerous); one impeding effect each. Swarms come in bigger
+  // packs (PackTemplate.extra). New attack kinds: 'quake' (circle around the attacker), 'leap', 'blink'; `push` shoves.
+  // -- The Shattered Skyreach (sky)
+  {
+    id: 'harpy', name: 'Harpy Diver', role: 'pursuer', themes: ['sky'],
+    description: 'A screeching harpy that folds its wings and dives down a marked lane, then rakes with hooked talons that slow.',
+    baseHealth: 125, baseDamage: 21, armor: 6, cost: 2, radius: 0.4, moveSpeed: 3.4, tags: ['objective', 'flying'],
+    perception: { sight: 15, hearing: 10, reactionTicks: 10 }, preferredRange: [0, 1.0],
+    utility: { pursue: 1.0, flank: 0.5, retreat: 0.05, cast: 0.9, reposition: 0.25 },
+    attacks: [
+      { id: 'talons', name: 'Rending Talons', kind: 'melee', damageType: 'physical', damageCoef: '1', inflict: { status: 'slowed', sec: 1.5, value: 0.35 }, windupSec: 0.4, releaseSec: 0.1, recoverySec: 0.5, cooldownSec: 1.3, range: 1.15, telegraph: { kind: 'cone', range: 1.4, arcDeg: 75 } },
+      { id: 'dive', name: 'Plummeting Dive', kind: 'charge', damageType: 'physical', damageCoef: '1.25', windupSec: 0.7, releaseSec: 0.3, recoverySec: 0.8, cooldownSec: 6, range: 4.5, telegraph: { kind: 'line', length: 4.5, width: 0.8 } },
+    ],
+    weaknesses: { frost: '1.2' },
+  },
+  {
+    id: 'galewisp', name: 'Gale Wisp', role: 'gale', themes: ['sky'],
+    description: 'A knot of living wind. Gathers a gust over a marked circle and bursts, shoving heroes out of it; flicks wind darts between gusts.',
+    baseHealth: 110, baseDamage: 15, armor: 0, cost: 3, radius: 0.38, moveSpeed: 2.8, tags: ['objective', 'flying'],
+    perception: { sight: 15, hearing: 11, reactionTicks: 10 }, preferredRange: [4, 6.5],
+    utility: { pursue: 0.35, flank: 0.6, retreat: 0.7, cast: 1.0, reposition: 0.8 },
+    attacks: [
+      { id: 'gust', name: 'Gale Burst', kind: 'burst', damageType: 'storm', damageCoef: '0.6', push: 1.4, windupSec: 0.85, releaseSec: 0.1, recoverySec: 0.6, cooldownSec: 5.5, range: 6.5, telegraph: { kind: 'circle', radius: 1.5 } },
+      { id: 'zephyr', name: 'Zephyr Dart', kind: 'projectile', damageType: 'storm', damageCoef: '0.8', windupSec: 0.4, releaseSec: 0.05, recoverySec: 0.45, cooldownSec: 2.1, range: 7, projectileSpeed: 9, projectileCount: 1, projectileKind: 'wind', telegraph: { kind: 'line', length: 7, width: 0.3 } },
+    ],
+    weaknesses: { ember: '1.2' },
+  },
+  {
+    id: 'stormhawk', name: 'Storm-Hawk', role: 'skirmisher', themes: ['sky'],
+    description: 'A crackling raptor that circles at range and spits static bolts: a hero struck is silenced (no skills) for a moment.',
+    baseHealth: 120, baseDamage: 17, armor: 4, cost: 3, radius: 0.38, moveSpeed: 3.1, tags: ['objective', 'flying'],
+    perception: { sight: 16, hearing: 10, reactionTicks: 10 }, preferredRange: [4.5, 7],
+    utility: { pursue: 0.4, flank: 0.9, retreat: 0.6, cast: 1.0, reposition: 0.8 },
+    attacks: [
+      { id: 'staticbolt', name: 'Static Bolt', kind: 'projectile', damageType: 'storm', damageCoef: '1', inflict: { status: 'silenced', sec: 1.5 }, windupSec: 0.45, releaseSec: 0.05, recoverySec: 0.45, cooldownSec: 2.4, range: 8, projectileSpeed: 10, projectileCount: 1, projectileKind: 'staticbolt', telegraph: { kind: 'line', length: 8, width: 0.3 } },
+    ],
+    weaknesses: { physical: '1.2' },
+  },
+  {
+    id: 'cloudgolem', name: 'Cloud Golem', role: 'brute', themes: ['sky'],
+    description: 'A lumbering giant of storm cloud and floating rock. Marks the ground around itself and slams down a hailstorm that chills.',
+    baseHealth: 330, baseDamage: 26, armor: 30, cost: 4, radius: 0.6, moveSpeed: 1.7, tags: ['objective'],
+    perception: { sight: 12, hearing: 8, reactionTicks: 14 }, preferredRange: [0, 1.4],
+    utility: { pursue: 1.0, flank: 0.1, retreat: 0.0, cast: 1.0, reposition: 0.15 },
+    attacks: [
+      { id: 'hailslam', name: 'Hailstone Slam', kind: 'quake', damageType: 'frost', damageCoef: '1.1', inflict: { status: 'chill', sec: 2.5, value: 0.3 }, windupSec: 0.9, releaseSec: 0.1, recoverySec: 0.9, cooldownSec: 4.5, range: 2.3, telegraph: { kind: 'circle', radius: 2.2 } },
+      { id: 'cloudfist', name: 'Cloud Fist', kind: 'melee', damageType: 'physical', damageCoef: '1', windupSec: 0.55, releaseSec: 0.1, recoverySec: 0.65, cooldownSec: 1.8, range: 1.4, telegraph: { kind: 'cone', range: 1.7, arcDeg: 90 } },
+    ],
+    weaknesses: { ember: '1.2' },
+  },
+  // -- The Dead Moon (moon)
+  {
+    id: 'mooncrawler', name: 'Moon-spawn Crawler', role: 'swarm', themes: ['moon'],
+    description: 'A pale grub-thing that boils out of the regolith in numbers. Its acid bite poisons (halved healing).',
+    baseHealth: 55, baseDamage: 9, armor: 2, cost: 1, radius: 0.3, moveSpeed: 3.6, tags: ['objective'],
+    perception: { sight: 11, hearing: 9, reactionTicks: 8 }, preferredRange: [0, 0.7],
+    utility: { pursue: 1.0, flank: 0.6, retreat: 0, cast: 1.0, reposition: 0.1 },
+    attacks: [
+      { id: 'acidbite', name: 'Acid Bite', kind: 'melee', damageType: 'decay', damageCoef: '1', inflict: { status: 'poisoned', sec: 2.5 }, windupSec: 0.32, releaseSec: 0.08, recoverySec: 0.45, cooldownSec: 1.0, range: 0.85, telegraph: { kind: 'cone', range: 1.0, arcDeg: 70 } },
+    ],
+    weaknesses: { ember: '1.3' },
+  },
+  {
+    id: 'moonleaper', name: 'Lunar Leaper', role: 'leaper', themes: ['moon'],
+    description: 'A long-limbed hunter at home in low gravity. Marks a circle and bounds onto it; heroes caught under the landing are rooted.',
+    baseHealth: 150, baseDamage: 23, armor: 8, cost: 2, radius: 0.42, moveSpeed: 2.9, tags: ['objective'],
+    perception: { sight: 15, hearing: 10, reactionTicks: 10 }, preferredRange: [0, 1.0],
+    utility: { pursue: 1.0, flank: 0.4, retreat: 0.05, cast: 1.0, reposition: 0.2 },
+    attacks: [
+      { id: 'leap', name: 'Low-Grav Leap', kind: 'leap', damageType: 'physical', damageCoef: '1.2', inflict: { status: 'rooted', sec: 1.2 }, minRange: 2.5, windupSec: 0.75, releaseSec: 0.55, recoverySec: 0.7, cooldownSec: 5.5, range: 6.5, telegraph: { kind: 'circle', radius: 1.3 } },
+      { id: 'rake', name: 'Claw Rake', kind: 'melee', damageType: 'physical', damageCoef: '1', windupSec: 0.4, releaseSec: 0.1, recoverySec: 0.55, cooldownSec: 1.3, range: 1.15, telegraph: { kind: 'cone', range: 1.4, arcDeg: 80 } },
+    ],
+    weaknesses: { storm: '1.15' },
+  },
+  {
+    id: 'lunarsentry', name: 'Lunar Sentry', role: 'sentry', themes: ['moon'],
+    description: 'An old lander drone still running its survey. Fires survey lasers and a tractor beam that chains a hero to the spot (dash to break it).',
+    baseHealth: 170, baseDamage: 18, armor: 20, cost: 3, radius: 0.45, moveSpeed: 1.5, tags: ['objective', 'flying'],
+    perception: { sight: 16, hearing: 9, reactionTicks: 14 }, preferredRange: [5.5, 8.5],
+    utility: { pursue: 0.25, flank: 0.2, retreat: 0.7, cast: 1.0, reposition: 0.5 },
+    attacks: [
+      { id: 'tractor', name: 'Tractor Beam', kind: 'projectile', damageType: 'astral', damageCoef: '0.6', inflict: { status: 'chained', sec: 2, value: 2.2 }, windupSec: 0.8, releaseSec: 0.05, recoverySec: 0.6, cooldownSec: 6.5, range: 8.5, projectileSpeed: 10, projectileCount: 1, projectileKind: 'tractor', telegraph: { kind: 'line', length: 8.5, width: 0.45 } },
+      { id: 'laser', name: 'Survey Laser', kind: 'projectile', damageType: 'physical', damageCoef: '0.9', windupSec: 0.4, releaseSec: 0.05, recoverySec: 0.45, cooldownSec: 1.9, range: 8.5, projectileSpeed: 11, projectileCount: 1, projectileKind: 'laser', telegraph: { kind: 'line', length: 8.5, width: 0.25 } },
+    ],
+    weaknesses: { storm: '1.3' },
+  },
+  {
+    id: 'voidshambler', name: 'Void-Eyed Shambler', role: 'shambler', themes: ['moon'],
+    description: 'A suited corpse with a black void where its visor was. Its gaze gathers over a spot and bursts: heroes caught inside are blinded.',
+    baseHealth: 260, baseDamage: 24, armor: 14, cost: 3, radius: 0.5, moveSpeed: 1.8, tags: ['objective'],
+    perception: { sight: 14, hearing: 9, reactionTicks: 14 }, preferredRange: [0, 1.3],
+    utility: { pursue: 0.9, flank: 0.15, retreat: 0.05, cast: 1.0, reposition: 0.2 },
+    attacks: [
+      { id: 'voidgaze', name: 'Void Gaze', kind: 'burst', damageType: 'astral', damageCoef: '0.7', inflict: { status: 'blinded', sec: 2.2 }, windupSec: 1.0, releaseSec: 0.1, recoverySec: 0.7, cooldownSec: 7.5, range: 6, telegraph: { kind: 'circle', radius: 1.6 } },
+      { id: 'grasp', name: 'Grasping Maul', kind: 'melee', damageType: 'physical', damageCoef: '1.1', windupSec: 0.6, releaseSec: 0.1, recoverySec: 0.7, cooldownSec: 1.9, range: 1.35, telegraph: { kind: 'cone', range: 1.6, arcDeg: 90 } },
+    ],
+    weaknesses: { physical: '1.15' },
+  },
+  // -- The Cursed Datavault (server)
+  {
+    id: 'maintdrone', name: 'Maintenance Drone', role: 'pursuer', themes: ['server'],
+    description: 'A corrupted repair drone. Darts in with its arc welder; the flash blinds a hero for a moment.',
+    baseHealth: 95, baseDamage: 15, armor: 10, cost: 2, radius: 0.36, moveSpeed: 3.5, tags: ['objective', 'flying'],
+    perception: { sight: 14, hearing: 10, reactionTicks: 10 }, preferredRange: [0, 0.9],
+    utility: { pursue: 1.0, flank: 0.5, retreat: 0.05, cast: 0.9, reposition: 0.25 },
+    attacks: [
+      { id: 'weld', name: 'Arc Welder', kind: 'melee', damageType: 'storm', damageCoef: '1', inflict: { status: 'blinded', sec: 1.5 }, windupSec: 0.45, releaseSec: 0.1, recoverySec: 0.5, cooldownSec: 1.6, range: 1.05, telegraph: { kind: 'cone', range: 1.3, arcDeg: 70 } },
+    ],
+    weaknesses: { storm: '1.25' },
+  },
+  {
+    id: 'firewall', name: 'Firewall Sentinel', role: 'guardian', themes: ['server'],
+    description: 'A rack-sized security construct behind a burning shield wall (its flank and back are exposed). Projects a quarantine line that roots.',
+    baseHealth: 300, baseDamage: 22, armor: 35, cost: 4, radius: 0.55, moveSpeed: 1.8, tags: ['objective', 'frontal'],
+    perception: { sight: 13, hearing: 8, reactionTicks: 14 }, preferredRange: [1, 3],
+    utility: { pursue: 0.6, flank: 0.1, retreat: 0.1, cast: 1.0, guard: 0.9, reposition: 0.4 },
+    attacks: [
+      { id: 'quarantine', name: 'Quarantine Line', kind: 'rootwall', damageType: 'ember', damageCoef: '0.8', inflict: { status: 'rooted', sec: 1.3 }, hazardKind: 'firewall', windupSec: 0.9, releaseSec: 0.1, recoverySec: 0.8, cooldownSec: 6.5, range: 7, projectileCount: 1, duration: 2.5, telegraph: { kind: 'line', length: 7, width: 0.9 } },
+      { id: 'firebash', name: 'Firewall Bash', kind: 'melee', damageType: 'ember', damageCoef: '1', windupSec: 0.55, releaseSec: 0.1, recoverySec: 0.7, cooldownSec: 1.8, range: 1.35, telegraph: { kind: 'cone', range: 1.6, arcDeg: 90 } },
+    ],
+    weaknesses: { frost: '1.25' },
+  },
+  {
+    id: 'glitchwraith', name: 'Glitch Wraith', role: 'blinker', themes: ['server'],
+    description: 'A ghost in the machine. Blinks between marked points and fires glitch bolts that silence (no skills, basic attacks still work).',
+    baseHealth: 115, baseDamage: 17, armor: 0, cost: 3, radius: 0.4, moveSpeed: 2.6, tags: ['objective', 'flying'],
+    perception: { sight: 15, hearing: 11, reactionTicks: 10 }, preferredRange: [4, 6.5],
+    utility: { pursue: 0.35, flank: 0.6, retreat: 0.7, cast: 1.0, reposition: 0.7 },
+    attacks: [
+      { id: 'blink', name: 'Packet Jump', kind: 'blink', damageType: 'astral', damageCoef: '0', windupSec: 0.5, releaseSec: 0.05, recoverySec: 0.35, cooldownSec: 6.5, range: 9, telegraph: { kind: 'circle', radius: 0.7 } },
+      { id: 'glitchbolt', name: 'Glitch Bolt', kind: 'projectile', damageType: 'astral', damageCoef: '1', inflict: { status: 'silenced', sec: 1.5 }, windupSec: 0.45, releaseSec: 0.05, recoverySec: 0.5, cooldownSec: 2.3, range: 7.5, projectileSpeed: 8.5, projectileCount: 1, projectileKind: 'glitchbolt', telegraph: { kind: 'line', length: 7.5, width: 0.3 } },
+    ],
+    weaknesses: { storm: '1.2' },
+  },
+  {
+    id: 'malware', name: 'Malware Swarm', role: 'swarm', themes: ['server'],
+    description: 'A skittering knot of corrupted code-bugs. Comes in numbers; each bite lags a hero (slowed).',
+    baseHealth: 60, baseDamage: 9, armor: 0, cost: 1, radius: 0.3, moveSpeed: 3.4, tags: ['objective'],
+    perception: { sight: 11, hearing: 9, reactionTicks: 8 }, preferredRange: [0, 0.7],
+    utility: { pursue: 1.0, flank: 0.6, retreat: 0, cast: 1.0, reposition: 0.1 },
+    attacks: [
+      { id: 'packetbite', name: 'Packet Bite', kind: 'melee', damageType: 'decay', damageCoef: '1', inflict: { status: 'slowed', sec: 1.5, value: 0.25 }, windupSec: 0.32, releaseSec: 0.08, recoverySec: 0.45, cooldownSec: 1.0, range: 0.85, telegraph: { kind: 'cone', range: 1.0, arcDeg: 70 } },
+    ],
+    weaknesses: { ember: '1.3' },
+  },
 ];
+
+/** Theme rosters (content 1.5): the foes native to each dungeon theme (EnemyDef.themes). Themes without natives use
+ *  the generic catacomb foes. */
+export const THEME_FOES: Record<string, string[]> = ENEMIES.reduce<Record<string, string[]>>((m, e) => {
+  for (const t of e.themes ?? []) (m[t] ??= []).push(e.id);
+  return m;
+}, {});
 
 export const ENEMY_BY_ID: Record<string, EnemyDef> = Object.fromEntries(ENEMIES.map((x) => [x.id, x]));
 
@@ -277,8 +430,9 @@ export const BOSS_ARENAS: Record<string, string[]> = {
 
 // ---------------- Packs (director.ts population) ----------------
 
-/** A pack: a lead archetype plus fodder drawn from `fodder`. Unlocks from `minRound`. */
-export interface PackTemplate { id: string; lead: string; fodder: string[]; minRound: number }
+/** A pack: a lead archetype plus fodder drawn from `fodder`. Unlocks from `minRound`. `extra`: units added on top of the
+ *  rolled pack size (swarm packs of tiny foes come in bigger numbers). */
+export interface PackTemplate { id: string; lead: string; fodder: string[]; minRound: number; extra?: number }
 
 export const PACK_TEMPLATES: PackTemplate[] = [
   { id: 'hounds', lead: 'pursuer', fodder: ['pursuer'], minRound: 1 },
@@ -291,6 +445,21 @@ export const PACK_TEMPLATES: PackTemplate[] = [
   { id: 'rime', lead: 'rimewraith', fodder: ['skirmisher', 'rimewraith', 'pursuer'], minRound: 2 },
   { id: 'gloom', lead: 'gloomshade', fodder: ['pursuer', 'hexer', 'gloomshade'], minRound: 3 },
   { id: 'brood', lead: 'broodcaller', fodder: ['pursuer'], minRound: 3 },
+  // theme packs (content 1.5): sky island
+  { id: 'harpies', lead: 'harpy', fodder: ['harpy', 'harpy', 'skirmisher'], minRound: 1 },
+  { id: 'gale', lead: 'galewisp', fodder: ['harpy', 'stormhawk'], minRound: 1 },
+  { id: 'storm', lead: 'stormhawk', fodder: ['stormhawk', 'harpy'], minRound: 1 },
+  { id: 'cloud', lead: 'cloudgolem', fodder: ['harpy', 'galewisp', 'stormhawk'], minRound: 2 },
+  // dead moon
+  { id: 'crawlers', lead: 'mooncrawler', fodder: ['mooncrawler'], minRound: 1, extra: 2 },
+  { id: 'leapers', lead: 'moonleaper', fodder: ['moonleaper', 'mooncrawler', 'mooncrawler'], minRound: 1 },
+  { id: 'sentries', lead: 'lunarsentry', fodder: ['mooncrawler', 'moonleaper'], minRound: 1 },
+  { id: 'void', lead: 'voidshambler', fodder: ['mooncrawler', 'mooncrawler', 'gloomshade'], minRound: 2 },
+  // server room
+  { id: 'drones', lead: 'maintdrone', fodder: ['maintdrone', 'malware'], minRound: 1 },
+  { id: 'glitch', lead: 'glitchwraith', fodder: ['malware', 'maintdrone'], minRound: 1 },
+  { id: 'malware', lead: 'malware', fodder: ['malware'], minRound: 1, extra: 2 },
+  { id: 'firewall', lead: 'firewall', fodder: ['maintdrone', 'glitchwraith', 'malware'], minRound: 2 },
 ];
 
 export const PACK_BY_ID: Record<string, PackTemplate> = Object.fromEntries(PACK_TEMPLATES.map((x) => [x.id, x]));
@@ -304,9 +473,10 @@ export const THEME_PACKS: Record<string, Record<string, number>> = {
   fungal: { webs: 3, toads: 3, brood: 2, hounds: 1, bats: 1 },
   forge: { gaol: 3, bonewall: 2, hounds: 2, toads: 1, cult: 1 },
   frost: { rime: 3, bats: 2, hounds: 2, gloom: 1, bonewall: 1 },
-  sky: { bats: 3, hounds: 2, gloom: 2, webs: 1, rime: 1, cult: 1 },
-  moon: { gloom: 3, rime: 2, bonewall: 2, hounds: 2, gaol: 1 },
-  server: { cult: 3, gaol: 2, gloom: 2, bonewall: 2, brood: 1, webs: 1 },
+  // content 1.5: the three newer themes field their own foes (theme packs above), with a few generic foes mixed in
+  sky: { harpies: 3, gale: 2, storm: 2, cloud: 2, bats: 1, hounds: 1 },
+  moon: { leapers: 3, crawlers: 2, sentries: 2, void: 2, gloom: 1, bonewall: 1 },
+  server: { drones: 3, glitch: 2, malware: 2, firewall: 2, cult: 1, gaol: 1 },
 };
 
 /** Affliction an attack inflicts, by attack id (enemy, boss and affix attacks; projectiles outlive their owner). */
