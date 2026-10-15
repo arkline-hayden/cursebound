@@ -168,7 +168,7 @@ function hitMarked(state: SimState, ev: SimEvent[], p: PlayerState, e: EnemyStat
 
 function execute(state: SimState, ev: SimEvent[], p: PlayerState, e: EnemyState) {
   castEv(ev, p, 'r_headshot', e.x, e.y, p.x, p.y);
-  if (e.cohort.count.lte(ONE)) killEnemy(state, ev, e, p.slot);
+  if (e.cohort.count.lte(ONE)) killEnemy(state, ev, e, p.slot, 'physical');
   else hitEnemy(state, ev, e, e.cohort.unitHp.mul(B(10)), ONE, { dtype: 'physical', srcSlot: p.slot, skillId: 'r_headshot', fromX: p.x, fromY: p.y, allowCrit: false, generation: 1 });
 }
 

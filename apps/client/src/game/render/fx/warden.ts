@@ -780,8 +780,8 @@ registerSkillFx({
     J.dust(p.x, p.y, 14, 0x3a4a30);
     ctx.dungeon.flashLight(p.x, p.y - 12, 340, SPIRIT, 2.6, 560);
     if (ctx.mine) { J.pop(SPIRIT, 0.14, 220); J.hitStop(50); }
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, 3);
-    sfx(ctx, 'boss_charge', e.x, e.y, 0, 2);
+    sfx(ctx, 'beast_howl', e.x, e.y, 0, 3);   // the call
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 2);   // the stampede's thunder
   },
   w_entangle: (ctx, e) => {
     const J = ctx.juice;
@@ -792,8 +792,8 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, R, GROVEP, 2, { dust: 8 });
     spikeRing(ctx, e.x, e.y, R * 0.55, 7, 'fx:warden:rootspike');
     J.bits('leaf', p.x, p.y - 10, 10, LEAF);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, ctx.mine ? 2 : 1);
-    sfx(ctx, 'rooted', e.x, e.y, 120, 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the seed
+    sfx(ctx, 'slam_heavy', e.x, e.y, 120, 1);   // roots ripping up
   },
   w_verdant_totem: (ctx, e) => {
     const J = ctx.juice;
@@ -805,8 +805,8 @@ registerSkillFx({
     spikeRing(ctx, e.x, e.y, R * 0.55, 6, 'fx:warden:rootspike');
     J.glyph(p.x, p.y, ctx.rx(ctx.rank(e.slot, 'w_forest_heart') ? 6 : 4), HEAL, 900);
     J.bits('leaf', p.x, p.y - 30, 10, BLOOM, { angle: -90, spread: 140 });
-    sfx(ctx, 'heal', e.x, e.y, 0, 2);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, 1);
+    sfx(ctx, 'summon_rise', e.x, e.y, 0, 2);   // the living totem rising
+    sfx(ctx, 'heal', e.x, e.y, 0, 1);
   },
   w_worldroot: (ctx, e) => {
     const J = ctx.juice;
@@ -818,7 +818,7 @@ registerSkillFx({
     J.bits('leaf', p.x, p.y - 8, 8, LEAF, { angle: Math.atan2(u.y, u.x) * DEG, spread: 40, speed: 1.8 });
     ctx.dungeon.flashLight(p.x, p.y - 10, 200, 0x6bd84a, 2, 400);
     if (ctx.mine) J.hitStop(35);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);
   },
   w_call_pack: (ctx, e) => {
     const J = ctx.juice;
@@ -830,7 +830,8 @@ registerSkillFx({
     spiritRise(ctx, p.x, p.y - 40, 'fx:warden:wolfspirit', 1.2, 640);
     J.bits('mote', p.x, p.y - 18, 14, SPIRIT, { angle: -90, spread: 160 });
     ctx.dungeon.flashLight(p.x, p.y - 16, 230, SPIRIT, 1.9, 420);
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'beast_howl', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'summon_rise', e.x, e.y, 0, 1);   // the wolf spirits rising
   },
   w_ursine_call: (ctx, e) => {
     const J = ctx.juice;
@@ -852,8 +853,8 @@ registerSkillFx({
       J.bits('mote', p.x, p.y - 16, 16, SPIRIT, { speed: 2 });
       J.bits('leaf', p.x, p.y - 10, 8, LEAF);
     });
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 3);
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 3);
+    sfx(ctx, 'beast_roar', e.x, e.y, 0, 2);   // the Ursa
   },
   w_alpha_pounce: (ctx, e) => {
     const J = ctx.juice;
@@ -876,7 +877,8 @@ registerSkillFx({
     spiritRise(ctx, p.x, p.y - 34, 'fx:warden:wolfspirit', 1, 480);
     spikeRing(ctx, e.x, e.y, 1.3, 5, 'fx:warden:rootspike', undefined, 0.8);
     if (ctx.mine) J.hitStop(60);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, ctx.mine ? 3 : 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 3 : 1);
+    sfx(ctx, 'beast_howl', e.x, e.y, 0, 1);   // the pack called
   },
   w_wolf_pounce: (ctx, e) => {
     const J = ctx.juice;
@@ -886,7 +888,7 @@ registerSkillFx({
     J.impact(p.x, p.y - 12, SPIRIT, 0.9);
     J.dust(p.x, p.y, 2, 0x3a4a30);
     J.bits('mote', p.x, p.y - 12, 2, SPIRIT);
-    sfx(ctx, 'enemy_bite', e.x, e.y, 70, 1);
+    sfx(ctx, 'beast_roar', e.x, e.y, 400, 1);   // a snarl (a pack leaping at once growls once)
   },
   w_ursa_swipe: (ctx, e) => {
     const J = ctx.juice;
@@ -903,13 +905,14 @@ registerSkillFx({
   w_thornburst: (ctx, e) => {
     thornNova(ctx, e, 2.8);
     if (ctx.mine) ctx.juice.hitStop(30);
-    sfx(ctx, 'signature_nova', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);   // thorns erupting
+    sfx(ctx, 'blast_decay', e.x, e.y, 0, 1);   // the venom
   },
   w_bramble_wall: (ctx, e) => {
     thornNova(ctx, e, 2.8);
     if (ctx.mine) ctx.juice.hitStop(35);
-    sfx(ctx, 'signature_nova', e.x, e.y, 0, ctx.mine ? 2 : 1);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the nova and the wall bursting up
+    sfx(ctx, 'blast_decay', e.x, e.y, 0, 1);
   },
   w_thorn_pod: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -917,7 +920,7 @@ registerSkillFx({
     lob(ctx, h.x, h.y, p.x, p.y - 6, VENOM, 'thorn', 260);
     ctx.juice.ring(p.x, p.y, 18, VENOM, 240);
     ctx.juice.dust(p.x, p.y, 3, 0x3a4a20);
-    sfx(ctx, 'enemy_shoot', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);
   },
   w_pod_burst: (ctx, e) => {
     const J = ctx.juice;
@@ -935,7 +938,7 @@ registerSkillFx({
     J.bits('bubble', p.x, p.y - 10, 12, VENOM);
     J.embersAt(p.x, p.y - 10, 10, VENOM);
     if (ctx.mine) { J.pop(VENOM, 0.1, 160); J.hitStop(40); }
-    sfx(ctx, 'signature_nova', e.x, e.y, 0, 2);
+    sfx(ctx, 'blast_decay', e.x, e.y, 0, 2);
   },
   w_thorn_lash: (ctx, e) => {
     const heart = ctx.rank(e.slot, 'w_heart_of_thorns') > 0;
@@ -943,7 +946,7 @@ registerSkillFx({
     const t = chestAt(ctx, e.dx, e.dy);
     ctx.juice.impact(t.x, t.y, heart ? BLOOD : THORN, 1);
     ctx.juice.sparksAt(t.x, t.y, 4, heart ? BLOOD : THORN);
-    sfx(ctx, 'hit_enemy', e.dx, e.dy, 80, 1);
+    sfx(ctx, 'swing', e.x, e.y, 80, 1);   // the lash (its hit plays the central impact)
   },
   w_thorn_nova: (ctx, e) => {
     const J = ctx.juice;
@@ -953,7 +956,7 @@ registerSkillFx({
     J.bits('thorn', p.x, p.y - 10, 10, 0xffd0c0, { speed: 1.3 });
     spikeRing(ctx, e.x, e.y, 1.1, 6, 'fx:warden:thornspike', 0xff9a8a, 0.9);
     J.starburst(p.x, p.y - 12, 0xffd0c0, 0.8, 140);
-    sfx(ctx, 'skill_guard', e.x, e.y, 120, 1);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 120, 1);   // thorns slicing out
   },
   w_contagion: (ctx, e) => {
     trail(ctx, e.x, e.y, e.dx, e.dy, VENOM, 3, 320);
@@ -972,7 +975,7 @@ registerSkillFx({
     spikeRing(ctx, e.x, e.y, 1, 5, 'fx:warden:thornspike', 0xc8ff8a, 0.9);
     ctx.dungeon.addDecal('slime', p.x, p.y + 3, 0x2a4a10, 0.9);
     ctx.dungeon.flashLight(p.x, p.y - 10, 150, VENOM, 1.8, 220);
-    sfx(ctx, 'signature_nova', e.x, e.y, 120, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 120, 1);
   },
   w_bloodroot: (ctx, e) => {
     const J = ctx.juice;
@@ -983,7 +986,7 @@ registerSkillFx({
     J.sparksAt(t.x, t.y, 10, BLOOD);
     J.bleed('player', t.x, t.y, 8);
     J.dust(t.x, t.y + 14, 4, 0x3a1a14);
-    sfx(ctx, 'crit', e.x, e.y, 80, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 200, 1);   // a spurt of blood (every rooted second, so spaced out)
   },
   w_sprout: (ctx, e) => {
     const J = ctx.juice;

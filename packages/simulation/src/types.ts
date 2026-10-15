@@ -221,6 +221,7 @@ export interface EnemyState {
   ccResistUntil: number;
   stagger: number;             // boss stagger meter
   staggerUntil: number;
+  /** impact knockback slide (knock.ts): world units moved per tick, decaying each tick; 0,0 = not sliding */
   knockX: number; knockY: number;
   // boss
   phaseIndex: number;
@@ -619,7 +620,8 @@ export type SimEvent =
   | { t: 'hit'; target: number; targetKind: 'enemy' | 'player'; amount: string; crit: boolean; dtype: DamageType; x: number; y: number; count?: string; sx?: number; sy?: number; kill?: boolean; frac?: number; src?: number }
   | { t: 'heal'; slot: number; amount: string }
   | { t: 'shield'; slot: number; amount: string }
-  | { t: 'death'; id: number; kind: string; x: number; y: number; by?: number }
+  /** a foe died; dt = the killing blow's damage type when known (picks the client's death animation) */
+  | { t: 'death'; id: number; kind: string; x: number; y: number; by?: number; dt?: DamageType }
   | { t: 'spawn'; id: number; kind: string; x: number; y: number }
   | { t: 'cast'; slot: number; skill: string; x: number; y: number; dx: number; dy: number; count?: string }
   | { t: 'enemy_attack'; id: number; attack: string; stage: 'windup' | 'release' }

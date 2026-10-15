@@ -127,7 +127,7 @@ registerSkillFx({
     ctx.juice.shockwave(p.x, p.y, ctx.rx(R), BLOOD, 260);
     ctx.juice.bleed('pursuer', c.x, c.y, 6);
     ctx.juice.bits('mote', c.x, c.y, 3, RAGE);
-    sfx(ctx, 'swing', e.x, e.y, 55, ctx.mine ? 2 : 1);
+    sfx(ctx, 'skill_sweep', e.x, e.y, 55, ctx.mine ? 2 : 1);
   },
   // Avatar of Carnage: the signature roar. Scales with the Fury consumed.
   b_avatar: (ctx, e) => {
@@ -161,7 +161,7 @@ registerSkillFx({
       J.hitStop(110);
       window.dispatchEvent(new CustomEvent('cursebound:banner', { detail: { text: 'Avatar of Carnage!', tone: 'good' } }));
     }
-    sfx(ctx, 'boss_roar', e.x, e.y, 0, 4);
+    sfx(ctx, 'beast_roar', e.x, e.y, 0, 4);
     sfx(ctx, 'signature_slam', e.x, e.y, 0, 4);
   },
   // Avatar swing whirl: a blood gust at its true radius each swing
@@ -174,6 +174,7 @@ registerSkillFx({
     ctx.juice.slash(c.x, c.y, a, RAGE, Math.min(2.4, ctx.rx(R) / 52) * 0.9, { thin: true });
     ctx.juice.slash(c.x, c.y, a + Math.PI, BLOOD, Math.min(2.4, ctx.rx(R) / 52) * 0.9, { thin: true, flip: true });
     ctx.juice.sparksAt(c.x, c.y, 4, RAGE);
+    sfx(ctx, 'skill_sweep', e.x, e.y, 120, ctx.mine ? 1 : 0);   // layered under the swing's own whoosh
   },
 
   // ---- Fury: crimson, drops, heartbeats ----
@@ -237,7 +238,7 @@ registerSkillFx({
     ctx.dungeon.flashLight(c.x, c.y, 210, RAGE, 2.6, 380);
     if (ctx.mine) J.pop(RAGE, 0.14, 160);
     sfx(ctx, 'chain_break', e.x, e.y, 0, 3);
-    sfx(ctx, 'boss_phase', e.x, e.y, 0, 3);
+    sfx(ctx, 'beast_roar', e.x, e.y, 0, 2);
   },
 
   // ---- Carnage: steel, smears, rend ----
@@ -264,7 +265,7 @@ registerSkillFx({
     J.dust(p.x, p.y, 8, DUST);
     const c = chest(ctx, e.x, e.y);
     J.orb(c.x, c.y, RAGE, 0.6, 180);
-    sfx(ctx, 'boss_charge', e.x, e.y, 0, 2);
+    sfx(ctx, 'dodge', e.x, e.y, 0, 2);
   },
   // the 200 degree, 3.2 unit cleave: the big crescent at the true reach, a ground scar and sparks along the arc
   b_execute_cleave: (ctx, e) => {
@@ -291,7 +292,8 @@ registerSkillFx({
     ctx.dungeon.addDecal('scorch', p.x, p.y + 2, 0x1a0c08, 1);
     ctx.dungeon.flashLight(p.x, p.y - 10, 210, RAGE, 2.6, 280);
     if (ctx.mine) J.hitStop(80);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 3);
+    sfx(ctx, 'skill_sweep', e.x, e.y, 0, 2);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 3);
   },
   // an execution: a gory burst, a skull and the word
   b_execute: (ctx, e) => {
@@ -305,8 +307,7 @@ registerSkillFx({
     J.number(c.x, c.y - 18, 'EXECUTED', '#ff5a4a', 'md');
     ctx.dungeon.addDecal('blood', c.x, c.y + 18, GORE, 1.4);
     ctx.dungeon.flashLight(c.x, c.y, 160, BLOOD, 2.4, 260);
-    sfx(ctx, 'kill', e.x, e.y, 0, 3);
-    sfx(ctx, 'crit', e.x, e.y, 60, 2);
+    sfx(ctx, 'crit', e.x, e.y, 60, 3);   // the death itself plays the central kill cue
   },
 
   // ---- Warcry: ember earth, dust, rock; dread for the shout ----
@@ -320,7 +321,7 @@ registerSkillFx({
       ctx.juice.embersAt(p.x, p.y - 8, 24, EMBER);
       ctx.juice.beam(p.x, p.y, 120, 22, EMBER, 260);
     }
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 4);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 4);
   },
   b_cataclysm_land: (ctx, e) => {
     const R = e.dx || 2.2;
@@ -328,8 +329,7 @@ registerSkillFx({
     const p = ctx.P(e.x, e.y);
     ctx.juice.beam(p.x, p.y, 160, 30, EMBER, 320);
     ctx.juice.embersAt(p.x, p.y - 10, 26, EMBER);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 4);
-    sfx(ctx, 'boss_rumble', e.x, e.y, 0, 3);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 4);   // each quake ring adds its own thud after this
   },
   // each Cataclysm ring (2.2, 3.6, 5): a thick front at the true radius, rock spray on the rim, hotter each ring
   b_quake_ring: (ctx, e) => {
@@ -343,7 +343,7 @@ registerSkillFx({
     debrisRing(ctx, e.x, e.y, R, 8 + i * 3, 1 + (i === 2 ? 1 : 0));
     if (i === 2) { quakeDecal(ctx, e.x, e.y, R * 0.8, 0xffc0a0); if (ctx.mine) J.pop(EMBER, 0.12, 160); }
     ctx.dungeon.flashLight(p.x, p.y - 8, ctx.rx(R) * 2, col, 1.8 + i * 0.3, 240);
-    sfx(ctx, 'boss_ring', e.x, e.y, 80, 2);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 80, 2);
   },
   b_aftershock: (ctx, e) => {
     const R = e.dx || 3.2;
@@ -353,7 +353,7 @@ registerSkillFx({
     debrisRing(ctx, e.x, e.y, R * 0.8, 8, 2);
     ctx.juice.dust(p.x, p.y, 10, DUST);
     ctx.dungeon.flashLight(p.x, p.y - 8, ctx.rx(R) * 2, EMBER, 1.8, 240);
-    sfx(ctx, 'boss_ring', e.x, e.y, 0, 2);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 2);
   },
   // Intimidating Shout: three dread waves at radius 5, skulls rising, the screen tints for the caster
   b_shout: (ctx, e) => {
@@ -374,7 +374,8 @@ registerSkillFx({
     if (spr) J.afterimage(spr, DREAD, 0.6, 420);
     ctx.dungeon.flashLight(c.x, c.y, 280, DREAD, 2.4, 420);
     if (ctx.mine) J.pop(DREAD, 0.14, 220);
-    sfx(ctx, 'boss_roar', e.x, e.y, 0, 4);
+    sfx(ctx, 'beast_roar', e.x, e.y, 0, 4);
+    sfx(ctx, 'skill_rally', e.x, e.y, 0, 2);   // Battle Cry for allies in range
   },
   // Concussive Force: an enemy smashed into a wall
   b_wall_slam: (ctx, e) => {
@@ -386,7 +387,7 @@ registerSkillFx({
     J.bits('ice', c.x, c.y, 6, ROCK, { angle: -90, spread: 140 });
     J.bits('star', c.x, c.y - 12, 3, 0xfff0a0);
     J.dust(c.x, c.y + 8, 5, DUST);
-    sfx(ctx, 'crit', e.x, e.y, 60, 2);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 90, 1);
   },
   b_flay_burst: (ctx, e) => bloodBurst(ctx, e, false),
   b_harvest: (ctx, e) => bloodBurst(ctx, e, true),
@@ -423,7 +424,7 @@ registerSkillFx({
     J.pop(0x60040a, 0.22, 240);
     if (ctx.mine) J.dilate(0.45, 420);
     sfx(ctx, 'heartbeat', e.x, e.y, 0, 4);
-    sfx(ctx, 'boss_phase', e.x, e.y, 0, 3);
+    sfx(ctx, 'cast_fire', e.x, e.y, 0, 2);   // the Fury burning away
   },
 });
 
@@ -471,7 +472,7 @@ function bloodBurst(ctx: FxCtx, e: CastFx, harvest: boolean) {
   J.bleed('pursuer', c.x, c.y, harvest ? 22 : 14);
   ctx.dungeon.addDecal('blood', p.x, p.y + 2, GORE, R * 0.6);
   if (harvest) { J.bits('skull', c.x, c.y - 6, 1, 0xff9a9a); J.embersAt(c.x, c.y, 8, EMBER); }
-  sfx(ctx, 'enemy_death', e.x, e.y, 70, 1);
+  sfx(ctx, 'blast_decay', e.x, e.y, 70, 1);   // a wet burst of blood (the kill itself has its central cue)
 }
 
 registerHazardFx({

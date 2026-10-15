@@ -231,7 +231,10 @@ function volleyFx(ctx: FxCtx, e: CastFx, kind: VolleyKind) {
     J.ring(p.x, p.y, ctx.rx(0.9), GOLD, 200);
     heroGhosts(ctx, e.slot, -e.dx, -e.dy, GOLD, 3, 9);
   }
-  sfx(ctx, long ? 'skill_arc' : 'skill_sweep', e.x, e.y, follow ? 90 : 50, ctx.mine ? 2 : 1);
+  sfx(ctx, 'bow_shot', e.x, e.y, follow ? 90 : 50, ctx.mine ? 2 : 1);
+  // the heavy shaft rips the air; the tumble rolls
+  if (long) sfx(ctx, 'skill_sweep', e.x, e.y, 50, 1);
+  else if (tumble) sfx(ctx, 'dodge', e.x, e.y, 50, 1);
 }
 
 /** A marked shot from x,y to a target point: bow flash, tracer, red hit and the reticle locking on. */
@@ -260,7 +263,7 @@ registerSkillFx({
     const bx = c.x + u.x * 10, by = c.y + u.y * 10;
     gust(ctx, bx, by, Math.atan2(u.y, u.x), WIND, 0.65);
     ctx.juice.sparksAt(bx, by, 2, GOLD);
-    sfx(ctx, 'swing', e.x, e.y, 70, ctx.mine ? 1 : 0);
+    sfx(ctx, 'bow_shot', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   r_multishot: (ctx, e) => volleyFx(ctx, e, 'multi'),
   r_barrage: (ctx, e) => volleyFx(ctx, e, 'barrage'),
@@ -285,11 +288,12 @@ registerSkillFx({
     J.dust(p.x, p.y, 8, 0x5a4a30);
     ctx.dungeon.flashLight(bx, by, 160, GOLD, 2.2, 170);
     if (ctx.mine) J.hitStop(45);
-    sfx(ctx, 'signature_slam', e.x, e.y, 60, 2);
+    sfx(ctx, 'bow_shot', e.x, e.y, 60, 2);
+    sfx(ctx, 'skill_sweep', e.x, e.y, 60, 1);   // the heavy arrow ripping the air
   },
   r_hunters_mark: (ctx, e) => {
     markShot(ctx, e, 1);
-    sfx(ctx, 'skill_phase', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'bow_shot', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   r_deadeye: (ctx, e) => {
     // three marked shots arrive in the same tick: the caster flourish plays once
@@ -298,13 +302,12 @@ registerSkillFx({
       deadeyeAt.set(e.slot, ctx.now);
       castFlash(ctx, e.x, e.y, MARKP, 1.5, { glyph: true });
       if (ctx.mine) { ctx.juice.pop(MARK, 0.08, 150); ctx.juice.hitStop(40); }
-      sfx(ctx, 'skill_arc', e.x, e.y, 40, ctx.mine ? 2 : 1);
+      sfx(ctx, 'bow_shot', e.x, e.y, 40, ctx.mine ? 2 : 1);   // the hits themselves play the central impacts
     }
     markShot(ctx, e, 2);
     const p = ctx.P(e.dx, e.dy);
     ctx.juice.beam(p.x, p.y, 70, 7, MARK, 260);
     ctx.juice.beam(p.x, p.y, 70, 2, MARK_HOT, 200);
-    sfx(ctx, 'crit', e.dx, e.dy, 70, 1);
   },
   r_mark_applied: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y);
@@ -318,7 +321,7 @@ registerSkillFx({
     ctx.juice.starburst(a.x, a.y, MARK_HOT, 0.8, 140);
     reticle(ctx, e.dx, e.dy, 1, 650);
     ctx.juice.sparksAt(b.x, b.y, 6, MARK);
-    sfx(ctx, 'skill_phase', e.dx, e.dy, 80, 1);
+    sfx(ctx, 'blink', e.dx, e.dy, 80, 1);   // the mark zipping to its new target
   },
   r_headshot: (ctx, e) => {
     const J = ctx.juice;
@@ -349,7 +352,7 @@ registerSkillFx({
     J.embersAt(p.x, p.y - 10, 3, EMBER);
     if (Math.random() < 0.25) ctx.dungeon.addDecal('scorch', p.x, p.y + 2, 0x1a1008, 0.6);
     ctx.dungeon.flashLight(p.x, p.y - 10, 90, EMBER, 1.4, 120);
-    sfx(ctx, 'hit_enemy', e.x, e.y, 60, 0);
+    sfx(ctx, 'impact_fire', e.x, e.y, 60, 0);
   },
   r_snare_trap: (ctx, e) => {
     const J = ctx.juice;
@@ -359,13 +362,13 @@ registerSkillFx({
     J.dust(p.x, p.y, 4, 0x5a4a30);
     J.sparksAt(p.x, p.y - 4, 4, STEEL);
     J.ring(p.x, p.y, ctx.rx(0.6), STEEL, 240);
-    sfx(ctx, 'swing', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   r_trap_volley: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y);
     ctx.juice.orb(c.x, c.y, LEATHER, 0.45, 160);
     ctx.juice.sparksAt(c.x, c.y, 5, STEEL);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   r_trap_spring: (ctx, e) => {
     const J = ctx.juice;
@@ -377,16 +380,17 @@ registerSkillFx({
     if (blast) {
       impactBurst(ctx, e.x, e.y, R, BLAST, 2, { decal: 'scorch', decalTint: 0x1a1008 });
       J.embersAt(p.x, p.y - 10, 12, EMBER);
-      sfx(ctx, 'signature_slam', e.x, e.y, 80, 1);
+      sfx(ctx, 'blast_fire', e.x, e.y, 80, 1);
     } else if (venom) {
       impactBurst(ctx, e.x, e.y, R, PLAGUE, 2, { decal: 'slime', decalTint: 0x2a4a10 });
       J.bits('bubble', p.x, p.y - 8, 8, TOXIC);
+      sfx(ctx, 'blast_decay', e.x, e.y, 80, 1);
     } else {
       impactBurst(ctx, e.x, e.y, R, STEELP, 2, { dust: 8 });
       // the Snare: a tight gold ring closing in
       J.shockwave(p.x, p.y, ctx.rx(R * 0.5), GOLD, 220, 80);
     }
-    sfx(ctx, 'enemy_bite', e.x, e.y, 50, 2);
+    sfx(ctx, 'trap_snap', e.x, e.y, 50, 2);
   },
   r_bait: (ctx, e) => {
     const J = ctx.juice;
@@ -398,7 +402,8 @@ registerSkillFx({
     J.ring(p.x, p.y, ctx.rx(2.2), STEEL, 300);
     J.bleed('pursuer', p.x, p.y - 6, 8);
     J.bits('mote', p.x, p.y - 8, 5, MARK);
-    sfx(ctx, 'skill_rally', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'skill_rally', e.x, e.y, 60, 1);   // the lure calling
   },
   r_rain_of_arrows: (ctx, e) => {
     const J = ctx.juice;
@@ -415,8 +420,8 @@ registerSkillFx({
     J.ring(p.x, p.y, ctx.rx(1.6), GOLD_HOT, 360);
     ctx.dungeon.flashLight(p.x, p.y - 30, 260, GOLD, 2, 700);
     if (ctx.mine) J.pop(GOLD, 0.08, 200);
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, 3);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, 1);
+    sfx(ctx, 'bow_shot', e.x, e.y, 0, 3);
+    sfx(ctx, 'cine_whoosh', e.x, e.y, 0, 1);   // the volley rising and falling
   },
   r_hawk_dive: (ctx, e) => {
     hawkDove(ctx, e);
@@ -436,7 +441,7 @@ registerSkillFx({
     J.sparksAt(c.x, c.y, 6, apex ? MARK : LEATHER);
     if (apex) reticle(ctx, e.x, e.y, 0.7, 380);
     if (ctx.rank(e.slot, 'r_poison_tips')) J.bits('bubble', c.x, c.y, 2, TOXIC);
-    sfx(ctx, 'enemy_bite', e.x, e.y, 80, 1);
+    sfx(ctx, 'blade_flurry', e.x, e.y, 80, 1);   // raking talons
   },
   r_plague_spread: (ctx, e) => {
     const J = ctx.juice;
@@ -450,7 +455,7 @@ registerSkillFx({
     J.bits('mote', p.x, p.y - 8, 6, TOXIC, { speed: 2.4 });
     ctx.dungeon.addDecal('slime', p.x, p.y + 3, 0x2a4a10, 1.1);
     ctx.dungeon.flashLight(p.x, p.y - 10, 150, TOXIC, 1.6, 240);
-    sfx(ctx, 'poison_spit', e.x, e.y, 120, 1);
+    sfx(ctx, 'blast_decay', e.x, e.y, 120, 1);
   },
 });
 

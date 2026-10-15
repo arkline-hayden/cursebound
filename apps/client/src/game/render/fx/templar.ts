@@ -101,6 +101,7 @@ registerSkillFx({
     J.starburst(p.x, p.y - 10, WHITE, 1, 160);
     ctx.dungeon.flashLight(p.x, p.y - 10, 160, GOLD, 2, 180);
     sfx(ctx, 'skill_sweep', e.x, e.y, 80, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cast_holy', e.x, e.y, 80, 1);   // the radiance in the wave
   },
   // Judgment Day call: the Templar raises the hammer, a sigil opens at the target and a bell tolls
   t_judgment_day: (ctx, e) => {
@@ -113,8 +114,8 @@ registerSkillFx({
     J.ring(t.x, t.y, ctx.rx(3.5), HOLY, 360);
     sigilFlash(ctx, e.dx, e.dy, 3.5, 700);
     ctx.dungeon.flashLight(t.x, t.y - 60, 240, HOLY, 1.8, 400);
-    sfx(ctx, 'bell_toll', e.x, e.y, 0, 3);
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, 2);
+    sfx(ctx, 'cast_holy', e.x, e.y, 0, 3);
+    sfx(ctx, 'bell_toll', e.x, e.y, 0, 2);
   },
   // the pillar crashes down: the class's biggest spectacle
   t_judgment_land: (ctx, e) => {
@@ -138,7 +139,7 @@ registerSkillFx({
     J.pop(HOLY, 0.26, 280);
     if (ctx.mine) J.hitStop(90);
     sfx(ctx, 'signature_slam', e.x, e.y, 0, 4);
-    sfx(ctx, 'signature_nova', e.x, e.y, 0, 3);
+    sfx(ctx, 'smite', e.x, e.y, 0, 3);
   },
 
   // ---- Radiance: sun gold, motes ----
@@ -154,7 +155,7 @@ registerSkillFx({
     J.bits('cross', p.x, p.y - 12, 4, GOLD);
     ctx.dungeon.flashLight(p.x, p.y - 12, 220, GOLD, 2.2, 460);
     if (ctx.rank(e.slot, 't_blinding_light')) blinding(ctx, e.x, e.y, R);
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, 2);
+    sfx(ctx, 'cast_holy', e.x, e.y, 0, 2);
   },
   // Dawnbreak: a sunrise nova at radius 3.5 that heals and stuns
   t_dawnbreak: (ctx, e) => {
@@ -176,7 +177,8 @@ registerSkillFx({
     J.bits('mote', c.x, c.y, 18, HOLY);
     J.bits('cross', c.x, c.y, 5, WHITE);
     if (ctx.rank(e.slot, 't_blinding_light')) blinding(ctx, e.x, e.y, R);
-    sfx(ctx, 'signature_nova', e.x, e.y, 0, 3);
+    sfx(ctx, 'smite', e.x, e.y, 0, 3);
+    sfx(ctx, 'cast_holy', e.x, e.y, 0, 1);
   },
   // Beacon of Light: an arcing spark lands and a sun ignites over the target
   t_beacon: (ctx, e) => {
@@ -190,21 +192,21 @@ registerSkillFx({
     J.bits('mote', t.x, t.y - 40, 10, HOLY);
     sigilFlash(ctx, e.dx, e.dy, 3, 600);
     if (ctx.rank(e.slot, 't_blinding_light')) blinding(ctx, e.dx, e.dy, 3);
-    sfx(ctx, 'skill_phase', e.dx, e.dy, 0, 2);
+    sfx(ctx, 'cast_holy', e.dx, e.dy, 0, 2);
   },
 
   // ---- Judgment: hammers and sky light ----
   t_hammer_throw: (ctx, e) => {
     swing(ctx, e, GOLD, 2, 1.1);
     castFlash(ctx, e.x, e.y, P_SKY, 0.8, { dx: e.dx, dy: e.dy });
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);
   },
   t_skyfall: (ctx, e) => {
     swing(ctx, e, HOLY, 2, 1.2);
     castFlash(ctx, e.x, e.y, P_SKY, 1.2, { dx: e.dx, dy: e.dy });
     const c = chest(ctx, e.x, e.y, 26);
     ctx.juice.embersAt(c.x, c.y, 8, HOLY);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);
   },
   // where the Skyfall hammer stops: a pillar of light smites 2 units
   t_skyfall_smite: (ctx, e) => {
@@ -214,8 +216,7 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, R, P_SKY, ctx.mine ? 3 : 2, { dust: 8 });
     crossFlash(ctx, p.x, p.y - 44, 1.5);
     ctx.juice.bits('star', p.x, p.y - 16, 8, GOLD);
-    sfx(ctx, 'skill_arc', e.x, e.y, 0, 3);
-    sfx(ctx, 'bell_toll', e.x, e.y, 400, 1);
+    sfx(ctx, 'smite', e.x, e.y, 0, 3);
   },
   // Divine Smite cast: the hand rises, a faint sigil marks the 3.5 unit search radius
   t_smite: (ctx, e) => {
@@ -227,7 +228,7 @@ registerSkillFx({
     const t = ctx.P(e.dx, e.dy);
     J.ring(t.x, t.y, ctx.rx(3.5), GOLD, 300);
     sigilFlash(ctx, e.dx, e.dy, 3.5, 420);
-    sfx(ctx, 'skill_arc', e.dx, e.dy, 0, 3);
+    sfx(ctx, 'cast_holy', e.x, e.y, 0, 3);
   },
   // each lance of light (up to 3 per cast, 1 unit splash)
   t_smite_hit: (ctx, e) => {
@@ -241,7 +242,7 @@ registerSkillFx({
     crossFlash(ctx, p.x, p.y - 30, 0.9);
     J.sparksAt(p.x, p.y - 8, 10, GOLD);
     J.bits('cross', p.x, p.y - 10, 3, HOLY);
-    sfx(ctx, 'skill_arc', e.x, e.y, 60, 2);
+    sfx(ctx, 'smite', e.x, e.y, 60, 2);
   },
   // Heaven's Call smite
   t_heaven_smite: (ctx, e) => {
@@ -252,7 +253,7 @@ registerSkillFx({
     J.shockwave(p.x, p.y, ctx.rx(R), HOLY, 260);
     J.starburst(p.x, p.y - 8, WHITE, 1, 150);
     J.bits('star', p.x, p.y - 8, 4, GOLD);
-    sfx(ctx, 'skill_arc', e.x, e.y, 90, 1);
+    sfx(ctx, 'smite', e.x, e.y, 90, 1);
   },
   // Condemn detonation: a cross bursts out of the mark, one ring per stack; Final Verdict burns orange
   t_condemn_burst: (ctx, e) => {
@@ -266,7 +267,7 @@ registerSkillFx({
     crossFlash(ctx, c.x, c.y - 6, 0.9 + stacks * 0.25 + (verdict ? 0.5 : 0), verdict ? 0xffb070 : undefined);
     for (let i = 0; i < stacks; i++) J.ring(p.x, p.y, ctx.rx(1.8) * (0.5 + i * 0.25), verdict ? VERDICT : HOLY, 260 + i * 70);
     if (verdict) { J.number(c.x, c.y - 20, 'VERDICT', '#ffae5a', 'md'); if (ctx.mine) J.hitStop(45); }
-    sfx(ctx, 'crit', e.x, e.y, 50, 2);
+    sfx(ctx, 'smite', e.x, e.y, 120, 2);
   },
   // Grinding Halt: the hammer stops and starts to spin in place
   t_hammer_hover: (ctx, e) => {
@@ -289,7 +290,7 @@ registerSkillFx({
     ctx.juice.starburst(c.x, c.y, WHITE, 0.9, 160);
     ctx.juice.sparksAt(c.x, c.y, 8, HOLY);
     ctx.juice.bits('star', c.x, c.y, 3, GOLD);
-    sfx(ctx, 'shield', e.x, e.y, 120, 1);
+    sfx(ctx, 'shield_bash', e.x, e.y, 120, 1);   // the hammer slapping home
   },
 
   // ---- Aegis: warding blue and gold ----
@@ -315,7 +316,8 @@ registerSkillFx({
     }
     ctx.dungeon.flashLight(p.x, p.y - 10, 180, GOLD, 2.2, 220);
     if (ctx.mine) J.hitStop(55);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 3);
+    sfx(ctx, 'shield_bash', e.x, e.y, 0, 3);
+    if (slamR) sfx(ctx, 'slam_heavy', e.x, e.y, 0, 1);   // Shield Slam
   },
   // Aegis Dome rises (radius 3)
   t_dome_up: (ctx, e) => {
@@ -335,7 +337,7 @@ registerSkillFx({
     ctx.juice.impact(c.x, c.y, WARD, 1.3);
     ctx.juice.starburst(c.x, c.y, 0xffffff, 0.8, 140);
     ctx.juice.bits('ice', c.x, c.y, 3, WARD);
-    sfx(ctx, 'shield', e.x, e.y, 70, 1);
+    sfx(ctx, 'impact_astral', e.x, e.y, 70, 1);
   },
   // Intercession: a gilded leap to an ally
   t_intercession: (ctx, e) => {
@@ -357,8 +359,8 @@ registerSkillFx({
     play(ctx, 'fx:templar:wings', p.x, p.y - 26, { sx: 1.5, sy: 1.5, depth: 4600, ms: 650, alpha: 0.95, rise: 10 });
     J.bits('feather', p.x, p.y - 24, 10, WHITE);
     J.bits('cross', p.x, p.y - 20, 5, HOLY);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 3);
-    sfx(ctx, 'shield', e.x, e.y, 0, 2);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 3);
+    sfx(ctx, 'cast_holy', e.x, e.y, 0, 2);   // the Vow (the shield itself plays the central shield cue)
   },
   // a Vow shield breaks: blue glass and light
   t_vow_burst: (ctx, e) => {
@@ -368,8 +370,8 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, R, P_WARD, 2, { dust: 0 });
     J.bits('ice', c.x, c.y, 10, WARD, { angle: -90, spread: 220, speed: 1.2 });
     crossFlash(ctx, c.x, c.y - 4, 1.1, 0xc8e8ff);
-    sfx(ctx, 'ice_shatter', e.x, e.y, 60, 2);
-    sfx(ctx, 'signature_nova', e.x, e.y, 60, 2);
+    sfx(ctx, 'smite', e.x, e.y, 60, 2);
+    sfx(ctx, 'impact_astral', e.x, e.y, 60, 1);   // the ward's glass ringing apart
   },
   // Divine Intervention: wings of light unfold behind the saved player
   t_intervention: (ctx, e) => {
@@ -385,6 +387,7 @@ registerSkillFx({
     if (ctx.mine) J.hitStop(80);
     window.dispatchEvent(new CustomEvent('cursebound:banner', { detail: { text: 'Divine Intervention!', tone: 'good' } }));
     sfx(ctx, 'player_revived', e.x, e.y, 0, 4);
+    sfx(ctx, 'cast_holy', e.x, e.y, 0, 2);
   },
   // Retribution keystone: stored pain released as an orange-gold nova (scales with the amount stored)
   t_retribution: (ctx, e) => {
@@ -398,7 +401,7 @@ registerSkillFx({
     pillar(ctx, e.x, e.y, ctx.rx(R) * (0.4 + stored * 0.5), 240, 0xffc890);
     crossFlash(ctx, p.x, p.y - 40, 1.2 + stored * 1.2, 0xffc080);
     J.bits('cross', p.x, p.y - 16, 6 + Math.round(stored * 10), VERDICT);
-    sfx(ctx, 'signature_nova', e.x, e.y, 0, 3);
+    sfx(ctx, 'smite', e.x, e.y, 0, 3);
   },
 });
 
@@ -419,7 +422,7 @@ function chargeStart(ctx: FxCtx, e: CastFx, color: number) {
   const p = ctx.P(e.x, e.y);
   J.dust(p.x, p.y, 10, DUST);
   J.sparksAt(p.x, p.y - 14, 8, color);
-  sfx(ctx, 'boss_charge', e.x, e.y, 0, 2);
+  sfx(ctx, 'dodge', e.x, e.y, 0, 2);   // the rush (the clang lands on t_charge_end)
 }
 
 /** Sigil sprite held on a ground hazard (one per hazard id, destroyed when the hazard stops drawing). */

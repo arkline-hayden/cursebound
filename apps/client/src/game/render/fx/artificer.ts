@@ -237,7 +237,7 @@ function blastFx(ctx: FxCtx, e: CastFx) {
     J.bits('mote', p.x, p.y - 10, 10, STEAM, { speed: 1.4 });
     J.dust(p.x, p.y - 4, 6, 0xd0dcdc);
     ctx.dungeon.flashLight(p.x, p.y - 8, Math.max(130, rpx * 2.2), 0xd8f0f0, 2, 260);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 70, ctx.mine ? 2 : 1);
+    sfx(ctx, 'steam_vent', e.x, e.y, 70, ctx.mine ? 2 : 1);
     return;
   }
   const scale = heavy ? 2.4 : style === 1 || style === 8 ? Math.min(1.1, 0.6 + R * 0.25) : Math.min(2.2, Math.max(1, rpx / 36));
@@ -257,8 +257,9 @@ function blastFx(ctx: FxCtx, e: CastFx) {
   ctx.dungeon.flashLight(p.x, p.y - 8, Math.max(110, rpx * 2.4), pal.main, big ? 2.8 : 1.8, big ? 320 : 200);
   if (heavy) { J.pop(0xff7a2a, 0.16, 200); if (ctx.mine) J.hitStop(80); }
   else if (big && ctx.mine && style !== 2) J.hitStop(30);
-  if (style === 8) sfx(ctx, 'hit_enemy', e.x, e.y, 70, 1);
-  else sfx(ctx, big || R >= 1.6 ? 'signature_slam' : 'hit_enemy', e.x, e.y, 70, big ? 2 : 1);
+  // grenades, shells and landings get the full explosion; bomblets and chain reactions a smaller flame whoomp
+  if (style !== 8 && (big || R >= 1.6)) sfx(ctx, 'blast_fire', e.x, e.y, 70, big ? 2 : 1);
+  else sfx(ctx, 'impact_fire', e.x, e.y, 70, 1);
 }
 
 function deployFx(ctx: FxCtx, e: CastFx, pal: Pal, kind: string) {
@@ -291,7 +292,7 @@ function deployFx(ctx: FxCtx, e: CastFx, pal: Pal, kind: string) {
     }
   }
   if (ctx.rank(e.slot, 'af_fortress_protocol') > 0) cog(ctx, p.x, p.y, ctx.rx(3.5), 900, TEAL);
-  sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
+  sfx(ctx, 'mech_deploy', e.x, e.y, 60, ctx.mine ? 2 : 1);
 }
 
 function overclockFx(ctx: FxCtx, e: CastFx, boiler: boolean) {
@@ -312,7 +313,9 @@ function overclockFx(ctx: FxCtx, e: CastFx, boiler: boolean) {
   }
   ctx.dungeon.flashLight(p.x, p.y - 16, 200, TEAL, 2.2, 400);
   if (ctx.mine) J.number(p.x, p.y - 34, 'OVERCLOCK', '#5ae8d4', 'sm');
-  sfx(ctx, 'skill_rally', e.x, e.y, 80, 2);
+  // the engine spinning up (Overclock's own vent arrives as a steam af_fx_blast; the boiler vents here)
+  sfx(ctx, 'mech_deploy', e.x, e.y, 80, 2);
+  if (boiler) sfx(ctx, 'steam_vent', e.x, e.y, 80, 1);
 }
 
 registerSkillFx({
@@ -326,7 +329,7 @@ registerSkillFx({
     J.sparksAt(mx, my, 2, BRASS_HOT);
     if (Math.random() < 0.3) J.bits('gear', c.x, c.y, 1, BRASS_DK, { angle: (Math.atan2(u.y, -u.x) * 180) / Math.PI - 60, spread: 30, speed: 0.6 });
     ctx.dungeon.flashLight(mx, my, 60, BRASS, 0.9, 70);
-    sfx(ctx, 'attack_spark', e.x, e.y, 70, ctx.mine ? 1 : 0);
+    sfx(ctx, 'gun_shot', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
 
   // ---- Turrets ----
@@ -342,7 +345,7 @@ registerSkillFx({
     const k = upgradeScale(ctx, e.slot, ['af_calibrated'], 1.75);
     ctx.juice.orb(mx, my, TEAL, 0.22 * k, 90);
     ctx.juice.sparksAt(mx, my, 2, ctx.rank(e.slot, 'af_marking_rounds') > 0 ? 0xff6a4a : TEAL);
-    sfx(ctx, 'attack_spark', e.x, e.y, 140, 0);
+    sfx(ctx, 'gun_shot', e.x, e.y, 140, 0);
   },
   af_fx_flame: (ctx, e) => {
     const J = ctx.juice;
@@ -387,6 +390,7 @@ registerSkillFx({
         J.sparksAt(p.x, p.y - 26, 3, FIRE_HOT);
         puff(ctx, p.x + (Math.random() - 0.5) * 8, p.y - 28, 0.9, 0, -20);
         ctx.dungeon.flashLight(p.x, p.y - 24, 110, FIRE, 1.4, 90);
+        if (i === 4) ctx.sfx('gun_shot', e.x, e.y, 1);   // second thump of the volley (unthrottled: ctx.now is stale here)
       });
     }
     J.dust(p.x, p.y, 8, 0x5a4a38);
@@ -395,8 +399,7 @@ registerSkillFx({
     cog(ctx, t.x, t.y, ctx.rx(3.6), 1500, 0xffa060);
     J.shockwave(t.x, t.y, ctx.rx(3.6), 0xff5a2a, 700);
     J.pop(FIRE, 0.08, 160);
-    sfx(ctx, 'skill_fireline', e.x, e.y, 80, 2);
-    sfx(ctx, 'enemy_shoot', e.x, e.y, 80, 1);
+    sfx(ctx, 'gun_shot', e.x, e.y, 80, 2);
   },
 
   // ---- Clockwork ----
@@ -412,7 +415,7 @@ registerSkillFx({
     J.dust(p.x, p.y, 10, 0xd0dcdc);
     heroGhosts(ctx, e.slot, e.dx - e.x, e.dy - e.y, FIRE, 4, 10);
     ctx.dungeon.addDecal('scorch', p.x, p.y + 2, 0x1a1008, 0.9);
-    sfx(ctx, 'skill_phase', e.x, e.y, 80, 2);
+    sfx(ctx, 'cast_fire', e.x, e.y, 80, 2);   // rocket ignition (the launch vent is a steam af_fx_blast)
   },
 });
 
@@ -421,7 +424,7 @@ function throwFx(ctx: FxCtx, e: CastFx) {
   const c = chestAt(ctx, e.x, e.y, 18);
   ctx.juice.slash(c.x + u.x * 6, c.y + u.y * 4, Math.atan2(u.y, u.x) - 0.6, BRASS, 0.6, { thin: true, ms: 140 });
   ctx.juice.sparksAt(c.x + u.x * 10, c.y - 4, 2, FIRE_HOT);
-  sfx(ctx, 'swing', e.x, e.y, 60, ctx.mine ? 1 : 0);
+  sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
 }
 
 /** Styled teleport ('rocket', Rocket Jump landing): x,y = destination, dx,dy = origin. */

@@ -256,9 +256,9 @@ registerSkillFx({
       J.sparksAt(ex + u.x * 12, ey - 14, 8, STEEL_HOT);
       J.dust(ex, ey, 5, EARTH);
       ctx.dungeon.flashLight(ex, ey - 12, 140, STEEL, 2, 200);
+      sfx(ctx, 'shield_bash', e.x + e.dx * 5, e.y + e.dy * 5, 60, ctx.mine ? 2 : 1);   // the slam where it stops (fixed delay)
     });
-    sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'boss_charge', e.x, e.y, 200, 0);
+    sfx(ctx, 'dodge', e.x, e.y, 60, ctx.mine ? 2 : 1);   // the rush
   },
 
   // Retaliate: the shield braces and a ring at the true blast radius (3) charges up over the brace.
@@ -305,8 +305,8 @@ registerSkillFx({
     rubble(ctx, p.x, p.y, 10);
     J.pop(GOLD, 0.18, 200);
     if (ctx.mine) J.hitStop(90);
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, 3);
-    sfx(ctx, 'crit', e.x, e.y, 80, 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 80, 3);
+    sfx(ctx, 'shield_bash', e.x, e.y, 80, 1);   // the shield shards
   },
 
   // Whirlwind: the true 4-long, r2 lane lights, a cyclone of gold/white blades turns around the hero for the spin.
@@ -348,6 +348,7 @@ registerSkillFx({
     ctx.dungeon.flashLight(hit.x, hit.y - 10, 150, RED, 2, 220);
     if (ctx.mine) J.hitStop(40);
     sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'slam_heavy', e.x + e.dx * 1.7, e.y + e.dy * 1.7, 60, 1);   // the blade cracking the stone
   },
   // An execution (on the executed enemy): a guillotine of red light, crossing white cuts, a blood burst.
   v_execute: (ctx, e) => {
@@ -384,9 +385,10 @@ registerSkillFx({
       J.bits('mote', q.x, q.y - 20, 10, BANNER);
       rubble(ctx, q.x, q.y, 6);
       ctx.dungeon.flashLight(q.x, q.y - 20, 240, BANNER, 2.2, 460);
-      sfx(ctx, 'signature_slam', e.dx, e.dy, 120, 1);
+      sfx(ctx, 'slam_heavy', e.dx, e.dy, 120, 1);
+      sfx(ctx, 'skill_rally', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // planted: the rally goes up
     });
-    sfx(ctx, 'skill_rally', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
 
   // Thunderous Shout (r5): the big one. A war-glyph, three staggered waves at the true radius, a visible roar, thunder.
@@ -424,7 +426,7 @@ registerSkillFx({
     ctx.dungeon.flashLight(p.x, p.y - 10, 320, BANNER, 3, 460);
     if (ctx.mine) J.hitStop(80);
     sfx(ctx, 'skill_rally', e.x, e.y, 60, 3);
-    sfx(ctx, 'boss_ring', e.x, e.y, 200, 1);
+    sfx(ctx, 'zap_strike', e.x, e.y, 200, 1);   // the thunder
   },
 
   // Warlord's Leap (x,y -> landing dx,dy, 0.4s airborne): take-off burst, a gold arc, a landing ring at the true r2.6
@@ -441,7 +443,7 @@ registerSkillFx({
     trailBits(ctx, e.x, e.y, e.dx, e.dy, 'star', 6, GOLD_HOT, 40);
     for (let i = 0; i < 3; i++) ctx.scene.time.delayedCall(i * 110, () => heroGhosts(ctx, e.slot, e.dx - e.x, e.dy - e.y, GOLD, 2, 12));
     landingMark(ctx, t.x, t.y, 2.6, 400);
-    sfx(ctx, 'dodge', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    sfx(ctx, 'cine_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);   // the arc up and over
   },
 
   // Iron Maelstrom pulse (every 0.5s while guarding, r in dx): a steel ring at the true radius and two turning blades.
@@ -468,7 +470,7 @@ registerSkillFx({
     J.bits('zap', p.x, p.y - 44, 4, RED);
     ctx.dungeon.flashLight(p.x, p.y - 20, 190, RED, 1.8, 300);
     if (ctx.mine) J.number(p.x, p.y - 34, 'PROVOKE', '#ff6a5e', 'sm');
-    sfx(ctx, 'telegraph_warn', e.x, e.y, 200, 1);
+    sfx(ctx, 'shield_bash', e.x, e.y, 200, 1);   // banging the shield in challenge
   },
 
   // Aftershock eruption (r in dx): the cracked ground bursts in amber, spurs and rubble.
@@ -480,7 +482,7 @@ registerSkillFx({
     oneShot(ctx, 'fx:vanguard:crack', p.x, p.y + 2, { depth: -69, add: false, sx: ctx.rx(R) / 46, ms: 800 });
     spurs(ctx, e.x, e.y, R * 0.55, 4, AMBER, 28);
     rubble(ctx, p.x, p.y, 10);
-    sfx(ctx, 'signature_slam', e.x, e.y, 120, 1);
+    sfx(ctx, 'slam_heavy', e.x, e.y, 120, 1);
   },
 
   // Last Stand (keystone): a golden pillar, a halo burst and a moment of slow motion for the Vanguard who refuses to fall.

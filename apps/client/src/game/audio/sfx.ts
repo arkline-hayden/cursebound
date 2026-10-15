@@ -89,7 +89,46 @@ export type SfxId =
   | 'altar_pact'
   | 'merchant_buy'
   | 'imp_jingle'
-  | 'imp_portal';
+  | 'imp_portal'
+  // combat feel pass: layered impacts by damage type and weapon weight (transient click + body thump + tail)
+  | 'impact_light'
+  | 'impact_heavy'
+  | 'impact_fire'
+  | 'impact_frost'
+  | 'impact_storm'
+  | 'impact_decay'
+  | 'impact_astral'
+  // kills by killing damage type (char sizzle, ice shatter, zap, squelch, chime); 'kill' stays the physical one
+  | 'kill_burn'
+  | 'kill_shatter'
+  | 'kill_zap'
+  | 'kill_squelch'
+  | 'kill_chime'
+  // ability casts and impacts matching the class fx (render/fx/*)
+  | 'cast_fire'
+  | 'blast_fire'
+  | 'cast_frost'
+  | 'blast_frost'
+  | 'cast_storm'
+  | 'zap_strike'
+  | 'cast_decay'
+  | 'blast_decay'
+  | 'cast_holy'
+  | 'smite'
+  | 'cast_astral'
+  | 'bow_shot'
+  | 'gun_shot'
+  | 'throw_whoosh'
+  | 'slam_heavy'
+  | 'blade_flurry'
+  | 'shield_bash'
+  | 'summon_rise'
+  | 'beast_howl'
+  | 'beast_roar'
+  | 'mech_deploy'
+  | 'steam_vent'
+  | 'trap_snap'
+  | 'blink';
 
 export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 
@@ -205,7 +244,67 @@ export const SFX_IDS: readonly SfxId[] = [
   'merchant_buy',
   'imp_jingle',
   'imp_portal',
+  'impact_light',
+  'impact_heavy',
+  'impact_fire',
+  'impact_frost',
+  'impact_storm',
+  'impact_decay',
+  'impact_astral',
+  'kill_burn',
+  'kill_shatter',
+  'kill_zap',
+  'kill_squelch',
+  'kill_chime',
+  'cast_fire',
+  'blast_fire',
+  'cast_frost',
+  'blast_frost',
+  'cast_storm',
+  'zap_strike',
+  'cast_decay',
+  'blast_decay',
+  'cast_holy',
+  'smite',
+  'cast_astral',
+  'bow_shot',
+  'gun_shot',
+  'throw_whoosh',
+  'slam_heavy',
+  'blade_flurry',
+  'shield_bash',
+  'summon_rise',
+  'beast_howl',
+  'beast_roar',
+  'mech_deploy',
+  'steam_vent',
+  'trap_snap',
+  'blink',
 ];
+
+/** Layered impact cue for a hit's damage type; physical splits by weapon weight (heavy = hammers, axes, slams). */
+export function impactSfx(dtype: string, heavy: boolean): SfxId {
+  switch (dtype) {
+    case 'ember': return 'impact_fire';
+    case 'frost': return 'impact_frost';
+    case 'storm': return 'impact_storm';
+    case 'decay': return 'impact_decay';
+    case 'astral': return 'impact_astral';
+    default: return heavy ? 'impact_heavy' : 'impact_light';
+  }
+}
+
+/** Kill cue for the killing blow's damage type: char sizzle, ice shatter, zap, squelch, chime (physical = 'kill'). */
+export function killSfx(dtype: string | undefined): SfxId {
+  switch (dtype) {
+    case 'ember': return 'kill_burn';
+    case 'frost': return 'kill_shatter';
+    case 'storm': return 'kill_zap';
+    case 'decay': return 'kill_squelch';
+    case 'astral': return 'kill_chime';
+    default: return 'kill';
+  }
+}
 
 /** Cues that are never voice-stolen and always produce a caption. */
 export const CRITICAL_SFX: readonly SfxId[] = ['boss_telegraph', 'telegraph_warn', 'player_downed'];

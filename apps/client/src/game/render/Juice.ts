@@ -420,7 +420,10 @@ export class Juice {
   /** Graphics-tier particle count for kits that spawn their own cosmetic sprites (same rounding as every burst). */
   budget(n: number): number { return this.reduced ? 0 : this.count(n); }
 
-  /** Floating pixel number. 'crit' pops large with an overshoot and a hot outline; 'heal' rises softly. */
+  /**
+   * Floating pixel callout (EXECUTE, SHATTER, kill streaks, statuses). 'crit' pops large with an overshoot and a hot
+   * outline; 'heal' rises softly. Damage and healing numbers roll per target in render/DamageNumbers.ts instead.
+   */
   number(x: number, y: number, text: string, color: string, size: NumberStyle = 'sm') {
     if (!this.numbersOn) return;
     if (this.texts.length > (this.low ? 30 : 70) && size !== 'crit') return;

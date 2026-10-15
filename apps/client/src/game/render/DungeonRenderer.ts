@@ -553,13 +553,14 @@ export class DungeonRenderer {
     st.clearTint();
   }
 
-  /** Bake a fallen body (last frame of its death animation) into the floor decals. */
-  stampCorpse(texture: string, frame: string | number, x: number, y: number, ox: number, oy: number, flip: boolean) {
+  /** Bake a fallen body (last frame of its death animation, or a toppled pose from render/DeathFx.ts) into the floor decals. */
+  stampCorpse(texture: string, frame: string | number, x: number, y: number, ox: number, oy: number, flip: boolean, pose: { rotation?: number; alpha?: number; scale?: number } = {}) {
     const rt = this.decalRT;
     if (!rt || !this.stamp || !this.scene.textures.exists(texture)) return;
-    const st = this.stamp.setTexture(texture, frame).setOrigin(ox, oy).setScale(1, 1).setFlipX(flip).setFlipY(false).setAlpha(0.92).setTint(0x8a7c7c);
+    const st = this.stamp.setTexture(texture, frame).setOrigin(ox, oy).setScale(pose.scale ?? 1).setFlipX(flip).setFlipY(false).setAlpha(pose.alpha ?? 0.92).setTint(0x8a7c7c)
+      .setRotation(pose.rotation ?? 0);
     rt.draw(st, x - this.origin.x, y - this.origin.y);
-    st.clearTint();
+    st.clearTint().setRotation(0);
     // the dead draw flies
     this.ambient?.addFlies(x, y);
   }

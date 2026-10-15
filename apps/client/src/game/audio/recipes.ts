@@ -29,6 +29,10 @@ export function pitchSpread(id: SfxId): number {
   if (id.startsWith('ui_') || id === 'move_click' || id === 'minimap_ping' || id.startsWith('vote_') || id === 'fate_commit') return 0.01;
   if (id === 'footstep') return 0.12;
   if (id === 'hit_enemy' || id === 'kill' || id === 'enemy_death' || id === 'swing' || id === 'enemy_bite') return 0.09;
+  // tonal cues stay in the song's key; layered impacts and typed kills vary enough that a pack's worth never drones
+  if (id === 'kill_chime' || id === 'cast_holy' || id === 'smite' || id === 'cast_astral' || id === 'impact_astral') return 0.012;
+  if (id.startsWith('impact_')) return 0.08;
+  if (id.startsWith('kill_') || id === 'bow_shot' || id === 'gun_shot' || id === 'blade_flurry') return 0.07;
   if (id.startsWith('boss_') || id.startsWith('cine_') || id === 'title_boom' || id === 'round_start' || id === 'stag_cry' || id === 'bell_toll' || id.startsWith('legendary')) return 0.015;
   if (id === 'round_clear' || id === 'level_up' || id === 'combo' || id === 'player_revived' || id === 'player_downed') return 0;
   return 0.05;
@@ -175,15 +179,18 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.noiseHit(o, t, { dur: 0.16, type: 'lowpass', f: 1400, f2: 300, gain: 0.32 });
       return s.tone(o, t, { type: 'square', f: 220, f2: 70, dur: 0.18, gain: 0.07, filter: 900 });
     case 'crit':
-      // heavy punch + crunch + the bright "ching"
-      s.noiseHit(o, t, { dur: 0.004, type: 'highpass', f: 4000, gain: 0.25, attack: 0.0005 });
-      s.tone(o, t, { f: 170, f2: 42, dur: 0.2, gain: 0.65, glide: 0.14 });
-      s.crunchHit(o, t, { dur: 0.09, f: 2200, q: 0.7, gain: 0.3, drive: 6 });
-      s.tone(o, t + 0.008, { f: 2637, dur: 0.5, gain: 0.09, attack: 0.001 });
-      s.tone(o, t + 0.008, { f: 3951, dur: 0.35, gain: 0.05, attack: 0.001 });
-      s.bell(o, t + 0.012, 1760, 0.65, 0.12, 1.5);
-      s.noiseHit(o, t + 0.01, { dur: 0.25, type: 'highpass', f: 7000, gain: 0.04 });
-      return 0.7;
+      // four layers, distinct from any plain impact: a whip-crack transient, a heavy sub punch with crunch, the
+      // two-note "ka-CHING" ring (a fifth apart, 35 ms) and a bright air tail. CombatScene stacks the typed impact under it.
+      s.noiseHit(o, t, { dur: 0.004, type: 'highpass', f: 5000, gain: 0.26, attack: 0.0005 });
+      s.noiseHit(o, t, { dur: 0.05, f: 1500, f2: 7000, q: 3, gain: 0.07, attack: 0.004 });
+      s.tone(o, t, { f: 180, f2: 40, dur: 0.22, gain: 0.62, glide: 0.14 });
+      s.crunchHit(o, t, { dur: 0.09, f: 2200, q: 0.7, gain: 0.28, drive: 7 });
+      s.bell(o, t + 0.008, 1760, 0.4, 0.08, 1.5);
+      s.tone(o, t + 0.043, { f: 2637, dur: 0.5, gain: 0.09, attack: 0.001 });
+      s.tone(o, t + 0.043, { f: 3951, dur: 0.35, gain: 0.045, attack: 0.001 });
+      s.bell(o, t + 0.045, 2637, 0.6, 0.1, 1.5);
+      s.noiseHit(o, t + 0.04, { dur: 0.28, type: 'highpass', f: 7000, gain: 0.04 });
+      return 0.75;
     case 'enemy_death':
       s.noiseHit(o, t, { dur: 0.3, type: 'lowpass', f: 1100, f2: 200, gain: 0.36 });
       s.noiseHit(o, t + 0.02, { dur: 0.22, f: 700, f2: 180, q: 3, gain: 0.22 });
@@ -569,6 +576,248 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.bell(o, t + 0.5, mtof(k0 + 25), 1.2, 0.03, 0.8);
       return 1.9;
     }
+    // ---------------------------------------------------------------- layered impacts (combat feel pass)
+    // Every impact stacks a transient click, a body thump and a typed tail; physical splits by weapon weight.
+    case 'impact_light':
+      // daggers, arrows, bolts: a bright tick, a short slap and a quick tear
+      s.noiseHit(o, t, { dur: 0.004, type: 'highpass', f: 4500, gain: 0.18, attack: 0.0005 });
+      s.tone(o, t, { f: 210, f2: 70, dur: 0.08, gain: 0.3, glide: 0.06 });
+      s.crunchHit(o, t + 0.002, { dur: 0.04, f: 2400, q: 1, gain: 0.14, drive: 4 });
+      return s.noiseHit(o, t + 0.004, { dur: 0.07, type: 'lowpass', f: 1200, f2: 400, gain: 0.08 });
+    case 'impact_heavy':
+      // hammers, axes, slams: a hard crack over a deep thump and sub, gritty crunch, a dull low tail and a bone knock
+      s.noiseHit(o, t, { dur: 0.006, type: 'highpass', f: 3000, gain: 0.24, attack: 0.0005 });
+      s.tone(o, t, { f: 120, f2: 38, dur: 0.22, gain: 0.58, glide: 0.16 });
+      s.tone(o, t, { f: 62, f2: 34, dur: 0.25, gain: 0.26 });
+      s.crunchHit(o, t + 0.002, { dur: 0.09, f: 1300, q: 0.8, gain: 0.26, drive: 6 });
+      s.click('bone', o, t + 0.012 + r() * 0.01, 0.6);
+      return s.noiseHit(o, t + 0.006, { dur: 0.22, type: 'lowpass', f: 700, f2: 150, gain: 0.16, brown: true });
+    case 'impact_fire':
+      // a hot tick, a whoomp of flame over a thump, then crackling embers
+      s.noiseHit(o, t, { dur: 0.004, type: 'highpass', f: 3500, gain: 0.14, attack: 0.0005 });
+      s.noiseHit(o, t, { dur: 0.16, type: 'lowpass', f: 900, f2: 180, gain: 0.3, attack: 0.006, brown: true });
+      s.tone(o, t, { f: 140, f2: 55, dur: 0.12, gain: 0.28 });
+      for (let k = 0; k < 4; k++) s.noiseHit(o, t + 0.03 + r() * 0.18, { dur: 0.008, type: 'highpass', f: 3000 + r() * 3000, gain: 0.05, attack: 0.001 });
+      return 0.24;
+    case 'impact_frost':
+      // a glassy tick, a dull thud through ice, a crack and a little tinkle of rime
+      s.noiseHit(o, t, { dur: 0.006, type: 'highpass', f: 6000, gain: 0.12, attack: 0.0005 });
+      s.tone(o, t, { type: 'triangle', f: 3200, dur: 0.03, gain: 0.05, attack: 0.001 });
+      s.tone(o, t, { f: 160, f2: 70, dur: 0.1, gain: 0.3 });
+      s.crunchHit(o, t + 0.003, { dur: 0.03, type: 'highpass', f: 2000, gain: 0.14, drive: 6 });
+      for (let k = 0; k < 3; k++) s.bell(o, t + 0.02 + k * 0.03, 2600 + r() * 2400, 0.18, 0.025, 1.6);
+      return 0.25;
+    case 'impact_storm':
+      // an electric snap, a buzzing body and a skitter of sparks
+      s.noiseHit(o, t, { dur: 0.005, type: 'highpass', f: 5000, gain: 0.2, attack: 0.0005 });
+      s.tone(o, t, { f: 130, f2: 60, dur: 0.1, gain: 0.26 });
+      s.tone(o, t, { type: 'square', f: 90 + r() * 20, dur: 0.09, gain: 0.07, filter: 1800 });
+      for (let k = 0; k < 3; k++) s.tone(o, t + k * 0.025, { type: 'square', f: 900 + r() * 1600, f2: 400, dur: 0.03, gain: 0.04, filter: 5000 });
+      return s.noiseHit(o, t + 0.01, { dur: 0.12, type: 'highpass', f: 4000, gain: 0.05 });
+    case 'impact_decay':
+      // a wet slap, a squelching body and a gurgle
+      s.noiseHit(o, t, { dur: 0.01, f: 1800, q: 1.5, gain: 0.16, attack: 0.001 });
+      s.tone(o, t, { f: 180, f2: 70, dur: 0.12, gain: 0.28, filter: 700, q: 3 });
+      s.noiseHit(o, t + 0.005, { dur: 0.14, f: 700, f2: 260, q: 4, gain: 0.2 });
+      s.click('bloop', o, t + 0.05 + r() * 0.03, 0.6);
+      return 0.08 + s.tone(o, t + 0.08, { f: 300, f2: 520, dur: 0.06, gain: 0.04, filter: 900, q: 6 });
+    case 'impact_astral': {
+      // a bright ping, a soft thump and a shimmer in the song's key
+      const pent = [0, 2, 4, 7, 9];
+      s.noiseHit(o, t, { dur: 0.004, type: 'highpass', f: 5000, gain: 0.1, attack: 0.0005 });
+      s.tone(o, t, { f: 2600, dur: 0.05, gain: 0.045, attack: 0.001 });
+      s.tone(o, t, { f: 150, f2: 60, dur: 0.1, gain: 0.26 });
+      s.bell(o, t + 0.01, mtof(key + 36 + pent[Math.floor(r() * pent.length)]!), 0.35, 0.04, 1.5);
+      s.noiseHit(o, t + 0.02, { dur: 0.2, type: 'highpass', f: 7000, gain: 0.025, attack: 0.02 });
+      return 0.36;
+    }
+
+    // ---------------------------------------------------------------- kills by damage type
+    case 'kill_burn':
+      // char sizzle: a whump, a flare, a long hiss with crackles popping through it
+      s.noiseHit(o, t, { dur: 0.25, type: 'lowpass', f: 600, f2: 120, gain: 0.3, brown: true });
+      s.tone(o, t, { f: 90, f2: 40, dur: 0.25, gain: 0.3 });
+      s.noiseHit(o, t + 0.01, { dur: 0.18, f: 1200, f2: 3200, q: 1, gain: 0.12, attack: 0.01 });
+      s.noiseHit(o, t + 0.04, { dur: 0.6, type: 'highpass', f: 5000, f2: 2600, gain: 0.06, attack: 0.03 });
+      for (let k = 0; k < 8; k++) s.noiseHit(o, t + 0.05 + r() * 0.5, { dur: 0.007, type: 'highpass', f: 2500 + r() * 4000, gain: 0.05 + r() * 0.03, attack: 0.001 });
+      return 0.7;
+    case 'kill_shatter':
+      // ice shatter: a hard crack, a crash of glass and shards raining down
+      s.crunchHit(o, t, { dur: 0.08, type: 'highpass', f: 1600, gain: 0.3, drive: 7 });
+      s.tone(o, t, { f: 130, f2: 60, dur: 0.12, gain: 0.24 });
+      s.noiseHit(o, t, { dur: 0.3, type: 'highpass', f: 4000, gain: 0.1 });
+      for (let k = 0; k < 10; k++) s.bell(o, t + 0.01 + r() * 0.35, 2000 + r() * 4000, 0.2 + r() * 0.15, 0.02 + r() * 0.015, 1.6);
+      return 0.6;
+    case 'kill_zap':
+      // zap: a snap, an arcing buzz and a crackle that sputters out downward
+      s.noiseHit(o, t, { dur: 0.006, type: 'highpass', f: 5000, gain: 0.24, attack: 0.0005 });
+      s.tone(o, t, { f: 120, f2: 45, dur: 0.15, gain: 0.26 });
+      s.tone(o, t, { type: 'sawtooth', f: 140, f2: 60, dur: 0.3, gain: 0.06, filter: 2500, q: 2 });
+      s.tone(o, t, { type: 'square', f: 220, f2: 80, dur: 0.22, gain: 0.04, filter: 3000 });
+      for (let k = 0; k < 7; k++) s.tone(o, t + 0.02 + k * 0.04, { type: 'square', f: 2400 - k * 250 + r() * 400, f2: 300, dur: 0.025, gain: 0.05 - k * 0.005, filter: 6000 });
+      return 0.45;
+    case 'kill_squelch':
+      // squelch: a wet splat over a low drop, a soft crunch and bubbles popping
+      s.noiseHit(o, t, { dur: 0.2, f: 900, f2: 250, q: 3, gain: 0.3 });
+      s.tone(o, t, { f: 110, f2: 38, dur: 0.25, gain: 0.42, glide: 0.2 });
+      s.crunchHit(o, t + 0.01, { dur: 0.1, type: 'lowpass', f: 1400, f2: 300, gain: 0.16, drive: 3 });
+      for (let k = 0; k < 4; k++) s.click('bloop', o, t + 0.08 + k * 0.07 + r() * 0.03, 0.5 + r() * 0.3);
+      s.tone(o, t + 0.12, { f: 260, f2: 500, dur: 0.05, gain: 0.035, filter: 800, q: 8 });
+      return 0.55;
+    case 'kill_chime': {
+      // holy chime: a soft thump, a rising triad in the song's key and an airy shimmer
+      s.tone(o, t, { f: 140, f2: 60, dur: 0.12, gain: 0.2 });
+      [0, 4, 7].forEach((d, k) => s.bell(o, t + k * 0.045, mtof(key + 24 + d), 0.7, 0.05, 1.3));
+      s.noiseHit(o, t + 0.05, { dur: 0.5, type: 'highpass', f: 6000, f2: 9000, gain: 0.035, attack: 0.08 });
+      return 0.8;
+    }
+
+    // ---------------------------------------------------------------- ability casts and impacts (class fx)
+    case 'cast_fire':
+      // ignition: a rising whoosh of flame over a low roar, a few crackles
+      s.noiseHit(o, t, { dur: 0.28, f: 300, f2: 2400, q: 1.2, gain: 0.22, attack: 0.08 });
+      s.noiseHit(o, t, { dur: 0.3, type: 'lowpass', f: 220, gain: 0.14, attack: 0.05, brown: true });
+      s.tone(o, t, { f: 80, f2: 140, dur: 0.2, gain: 0.08, attack: 0.04 });
+      for (let k = 0; k < 4; k++) s.noiseHit(o, t + 0.08 + r() * 0.22, { dur: 0.008, type: 'highpass', f: 3000 + r() * 3000, gain: 0.05, attack: 0.001 });
+      return 0.35;
+    case 'blast_fire':
+      // explosion: a deep boom, a gritty blast front, a rolling fireball and falling debris
+      s.tone(o, t, { f: 70, f2: 30, dur: 0.5, gain: 0.58, glide: 0.4 });
+      s.crunchHit(o, t, { dur: 0.15, type: 'lowpass', f: 2000, f2: 300, gain: 0.28, drive: 4 });
+      s.noiseHit(o, t, { dur: 0.55, type: 'lowpass', f: 1200, f2: 150, gain: 0.38, brown: true });
+      for (let k = 0; k < 8; k++) s.noiseHit(o, t + 0.06 + r() * 0.45, { dur: 0.008, type: 'highpass', f: 2500 + r() * 3500, gain: 0.05, attack: 0.001 });
+      return 0.65;
+    case 'cast_frost':
+      // crystalline swell: rising air, three glassy partials and a scatter of ice ticks
+      s.noiseHit(o, t, { dur: 0.3, type: 'highpass', f: 3000, f2: 8000, gain: 0.06, attack: 0.2 });
+      for (let k = 0; k < 3; k++) s.tone(o, t + k * 0.05, { type: 'triangle', f: 1800 + k * 600, f2: 2200 + k * 600, dur: 0.25, gain: 0.022, attack: 0.08 });
+      for (let k = 0; k < 4; k++) s.click('ice', o, t + 0.05 + r() * 0.25, 0.6);
+      return 0.4;
+    case 'blast_frost':
+      // ice burst: a thud, a hard crack, a hiss of frost and shards
+      s.tone(o, t, { f: 110, f2: 50, dur: 0.25, gain: 0.34 });
+      s.crunchHit(o, t, { dur: 0.1, type: 'highpass', f: 1500, gain: 0.26, drive: 6 });
+      s.noiseHit(o, t, { dur: 0.4, type: 'highpass', f: 4500, gain: 0.08 });
+      for (let k = 0; k < 8; k++) s.bell(o, t + 0.01 + r() * 0.3, 2000 + r() * 3000, 0.22, 0.025, 1.6);
+      return 0.55;
+    case 'cast_storm':
+      // charge: a whine climbing over hissing static, released with a snap
+      s.tone(o, t, { type: 'sawtooth', f: 200, f2: 1600, dur: 0.22, gain: 0.04, filter: 3000, glide: 0.2 });
+      s.noiseHit(o, t, { dur: 0.2, type: 'highpass', f: 4000, gain: 0.05, attack: 0.12 });
+      return 0.2 + s.noiseHit(o, t + 0.2, { dur: 0.006, type: 'highpass', f: 5000, gain: 0.16, attack: 0.0005 });
+    case 'zap_strike':
+      // lightning strike: a split-second crack, sizzling arcs, then a short thunder roll
+      s.noiseHit(o, t, { dur: 0.008, type: 'highpass', f: 3000, gain: 0.3, attack: 0.0005 });
+      s.crunchHit(o, t, { dur: 0.05, type: 'highpass', f: 2500, gain: 0.24, drive: 8 });
+      for (let k = 0; k < 5; k++) s.tone(o, t + k * 0.03, { type: 'square', f: 700 + r() * 1800, f2: 250 + r() * 300, dur: 0.04, gain: 0.05, filter: 5000 });
+      s.noiseHit(o, t + 0.02, { dur: 0.6, type: 'lowpass', f: 300, f2: 80, gain: 0.24, attack: 0.02, brown: true });
+      return s.tone(o, t + 0.02, { f: 60, f2: 35, dur: 0.4, gain: 0.24 });
+    case 'cast_decay':
+      // a gurgling whisper over two sickly detuned tones
+      s.whisper(o, t, 0.35, 0.04);
+      s.noiseHit(o, t, { dur: 0.3, f: 500, f2: 900, q: 5, gain: 0.1, attack: 0.05 });
+      s.tone(o, t, { type: 'triangle', f: 170, dur: 0.3, gain: 0.04, attack: 0.05 });
+      s.tone(o, t, { type: 'triangle', f: 176, dur: 0.3, gain: 0.04, attack: 0.05 });
+      for (let k = 0; k < 2; k++) s.click('bloop', o, t + 0.08 + k * 0.12, 0.5);
+      return 0.4;
+    case 'blast_decay':
+      // rot burst: a wet pop, a splattering spray and bubbles
+      s.tone(o, t, { f: 160, f2: 45, dur: 0.2, gain: 0.38 });
+      s.noiseHit(o, t, { dur: 0.25, f: 1100, f2: 300, q: 2, gain: 0.24 });
+      s.noiseHit(o, t + 0.02, { dur: 0.35, type: 'highpass', f: 3500, gain: 0.06, attack: 0.02 });
+      for (let k = 0; k < 3; k++) s.click('bloop', o, t + 0.06 + k * 0.08, 0.6);
+      return 0.45;
+    case 'cast_holy':
+      // a choir swell on the root and fifth of the song's key, a bell above and a breath of light
+      s.choirNote(o, t, mtof(key + 12), 0.6, 0.035);
+      s.choirNote(o, t, mtof(key + 19), 0.6, 0.025);
+      s.bell(o, t + 0.05, mtof(key + 24), 0.6, 0.05, 1.2);
+      s.noiseHit(o, t, { dur: 0.5, type: 'highpass', f: 6000, gain: 0.03, attack: 0.2 });
+      return 0.7;
+    case 'smite':
+      // holy strike: a thump, a crack of judgement and two bells in key ringing out
+      s.tone(o, t, { f: 120, f2: 45, dur: 0.25, gain: 0.44 });
+      s.crunchHit(o, t, { dur: 0.08, type: 'lowpass', f: 2200, gain: 0.2, drive: 4 });
+      s.bell(o, t + 0.01, mtof(key + 24), 1.0, 0.1, 1.3);
+      s.bell(o, t + 0.03, mtof(key + 31), 0.8, 0.05, 1.3);
+      s.noiseHit(o, t + 0.02, { dur: 0.4, type: 'highpass', f: 5000, gain: 0.05, attack: 0.02 });
+      return 1.0;
+    case 'cast_astral':
+      // starlight: an ascending pentatonic glitter, a soft rising tone and shimmer
+      [0, 7, 12, 19].forEach((d, k) => s.bell(o, t + k * 0.03, mtof(key + 24 + d), 0.4, 0.03, 1.5));
+      s.tone(o, t, { type: 'triangle', f: 400, f2: 1200, dur: 0.25, gain: 0.04, attack: 0.03 });
+      s.noiseHit(o, t, { dur: 0.3, type: 'highpass', f: 5000, gain: 0.04, attack: 0.1 });
+      return 0.5;
+    case 'bow_shot':
+      // a taut twang, the string's thrum and the arrow's whistle
+      s.pluck(o, t, 180 + r() * 20, 0.25, 0.12);
+      s.tone(o, t, { type: 'triangle', f: 110, dur: 0.12, gain: 0.08 });
+      return s.noiseHit(o, t + 0.01, { dur: 0.18, f: 3000, f2: 1800, q: 6, gain: 0.05, attack: 0.02 });
+    case 'gun_shot':
+      // repeater: a mechanical clack, a compressed pop and a puff of steam
+      s.noiseHit(o, t, { dur: 0.012, f: 2500, q: 3, gain: 0.15, attack: 0.001 });
+      s.tone(o, t, { f: 300, f2: 90, dur: 0.05, gain: 0.2 });
+      return s.noiseHit(o, t + 0.005, { dur: 0.06, type: 'lowpass', f: 1500, gain: 0.1 });
+    case 'throw_whoosh':
+      // a spinning throw: two overlapping whooshes
+      s.noiseHit(o, t, { dur: 0.25, f: 500, f2: 1800, q: 2, gain: 0.15, attack: 0.08 });
+      return 0.08 + s.noiseHit(o, t + 0.08, { dur: 0.22, f: 600, f2: 2000, q: 2, gain: 0.1, attack: 0.07 });
+    case 'slam_heavy':
+      // ground slam (lighter than a signature): a thud, a crunch, a rumble and debris
+      s.tone(o, t, { f: 90, f2: 36, dur: 0.4, gain: 0.48 });
+      s.crunchHit(o, t, { dur: 0.1, f: 1200, q: 0.8, gain: 0.22 });
+      s.noiseHit(o, t, { dur: 0.4, type: 'lowpass', f: 800, f2: 120, gain: 0.28, brown: true });
+      for (let k = 0; k < 4; k++) s.click('bone', o, t + 0.05 + r() * 0.25, 0.4 + r() * 0.3);
+      return 0.5;
+    case 'blade_flurry':
+      // three quick slashes and a glint
+      for (let k = 0; k < 3; k++) s.noiseHit(o, t + k * 0.055, { dur: 0.06, f: 900, f2: 4000, q: 2, gain: 0.12, attack: 0.01 });
+      return 0.11 + s.tone(o, t + 0.11, { f: 3000, dur: 0.12, gain: 0.03, attack: 0.002 });
+    case 'shield_bash':
+      // a metal clang over a heavy thump
+      s.tone(o, t, { f: 110, f2: 45, dur: 0.15, gain: 0.44 });
+      s.crunchHit(o, t, { dur: 0.05, f: 1600, gain: 0.18 });
+      s.bell(o, t, 380, 0.35, 0.12, 1.2);
+      return s.bell(o, t + 0.005, 570, 0.25, 0.06, 1.2);
+    case 'summon_rise':
+      // a spirit rising: a swelling whoosh, a whisper and a climbing tone
+      s.noiseHit(o, t, { dur: 0.5, f: 200, f2: 2000, q: 2, gain: 0.12, attack: 0.35 });
+      s.whisper(o, t + 0.05, 0.5, 0.04);
+      return s.tone(o, t, { type: 'triangle', f: 110, f2: 330, dur: 0.5, gain: 0.06, attack: 0.2, glide: 0.45 });
+    case 'beast_howl':
+      // a wolf's howl: a rising, wavering tone through a formant
+      s.tone(o, t, { type: 'sawtooth', f: 330, f2: 640, dur: 0.55, gain: 0.05, filter: 1600, q: 3, attack: 0.06, glide: 0.25 });
+      s.tone(o, t, { type: 'triangle', f: 336, f2: 650, dur: 0.55, gain: 0.04, attack: 0.08, glide: 0.3, detune: 12 });
+      return s.noiseHit(o, t, { dur: 0.5, f: 900, q: 4, gain: 0.03, attack: 0.1 });
+    case 'beast_roar':
+      // a short growl: a rough saw through a low formant over a sub
+      s.tone(o, t, { type: 'sawtooth', f: 90, f2: 70, dur: 0.5, gain: 0.12, filter: 700, q: 4, attack: 0.03 });
+      s.noiseHit(o, t, { dur: 0.45, f: 400, f2: 250, q: 1, gain: 0.14, attack: 0.04 });
+      return s.tone(o, t, { f: 50, f2: 35, dur: 0.5, gain: 0.24 });
+    case 'mech_deploy':
+      // a clank, a servo whirr and the lock clicking home
+      s.crunchHit(o, t, { dur: 0.03, f: 2000, q: 3, gain: 0.2, drive: 4 });
+      s.bell(o, t, 900, 0.2, 0.04, 1.4);
+      s.tone(o, t + 0.05, { type: 'square', f: 300, f2: 600, dur: 0.25, gain: 0.03, filter: 1500, glide: 0.2 });
+      return 0.28 + s.crunchHit(o, t + 0.28, { dur: 0.03, f: 2400, q: 3, gain: 0.16, drive: 4 });
+    case 'steam_vent':
+      // a burst of steam: a falling hiss, a thin whistle and a low chug
+      s.noiseHit(o, t, { dur: 0.6, type: 'highpass', f: 2500, f2: 1200, gain: 0.14, attack: 0.01 });
+      s.tone(o, t, { f: 1800, f2: 1600, dur: 0.4, gain: 0.02, attack: 0.02 });
+      s.tone(o, t, { f: 70, dur: 0.2, gain: 0.14 });
+      return 0.65;
+    case 'trap_snap':
+      // steel jaws: a hard snap, a ring and a spring twang
+      s.crunchHit(o, t, { dur: 0.03, type: 'highpass', f: 2500, gain: 0.28, drive: 6 });
+      s.bell(o, t, 1200, 0.15, 0.05, 1.6);
+      s.tone(o, t, { f: 160, f2: 60, dur: 0.08, gain: 0.24 });
+      s.pluck(o, t + 0.01, 420, 0.2, 0.05);
+      return 0.3;
+    case 'blink':
+      // a short teleport zip: down out of sight, up into place
+      s.tone(o, t, { type: 'triangle', f: 1400, f2: 300, dur: 0.16, gain: 0.08 });
+      s.noiseHit(o, t, { dur: 0.12, type: 'highpass', f: 3000, f2: 7000, gain: 0.05, attack: 0.01 });
+      return 0.12 + s.tone(o, t + 0.12, { type: 'triangle', f: 300, f2: 1400, dur: 0.1, gain: 0.04 });
     default:
       return 0.1;
   }

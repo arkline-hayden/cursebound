@@ -6,7 +6,7 @@ import { AFFIXES, AFFIX_RULES } from './affixes';
 import { LEGENDARIES, LOOT_RULES } from './legendaries';
 import { CONSUMABLES, MAX_BLESSINGS, TRAINING_THEME } from './consumables';
 import { canonicalJson, sha256Hex } from './hash';
-import { AFFLICTION_RULES, CONTENT_VERSION, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION } from './rules';
+import { AFFLICTION_RULES, CONTENT_VERSION, KNOCKBACK_RULES, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION } from './rules';
 import { STATS } from './stats';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { ALTAR_PACTS, COIN_RULES, MERCHANT_WARES, RELIC_AMPLIFY, ROOM_EVENT_RULES, SHRINES, SHRINE_TUNING } from './roomEvents';
@@ -52,6 +52,8 @@ export const CONTENT_MANIFEST = {
   themePacks: THEME_PACKS,
   dungeon: { layouts: DUNGEON_LAYOUTS, roomKinds: ROOM_KINDS, themeRooms: THEME_ROOM_WEIGHTS, arenas: ARENA_DESIGNS, bossArenas: BOSS_ARENAS },
   afflictionRules: AFFLICTION_RULES,
+  // impact knockback (heavy hits, slams, blasts, crits): per damage type / per skill pushes and elite factors
+  knockbackRules: KNOCKBACK_RULES,
   legendaries: LEGENDARIES,
   lootRules: LOOT_RULES,
   // legendary consumables (Fate's Blessing) and the training grounds
