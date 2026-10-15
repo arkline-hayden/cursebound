@@ -255,13 +255,13 @@ describe('afflictions', () => {
     run(s, 12);
     expect(hasStatus(s, p, 'silenced')).toBe(true);
     const sig = p.skills[p.skills.length - 1].skillId;
-    p.resource = 999;
+   
     const ev = run(s, 45, (i) => inp(800 + i, 0, 0, ACTION.ATTACK | ACTION.SIGNATURE));
     expect(ev.some((e) => e.t === 'cast' && e.skill === sig)).toBe(false);
     expect(ev.some((e) => e.t === 'cast' && e.slot === 0)).toBe(true);
     run(s, T(AR.silenceSec));
     expect(hasStatus(s, p, 'silenced')).toBe(false);
-    p.resource = 999;
+   
     const ev2 = run(s, 4, (i) => inp(900 + i, 0, 0, ACTION.SIGNATURE));
     expect(ev2.some((e) => e.t === 'cast' && e.skill === sig)).toBe(true);
   });

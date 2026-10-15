@@ -9,7 +9,7 @@ const T = 'templar';
 describe('templar content', () => {
   it('three deep branches with evolution choices and keystone pairs', () => {
     const cls = CLASS_BY_ID[T];
-    expect(cls.resource.name).toBe('Zeal');
+    expect('resource' in cls).toBe(false);
     for (const b of cls.branches) {
       const bn = NODES.filter((n) => n.classId === T && n.branch === b.id);
       expect(bn.length).toBeGreaterThanOrEqual(11);
@@ -24,16 +24,15 @@ describe('templar content', () => {
 });
 
 describe('templar kit', () => {
-  it('hammer swings grant Zeal and every third swing releases a radiant shockwave', () => {
+  it('every third hammer swing releases a radiant shockwave', () => {
     const s = arena([T]);
     const e = spawn(s, 11.5, 10, { hp: 1e7 });
-    s.players[0].resource = 0;
+   
     const ev = run(s, 150, () => [inp(BTN.ATTACK, 1, 0)]);
     const swings = casts(ev, 't_hammer').length;
     expect(swings).toBeGreaterThanOrEqual(3);
     expect(casts(ev, 't_shockwave').length).toBe(Math.floor(swings / 3));
     expect(hpLeft(e).lt(Big.from(1e7))).toBe(true);
-    expect(s.players[0].resource).toBeGreaterThan(20);
   });
 
   it('Judgment Day pulls, damages and stuns, then consecrates the ground', () => {

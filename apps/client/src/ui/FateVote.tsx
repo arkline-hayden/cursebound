@@ -165,7 +165,7 @@ export function ForecastDetail({ c }: { c: CardForecast }) {
               <li>Attack frequency: <Delta v={p.attackFreq} /> /s · critical chance {pct(p.critChance.before)} → <b>{pct(p.critChance.after)}</b></li>
               <li>Armor: <Delta v={p.armor} /> · healing factor <Delta v={p.healing} /></li>
               <li>Movement speed: <Delta v={p.moveSpeed} /> · signature cooldown <Delta v={p.cooldownSec} kind="sec" invert /></li>
-              <li>Resource regeneration: <Delta v={p.resourceRegen} /> /s</li>
+              <li>Cooldown recovery: ×<Delta v={p.recoveryRate} /></li>
               <li>Survival without healing: <Delta v={p.survivalSec} kind="sec" /></li>
               <li>{p.measuredDps ? <>Measured DPS (last {p.measuredDps.sampleSec}s): {fmt(p.measuredDps.value)}{p.estimatedDps && <> → est. <b>{fmt(p.estimatedDps.after)}</b></>}</> : <>Insufficient combat sample — static model only.</>}</li>
             </ul>

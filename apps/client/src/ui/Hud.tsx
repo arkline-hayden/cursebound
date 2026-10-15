@@ -6,17 +6,16 @@ import { netStore, type GameConnection } from '@/lib/net';
 import { settingsStore, keyCap, keyLabel, type Action } from '@/lib/settings';
 import { padGlyph, padStore } from '@/lib/gamepad';
 import { useStore } from '@/lib/store';
-import { score, whole, wholeNum } from '@/lib/format';
+import { score, whole } from '@/lib/format';
 import { NodeIcon, CardIcon } from './icons';
 import { ActorPortrait, actorFor } from './ClassPortrait';
 import { Orb } from './Orb';
-import { orbLabelColor, orbPalette } from './orbArt';
 import { GearBar } from './GearBar';
 import { SpectateBar } from './Spectate';
 import { StatusIcon, sortStatuses, statusDef } from './icons/statusIcons';
 import { useCinematic } from './cinematic';
 
-// COMBAT HUD (PRD §16.1), Diablo-style: health and resource orbs in the bottom corners, a carved stone action bar
+// COMBAT HUD (PRD §16.1), Diablo-style: the health orb in the bottom corner (skills are purely cooldown-gated: no resource orb), a carved stone action bar
 // with skill sockets, cooldowns and key labels between them, the round medallion with wave/time wings and the boss
 // bar top-centre, gothic party portraits top-left, score and Fate Ledger top-right. Orbs animate in their own
 // canvas loop; this component only re-renders at the throttled snapshot rate. Text status summary for assistive tech.
@@ -125,8 +124,6 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
   const dodgeReady = dc > 0;
   const buffs = (me.buffs ?? []).filter((b, i, a) => a.indexOf(b) === i);
   const cls = CLASS_BY_ID[me.c];
-  const resName = cls?.resource.name ?? 'Resource';
-  const resPal = orbPalette(me.c, cls?.accent);
   const enc = snap.enc;
   const boss = enc?.boss && enc.bossId ? BOSS_BY_ID[enc.bossId] : null;
   const slotKeys = [keys.skill1[0], keys.skill2[0], keys.skill3[0], keys.signature[0]];
@@ -218,7 +215,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
         <button className="btn small" onClick={onPause}>Menu <span className="kbd">{cap('pause', 'Escape')}</span></button>
       </div>
 
-      {/* bottom: life orb, action bar, resource orb */}
+      {/* bottom: life orb, action bar */}
       <div className="hud-orb left" aria-hidden="true">
         <div className="orb-plaque">
           <span className="oname">Life{me.sh > 0 && <span className="osh"> +{whole(me.shT)}</span>}</span>
@@ -226,13 +223,6 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
         </div>
         <Orb kind="life" value={me.hp} shield={me.sh} />
         <StatusChips buffs={buffs} />
-      </div>
-      <div className="hud-orb right" aria-hidden="true">
-        <div className="orb-plaque">
-          <span className="oname" style={{ color: orbLabelColor(resPal) }}>{resName}</span>
-          <span className="oval">{wholeNum(me.res)} / {wholeNum(me.resMax)}</span>
-        </div>
-        <Orb kind={me.c} accent={cls?.accent} value={me.res / Math.max(1, me.resMax)} />
       </div>
 
       <div className="hud-center" aria-hidden="true">
@@ -243,10 +233,10 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
         <GearBar />
         <div className="actionbar">
           {me.cd.map(([id, frac, ch, max], i) => {
-            const cost = id ? SKILL_BY_ID[id]?.resourceCost ?? 0 : 0;
-            const ready = !!id && frac === 0 && ch > 0 && me.res >= cost;
+            const ready = !!id && frac === 0 && ch > 0;
             const sig = i === 3;
-            const tip = id ? `${SKILL_BY_ID[id]?.name ?? id}${cost ? ` · ${cost} ${resName}` : ''}` : 'Empty — unlock in your skill tree';
+            const cd = id ? SKILL_BY_ID[id]?.cooldownSec ?? 0 : 0;
+            const tip = id ? `${SKILL_BY_ID[id]?.name ?? id}${cd ? ` · ${cd}s cooldown` : ''}` : 'Empty — unlock in your skill tree';
             return (
               <div key={i} className={`slot ${sig ? 'sig' : ''} ${!id ? 'empty' : ready ? 'ready' : ''}`} data-tip={tip}>
                 {id && <NodeIcon nodeId={id} size={32} />}

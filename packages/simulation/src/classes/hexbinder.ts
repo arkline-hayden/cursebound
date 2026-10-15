@@ -3,7 +3,7 @@ import { SKILL_BY_ID } from '@cursebound/content';
 import { addDot, healPlayer, hitEnemy, mitigationFactor } from '../combat';
 import { registerClassHooks, registerGlobalHooks, type SimHooks } from '../hooks';
 import { inLine, moveCircle, norm, rayDistance } from '../geometry';
-import { areaCoverage, knockback, makeHazard, spawnPlayerProjectiles } from '../players';
+import { areaCoverage, cutCooldowns, knockback, makeHazard, spawnPlayerProjectiles } from '../players';
 import { B, ONE, hitDamage, playerDerived, toFloatClamped, treeFactor } from '../stats';
 import type { EnemyState, Hazard, PlayerState, SimEvent, SimState } from '../types';
 import {
@@ -33,6 +33,9 @@ const WRAITH_KINDS: Record<string, { skill: string; speed: number; reach: number
   hx_lesser: { skill: 'h_lesser_wraith', speed: 6, reach: 1.0, interval: 36, dur: 4, max: 4 },
 };
 const SOUL_MAX = 6;
+/** Blood Price: every cast costs `hp` of max health and cooldowns are x`cd` while paying leaves the hero above `floor`. */
+const BLOOD_PRICE = { hp: 0.03, cd: 0.7, floor: 0.35 } as const;
+const bloodPriceActive = (p: PlayerState) => has(p, 'h_blood_price') && p.hp.ratio(p.maxHp) - BLOOD_PRICE.hp > BLOOD_PRICE.floor;
 
 // ---------------- damage, rot and healing ----------------
 
@@ -113,8 +116,11 @@ function hxHeal(state: SimState, ev: SimEvent[], p: PlayerState, amount: Big) {
   if (has(p, 'h_blood_ward') && eff.gt(missing)) shieldSoft(state, ev, p, eff.sub(missing));
 }
 
-function gainBlood(state: SimState, p: PlayerState, n: number) {
-  p.resource = Math.min(playerDerived(state, p).resourceMax, p.resource + n);
+/** Blood (no resource): cut `sec` from the remaining cooldown of one skill (`skillId`) or of every recharging skill. */
+function gainBlood(p: PlayerState, sec: number, skillId?: string) {
+  if (!skillId) { cutCooldowns(p, sec); return; }
+  const s = p.skills.find((x) => x.skillId === skillId);
+  if (s && s.charges < s.maxCharges) s.cooldown -= sec;
 }
 
 function spawnSpirit(state: SimState, p: PlayerState, x: number, y: number, dx: number, dy: number, mult: string) {
@@ -435,25 +441,16 @@ const hexHooks: SimHooks = {
 
   hazardTick: stepHazard,
 
-  costFactor(state, p, skillId) {
-    p.vars.hx_debt = 0;
-    if (!has(p, 'h_blood_price')) return 1;
-    const base = SKILL_BY_ID[skillId]?.resourceCost ?? 0;
-    if (base <= 0 || p.resource >= base) return 1;
-    const missing = base - Math.max(0, p.resource);
-    if (p.hp.ratio(p.maxHp) - missing * 0.01 <= 0.35) return 1;
-    p.vars.hx_debt = missing;
-    return Math.max(0, p.resource) / base;
+  // Blood Price: while the hero can pay (above BLOOD_PRICE.floor after paying), cooldowns run shorter; onCast pays
+  cooldownFactor(state, p) {
+    return bloodPriceActive(p) ? BLOOD_PRICE.cd : 1;
   },
 
-  onCast(state, ev, p) {
-    const debt = p.vars.hx_debt ?? 0;
-    if (debt > 0) {
-      p.vars.hx_debt = 0;
-      const room = p.hp.sub(p.maxHp.mul(B('0.35')));
-      const amt = Big.min(p.maxHp.mul(coef(debt * 0.01)), room);
-      if (!amt.isZero()) { p.hp = p.hp.sub(amt); castEv(ev, p, 'h_blood_price', p.x, p.y, p.aimX, p.aimY); }
-      if (p.resource < 0) p.resource = 0;
+  onCast(state, ev, p, skillId) {
+    if (bloodPriceActive(p) && SKILL_BY_ID[skillId]?.cooldownSec > 0) {
+      const room = p.hp.sub(p.maxHp.mul(coef(BLOOD_PRICE.floor)));
+      const amt = Big.min(p.maxHp.mul(coef(BLOOD_PRICE.hp)), room);
+      if (!amt.isZero() && amt.gt(Big.ZERO)) { p.hp = p.hp.sub(amt); castEv(ev, p, 'h_blood_price', p.x, p.y, p.aimX, p.aimY); }
     }
     if (has(p, 'h_blood_sacrament')) {
       const floor = p.maxHp.mul(B('0.3'));
@@ -488,7 +485,7 @@ const hexHooks: SimHooks = {
     }
     if (BLOOD.has(info.skillId ?? '')) {
       if (has(p, 'h_crimson_covenant')) shieldSoft(state, ev, p, info.dealt.mul(B('0.4')));
-      if (info.skillId === 'h_sanguine_lance' && gen0) { hxHeal(state, ev, p, p.maxHp.mul(B('0.02'))); gainBlood(state, p, 3); }
+      if (info.skillId === 'h_sanguine_lance' && gen0) { hxHeal(state, ev, p, p.maxHp.mul(B('0.02'))); gainBlood(p, 0.25, 'h_sanguine_lance'); }
       if (info.kill && gen0 && has(p, 'h_exsanguinate')) {
         hitArea(state, ev, e.x, e.y, 2, coefDmg(state, p, '1.2', 'h_exsanguinate'), { dtype: 'decay', srcSlot: p.slot, skillId: 'h_exsanguinate', allowCrit: false, generation: 1 }, [e.id]);
         hxHeal(state, ev, p, p.maxHp.mul(B('0.03')));
@@ -501,7 +498,7 @@ const hexHooks: SimHooks = {
   onKill(state, ev, e, p) {
     if (!p || p.classId !== CID) return;
     const harvest = rank(p, 'h_soul_harvest');
-    if (harvest > 0) { gainBlood(state, p, 2 * harvest); addSoul(state, p, e.x, e.y); }
+    if (harvest > 0) { gainBlood(p, 0.15 * harvest); addSoul(state, p, e.x, e.y); }
     if (has(p, 'h_legion_of_the_damned') && state.map) summon(state, ev, p, 'hx_lesser', e.x, e.y, coefDmg(state, p, '0.4', 'h_lesser_wraith'));
   },
 
@@ -513,17 +510,16 @@ const hexHooks: SimHooks = {
       else if (pr.kind === 'hx_seed') steerProjectile(state, pr, 6, 0.12);
     }
     if (has(p, 'h_crimson_frenzy') && p.hp.ratio(p.maxHp) < 0.5) {
-      const pd = playerDerived(state, p);
-      p.resource = Math.min(pd.resourceMax, p.resource + toFloatClamped(pd.resourceRegen, 1e9) * DT * 0.5);
+      // cooldowns recover 25% faster while bloodied (on top of the core's recovery-rate tick)
+      gainBlood(p, toFloatClamped(playerDerived(state, p).recovery, 1e9) * DT * 0.25);
     }
     if (has(p, 'h_black_death') && (state.tick + p.slot * 7) % 60 === 0) blackDeath(state, ev, p);
-    p.vars.hx_debt = 0;
   },
 
   onRoundStart(state) {
     for (const p of state.players) {
       if (p.classId !== CID) continue;
-      p.vars.hx_debt = 0; p.vars.hx_lust = 0; p.vars.hx_lustUntil = 0; p.vars.hx_volley = 0;
+      p.vars.hx_lust = 0; p.vars.hx_lustUntil = 0; p.vars.hx_volley = 0;
     }
   },
 };

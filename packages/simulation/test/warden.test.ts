@@ -16,7 +16,7 @@ const THORNS8 = ['w_thornburst', 'w_barbed', 'w_barbed', 'w_barbed', 'w_virulenc
 
 const hz = (s: SimState, kind: string) => s.hazards.filter((h) => h.kind === kind && h.untilTick > s.tick);
 const wolves = (s: SimState) => hz(s, 'w_wolf');
-const ready = (a: Arena, slot: number) => { const k = a.s.players[0].skills[slot]; k.charges = k.maxCharges; k.cooldown = 0; a.s.players[0].resource = 100; };
+const ready = (a: Arena, slot: number) => { const k = a.s.players[0].skills[slot]; k.charges = k.maxCharges; k.cooldown = 0; };
 const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
 
 describe('warden: content', () => {
@@ -39,10 +39,8 @@ describe('warden: content', () => {
     expect(actives).toHaveLength(9);
     for (const id of [...actives, cls.signatureSkill]) {
       const s = SKILL_BY_ID[id];
-      expect(s.cooldownSec).toBeGreaterThanOrEqual(3);
-      expect(s.cooldownSec).toBeLessThanOrEqual(14);
-      expect(s.resourceCost).toBeGreaterThanOrEqual(10);
-      expect(s.resourceCost).toBeLessThanOrEqual(35);
+      expect(s.cooldownSec).toBeGreaterThanOrEqual(2);     // cooldown-only skills (x0.7 since content 1.2)
+      expect(s.cooldownSec).toBeLessThanOrEqual(10);
     }
     expect(cls.base.damage).toBeGreaterThanOrEqual(75);
     expect(cls.base.damage).toBeLessThanOrEqual(105);

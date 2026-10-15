@@ -518,7 +518,7 @@ export function SkillTree({ net }: { net: GameConnection }) {
       <h4 id="mastery-h" className="engraved">Mastery · tree complete</h4>
       <p className="muted">Each choice compounds independently (×1.05). Mastery is not a Fate Card.</p>
       <div className="td-mastery-row">{MASTERY_CHOICES.map((m) => {
-        const k = m.id.replace('mastery_', '') as 'damage' | 'health' | 'regen';
+        const k = m.id.replace('mastery_', '') as 'damage' | 'health' | 'recovery';
         return <button key={m.id} className="btn small" onClick={() => net.mastery(k)}><NodeIcon nodeId={m.id} size={16} /> {m.name} · {me.mastery[k]}</button>;
       })}</div>
     </section>

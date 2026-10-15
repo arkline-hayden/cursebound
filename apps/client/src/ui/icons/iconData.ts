@@ -45,7 +45,7 @@ export const NODE_BRANCHES = {
   dodge: ['dodge'],
   mDamage: ['mastery_damage'],
   mHealth: ['mastery_health'],
-  mRegen: ['mastery_regen'],
+  mRegen: ['mastery_recovery'],
 } as const;
 
 export const NODE_IDS: readonly string[] = Object.values(NODE_BRANCHES).flat();

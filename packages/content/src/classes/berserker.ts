@@ -2,10 +2,9 @@ import type { ClassDef, NodeDef, SkillDef } from '../types';
 import { MELEE_PASSIVES, node } from './common';
 
 // Berserker: rage-fuelled dual-axe brute. Kit-wide rules (implemented in simulation/src/classes/berserker.ts):
-//  - Fury (0..100) does not regenerate. +5 per basic swing that connects, +1 per enemy struck by an active skill
-//    (at most +2 per tick), +1 per 1% of maximum health lost. After 3s without dealing or taking damage it decays
-//    at 10 per second. Every Fury gain scales with Fury generation and Player resource regeneration factors.
-//    Fury starts each round at 0.
+//  - Rage (there is no resource bar): every basic swing that connects cuts 0.1s from your active skill cooldowns,
+//    every enemy struck by an active skill 0.03s (at most 2 per tick), and every 1% of maximum health lost 0.02s.
+//    The Avatar of Carnage keeps its own cooldown.
 //  - Frenzy: every basic swing that connects grants a stack (max 5, all expire 3s after the last gain). Each stack
 //    multiplies attack frequency by x1.05. Exposed to the HUD as vars.ui_frenzy / ui_frenzyMax.
 // Branch skill families (evolutions replace the base active in its slot and inherit its tree damage modifiers):
@@ -17,11 +16,11 @@ const n = (id: string, branch: string, name: string, rankLimit: number, tier: No
 export const SKILLS: SkillDef[] = [
   { id: 'b_chop', classId: 'berserker', name: 'Twin Chop', slot: 'basic', damageType: 'physical', damageCoef: '1.1', cooldownSec: 0, charges: 1,
     shape: { kind: 'arc', range: 2.0, arcDeg: 120 },
-    description: `Both axes chop in a 120° arc (2 units): two strikes of 0.55x physical each. Connecting swings grant 5 Fury and a Frenzy stack. ${MELEE_PASSIVES}`,
+    description: `Both axes chop in a 120° arc (2 units): two strikes of 0.55x physical each. Rage: connecting swings cut 0.1s from your active cooldowns and grant a Frenzy stack. ${MELEE_PASSIVES}`,
     compressionSupport: true, icon: 'node:b_chop' },
   { id: 'b_avatar', classId: 'berserker', name: 'Avatar of Carnage', slot: 'signature', damageType: 'physical', damageCoef: '2', cooldownSec: 10, charges: 1,
     shape: { kind: 'circle', radius: 3, selfCentered: true, range: 0 }, knockback: 1.5,
-    description: 'Consume all your Fury (at least 35): a roar deals 2x physical within 3 units and hurls enemies back (bosses take 120 stagger), then you become the Avatar for 4s + 0.04s per Fury consumed (8s at 100, up to 10s). The Avatar is huge: x1.4 damage, x0.8 damage taken, Twin Chop reaches x1.35 further, every swing also whirls for 0.6x physical within 2.4 units, and Fury and Frenzy never decay.',
+    description: 'A roar deals 2x physical within 3 units and hurls enemies back (bosses take 120 stagger), then you become the Avatar for 5s; each kill while it lasts adds 0.25s (up to 7s). The Avatar is huge: x1.4 damage, x0.8 damage taken, Twin Chop reaches x1.35 further, every swing also whirls for 0.6x physical within 2.4 units, and Frenzy never decays.',
     compressionSupport: true, icon: 'node:b_avatar' },
   // ---- Fury ----
   { id: 'b_bloodlust', classId: 'berserker', name: 'Bloodlust', slot: 'active', damageType: 'physical', damageCoef: '0', cooldownSec: 7, charges: 1,
@@ -56,7 +55,7 @@ export const SKILLS: SkillDef[] = [
     compressionSupport: true, icon: 'node:b_leap' },
   { id: 'b_shout', classId: 'berserker', name: 'Intimidating Shout', slot: 'active', damageType: 'physical', damageCoef: '0', cooldownSec: 7, charges: 1,
     shape: { kind: 'aura', radius: 5, duration: 6 }, knockback: 1,
-    description: 'A terrifying roar (radius 5): enemies are knocked back 1 unit, flee in fear for 2s and are Weakened for 6s (x1.2 damage taken; bosses take 80 stagger and the Weaken). You and allies within 5 units gain Battle Cry for 6s: attack frequency x1.2. Gain 15 Fury.',
+    description: 'A terrifying roar (radius 5): enemies are knocked back 1 unit, flee in fear for 2s and are Weakened for 6s (x1.2 damage taken; bosses take 80 stagger and the Weaken). You and allies within 5 units gain Battle Cry for 6s: attack frequency x1.2. Cuts 0.5s from your active cooldowns.',
     compressionSupport: true, icon: 'node:b_shout' },
   { id: 'b_cataclysm', classId: 'berserker', name: 'Cataclysm', slot: 'active', damageType: 'physical', damageCoef: '1.1', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'circle', radius: 5, selfCentered: false, range: 7 }, knockback: 0.6,
@@ -76,7 +75,7 @@ export const NODES: NodeDef[] = [
   n('b_unchained', 'fury', 'Unchained', 1, 2, { prereqs: [{ node: 'b_bloodlust', rank: 1 }], excludes: ['b_bloodbath'], grantsSkill: 'b_unchained', description: 'Enters a 7s Bloodlust with double Frenzy cap and a third chop; you take ×1.2 damage.' }),
   n('b_undying', 'fury', 'Undying Rage', 1, 3, { mechanics: ['undying'], description: 'Saves you from a lethal hit every 45s: 4s unkillable with ×1.3 damage.' }),
   n('b_death_wish', 'fury', 'Death Wish', 2, 3, { mechanics: ['death_wish'], description: 'Adds up to +30% damage per rank, scaling with your missing health.' }),
-  n('b_deathless', 'fury', 'Deathless', 1, 4, { prereqs: [{ node: 'b_bloodlust', rank: 1 }], excludes: ['b_blood_god'], mechanics: ['deathless'], description: 'Keystone: whenever a hit would down you while you hold 50 Fury, it instead consumes 50 Fury and leaves you at 1 health, invulnerable for 1s.' }),
+  n('b_deathless', 'fury', 'Deathless', 1, 4, { prereqs: [{ node: 'b_bloodlust', rank: 1 }], excludes: ['b_blood_god'], mechanics: ['deathless'], description: 'Keystone: a hit that would down you leaves you at 1 health, invulnerable 1s (every 40s).' }),
   n('b_blood_god', 'fury', 'Blood God', 1, 4, { prereqs: [{ node: 'b_bloodlust', rank: 1 }], excludes: ['b_deathless'], mechanics: ['blood_god'], description: 'Raises max Frenzy by 5; each stack gives 1% lifesteal; full stacks make Twin Chop 360°.' }),
 
   // ---- Berserker / Carnage ----
@@ -90,8 +89,8 @@ export const NODES: NodeDef[] = [
   n('b_executioner', 'carnage', 'Executioner\'s Cleave', 1, 2, { prereqs: [{ node: 'b_whirlwind', rank: 1 }], excludes: ['b_bladestorm'], grantsSkill: 'b_executioner', description: 'Lunges into a 3× cleave, ×1.5 on Rended enemies, executing enemies under 15%.' }),
   n('b_widening_gyre', 'carnage', 'Widening Gyre', 2, 3, { modifiers: [{ stat: 'skill.b_whirlwind.radius', factorPerRank: '1.1' }, { stat: 'skill.b_chop.radius', factorPerRank: '1.1' }], description: 'Extends Whirlwind and Twin Chop reach ×1.1 per rank; rank 2 widens Twin Chop to 180°.' }),
   n('b_hemorrhage', 'carnage', 'Hemorrhage', 1, 3, { mechanics: ['hemorrhage'], description: 'Makes your hits deal ×1.25 damage to Rended enemies.' }),
-  n('b_endless_storm', 'carnage', 'Endless Storm', 1, 4, { prereqs: [{ node: 'b_whirlwind', rank: 1 }], excludes: ['b_red_harvest'], mechanics: ['endless_storm'], description: 'Keystone: Whirlwind and Bladestorm keep spinning while you hold their key after the normal duration, draining 12 Fury per second, up to 10s in total.' }),
-  n('b_red_harvest', 'carnage', 'Red Harvest', 1, 4, { prereqs: [{ node: 'b_whirlwind', rank: 1 }], excludes: ['b_endless_storm'], mechanics: ['red_harvest'], description: 'Keystone: enemies that die while bleeding from your Rend burst, dealing 0.5x physical plus 100% of their remaining Rend damage to enemies within 2 units, and grant 3 Fury.' }),
+  n('b_endless_storm', 'carnage', 'Endless Storm', 1, 4, { prereqs: [{ node: 'b_whirlwind', rank: 1 }], excludes: ['b_red_harvest'], mechanics: ['endless_storm'], description: 'Keystone: hold to keep Whirlwind spinning (up to 10s); overtime adds to its cooldown.' }),
+  n('b_red_harvest', 'carnage', 'Red Harvest', 1, 4, { prereqs: [{ node: 'b_whirlwind', rank: 1 }], excludes: ['b_endless_storm'], mechanics: ['red_harvest'], description: 'Keystone: Rended foes burst on death for 0.5× plus their Rend; cuts 0.15s off actives.' }),
 
   // ---- Berserker / Warcry ----
   n('b_leap', 'warcry', 'Earthshatter Leap', 1, 0, { starting: true, grantsSkill: 'b_leap', description: 'Leaps up to 6 units and slams for 2× physical in radius 2.4, hurling enemies back.' }),
@@ -99,23 +98,23 @@ export const NODES: NodeDef[] = [
   n('b_iron_hide', 'warcry', 'Iron Hide', 3, 1, { modifiers: [{ stat: 'player.armor', factorPerRank: '1.12' }], description: 'Raises armor ×{value} per rank.' }),
   n('b_aftershock', 'warcry', 'Aftershock', 2, 1, { prereqs: [{ node: 'b_leap', rank: 1 }], mechanics: ['aftershock'], upgrades: 'b_leap', description: 'Upgrades Earthshatter Leap: an aftershock 0.5s later for 0.8× per rank (radius 3.2).' }),
   n('b_meteor', 'warcry', 'Meteor Leap', 1, 2, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_bounding'], mechanics: ['meteor'], upgrades: 'b_leap', description: 'Upgrades Earthshatter Leap: +3 range and ×1.25 landing radius, but 0.15s more airtime.' }),
-  n('b_bounding', 'warcry', 'Bounding Fury', 1, 2, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_meteor'], mechanics: ['bounding'], description: 'Choice: Earthshatter Leap and Cataclysm hold 2 charges, and a leap within 3s of the previous one costs no Fury.' }),
+  n('b_bounding', 'warcry', 'Bounding Fury', 1, 2, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_meteor'], mechanics: ['bounding'], upgrades: 'b_leap', description: 'Upgrades Earthshatter Leap: 2 charges; a second leap within 3s lands for ×1.3 damage.' }),
   n('b_shout', 'warcry', 'Intimidating Shout', 1, 2, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_cataclysm'], grantsSkill: 'b_shout', description: 'Roars to fear enemies within 5 units, who take ×1.2 damage; allies attack ×1.2 faster.' }),
   n('b_cataclysm', 'warcry', 'Cataclysm', 1, 2, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_shout'], grantsSkill: 'b_cataclysm', description: 'Leaps up to 7 units and sends 3 quake rings out, each 1.1× with a 0.4s stun.' }),
-  n('b_blood_brothers', 'warcry', 'Blood Brothers', 1, 3, { mechanics: ['blood_brothers'], description: 'Your Warcry skills heal you and allies within 5 units for 6% maximum health; allies gain 12 resource and you gain 12 Fury.' }),
+  n('b_blood_brothers', 'warcry', 'Blood Brothers', 1, 3, { mechanics: ['blood_brothers'], description: 'Warcry skills heal you and allies within 5 units 6% and cut 0.5s off their cooldowns.' }),
   n('b_concussive', 'warcry', 'Concussive Force', 2, 3, { mechanics: ['concussive'], upgrades: 'b_leap', description: 'Upgrades Earthshatter Leap: enemies knocked into walls take 1× per rank and are stunned.' }),
   n('b_tectonic', 'warcry', 'Tectonic Rage', 1, 4, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_warmonger'], mechanics: ['tectonic'], upgrades: 'b_leap', description: 'Upgrades Earthshatter Leap: opens a 4s fissure that erupts for 0.4× every 0.5s.' }),
-  n('b_warmonger', 'warcry', 'Warmonger', 1, 4, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_tectonic'], mechanics: ['warmonger'], description: 'Keystone: each enemy hit by a Warcry skill cuts 0.4s from its cooldown (up to 4s per cast) and grants 3 Fury (up to 15 per cast).' }),
+  n('b_warmonger', 'warcry', 'Warmonger', 1, 4, { prereqs: [{ node: 'b_leap', rank: 1 }], excludes: ['b_tectonic'], mechanics: ['warmonger'], description: 'Keystone: each Warcry hit cuts 0.4s off it (max 4s) and 0.1s off other actives (max 1s).' }),
 ];
 
 export const CLASS: ClassDef = {
-  id: 'berserker', name: 'Berserker', tagline: 'Two axes, no retreat. Pain becomes Fury, and Fury becomes carnage.',
+  id: 'berserker', name: 'Berserker', tagline: 'Two axes, no retreat. Pain becomes rage, and rage becomes carnage.',
   branches: [
     { id: 'fury', name: 'Fury', theme: 'Frenzy, lifesteal and refusing to die' },
     { id: 'carnage', name: 'Carnage', theme: 'Whirlwinds, cleaves and bleeding' },
     { id: 'warcry', name: 'Warcry', theme: 'Leaps, quakes and terror' },
   ],
-  accent: '#b3261e', role: 'Melee bruiser · rage',
+  accent: '#b3261e', role: 'Melee bruiser · rage',
   base: { maxHealth: 960, armor: 20, damage: 92, attackFrequency: 2.1, moveSpeed: 4.8, critTendency: '0.3', critMultiplier: '2', shieldCapacity: 0.5 },
   melee: true, basicSkill: 'b_chop', signatureSkill: 'b_avatar',
   nodes: NODES.map((x) => x.id),

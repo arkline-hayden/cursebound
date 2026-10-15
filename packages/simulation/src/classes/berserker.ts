@@ -3,24 +3,26 @@ import { SKILL_BY_ID } from '@cursebound/content';
 import { addStagger, cohortHpFrac, healPlayer, hitEnemy, killEnemy } from '../combat';
 import { inCone, moveCircle, norm } from '../geometry';
 import { registerClassHooks } from '../hooks';
-import { areaCoverage, cosHalf, flinch, livingEnemies, newProjectileId } from '../players';
+import { areaCoverage, cosHalf, cutCooldowns, flinch, livingEnemies, newProjectileId } from '../players';
 import { B, ONE } from '../stats';
 import type { EnemyState, Hazard, PlayerState, Projectile, SimEvent, SimState } from '../types';
 import {
-  DT, addHazard, buffActive, castEv, costOf, endHazard, enemiesIn, enemyById, findHazard, followAttachment, gainResource, has, hitCircle,
+  DT, addHazard, buffActive, castEv, endHazard, enemiesIn, enemyById, findHazard, followAttachment, has, hitCircle,
   hitOne, isLive, kitGlobal, registerTargetScale, landingPoint, moving, pull, radiusOf, rank, refundCooldown, registerFamily, registerTempDamage, setBuff, shove,
   skillDmg, slotBit, slotOf, startDash, startLeap, statFactor, stepMove, stun, subDmg, ticks, vuln,
 } from './tbkit';
 
 // Berserker kit (content: packages/content/src/classes/berserker.ts). Deterministic: state and inputs only. p.vars:
-//   b_last                 last tick the Berserker dealt or took damage (Fury decays 3s after it)
+//   b_last                 last tick the Berserker dealt or took damage
 //   b_frenzy / b_frenzyT   Frenzy stacks and the tick of the last gain (ui_frenzy / ui_frenzyMax mirror them)
-//   b_fhTick / b_fhN       per-tick cap on Fury from active skill hits
+//   b_fhTick / b_fhN       per-tick cap on Rage from active skill hits
 //   b_ls                   lifesteal accumulated this tick (fraction of maximum health, applied once per tick)
 //   b_ww*                  Whirlwind / Bladestorm spin (Until, Kind 1|2, Next pulse, Axe, Start, Slot)
 //   b_blStart              Bloodlust start tick (Battle Trance cap)
 //   b_udReady/b_udEnd/b_udDealt  Undying Rage cooldown, window end, damage dealt during it (fraction of max health)
-//   b_bfUntil              Bounding Fury free-leap window; b_wmCd / b_wmFury Warmonger per-cast budgets
+//   b_bfUntil              Bounding Fury empowered-leap window; b_wmCd / b_wmOther Warmonger per-cast budgets
+//   b_avStart              Avatar start tick (kill extensions cap); b_dlReady Deathless recharge; b_wwExtra Endless Storm overtime
+// Rage (no resource): connecting swings, active-skill hits and health lost cut seconds from every recharging skill.
 //   mv_*                   scripted leap / lunge (tbkit)
 // Buffs: avatar, bloodlust, unchained, undying, battle_cry (any class: attack frequency x1.2).
 // Hazards: b_avatar, b_whirl, b_frenzy, b_undying (attached to the Berserker), b_fear (attached to an enemy, dx/dy =
@@ -28,35 +30,36 @@ import {
 // Cosmetic cast events: b_chop_spin, b_avatar_whirl, b_whirl_tick (dx = radius, dy = kind), b_leap_land / b_cataclysm_land
 // (dx = radius), b_quake_ring (dx = radius, dy = ring), b_aftershock, b_execute_cleave, b_execute, b_wall_slam, b_flay_burst,
 // b_harvest, b_undying, b_deathless. b_leap / b_cataclysm carry the landing point in dx/dy; b_avatar carries
-// (duration, Fury spent) in dx/dy.
+// (duration, 0) in dx/dy.
 
 const CLS = 'berserker';
 const BR = { fury: 0, carnage: 1, warcry: 2 } as const;
 const TAG = { LEAP: 21, CATA: 22, EXEC: 23 } as const;
 
 const K = {
-  chop: { range: 1.8, arc: 120, wide: 180, strike: '0.5', fury: 5, flinch: 0.18 },
-  fury: { skillHit: 1, capPerTick: 2, perPct: 1, decayAfter: 3, decay: 10 },
+  chop: { range: 1.8, arc: 120, wide: 180, strike: '0.5', flinch: 0.18 },
+  // Rage: seconds cut from every recharging skill (swing that connects, active skill hit (max 2 per tick), per 1% health lost)
+  rage: { swing: 0.1, skillHit: 0.03, capPerTick: 2, perPct: 0.02 },
   frenzy: { base: 5, perRank: 3, god: 5, sec: 3, atk: 1.05 },
-  avatar: { minSec: 4, perFury: 0.04, maxSec: 10, radius: 3, knock: 1.5, stagger: 120, dmg: 1.4, taken: 0.8, whirlR: 2.4, whirlCoef: '0.6', reach: 1.35 },
+  avatar: { sec: 5, perKill: 0.25, maxSec: 7, radius: 3, knock: 1.5, stagger: 120, dmg: 1.4, taken: 0.8, whirlR: 2.4, whirlCoef: '0.6', reach: 1.35 },
   lust: { sec: 6, steal: 6, feastBelow: 0.5, tranceSec: 9, tranceKill: 0.5, tranceMax: 15, frenzy: 3 },
   bath: { radius: 2.8, rend: 0.3, heal: 0.03, healMax: 5 },
   unchained: { sec: 7, taken: 1.2 },
   undying: { cd: 45, sec: 4, dmg: 1.3, heal: 0.4, cap: 0.6 },
-  deathWish: 0.3, deathless: 50,
+  deathWish: 0.3, deathless: { cd: 40, iframes: 1 },
   whirl: { sec: 2.5, every: 0.25, radius: 2.2, pull: 0.15, mPull: 0.45, mR: 1.25, stagger: 6 },
   blade: { sec: 3, every: 0.2, radius: 2.6, axeEvery: 0.5, axeRange: 8, axeCoef: '0.8', axeSpeed: 13 },
   rend: { perRank: 0.08, sec: 4 }, flay: { rend: 0.15, r: 1.6, coef: '0.8' },
   exec: { lunge: 2.5, speed: 16, range: 3.2, arc: 200, rend: '1.5', below: 0.15, stagger: 60 },
-  hemorrhage: '1.25', endless: { drain: 12, max: 10 }, harvest: { r: 2, coef: '0.5', fury: 3 },
+  hemorrhage: '1.25', endless: { max: 10 }, harvest: { r: 2, coef: '0.5', rage: 0.15 },
   leap: { min: 1.5, max: 6, air: 0.45, radius: 2.4, knock: 1.5, stagger: 60 },
-  meteor: { reach: 3, radius: 1.25, air: 0.15 }, bounding: 3,
+  meteor: { reach: 3, radius: 1.25, air: 0.15 }, bounding: { sec: 3, dmg: '1.3' },
   after: { delay: 0.5, radius: 3.2, perRank: 0.8 },
-  shout: { radius: 5, fear: 2, vuln: '1.2', vulnSec: 6, knock: 1.0, stagger: 80, cry: 6, atk: 1.2, fury: 15 },
+  shout: { radius: 5, fear: 2, vuln: '1.2', vulnSec: 6, knock: 1.0, stagger: 80, cry: 6, atk: 1.2, rage: 0.5 },
   cata: { max: 7, air: 0.5, rings: [2.2, 3.6, 5.0], every: 0.25, stun: 0.4, stagger: 40, knock: 0.6 },
-  brothers: { radius: 5, heal: '0.06', resource: 12 }, concussive: { perRank: 1, stun: 1 },
+  brothers: { radius: 5, heal: '0.06', cd: 0.5 }, concussive: { perRank: 1, stun: 1 },
   tectonic: { radius: 2.6, sec: 4, coef: '0.4', vuln: '1.15' },
-  warmonger: { cd: 0.4, cdMax: 4, fury: 3, furyMax: 15 },
+  warmonger: { cd: 0.4, cdMax: 4, other: 0.1, otherMax: 1 },
 };
 
 registerFamily({
@@ -73,9 +76,9 @@ const d2 = (ax: number, ay: number, bx: number, by: number) => (ax - bx) ** 2 + 
 
 // ---------------- Fury & Frenzy ----------------
 
-function gainFury(state: SimState, p: PlayerState, amount: number) {
-  if (amount <= 0) return;
-  gainResource(state, p, amount * statFactor(state, p, 'player.furyGeneration') * statFactor(state, p, 'player.resourceRegen'));
+/** Rage: cut `sec` from every recharging skill (pain and carnage speed the whole hotbar; there is no resource). */
+function rage(p: PlayerState, sec: number) {
+  if (sec > 0 && p.lifeState === 'alive') cutCooldowns(p, sec, p.skills.length - 1);   // actives only: the Avatar keeps its own clock
 }
 
 const markCombat = (state: SimState, p: PlayerState) => { p.vars.b_last = state.tick; };
@@ -146,7 +149,7 @@ function chop(state: SimState, ev: SimEvent[], p: PlayerState, k: Big) {
     }
     castEv(ev, p, 'b_avatar_whirl', p.x, p.y, K.avatar.whirlR, 0);
   }
-  if (hitAny) { gainFury(state, p, K.chop.fury); addFrenzy(state, p, 1); markCombat(state, p); }
+  if (hitAny) { rage(p, K.rage.swing); addFrenzy(state, p, 1); markCombat(state, p); }
 }
 
 // ---------------- Carnage ----------------
@@ -188,15 +191,21 @@ function flingAxe(state: SimState, p: PlayerState, R: number) {
 function stepWhirl(state: SimState, ev: SimEvent[], p: PlayerState) {
   const v = p.vars;
   if (!v.b_wwUntil) return;
-  // Endless Storm: holding the key keeps the spin going past its duration, draining Fury
+  // Endless Storm: holding the key keeps the spin going past its duration; the overtime is added to its cooldown
   if (has(p, 'b_endless_storm') && v.b_wwUntil - state.tick <= 1 && v.b_wwUntil >= state.tick
-    && (p.prevButtons & slotBit(p, v.b_wwSlot ?? -1)) && state.tick - (v.b_wwStart ?? 0) < ticks(K.endless.max) && p.resource >= K.endless.drain * DT) {
+    && (p.prevButtons & slotBit(p, v.b_wwSlot ?? -1)) && state.tick - (v.b_wwStart ?? 0) < ticks(K.endless.max)) {
     v.b_wwUntil = state.tick + 2;
-    p.resource -= K.endless.drain * DT;
+    v.b_wwExtra = (v.b_wwExtra ?? 0) + DT;
     const h = findHazard(state, 'b_whirl', p.slot);
     if (h) h.untilTick = v.b_wwUntil + 1;
   }
-  if (v.b_wwUntil <= state.tick) { v.b_wwUntil = 0; return; }
+  if (v.b_wwUntil <= state.tick) {
+    v.b_wwUntil = 0;
+    const s = p.skills[v.b_wwSlot ?? -1];
+    if ((v.b_wwExtra ?? 0) > 0 && s && s.charges < s.maxCharges) s.cooldown += v.b_wwExtra!;
+    v.b_wwExtra = 0;
+    return;
+  }
   const kind = v.b_wwKind ?? 1;
   if (state.tick >= (v.b_wwNext ?? 0)) {
     v.b_wwNext = state.tick + ticks(kind === 2 ? K.blade.every : K.whirl.every);
@@ -248,7 +257,7 @@ function warcryCommon(state: SimState, ev: SimEvent[], p: PlayerState, x: number
     for (const a of state.players) {
       if (a.lifeState !== 'alive' || d2(a.x, a.y, x, y) > K.brothers.radius ** 2) continue;
       healPlayer(state, ev, a, a.maxHp.mul(B(K.brothers.heal)));
-      if (a === p) gainFury(state, p, K.brothers.resource); else gainResource(state, a, K.brothers.resource);
+      cutCooldowns(a, K.brothers.cd);
     }
   }
   if (has(p, 'b_tectonic')) {
@@ -259,10 +268,10 @@ function warcryCommon(state: SimState, ev: SimEvent[], p: PlayerState, x: number
   }
 }
 
-function quakeRing(state: SimState, ev: SimEvent[], p: PlayerState, x: number, y: number, i: number) {
+function quakeRing(state: SimState, ev: SimEvent[], p: PlayerState, x: number, y: number, i: number, mult = ONE) {
   const radii = K.cata.rings.map((r) => landRadius(p, 'b_cataclysm', r));
   const outer = radii[i], inner = i === 0 ? 0 : radii[i - 1] - 0.3;
-  const dmg = skillDmg(state, p, 'b_cataclysm');
+  const dmg = skillDmg(state, p, 'b_cataclysm').mul(mult);
   for (const e of enemiesIn(state, x, y, outer)) {
     const d = Math.sqrt(d2(e.x, e.y, x, y));
     if (d + e.radius < inner) continue;
@@ -275,13 +284,16 @@ function quakeRing(state: SimState, ev: SimEvent[], p: PlayerState, x: number, y
 
 function leapLand(state: SimState, ev: SimEvent[], p: PlayerState, cata: boolean) {
   const x = p.x, y = p.y;
+  // Bounding Fury: the second leap of a pair lands harder
+  const emp = p.vars.b_bfEmp ? B(K.bounding.dmg) : ONE;
+  p.vars.b_bfEmp = 0;
   if (!cata) {
     const R = landRadius(p, 'b_leap', K.leap.radius);
-    const hit = hitCircle(state, ev, p, x, y, R, skillDmg(state, p, 'b_leap'), { dtype: 'physical', skillId: 'b_leap', stagger: K.leap.stagger });
+    const hit = hitCircle(state, ev, p, x, y, R, skillDmg(state, p, 'b_leap').mul(emp), { dtype: 'physical', skillId: 'b_leap', stagger: K.leap.stagger });
     for (const e of hit) knock(state, ev, p, e, x, y, K.leap.knock);
     castEv(ev, p, 'b_leap_land', x, y, R, 0);
   } else {
-    quakeRing(state, ev, p, x, y, 0);
+    quakeRing(state, ev, p, x, y, 0, emp);
     addHazard(state, p, { kind: 'b_quake', x, y, radius: landRadius(p, 'b_cataclysm', K.cata.rings[2]), nextTick: state.tick + ticks(K.cata.every), untilTick: state.tick + ticks(K.cata.every * 2) + 2, outer: 1 });
     castEv(ev, p, 'b_cataclysm_land', x, y, landRadius(p, 'b_cataclysm', K.cata.rings[0]), 0);
   }
@@ -313,11 +325,11 @@ function shout(state: SimState, ev: SimEvent[], p: PlayerState) {
     if (a.lifeState !== 'alive' || d2(a.x, a.y, p.x, p.y) > R * R) continue;
     setBuff(a, 'battle_cry', state.tick + ticks(K.shout.cry), K.shout.atk);
   }
-  gainFury(state, p, K.shout.fury);
+  rage(p, K.shout.rage);
   if (has(p, 'b_warmonger') && n > 0) {
     refundCooldown(p, BR.warcry, Math.min(K.warmonger.cdMax, K.warmonger.cd * n));
-    gainFury(state, p, Math.min(K.warmonger.furyMax, K.warmonger.fury * n));
-    p.vars.b_wmCd = K.warmonger.cdMax; p.vars.b_wmFury = K.warmonger.furyMax;
+    rage(p, Math.min(K.warmonger.otherMax, K.warmonger.other * n));
+    p.vars.b_wmCd = K.warmonger.cdMax; p.vars.b_wmOther = K.warmonger.otherMax;
   }
   warcryCommon(state, ev, p, p.x, p.y);
   castEv(ev, p, 'b_shout', p.x, p.y, R, n);
@@ -341,10 +353,8 @@ function cast(state: SimState, ev: SimEvent[], p: PlayerState, id: string): bool
   const tick = state.tick;
   switch (id) {
     case 'b_avatar': {
-      const cost = costOf(state, p, id);
-      const spent = p.resource;
-      const sec = Math.min(K.avatar.maxSec, K.avatar.minSec + K.avatar.perFury * spent);
-      p.resource = cost;    // the core subtracts the cost next: every point of Fury is consumed
+      const sec = K.avatar.sec;   // kills while it lasts extend it (onKill), up to K.avatar.maxSec
+      p.vars.b_avStart = tick;
       setBuff(p, 'avatar', tick + ticks(sec));
       const hit = hitCircle(state, ev, p, p.x, p.y, K.avatar.radius, skillDmg(state, p, id), { dtype: 'physical', skillId: id, stagger: K.avatar.stagger });
       for (const e of hit) shove(state, e, e.x - p.x, e.y - p.y, K.avatar.knock);
@@ -352,7 +362,7 @@ function cast(state: SimState, ev: SimEvent[], p: PlayerState, id: string): bool
       if (old) endHazard(state, old);
       addHazard(state, p, { kind: 'b_avatar', x: p.x, y: p.y, radius: 1.2, untilTick: tick + ticks(sec), speed: 1, outer: Math.round(sec * 10) / 10 });
       markCombat(state, p);
-      castEv(ev, p, id, p.x, p.y, Math.round(sec * 100) / 100, Math.round(spent));
+      castEv(ev, p, id, p.x, p.y, Math.round(sec * 100) / 100, 0);
       return true;
     }
     case 'b_bloodlust': {
@@ -435,15 +445,15 @@ registerClassHooks(CLS, {
   extraCharges(p, skillId) {
     return has(p, 'b_bounding') && (skillId === 'b_leap' || skillId === 'b_cataclysm') ? 1 : 0;
   },
-  costFactor(state, p, skillId) {
-    if ((skillId === 'b_leap' || skillId === 'b_cataclysm') && has(p, 'b_bounding') && (p.vars.b_bfUntil ?? 0) > state.tick) return 0;
-    return 1;
-  },
   onCast(state, ev, p, skillId) {
     if (skillId === 'b_leap' || skillId === 'b_cataclysm') {
-      if (has(p, 'b_bounding')) p.vars.b_bfUntil = (p.vars.b_bfUntil ?? 0) > state.tick ? 0 : state.tick + ticks(K.bounding);
+      if (has(p, 'b_bounding')) {
+        const second = (p.vars.b_bfUntil ?? 0) > state.tick;
+        p.vars.b_bfEmp = second ? 1 : 0;
+        p.vars.b_bfUntil = second ? 0 : state.tick + ticks(K.bounding.sec);
+      }
     }
-    if (WARCRY_SKILLS.has(skillId) && skillId !== 'b_shout') { p.vars.b_wmCd = 0; p.vars.b_wmFury = 0; }
+    if (WARCRY_SKILLS.has(skillId) && skillId !== 'b_shout') { p.vars.b_wmCd = 0; p.vars.b_wmOther = 0; }
   },
   onEnemyHit(state, ev, p, e, info) {
     if (!isBerserker(p)) return;
@@ -458,15 +468,22 @@ registerClassHooks(CLS, {
     if (info.generation !== 0 || !info.skillId) return;
     if (!BASIC_HITS.has(info.skillId)) {
       if (v.b_fhTick !== state.tick) { v.b_fhTick = state.tick; v.b_fhN = 0; }
-      if ((v.b_fhN ?? 0) < K.fury.capPerTick) { v.b_fhN = (v.b_fhN ?? 0) + 1; gainFury(state, p, K.fury.skillHit); }
+      if ((v.b_fhN ?? 0) < K.rage.capPerTick) { v.b_fhN = (v.b_fhN ?? 0) + 1; rage(p, K.rage.skillHit); }
     }
     if (WARCRY_HITS.has(info.skillId) && has(p, 'b_warmonger')) {
       if ((v.b_wmCd ?? 0) < K.warmonger.cdMax) { refundCooldown(p, BR.warcry, K.warmonger.cd); v.b_wmCd = (v.b_wmCd ?? 0) + K.warmonger.cd; }
-      if ((v.b_wmFury ?? 0) < K.warmonger.furyMax) { gainFury(state, p, K.warmonger.fury); v.b_wmFury = (v.b_wmFury ?? 0) + K.warmonger.fury; }
+      if ((v.b_wmOther ?? 0) < K.warmonger.otherMax) { rage(p, K.warmonger.other); v.b_wmOther = (v.b_wmOther ?? 0) + K.warmonger.other; }
     }
   },
   onKill(state, ev, e, p) {
     if (!isBerserker(p) || p.lifeState !== 'alive') return;
+    // Avatar: every kill extends it (up to K.avatar.maxSec from its start)
+    const av = p.buffs.find((x) => x.id === 'avatar' && x.until > state.tick);
+    if (av) {
+      av.until = Math.min((p.vars.b_avStart ?? state.tick) + ticks(K.avatar.maxSec), av.until + ticks(K.avatar.perKill));
+      const h = findHazard(state, 'b_avatar', p.slot);
+      if (h) h.untilTick = av.until;
+    }
     if (has(p, 'b_battle_trance')) {
       const b = p.buffs.find((x) => x.id === 'bloodlust' && x.until > state.tick);
       if (b) b.until = Math.min((p.vars.b_blStart ?? state.tick) + ticks(K.lust.tranceMax), b.until + ticks(K.lust.tranceKill));
@@ -483,12 +500,12 @@ registerClassHooks(CLS, {
       }
       const dmg = subDmg(state, p, 'physical', K.harvest.coef).add(rest);
       hitCircle(state, ev, p, e.x, e.y, K.harvest.r, dmg, { dtype: 'physical', skillId: 'b_harvest', generation: 1, allowCrit: false });
-      gainFury(state, p, K.harvest.fury);
+      rage(p, K.harvest.rage);
       castEv(ev, p, 'b_harvest', e.x, e.y, K.harvest.r, 0);
     }
   },
   onPlayerDamaged(state, ev, p) {
-    // Fury for the health actually lost is granted after the kit's damage adjustments and lethal guards (kitGlobal.after)
+    // Rage for the health actually lost is granted after the kit's damage adjustments and lethal guards (kitGlobal.after)
     markCombat(state, p);
     p.vars.b_hpPre = p.maxHp.isZero() ? 0 : Math.min(1, p.hp.ratio(p.maxHp));
   },
@@ -508,8 +525,6 @@ registerClassHooks(CLS, {
       if (frac > 0) healPlayer(state, ev, p, p.maxHp.mul(Big.from(frac.toFixed(4))));
     }
     const avatar = buffActive(state, p, 'avatar');
-    // Fury decays out of combat (never while Avatar)
-    if (!avatar && state.tick - (v.b_last ?? -1e9) > ticks(K.fury.decayAfter) && p.resource > 0) p.resource = Math.max(0, p.resource - K.fury.decay * DT);
     // Frenzy expiry (frozen by Bloodlust and Avatar), clamp to the current cap
     const max = frenzyMax(state, p);
     let st = Math.min(v.b_frenzy ?? 0, max);
@@ -561,8 +576,7 @@ registerClassHooks(CLS, {
     for (const p of state.players) {
       if (!isBerserker(p)) continue;
       const v = p.vars;
-      p.resource = 0;
-      v.b_frenzy = 0; v.b_wwUntil = 0; v.mv_mode = 0; v.b_ls = 0; v.b_udEnd = 0; v.b_bfUntil = 0; v.b_last = state.tick;
+      v.b_frenzy = 0; v.b_wwExtra = 0; v.b_wwUntil = 0; v.mv_mode = 0; v.b_ls = 0; v.b_udEnd = 0; v.b_bfUntil = 0; v.b_last = state.tick;
       v.ui_frenzy = 0; v.ui_frenzyMax = frenzyMax(state, p);
     }
   },
@@ -590,7 +604,7 @@ kitGlobal.after((state, ev, p, info) => {
   if (p.classId !== CLS || p.maxHp.isZero()) return;
   const final = p.hp.gt(info.dealt) ? p.hp.sub(info.dealt) : Big.ZERO;
   const lost = Math.max(0, (p.vars.b_hpPre ?? 0) - Math.min(1, final.ratio(p.maxHp)));
-  if (lost > 0) gainFury(state, p, lost * 100 * K.fury.perPct);
+  if (lost > 0) rage(p, lost * 100 * K.rage.perPct);
 });
 
 kitGlobal.lethal((state, ev, p) => {
@@ -605,10 +619,10 @@ kitGlobal.lethal((state, ev, p) => {
     castEv(ev, p, 'b_undying', p.x, p.y, K.undying.sec, 0);
     return { keep: ONE };
   }
-  if (has(p, 'b_deathless') && p.resource >= K.deathless) {
-    p.resource -= K.deathless;
-    p.iframes = Math.max(p.iframes, 1);
-    castEv(ev, p, 'b_deathless', p.x, p.y, p.resource, 0);
+  if (has(p, 'b_deathless') && state.tick >= (p.vars.b_dlReady ?? 0)) {
+    p.vars.b_dlReady = state.tick + ticks(K.deathless.cd);
+    p.iframes = Math.max(p.iframes, K.deathless.iframes);
+    castEv(ev, p, 'b_deathless', p.x, p.y, K.deathless.cd, 0);
     return { keep: ONE };
   }
   return null;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Big } from '@cursebound/numeric';
+import { SKILL_BY_ID } from '@cursebound/content';
 import { addDot, canAllocate, hitPlayer, killEnemy, stateHash, type EnemyState, type SimState } from '@cursebound/simulation';
 import { ACTION, aimAt, casts, damaged, dead, dist, hp, kit, run, spawn } from './kits3.helpers';
 import { newRun, runBot } from './run.helpers';
@@ -100,10 +101,10 @@ describe('vanguard: Cleaver', () => {
     const p2 = k2.s.players[0];
     const victim = spawn(k2, 'pursuer', 1.6, 0, '1');
     victim.cohort.front = victim.cohort.unitHp.mul(Big.from('0.9'));
-    p2.resource = 50;
+   
     run(k2, 1, ACTION.SKILL2);
     expect(dead(victim)).toBe(true);
-    expect(p2.resource).toBeGreaterThan(50 - 18 + 9);
+    expect(p2.skills[1].cooldown).toBeLessThan(SKILL_BY_ID['v_executioner'].cooldownSec - 1.5 + 1e-6);   // execution kill: -1.5s
   });
 
   it('Follow Through really restores the Sweeping Strike charge after an instant kill', () => {

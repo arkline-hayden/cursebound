@@ -3,7 +3,6 @@ import { MELEE_PASSIVES, node } from './common';
 
 // Templar: holy warrior with a great hammer and a tower shield. Consecrates the ground, hurls a returning hammer,
 // condemns foes and shields the party. Kit-wide rules (implemented in simulation/src/classes/templar.ts):
-//  - Zeal: regenerates 8 per second; every basic swing that connects grants 4 more.
 //  - Hallowed Hammer: every third swing releases a radiant shockwave (0.9x astral, 120° cone, 2.9 units).
 //  - Holy ground: consecrated ground (Consecrate, Dawnbreak, Judgment Day) and the Beacon's light pulse every 0.5s,
 //    damaging enemies inside and healing allies inside. Healing and shields you grant scale with Holy healing.
@@ -19,7 +18,7 @@ const GROUND = 'enemies inside take 0.35x astral damage and allies inside heal 1
 export const SKILLS: SkillDef[] = [
   { id: 't_hammer', classId: 'templar', name: 'Hallowed Hammer', slot: 'basic', damageType: 'physical', damageCoef: '1', cooldownSec: 0, charges: 1,
     shape: { kind: 'arc', range: 2.2, arcDeg: 110 },
-    description: `A heavy hammer swing (110° arc, 2.2 units). Every third swing releases a radiant shockwave: 0.9x astral damage in a 120° cone reaching 2.9 units. Connecting swings grant 4 Zeal. ${MELEE_PASSIVES}`,
+    description: `A heavy hammer swing (110° arc, 2.2 units). Every third swing releases a radiant shockwave: 0.9x astral damage in a 120° cone reaching 2.9 units. ${MELEE_PASSIVES}`,
     compressionSupport: true, icon: 'node:t_hammer' },
   { id: 't_judgment_day', classId: 'templar', name: 'Judgment Day', slot: 'signature', damageType: 'astral', damageCoef: '4', cooldownSec: 8.5, charges: 1,
     shape: { kind: 'circle', radius: 3, selfCentered: false, range: 6 },
@@ -90,7 +89,7 @@ export const NODES: NodeDef[] = [
   n('t_skyfall', 'judgment', 'Skyfall Hammer', 1, 2, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_smite'], grantsSkill: 't_skyfall', description: 'Throws the hammer to a point where a pillar of light smites for 2.2× and stuns.' }),
   n('t_smite', 'judgment', 'Divine Smite', 1, 2, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_skyfall'], grantsSkill: 't_smite', description: 'Smites the 3 enemies nearest your aim for 2.4× astral and stuns them (2 charges).' }),
   n('t_final_verdict', 'judgment', 'Final Verdict', 1, 3, { prereqs: [{ node: 't_condemnation', rank: 1 }], mechanics: ['final_verdict'], description: 'Makes Condemn detonations deal ×2.5 to enemies below 35% health.' }),
-  n('t_momentum', 'judgment', 'Righteous Momentum', 2, 3, { prereqs: [{ node: 't_condemnation', rank: 1 }], mechanics: ['momentum'], description: 'Each Condemn detonation cuts 0.5s per rank from your Judgment skill\'s cooldown and grants 3 Zeal per rank.' }),
+  n('t_momentum', 'judgment', 'Righteous Momentum', 2, 3, { prereqs: [{ node: 't_condemnation', rank: 1 }], mechanics: ['momentum'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: each Condemn detonation cuts 0.75s per rank off its cooldown.' }),
   n('t_inquisitor', 'judgment', 'Inquisitor', 1, 4, { prereqs: [{ node: 't_condemnation', rank: 1 }], excludes: ['t_heavens_call'], mechanics: ['inquisitor'], description: 'Lets Condemn stack 3 times, and each detonation spreads a stack to 3 enemies.' }),
   n('t_heavens_call', 'judgment', 'Heaven\'s Call', 1, 4, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_inquisitor'], mechanics: ['heavens_call'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: each cast calls 3 smites on nearby enemies for 1×.' }),
 
@@ -116,7 +115,7 @@ export const CLASS: ClassDef = {
     { id: 'judgment', name: 'Judgment', theme: 'Returning hammer, smites and condemn detonations' },
     { id: 'aegis', name: 'Aegis', theme: 'Shield charges, domes, vows and rescue' },
   ],
-  accent: '#f2d16b', role: 'Holy frontliner · support',
+  accent: '#f2d16b', role: 'Holy frontliner · support',
   base: { maxHealth: 1040, armor: 35, damage: 110, attackFrequency: 1.3, moveSpeed: 4.4, critTendency: '0.2', critMultiplier: '2', shieldCapacity: 0.7 },
   melee: true, basicSkill: 't_hammer', signatureSkill: 't_judgment_day',
   nodes: NODES.map((x) => x.id),

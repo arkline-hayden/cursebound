@@ -84,7 +84,7 @@ describe('helpers', () => {
   it('validates builds against the content', async () => {
     const { NODES } = await import('@cursebound/content');
     const node = NODES.find((x) => x.classId === 'vanguard' && !x.starting)!;
-    expect(parseBuild({ name: 'x', classId: 'vanguard', ranks: { [node.id]: 1 }, mastery: { damage: 2 } })).toMatchObject({ ranks: { [node.id]: 1 }, mastery: '{"damage":2,"health":0,"regen":0}' });
+    expect(parseBuild({ name: 'x', classId: 'vanguard', ranks: { [node.id]: 1 }, mastery: { damage: 2 } })).toMatchObject({ ranks: { [node.id]: 1 }, mastery: '{"damage":2,"health":0,"recovery":0}' });
     expect(() => parseBuild({ classId: 'nope', ranks: {} })).toThrow(HttpError);
     expect(() => parseBuild({ classId: 'vanguard', ranks: { [node.id]: 999 } })).toThrow(/rank of/);
   });

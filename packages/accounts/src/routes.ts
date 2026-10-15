@@ -62,8 +62,10 @@ export function parseBuild(b: Record<string, unknown>): SavedBuildInput {
   if (b.mastery !== undefined && b.mastery !== null) {
     const m = b.mastery as Record<string, unknown>;
     const ok = (x: unknown) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 999;
-    if (typeof m !== 'object' || !ok(m.damage ?? 0) || !ok(m.health ?? 0) || !ok(m.regen ?? 0)) throw new HttpError(400, 'INVALID_INPUT', 'invalid mastery');
-    mastery = JSON.stringify({ damage: m.damage ?? 0, health: m.health ?? 0, regen: m.regen ?? 0 });
+    // `regen` is the pre-1.3 resource mastery; its points carry over to cooldown recovery
+    const recovery = m.recovery ?? m.regen ?? 0;
+    if (typeof m !== 'object' || !ok(m.damage ?? 0) || !ok(m.health ?? 0) || !ok(recovery)) throw new HttpError(400, 'INVALID_INPUT', 'invalid mastery');
+    mastery = JSON.stringify({ damage: m.damage ?? 0, health: m.health ?? 0, recovery });
   }
   return {
     name: str(b.name ?? '', 'name', 80),

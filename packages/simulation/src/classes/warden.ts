@@ -4,7 +4,7 @@ import { addDot, addStagger, healPlayer, hitEnemy, shieldPlayer, type CohortResu
 import { registerClassHooks, registerGlobalHooks, type SimHooks } from '../hooks';
 import { inCone, inLine, moveCircle, norm, rayDistance } from '../geometry';
 import { nearestFloor } from '../map';
-import { areaCoverage, cosHalf, flinch, knockback, livingEnemies, makeHazard, newProjectileId, spawnPlayerProjectiles } from '../players';
+import { areaCoverage, cosHalf, cutCooldowns, flinch, knockback, livingEnemies, makeHazard, newProjectileId, spawnPlayerProjectiles } from '../players';
 import { B, ONE, breakdown, hitDamage, playerDerived, treeFactor } from '../stats';
 import type { EnemyState, Hazard, PlayerState, Projectile, SimEvent, SimState } from '../types';
 

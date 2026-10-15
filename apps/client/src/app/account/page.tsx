@@ -198,7 +198,8 @@ function BuildCard({ b, onChange, onDelete }: { b: Build; onChange: (b: Build) =
   const nodes = Object.entries(b.ranks).map(([id, r]) => ({ node: NODE_BY_ID[id], id, r })).filter((x) => x.node);
   const points = nodes.reduce((s, x) => s + x.r * (x.node!.costPerRank ?? 1), 0);
   const branches = cls?.branches.map((br) => ({ br, nodes: nodes.filter((x) => x.node!.branch === br.id).sort((x, y) => x.node!.tier - y.node!.tier) })).filter((g) => g.nodes.length) ?? [];
-  const mastery = b.mastery ? (JSON.parse(b.mastery) as { damage: number; health: number; regen: number }) : null;
+  const mastery = b.mastery ? (JSON.parse(b.mastery) as { damage: number; health: number; recovery?: number; regen?: number }) : null;
+  const mRec = mastery ? (mastery.recovery ?? mastery.regen ?? 0) : 0;   // builds saved before 1.3 stored the old regen mastery
   const save = async () => {
     setErr(null);
     try { onChange((await accountApi<{ build: Build }>('PUT', `/builds/${b.id}`, { name, notes })).build); setEdit(false); } catch (e) { setErr(errText(e)); }
@@ -222,7 +223,7 @@ function BuildCard({ b, onChange, onDelete }: { b: Build; onChange: (b: Build) =
           ))}
         </div>
       )}
-      {mastery && (mastery.damage + mastery.health + mastery.regen > 0) && <p className="faint" style={{ margin: 0 }}>Mastery: damage {mastery.damage} · health {mastery.health} · regen {mastery.regen}</p>}
+      {mastery && (mastery.damage + mastery.health + mRec > 0) && <p className="faint" style={{ margin: 0 }}>Mastery: damage {mastery.damage} · health {mastery.health} · recovery {mRec}</p>}
       {edit ? (
         <textarea className="input" value={notes} maxLength={500} rows={3} placeholder="Notes: when to take what, which Fates it loves…" onChange={(e) => setNotes(e.target.value)} aria-label="Build notes" />
       ) : b.notes ? <p className="build-notes">{b.notes}</p> : null}

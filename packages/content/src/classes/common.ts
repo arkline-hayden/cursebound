@@ -15,7 +15,7 @@ export const MELEE_PASSIVES = `Melee: Close Quarters, you take ${Math.round((1 -
  * free starting grant (tier 0, `starting`), so tier 1 is open from the start and the later gates keep the old pacing
  * (they were 1/3/5/8 when the base skill cost the first point).
  */
-export const BRANCH_TIER_POINTS = [0, 0, 2, 4, 7] as const;
+export const BRANCH_TIER_POINTS: readonly number[] = [0, 0, 2, 4, 7];
 
 export const DODGE = {
   travel: 2.6,          // world units per dash

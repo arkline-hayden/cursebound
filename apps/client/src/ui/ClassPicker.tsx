@@ -80,7 +80,6 @@ function VesselDetail({ id, cls, chosen }: { id: string; cls: ClassDef; chosen: 
       <dl className="vd-stats">
         <div><dt>Life</dt><dd>{wholeNum(cls.base.maxHealth)}</dd></div>
         <div><dt>Armor</dt><dd>{wholeNum(cls.base.armor)}</dd></div>
-        <div><dt>{cls.resource.name}</dt><dd>{wholeNum(cls.resource.max)}</dd></div>
       </dl>
     </div>
   );
