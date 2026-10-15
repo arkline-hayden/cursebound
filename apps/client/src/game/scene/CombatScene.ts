@@ -19,7 +19,9 @@ import { AfflictionFx, foeActor, heroTint } from '../render/Afflictions';
 import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
-import type { StingerKind } from '../audio/sfx';
+import { impactSfx, killSfx, type StingerKind } from '../audio/sfx';
+import { DamageNumbers, NUMBER_COLOR } from '../render/DamageNumbers';
+import { DeathFx, deathStyle } from '../render/DeathFx';
 import { InputController, type Sample } from '@/lib/input';
 import { ClickMove, type DriveOut } from '../input/ClickMove';
 import { basicReach, pickEnemy, pickGround, type GroundThing } from '../input/targeting';
@@ -36,16 +38,9 @@ import { spectateTarget } from '../spectate';
 
 // Combat presentation (PRD §15, §16, §18): renders authoritative snapshots in a lit isometric dungeon, predicts the
 // local avatar, interpolates remote entities, draws shape-coded telegraphs that survive reduced effects, and layers
-// cosmetic "juice" (hit-stop, recoil, corpse launches, gibs, shockwaves, time dilation on the last kill) that never
+// cosmetic "juice" (hit-stop, recoil, stagger flinches, death animations, gibs, shockwaves, time dilation on the last kill) that never
 // alters authoritative outcomes. Champions/rares (EliteFx) and potions/orbs (PickupRenderer) are drawn here too.
 
-
-/** Retro damage readout: whole numbers below a thousand, suffixes and scientific notation beyond. */
-function dmgText(compact: string): string {
-  const b = Big.fromCompact(compact);
-  if (b.lt(Big.from(1000))) { const n = b.toNumber(); return n > 0 && n < 1 ? '1' : String(Math.round(n)); }
-  return formatBig(b);
-}
 
 /** Hover-plate health: whole numbers below 100K ("820 / 1000"), compact notation above. */
 function hpNum(compact: string): string {
@@ -64,8 +59,6 @@ const ELITE_HAZARD_LIGHT: Record<string, number> = { moltenBlast: 0xff7a2a, fros
 const ELEM_TINT: Record<string, number> = { storm: 0xc4ecff, decay: 0xc4f08a, frost: 0xd0f4ff, ember: 0xffbe8a, astral: 0xe8c4ff };
 /** Death burst colours per killing damage type (main, hot core). */
 const DEATH_FX: Record<string, [number, number]> = { ember: [0xff7a2a, 0xffe0a0], frost: [0x8fe0ff, 0xffffff], storm: [0x9fd8ff, 0xffffff], decay: [0x8fd14f, 0xe0ffb0], astral: [0xb07aff, 0xf0e0ff] };
-
-interface Launch { t0: number; dur: number; dx: number; dy: number; dist: number; h: number; spin: number; landed: boolean }
 
 interface ActorView {
   sprite: Phaser.GameObjects.Sprite;
@@ -87,9 +80,17 @@ interface ActorView {
   /** last snapshot health fraction (overkill detection) and elite tier */
   lastHp: number;
   elite: number;
-  launch?: Launch;
   gibbed?: boolean;
+  /** stagger flinch (combat feel pass): when the last hit landed (presentation clock), how hard (0..1), lean side (-1/1) */
+  flinchAt?: number; flinchMag?: number; flinchSide?: number;
 }
+
+/** Stagger flinch: the foe squashes and leans away from a hit for this long (ms); bigger hits flinch harder. */
+const FLINCH_MS = 110;
+/** Heavy-weapon heroes: their physical hits use the heavy impact layer (hammers, axes, slams). */
+const HEAVY_WEAPON = new Set(['vanguard', 'berserker', 'templar', 'warden']);
+/** Rolling-number colour per damage type (crits are gold, NUMBER_COLOR). */
+const DMG_COLOR: Record<string, string> = { ember: '#ff9a3a', storm: '#9fd8ff', astral: '#d7a8ff', frost: '#bfeaff', decay: '#a8e070', physical: '#ffffff' };
 
 const SFX_FOR_SKILL: Record<string, SfxId> = {
   v_cleave: 'swing', a_spark: 'attack_spark', v_earthbreaker: 'signature_slam', a_astral_nova: 'signature_nova',
@@ -102,6 +103,9 @@ export class CombatScene extends Phaser.Scene {
   input2 = new InputController();
   dungeon!: DungeonRenderer;
   juice!: Juice;
+  /** rolling damage numbers and death animations by damage type (combat feel pass) */
+  numbers!: DamageNumbers;
+  deaths!: DeathFx;
   /** legendary ground loot, beams and perk fx (render/LootRenderer.ts) */
   loot: LootRenderer | null = null;
   elites!: EliteFx;
@@ -128,6 +132,7 @@ export class CombatScene extends Phaser.Scene {
    *  safe moment (never mid-fight, mid-boss or mid-cutscene); one report per scene */
   private watch = { born: 0, at: 0, slowSec: 0, pending: false, done: false };
   private lastHitSfx = 0;
+  private lastCritSfx = 0;
   /** last time a connecting melee swing of ours hit-stopped (throttle: one stop per swing, not per foe) */
   private lastMeleeStop = 0;
   /** world point a locked camera follows: the hero plus a slight aim look-ahead, or the spectated teammate */
@@ -165,7 +170,7 @@ export class CombatScene extends Phaser.Scene {
   private hoverFx: Phaser.FX.Glow | null = null;
   private hoverSig = '';
   private frameCount = 0;
-  /** last player hit on each enemy (screen direction, crit, one-shot, damage type) for corpse launches, gibs and death bursts */
+  /** last player hit on each enemy (screen direction, crit, one-shot, damage type) for death animations, gibs and death bursts */
   private lastHit = new Map<number, { ux: number; uy: number; crit: boolean; big: boolean; at: number; dtype?: string }>();
   /** brief elemental tint on a foe after a typed hit (storm shock, decay poison, frost, ember, astral) */
   private elemTint = new Map<number, { c: number; until: number }>();
@@ -198,6 +203,8 @@ export class CombatScene extends Phaser.Scene {
     // GameCanvas rebuilds the game when it changes
     this.dungeon = new DungeonRenderer(this, { lighting: gfx().lighting, ambient: 0x8a7a8e });
     this.juice = new Juice(this, this.dungeon);
+    this.numbers = new DamageNumbers(this, this.juice);
+    this.deaths = new DeathFx(this, this.juice, this.dungeon);
     this.loot = new LootRenderer(this);
     this.elites = new EliteFx(this, this.juice, this.dungeon);
     this.outlines = new Outlines(this);
@@ -438,18 +445,24 @@ export class CombatScene extends Phaser.Scene {
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
     switch (e.t) {
       case 'hit': {
-        const amount = dmgText(e.amount);
+        const amt = Big.fromCompact(e.amount);
         const { x, y } = this.P(e.x, e.y);
         const dx = e.x - (e.sx ?? e.x), dy = e.y - (e.sy ?? e.y);
         const u = Math.hypot(dx, dy) > 1e-6 ? iso.unit(dx, dy) : { x: 0, y: 0 };
         if (e.targetKind === 'enemy') {
           const v = this.viewFor('enemy', e.target);
-          if (v) { v.recoilX = u.x * (e.crit ? 8 : 4); v.recoilY = u.y * (e.crit ? 6 : 3); v.squash = e.crit ? 1 : 0.6; }
+          if (v && e.sx !== undefined) {   // direct hits only: burn and rot ticks carry no source and never flinch
+            v.recoilX = u.x * (e.crit ? 8 : 4); v.recoilY = u.y * (e.crit ? 6 : 3); v.squash = e.crit ? 1 : 0.6;
+            // stagger flinch (applyRecoil): squash and lean away from the hit; frac = the hit's share of a unit's health
+            const mag = Math.min(1, 0.3 + (e.frac ?? 0.08) * 1.5 + (e.crit ? 0.3 : 0) + (e.kill ? 0.2 : 0));
+            const fresh = v.flinchAt === undefined || J.clock - v.flinchAt > FLINCH_MS * 0.6;
+            if (fresh || mag > (v.flinchMag ?? 0)) { v.flinchAt = J.clock; v.flinchMag = mag; v.flinchSide = u.x > 0.05 ? 1 : u.x < -0.05 ? -1 : (v.flinchSide ?? 1); }
+          }
           if (e.sx !== undefined) this.lastHit.set(e.target, { ux: u.x, uy: u.y, crit: e.crit, big: !!e.kill && (v?.lastHp ?? 0) >= 0.85, at: this.time.now, dtype: e.dtype });
           const big = e.crit || e.kill;
-          const label = `${amount}${e.count ? ` ×${formatBig(Big.fromCompact(e.count))}` : ''}${e.crit ? '!' : ''}`;
-          if (e.crit) J.number(x, y - 8, label, '#ffe27a', 'crit');
-          else J.number(x, y - 8, label, e.dtype === 'ember' ? '#ff9a3a' : e.dtype === 'storm' ? '#9fd8ff' : e.dtype === 'astral' ? '#d7a8ff' : e.dtype === 'frost' ? '#bfeaff' : e.dtype === 'decay' ? '#a8e070' : '#ffffff', 'sm');
+          // one rolling number per foe (crits roll their own, gold), render/DamageNumbers.ts
+          if (e.crit) this.numbers.add(`e${e.target}`, 'crit', amt, x, y, NUMBER_COLOR.crit);
+          else this.numbers.add(`e${e.target}`, 'dmg', amt, x, y, DMG_COLOR[e.dtype] ?? '#ffffff');
           const kind = v?.kind ?? 'pursuer';
           if (e.dtype === 'physical' || e.dtype === 'storm') J.sparksAt(x, y - 14, e.crit ? 14 : 5, e.dtype === 'storm' ? 0x9fd8ff : 0xffd890);
           if (e.dtype === 'ember') J.embersAt(x, y - 14, e.crit ? 10 : 4);
@@ -477,10 +490,16 @@ export class CombatScene extends Phaser.Scene {
             }
             if (e.crit) J.shake(0.004, 90);
           }
-          if (this.time.now - this.lastHitSfx > 40) { this.lastHitSfx = this.time.now; this.sfx(e.crit ? 'crit' : 'hit_enemy', e.x, 0, e.y); }
+          // layered impact by damage type and weapon weight; a crit stacks its own distinct cue on top (separate throttle)
+          if (this.time.now - this.lastHitSfx > 40) {
+            this.lastHitSfx = this.time.now;
+            const cls = e.src !== undefined ? snap?.players.find((pl) => pl.s === e.src)?.c : undefined;
+            this.sfx(impactSfx(e.dtype, !!cls && HEAVY_WEAPON.has(cls)), e.x, 0, e.y);
+          }
+          if (e.crit && this.time.now - this.lastCritSfx > 70) { this.lastCritSfx = this.time.now; this.sfx('crit', e.x, 1, e.y); }
         } else {
           const frac = e.frac ?? 0.1;
-          J.number(x, y - 10, `-${amount}`, e.target === me ? '#ff5a5a' : '#ff9a9a', e.target === me ? 'md' : 'sm');
+          this.numbers.add(`p${e.target}`, e.target === me ? 'hurt' : 'ally', amt, x, y, e.target === me ? NUMBER_COLOR.hurt : NUMBER_COLOR.ally);
           J.bleed('player', x, y - 16, 6 + Math.round(frac * 20), u.x, u.y);
           const v = this.viewFor('player', e.target);
           if (v) { v.recoilX = u.x * 6; v.recoilY = u.y * 4; v.squash = 1; }
@@ -499,7 +518,7 @@ export class CombatScene extends Phaser.Scene {
         if (!p) break;
         const q = this.P(p.x, p.y);
         const potion = this.time.now - (this.potionAt.get(e.slot) ?? -1e9) < 120;
-        J.number(q.x, q.y - 6, `+${dmgText(e.amount)}`, potion ? '#9cff7a' : '#8fe07a', potion ? 'md' : 'heal');
+        this.numbers.add(`p${e.slot}`, 'heal', Big.fromCompact(e.amount), q.x, q.y, NUMBER_COLOR.heal);
         J.embersAt(q.x, q.y - 10, potion ? 12 : 6, 0x8fe07a);
         break;
       }
@@ -636,8 +655,11 @@ export class CombatScene extends Phaser.Scene {
   }
 
   /**
-   * Deaths: killing blows launch the body back along the hit with a little arc and spin before it stamps as a corpse;
-   * crits and one-shots (big overkills) burst into gibs; elites and bosses get a bigger flourish. Kill streaks escalate.
+   * Deaths: the killing blow's damage type picks the body's death animation (render/DeathFx.ts, on the foe's own sprite):
+   * burned foes char and crumble to ash, frozen ones shatter, shocked ones flash to a skeleton and crackle out, rotted
+   * ones melt into a puddle, astral ones dissolve upward into light, and physical kills topple like a ragdoll and fade
+   * into a dim corpse. Physical crits and one-shots (big overkills) burst into gibs; elites and bosses get a bigger
+   * flourish. Kill streaks escalate.
    */
   private onDeath(e: Extract<SimEvent, { t: 'death' }>, me: number, snap: Snapshot | null) {
     const J = this.juice;
@@ -649,35 +671,42 @@ export class CombatScene extends Phaser.Scene {
     this.lastHit.delete(e.id);
     const recent = !!lh && this.time.now - lh.at < 300;
     const elite = v?.elite ?? 0;
-    const gib = boss || (recent && (lh!.crit || lh!.big));
+    // the sim names the killing blow's type (burns and rot that finish a foe included); else the last hit we saw
+    const dtype = e.dt ?? (recent ? lh!.dtype : undefined);
+    const style = deathStyle(dtype);
+    const gib = boss || (style === 'topple' && recent && (lh!.crit || lh!.big));
     const gore = GORE[e.kind] ?? GORE.pursuer;
+    let handled = false;
     if (gib) {
       J.gib(e.kind, x, y - 10, boss || elite > 0);
       if (v && !boss && !J.reduced) { v.gibbed = true; v.sprite.setVisible(false); v.extras.forEach((s) => s.setVisible(false)); }
     } else {
-      J.bleed(e.kind, x, y - 12, 8, lh?.ux ?? 0, lh?.uy ?? 0);
-      this.dungeon.addDecal(gore.decal, x, y + 6, gore.color, 0.8 + Math.random() * 0.4);
-      if (v && !J.reduced && J.motionOn) {
-        const ang = Math.random() * Math.PI * 2;
-        const dx = recent ? lh!.ux : Math.cos(ang), dy = recent ? lh!.uy : Math.sin(ang) * 0.5;
-        const l = Math.hypot(dx, dy) || 1;
-        v.launch = {
-          t0: J.clock, dur: 360 + Math.random() * 120, dx: dx / l, dy: dy / l, dist: (recent ? 26 : 10) + Math.random() * 14 + elite * 8,
-          h: 12 + Math.random() * 12, spin: (Math.random() < 0.5 ? -1 : 1) * Math.PI * 2, landed: false,
-        };
+      if (style === 'topple') {
+        J.bleed(e.kind, x, y - 12, recent ? 12 : 8, lh?.ux ?? 0, lh?.uy ?? 0);
+        this.dungeon.addDecal(gore.decal, x, y + 6, gore.color, 0.8 + Math.random() * 0.4);
+      }
+      // the body takes its death animation; a ragdoll topple is motion, so reduced motion keeps the death sprite instead
+      if (v && !v.gibbed && v.sprite.visible && (J.motionOn || style !== 'topple')) {
+        const tint = foeActor(this, e.kind, false, !!ENEMY_BY_ID[e.kind]).tint;
+        const ux = recent ? lh!.ux : 0, uy = recent ? lh!.uy : 0;
+        handled = this.deaths.play(v.sprite, style, { x: v.shadow.x, y: v.shadow.y, ux, uy, big: recent && (lh!.crit || lh!.big), elite, scale: v.baseScale, tint });
+        if (handled) {
+          for (const s of v.extras) if (s.visible) this.deaths.play(s, style, { x: s.x, y: s.y, ux, uy, big: false, elite: 0, scale: s.scaleX, tint, lite: true });
+          v.gibbed = true; v.sprite.setVisible(false); v.extras.forEach((s) => s.setVisible(false));
+        }
       }
     }
     J.impact(x, y - 12, 0xffffff, boss ? 3 : elite ? 2.2 : 1.4);
     this.elemTint.delete(e.id);
-    // typed deaths burst in their element: ember flares and scorches, frost shatters, storm crackles, decay bursts in
-    // spores and slime, astral scatters stars (physical keeps the gore above)
-    const dfx = recent && lh!.dtype ? DEATH_FX[lh!.dtype] : undefined;
+    // typed bursts for bodies DeathFx does not take (bosses, gibs, reduced motion): ember flares and scorches, frost
+    // shatters, storm crackles, decay bursts in spores and slime, astral scatters stars (physical keeps the gore above)
+    const dfx = !handled && dtype ? DEATH_FX[dtype] : undefined;
     if (dfx) {
       const big = gib || elite > 0 || boss;
       const [col, hot] = dfx;
       J.starburst(x, y - 12, hot, big ? 1.6 : 1, 180);
       J.orb(x, y - 12, col, big ? 1.1 : 0.7, 240);
-      switch (lh!.dtype) {
+      switch (dtype) {
         case 'ember': J.embersAt(x, y - 12, big ? 18 : 9, col); J.dust(x, y - 6, big ? 5 : 2, 0x2a1a10); this.dungeon.addDecal('scorch', x, y + 4, 0x1a1008, big ? 1.4 : 0.8); break;
         case 'frost': J.bits('ice', x, y - 14, big ? 16 : 8, 0xd8f6ff); J.bits('star', x, y - 14, big ? 5 : 2, 0xffffff); break;
         case 'storm': J.bits('zap', x, y - 14, big ? 10 : 5, col); J.sparksAt(x, y - 14, big ? 14 : 7, col); break;
@@ -689,7 +718,7 @@ export class CombatScene extends Phaser.Scene {
     if (e.by !== undefined && e.by >= 0) {
       const ctx = this.fxCtx(e.by === me);
       const k = KILL_FX[ctx.cls(e.by) ?? ''];
-      if (k) k(ctx, { slot: e.by, kind: e.kind, x: e.x, y: e.y, dtype: recent ? lh!.dtype : undefined, crit: recent && lh!.crit, big: gib, elite, boss });
+      if (k) k(ctx, { slot: e.by, kind: e.kind, x: e.x, y: e.y, dtype, crit: recent && lh!.crit, big: gib, elite, boss });
     }
     this.dungeon.flashLight(x, y - 10, boss ? 300 : elite ? 200 : 130, elite ? (ELITE_COLOR[elite]?.main ?? gore.color) : gore.color, boss ? 3 : elite ? 2.4 : 1.6, boss ? 600 : elite ? 420 : 220);
     if (elite) {
@@ -697,7 +726,7 @@ export class CombatScene extends Phaser.Scene {
       J.ring(x, y, iso.rx(2.2), col, 420); J.embersAt(x, y - 14, 20, col);
       this.sfx('crit', e.x, 2, e.y);
     }
-    this.sfx('kill', e.x, 1, e.y);
+    this.sfx(killSfx(dtype), e.x, 1, e.y);   // char sizzle, ice shatter, zap, squelch, chime; physical keeps the pop and crack
     if (e.by === me) {
       J.hitStop(boss ? 220 : elite ? 70 : 28 + Math.min(20, this.combo) * 1.2);
       J.shake(boss ? 0.02 : elite ? 0.009 : 0.003, boss ? 500 : elite ? 200 : 80);
@@ -818,6 +847,7 @@ export class CombatScene extends Phaser.Scene {
       if (latest.phase === 'ROUND_SETUP') {
         for (const k of [...this.actors.keys()]) this.destroyView(k);
         this.renderSelf.init = false; this.combo = 0; this.lastHit.clear(); this.pickupsR.clear(); this.pendingBanners = [];
+        this.numbers.clear(); this.deaths.clear();
         this.clickFx?.clear();
         this.camSnap = 'cut';   // a new round starts the camera on the hero
         this.releaseNames();
@@ -829,6 +859,8 @@ export class CombatScene extends Phaser.Scene {
     this.cine?.ingest(this.net.events, latest);   // cutscene triggers (reads, does not consume)
     this.handleEvents(latest);
     J.update(delta / 1000);
+    this.numbers.update();
+    this.deaths.update();
     this.elites.begin(this.time.now);
     this.outlines.begin();
     this.aff.begin(this.time.now);
@@ -890,7 +922,6 @@ export class CombatScene extends Phaser.Scene {
     for (const [key, v] of this.actors) {
       if (seen.has(key)) continue;
       if (!v.dying) { v.dying = true; v.lastSeen = realNow; }
-      if (v.launch && !v.launch.landed) this.applyLaunchOnly(v);
       v.sprite.setAlpha(Math.max(0, 1 - (realNow - v.lastSeen) / 260));
       v.bar?.clear(); v.badge?.setVisible(false); v.label?.setVisible(false); v.shadow.setAlpha(0);
       if (realNow - v.lastSeen > 260) {
@@ -1132,42 +1163,29 @@ export class CombatScene extends Phaser.Scene {
     });
   }
 
-  /** Position/scale/rotation for an actor: recoil, squash, elite scale and (for the slain) the corpse launch arc. */
+  /**
+   * Position/scale/rotation for an actor: recoil, squash, elite scale and the stagger flinch, a ~110 ms squash that
+   * leans the body away from the hit (sprites pivot on their feet), harder for bigger hits. The slain are animated by
+   * render/DeathFx.ts.
+   */
   private applyRecoil(v: ActorView, x: number, y: number, delta: number) {
     const decay = Math.pow(0.0005, delta / 1000);
     v.recoilX *= decay; v.recoilY *= decay; v.squash *= Math.pow(0.002, delta / 1000);
-    const sq = v.squash;
+    let sq = v.squash, lean = 0;
     const bs = v.baseScale;
-    let ox = 0, oy = 0, rot = 0, gx = 0, gy = 0;
-    if (v.launch) {
-      const L = v.launch;
-      const k = Math.min(1, (this.juice.clock - L.t0) / L.dur);
-      const e = 1 - (1 - k) * (1 - k);
-      gx = L.dx * L.dist * e; gy = L.dy * L.dist * e;
-      ox = gx; oy = gy - Math.sin(k * Math.PI) * L.h;
-      rot = L.spin * e;
-      if (k >= 1 && !L.landed) {
-        L.landed = true; rot = 0;
-        this.juice.dust(x + gx, y + gy, 4, 0x3a2e28);
-        const g = GORE[v.kind] ?? GORE.pursuer;
-        this.dungeon.addDecal(g.decal, x + gx, y + gy + 4, g.color, 0.7);
+    if (v.flinchAt !== undefined) {
+      const k = (this.juice.clock - v.flinchAt) / FLINCH_MS;
+      if (k >= 1 || k < 0) v.flinchAt = undefined;
+      else if (this.juice.motionOn) {
+        // snap into the flinch in the first quarter, ease back out
+        const env = k < 0.25 ? k / 0.25 : (1 - (k - 0.25) / 0.75) ** 2;
+        const mag = v.flinchMag ?? 0.4;
+        lean = (v.flinchSide ?? 1) * 0.24 * mag * env;
+        sq = Math.max(sq, mag * env);
       }
     }
-    // spin around the body's centre, not the feet
-    const hc = v.sprite.height * v.sprite.originY * 0.5 * bs;
-    const cx = x + v.recoilX + ox, cy = y + v.recoilY + oy - hc;
-    const fx = rot ? cx - Math.sin(rot) * hc : x + v.recoilX + ox, fy = rot ? cy + Math.cos(rot) * hc : y + v.recoilY + oy;
-    v.sprite.setPosition(Math.round(fx), Math.round(fy)).setRotation(rot).setScale(bs * (1 + sq * 0.18), bs * (1 - sq * 0.14));
-    v.shadow.setPosition(Math.round(x + gx), Math.round(y + gy));
-  }
-
-  /** Keep a launched body flying after its enemy left the snapshot. */
-  private applyLaunchOnly(v: ActorView) {
-    const L = v.launch!;
-    const baseX = v.sprite.getData('lx') as number | undefined, baseY = v.sprite.getData('ly') as number | undefined;
-    if (baseX === undefined || baseY === undefined) return;
-    this.applyRecoil(v, baseX, baseY, 0);
-    if (L.landed) v.sprite.setRotation(0);
+    v.sprite.setPosition(Math.round(x + v.recoilX), Math.round(y + v.recoilY)).setRotation(lean).setScale(bs * (1 + sq * 0.18), bs * (1 - sq * 0.14));
+    v.shadow.setPosition(Math.round(x), Math.round(y));
   }
 
   private drawPlayer(key: string, p: SnapPlayer, x: number, y: number, isMe: boolean, delta: number) {
@@ -1272,13 +1290,15 @@ export class CombatScene extends Phaser.Scene {
     v.elite = e.el ?? 0;
     v.baseScale = EliteFx.scaleFor(e.el);
     if (e.st !== 'dying') v.lastHp = e.hp;
-    v.sprite.setData('lx', px).setData('ly', py);
     if (v.gibbed) { v.bar?.clear(); v.badge?.setVisible(false); v.shadow.setAlpha(0); return; }
     const st: ActorState = e.st === 'dying' ? 'death' : e.st === 'windup' ? 'windup' : e.st === 'attack' || e.st === 'recovery' ? 'attack' : e.st === 'stagger' || e.stag ? 'stagger' : e.st === 'move' ? 'run' : 'idle';
     this.play(v, st, this.dirOf(e.fx, e.fy));
     v.sprite.setDepth(depth).setAlpha(1);
     this.applyRecoil(v, px, py, delta);
-    const flashing = e.flash && this.settings().flashes;
+    // white hit flash, then the element tint: driven by the hit event together with the stagger flinch, so it lands on
+    // the frame the hit does (bigger hits flash a touch longer); the snapshot flag only covers hits we saw no event for
+    const sinceHit = v.flinchAt === undefined ? Infinity : this.juice.clock - v.flinchAt;
+    const flashing = this.settings().flashes && (sinceHit < ((v.flinchMag ?? 0) > 0.7 ? 80 : 55) || (e.flash && sinceHit === Infinity));
     if (flashing) v.sprite.setTintFill(0xffffff);
     else if (e.st === 'windup') v.sprite.setTint((Math.floor(this.time.now / 70) % 2) ? 0xff9a8a : 0xffffff);   // readable windup blink
     else if (this.elemTintOf(e.i)) v.sprite.setTint(this.elemTintOf(e.i));   // shock / poison / frost / scorch / starlight after a typed hit
