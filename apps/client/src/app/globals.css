@@ -167,6 +167,11 @@ body {
 button, a, [role='radio'], [role='tab'], label, select, summary { cursor: var(--px-cursor, pointer); }
 a { color: var(--ember-hi); }
 button, input, select { font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; }
+/* no text highlighting anywhere (menus included; ui/NoTextSelect.tsx also stops drag-selection and link / image
+   ghost drags). Text fields stay selectable and editable. */
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+img, a, canvas, svg { -webkit-user-drag: none; }
+input, textarea, select, [contenteditable]:not([contenteditable='false']) { -webkit-user-select: text; user-select: text; }
 ::selection { background: var(--blood); color: var(--bone); }
 :focus-visible { outline: 2px dashed var(--ember-hi); outline-offset: 4px; }
 [data-reduced-motion='true'] *, [data-reduced-motion='true'] *::before, [data-reduced-motion='true'] *::after { animation: none !important; transition: none !important; }
