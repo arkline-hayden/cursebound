@@ -19,8 +19,8 @@ export interface Pt { x: number; y: number }
 export const CAM = {
   /** CSS px from the window edge where edge panning starts (small, like LoL) */
   edgeMargin: 6,
-  /** view px per second at edge-pan speed 1 (a 640 px wide view crosses in under a second) */
-  edgeSpeed: 720,
+  /** view px per second at edge-pan speed 1 (one 640 px play view per second) */
+  edgeSpeed: 640,
   /** follow smoothing time constant in ms (the old camera's feel) */
   followMs: 110,
   /** hold-to-centre / F-key smoothing in ms (near-instant, like LoL's Space) */
