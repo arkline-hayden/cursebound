@@ -63,7 +63,7 @@ export function skyBolt(ctx: FxCtx, x: number, y: number, color = BOLT) {
   }
   ctx.juice.sparksAt(p.x, p.y - 6, 12, color);
   ctx.juice.ring(p.x, p.y, ctx.rx(1.2), color, 240);
-  ctx.dungeon.flashLight(p.x, p.y - 24, 200, color, 2.8, 180);
+  ctx.dungeon.flashLight(p.x, p.y - 24, 130, color, 1.5, 150);   // several strike at once: keep each flash modest
 }
 
 registerHazardFx({
