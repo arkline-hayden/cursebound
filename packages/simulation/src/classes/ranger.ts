@@ -272,7 +272,7 @@ function stepHawk(state: SimState, ev: SimEvent[], p: PlayerState, h: Hazard) {
   h.inner += 2.4 * DT;
   const a = h.inner + h.outer * Math.PI;
   const ox = p.x + Math.cos(a) * 1.8, oy = p.y + Math.sin(a) * 1.8;
-  const left = moveTo(ox, oy, 14);
+  const left = moveTo(ox, oy, 14 * RULES.minionMoveSpeedMult);   // pet flight (x0.8 rules 1.4); the dive is a strike and keeps 16
   if (left < 0.05) { h.dx = -Math.sin(a); h.dy = Math.cos(a); }
   if (state.tick < h.nextTick || p.lifeState !== 'alive') return;
   const pool = enemiesIn(state, p.x, p.y, 8);

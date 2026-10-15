@@ -748,7 +748,9 @@ registerClassHooks('duelist', {
     const r = rank(p, 'd_phantom_dash');
     if (r > 0 && state.map) {
       const pd = playerDerived(state, p);
-      const travel = Math.min(40, DODGE.travel * toFloatClamped(pd.moveSpeed, 1e7) / CLASS_BY_ID[p.classId].base.moveSpeed);
+      // the strike line covers the dash itself: same normalization as players.dodgeSpeedFor (tree / Fate speed
+      // lengthens it, the global RULES.playerMoveSpeedMult does not)
+      const travel = Math.min(40, DODGE.travel * toFloatClamped(pd.moveSpeed, 1e7) / (CLASS_BY_ID[p.classId].base.moveSpeed * Number(RULES.playerMoveSpeedMult)));
       const dx = p.dodgeDirX, dy = p.dodgeDirY;
       const len = Math.min(travel, rayDistance(state.map, p.x, p.y, dx, dy, travel));
       const ex = p.x + dx * len, ey = p.y + dy * len;

@@ -135,7 +135,12 @@ class WorkerStore implements StoreHandle {
 
   createProfile: Store['createProfile'] = (displayName) => this.send('createProfile', [displayName]);
   getProfile: Store['getProfile'] = (id) => this.send('getProfile', [id]);
-  linkCloudProfile: Store['linkCloudProfile'] = (accountId, displayName) => this.send('linkCloudProfile', [accountId, displayName]);
+  linkCloudProfile: Store['linkCloudProfile'] = (accountId, displayName, cloudXp) => this.send('linkCloudProfile', [accountId, displayName, cloudXp ?? null]);
+  getProgress: Store['getProgress'] = (profileId) => this.send('getProgress', [profileId]);
+  ensureBounty: Store['ensureBounty'] = (q) => this.send('ensureBounty', [q]);
+  getBounty: Store['getBounty'] = (id) => this.send('getBounty', [id]);
+  bountyCompleted: Store['bountyCompleted'] = (bountyId, profileId) => this.send('bountyCompleted', [bountyId, profileId]);
+  runAwards: Store['runAwards'] = (runId) => this.send('runAwards', [runId]);
   createAccount: Store['createAccount'] = a => this.send('createAccount', [a]);
   getAccountCredentials: Store['getAccountCredentials'] = username => this.send('getAccountCredentials', [username]);
   getAccount: Store['getAccount'] = id => this.send('getAccount', [id]);

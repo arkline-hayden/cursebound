@@ -2,6 +2,7 @@ import { Big, percentToFactor, floorMulBig } from '@cursebound/numeric';
 import { DUNGEON_THEMES, RARITY_WEIGHTS, RULES, TICK_RATE, basePoints, cardById, cardMechanics, cardRarity, cardStatEffects, isBossRound, type CardRarity } from '@cursebound/content';
 import { blessedCard } from './blessing';
 import { bindMechanic } from './boons';
+import { bountyRules } from './bountyRules';
 import { nextInt, seedRng, type RngState } from './rng';
 import { ONE, derivePlayer } from './stats';
 import type { CommitRecord, OfferState, SimEvent, SimState } from './types';
@@ -133,13 +134,18 @@ export function applyCard(state: SimState, cardId: string, offerId: string, ev: 
   const card = blessed ? blessedCard(found) : found;
   const beforeMax = state.players.map((p) => p.maxHp);
   let seq = state.fate.entries.length + (state.fate.mechanicEntries?.length ?? 0);
-  for (const { effect: eff } of cardStatEffects(card)) {
+  const priceCopies = bountyRules(state).fatePriceCopies ?? 1;   // "Fate's Spite" bounty: every price is paid twice
+  for (const { side, effect: eff } of cardStatEffects(card)) {
     const factor = percentToFactor(eff.percent);
-    const old = state.fate.factors[eff.stat] ?? ONE;
-    state.fate.factors[eff.stat] = old.mul(factor);
-    state.fate.entries.push({ seq: seq++, offerId, cardId, round: state.round, stat: eff.stat, percent: eff.percent, factor });
+    for (let k = side === 'price' ? priceCopies : 1; k > 0; k--) {
+      const old = state.fate.factors[eff.stat] ?? ONE;
+      state.fate.factors[eff.stat] = old.mul(factor);
+      state.fate.entries.push({ seq: seq++, offerId, cardId, round: state.round, stat: eff.stat, percent: eff.percent, factor });
+    }
   }
-  for (const { effect } of cardMechanics(card)) bindMechanic(state, effect.id, effect.magnitude, { offerId, cardId, seq: seq++ });
+  for (const { side, effect } of cardMechanics(card)) {
+    for (let k = side === 'price' ? priceCopies : 1; k > 0; k--) bindMechanic(state, effect.id, effect.magnitude, { offerId, cardId, seq: seq++ });
+  }
   state.stateVersion++;
   state.players.forEach((p, i) => {
     const d = derivePlayer(state, p);

@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { CARD_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION, CONTENT_VERSION, TICK_RATE, contentHash } from '@cursebound/content';
+import { BOUNTY_MIN_DEPTH, CARD_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION, CONTENT_VERSION, TICK_RATE, contentHash, describeAward, xpForRun, type XpAward } from '@cursebound/content';
 import { BUILD_ID, LIMITS, type ServerMessage } from '@cursebound/protocol';
 import {
   buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, serializeState, stateHash, step,
@@ -47,6 +47,8 @@ export interface AuthorityOptions {
   resume?: { persistSeq: number; chunkNo: number };
   /** training grounds (rooms.ts): nothing is persisted — no run record, events, commits, replay chunks, boards or records */
   training?: boolean;
+  /** daily bounty id (local or cloud) a bounty run counts toward; its modifier is in the state (SimState.bounty) */
+  bountyId?: string | null;
 }
 
 export class RunAuthority {
@@ -58,6 +60,9 @@ export class RunAuthority {
   practice: boolean;
   /** training grounds run: never touches the store (see AuthorityOptions.training) */
   readonly training: boolean;
+  readonly bountyId: string | null;
+  /** progression: XP awarded to each member's profile at finalization (by profile id), shown on RESULTS */
+  private awards = new Map<string, XpAward>();
   private queues: PlayerInput[][] = [];
   private last: (PlayerInput | null)[] = [];
   private buckets: { tokens: number; at: number }[] = [];
@@ -90,6 +95,7 @@ export class RunAuthority {
     this.boardKey = o.boardKey;
     this.practice = o.practice;
     this.training = !!o.training;
+    this.bountyId = o.bountyId ?? null;
     this.persistSeq = o.resume?.persistSeq ?? 0;
     this.chunkNo = o.resume?.chunkNo ?? 0;
     this.journal = { v: 1, runId: o.state.runId, ticks: [] };
@@ -308,7 +314,7 @@ export class RunAuthority {
   }
 
   private checkpointBlob(): { blob: string; sum: string } {
-    const blob = JSON.stringify({ v: 1, persistSeq: this.persistSeq, chunkNo: this.chunkNo + 1, state: serializeState(this.state), boardKey: this.boardKey, practice: this.practice });
+    const blob = JSON.stringify({ v: 1, persistSeq: this.persistSeq, chunkNo: this.chunkNo + 1, state: serializeState(this.state), boardKey: this.boardKey, practice: this.practice, bountyId: this.bountyId });
     return { blob, sum: checksum(blob) };
   }
 
@@ -377,6 +383,10 @@ export class RunAuthority {
       deathRecaps: s.deathRecaps.slice(-10),
       legendaries: s.lootFound ?? [],
       ...(this.training ? { training: true } : {}),
+      // daily bounty and progression (content bounties.ts / progression.ts): the XP award per slot (null until the
+      // finalize transaction credited it, or for a profile this machine does not hold)
+      bounty: s.bounty ? { id: this.bountyId, modifierId: s.bounty } : null,
+      progress: s.players.map((p) => this.awards.get(p.profileId) ?? null),
       finalStateHash: stateHash(s),
       trustLabel: 'Local (unverified)',
     };
@@ -391,12 +401,20 @@ export class RunAuthority {
       runId: s.runId, status: status as 'finalized' | 'aborted' | 'invalidated', endReason: s.endReason ?? 'retired', scoreText: s.scoreText,
       depth: clearedDepth(s), activeTicks: s.totalActiveTicks, boardKey: this.boardKey, trust: s.trust,
       participantsJson: JSON.stringify(s.players.map((p) => ({ name: p.name, classId: p.classId }))), summaryJson: JSON.stringify(sum), practice: this.practice,
+      // progression: every member's profile earns the run's XP; a bounty run that cleared a round doubles each member's
+      // first completion of that bounty
+      progress: {
+        members: s.players.map((p) => ({ profileId: p.profileId, baseXp: xpForRun({ scoreText: s.scoreText, depth: clearedDepth(s) }) })),
+        bountyId: s.bounty ? this.bountyId : null,
+        bountyEligible: clearedDepth(s) >= BOUNTY_MIN_DEPTH,
+      },
     };
     const run = () => {
       this.chain = this.chain.then(async () => {
         await this.created;
         if (journal) await this.store.writeReplayChunk(journal).catch((err) => this.log.warn('replay_chunk_failed', { err: err as Error }));
-        await this.store.finalizeRun(input);
+        const r = await this.store.finalizeRun(input);
+        for (const a of r.awards ?? []) this.awards.set(a.profileId, describeAward(a.baseXp, a.bounty, a.xpBefore));
       }).then(() => {
         // RESULTS is entered only after the final summary is durably recorded
         this.pending.push({ cmd: { type: 'DURABLE', what: 'finalize' } });

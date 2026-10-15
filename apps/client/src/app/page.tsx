@@ -4,13 +4,14 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { CLASSES, CLASS_BY_ID } from '@cursebound/content';
+import { CLASSES, CLASS_BY_ID, STARTER_CLASSES, classUnlockLevel } from '@cursebound/content';
 import { api, ApiError } from '@/lib/api';
 import { authStore } from '@/lib/auth';
 import { createProfile, ensureProfile, setSeat, type Profile } from '@/lib/profile';
 import { initSettings, settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
 import { score } from '@/lib/format';
+import { bountyRoomOption, classUnlocked, countdownText, progressStore, refreshBounty, refreshProgress } from '@/lib/progress';
 import { clearGuestSession, joinViaHost } from '@/lib/p2p/guest';
 import { markHosting, stopHostBridge } from '@/lib/p2p/host';
 import { presenceOnline, presenceStore, resolveCode, setStatus, startPresence, type PeerId } from '@/lib/p2p/presence';
@@ -30,11 +31,14 @@ import { ClassEmblem } from '@/ui/icons';
 // Online (cloud signed in), a slim friends plate sits under the account plate: who is online, what they are doing,
 // and Join for open co-op parties (peer-to-peer, lib/p2p). Party invites arrive as toasts.
 // The title stage is shown once per tab; returning from another page lands on the menu.
+// Progression (lib/progress.ts): the account plate carries the level and an XP bar; the vessel picker locks classes
+// above the player's level. The Daily Bounty plaque under the menu shows today's negative modifier, the countdown to
+// its reroll, the x2 XP note and whether it is done; "Take the bounty" opens the vessel dialog for a solo bounty run.
 
 const MenuBackdrop = dynamic(() => import('@/game/MenuBackdrop'), { ssr: false });
 
 interface RunItem { id: string; mode: string; status: string; round: number; scoreText: string; resumed: boolean; createdAt: number; challengeId: string | null }
-type Intent = 'solo' | 'daily' | 'tutorial';
+type Intent = 'solo' | 'daily' | 'tutorial' | 'bounty';
 type Pane = 'none' | 'party' | 'continue' | 'vessel';
 type Stage = 'title' | 'menu';
 
@@ -45,6 +49,7 @@ const INTENT_COPY: Record<Intent, { title: string; go: string; busy: string }> =
   solo: { title: 'Choose your vessel', go: 'Descend', busy: 'Descending…' },
   daily: { title: 'The Daily Rite', go: 'Begin the rite', busy: 'Descending…' },
   tutorial: { title: 'First Descent', go: 'Begin the tutorial', busy: 'Descending…' },
+  bounty: { title: 'The Daily Bounty', go: 'Take the bounty', busy: 'Descending…' },
 };
 
 /** Integer logo scale: 2x up to 1080p-class screens, 3x when there is room for it. */
@@ -83,6 +88,17 @@ function Dialog({ title, tone, wide, onClose, children }: { title: string; tone:
   );
 }
 
+/** Level and XP bar on the account plate (progression). */
+function LevelPlate({ level, into, need }: { level: number; into: number; need: number }) {
+  const pct = need > 0 ? Math.max(0, Math.min(100, (into / need) * 100)) : 100;
+  return (
+    <span className="ap-level" data-tip={need > 0 ? `${into} / ${need} XP to level ${level + 1}` : 'Maximum level'}>
+      <span className="ap-lv">Level {level}<span>{need > 0 ? `${into}/${need}` : 'max'}</span></span>
+      <span className="bar thin xp" role="progressbar" aria-label={`Level ${level} experience`} aria-valuemin={0} aria-valuemax={need || 1} aria-valuenow={need > 0 ? into : 1}><i style={{ width: `${pct}%` }} /></span>
+    </span>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>('title');
@@ -101,6 +117,11 @@ export default function Home() {
   const settings = useStore(settingsStore, (s) => s.s);
   const auth = useStore(authStore, (s) => s);
   const presence = useStore(presenceStore, (s) => s.conn);
+  const progress = useStore(progressStore, (s) => s.progress);
+  const bounty = useStore(progressStore, (s) => s.bounty);
+  const skewMs = useStore(progressStore, (s) => s.skewMs);
+  const [now, setNow] = useState(() => Date.now());
+  const [partyBounty, setPartyBounty] = useState(false);
   const logoScale = useLogoScale();
   const menuRef = useRef<HTMLUListElement>(null);
 
@@ -118,6 +139,8 @@ export default function Home() {
     api('GET', '/lan').then(setLan).catch(() => undefined);
     ensureProfile().then((p) => {
       setProfile(p); setName(p.displayName); initSettings(p.id);
+      void refreshProgress(p.id);
+      void refreshBounty(p.id);
       api<{ runs: RunItem[] }>('GET', `/runs?profileId=${p.id}&limit=20`).then((r) => setRuns(r.runs)).catch(() => undefined);
       const fav = authStore.get().account?.favoriteClass;
       if (fav && CLASS_BY_ID[fav] && !localStorage.getItem(VESSEL_KEY)) setClassId(fav);
@@ -141,6 +164,25 @@ export default function Home() {
 
   const chooseClass = (id: string) => { setClassId(id); try { localStorage.setItem(VESSEL_KEY, id); } catch { /* ignore */ } };
 
+  // a remembered vessel that is still locked for this player falls back to a starter
+  useEffect(() => {
+    if (progress && !classUnlocked(classId, progress)) setClassId(STARTER_CLASSES[0] ?? 'vanguard');
+  }, [progress, classId]);
+
+  // the bounty countdown ticks once a second on the menu; at zero the bounty is fetched again (the backend rerolls it)
+  useEffect(() => {
+    if (stage !== 'menu' || !bounty) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [stage, bounty]);
+  const bountyLeft = bounty ? bounty.expiresAt - (now - skewMs) : 0;
+  useEffect(() => {
+    if (bounty && bountyLeft <= 0) { const t = setTimeout(() => { void refreshBounty(profile?.id ?? null); }, 1500); return () => clearTimeout(t); }
+  }, [bounty, bountyLeft <= 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Client-side class gate (the authority refuses locked classes too; a peer-to-peer guest relies on this one). */
+  const lockedMessage = (id: string) => (classUnlocked(id, progress) ? null : `${CLASS_BY_ID[id]?.name ?? id} unlocks at level ${classUnlockLevel(id)}`);
+
   const signedIn = auth.status === 'signedIn' && !!auth.account;
 
   const rename = async () => {
@@ -151,12 +193,17 @@ export default function Home() {
     return p;
   };
 
-  const start = async (kind: 'solo' | 'daily' | 'tutorial' | 'coop' | 'training') => {
+  const start = async (kind: 'solo' | 'daily' | 'tutorial' | 'coop' | 'bounty' | 'training', withBounty = kind === 'bounty') => {
+    const locked = kind === 'coop' || kind === 'training' ? null : lockedMessage(classId);   // training grounds: every class may be tried
+    if (locked) { setErr(locked); return; }
     setBusy(kind); setErr(null);
     try {
       const p = await rename();
       const r = await api<{ roomId: string; code: string; seatToken: string; slot: number }>('POST', '/rooms', {
-        profileId: p.id, mode: kind === 'coop' ? 'coop' : 'solo', classId, challenge: kind === 'daily' ? 'daily' : 'random', tutorial: kind === 'tutorial',
+        profileId: p.id, mode: kind === 'coop' ? 'coop' : 'solo', classId: kind === 'coop' && !classUnlocked(classId, progress) ? STARTER_CLASSES[0] : classId,
+        challenge: kind === 'daily' ? 'daily' : 'random', tutorial: kind === 'tutorial',
+        // daily bounty: the cloud bounty is passed through (online), else the authority's own (lib/progress.ts)
+        ...(withBounty ? { bounty: bountyRoomOption() ?? true } : {}),
         ...(kind === 'training' ? { training: true } : {}),   // training grounds: a sandbox, never scored or recorded
       });
       clearGuestSession();
@@ -169,6 +216,9 @@ export default function Home() {
 
   /** Join a friend's (or a resolved code's) host over peer-to-peer. */
   const joinPeer = async (host: PeerId, roomCode: string) => {
+    // the host's machine cannot see a guest's cloud level, so a peer-to-peer guest is gated here
+    const locked = lockedMessage(classId);
+    if (locked) { setErr(`${locked}. Choose another vessel before joining.`); return; }
     setBusy('join'); setErr(null);
     try {
       const seat = await joinViaHost(host, roomCode, classId);
@@ -245,11 +295,13 @@ export default function Home() {
           <>
             <span className="ap-emblem" aria-hidden="true"><ClassEmblem classId={auth.account!.favoriteClass ?? classId} size={24} /></span>
             <span className="ap-who"><span className="ap-label">Signed in</span><b>{auth.account!.displayName}</b></span>
+            {progress && <LevelPlate level={progress.level} into={progress.xpIntoLevel} need={progress.xpForNext} />}
             <Link className="btn small ghost" href="/account">Account</Link>
           </>
         ) : (
           <>
             <span className="ap-who"><span className="ap-label">{auth.status === 'unknown' ? 'Checking…' : 'Guest'}</span><b>{profile?.displayName ?? 'Wanderer'}</b></span>
+            {progress && <LevelPlate level={progress.level} into={progress.xpIntoLevel} need={progress.xpForNext} />}
             <Link className="btn small" href="/account">Sign in</Link>
           </>
         )}
@@ -286,6 +338,19 @@ export default function Home() {
               {!settings.tutorialDone && <li><button className="menu-item" aria-disabled={offline || !!busy} aria-haspopup="dialog" onClick={() => !offline && !busy && openVessel('tutorial')}>First Descent <small>start here</small></button></li>}
               <li><Link className="menu-item" href="/account">{signedIn ? 'Account' : 'Sign In'}</Link></li>
             </ul>
+            {bounty && (
+              <section className="bounty-plaque frame inset" aria-labelledby="bounty-h" style={{ '--bounty': bounty.modifier.color } as React.CSSProperties}>
+                <div className="bp-head">
+                  <h2 id="bounty-h" className="bp-title">Daily Bounty</h2>
+                  <span className="bp-timer" role="timer" aria-label={`Rerolls in ${countdownText(bountyLeft)}`} data-tip="Until the bounty rerolls">{countdownText(bountyLeft)}</span>
+                </div>
+                <p className="bp-mod"><b>{bounty.modifier.name}</b><span>{bounty.modifier.short}</span></p>
+                <div className="bp-foot">
+                  {bounty.completed ? <span className="chip good done">Completed today</span> : <span className="chip gold">×{bounty.xpMultiplier} XP first run</span>}
+                  <button className="btn small primary" disabled={offline || !!busy} onClick={() => openVessel('bounty')}>Take the bounty</button>
+                </div>
+              </section>
+            )}
             <div className="title-links">
               <button className="btn small ghost" disabled={offline || !!busy} onClick={() => start('training')} title={`Train as ${cls?.name ?? 'your vessel'}: spawn foes and bosses, swap classes, rank every skill`}>{busy === 'training' ? 'Opening…' : 'Training Grounds'}</button>
               <Link className="btn small ghost" href="/records">Records</Link>
@@ -318,7 +383,8 @@ export default function Home() {
               </label>
             )}
             <span className="engraved" id="cls-label">Choose your vessel</span>
-            <ClassPicker value={classId} onChange={chooseClass} labelledBy="cls-label" idPrefix="title-vessel" />
+            {intent === 'bounty' && bounty && <p className="muted">Today&apos;s modifier: <b className="gold-text">{bounty.modifier.name}</b> — {bounty.modifier.description}{bounty.completed ? '' : ` First finished run earns ×${bounty.xpMultiplier} XP.`}</p>}
+            <ClassPicker value={classId} onChange={chooseClass} labelledBy="cls-label" idPrefix="title-vessel" level={progress?.level ?? null} />
             {err && <p className="neg" role="alert">{err}</p>}
             <div className="row vs-foot">
               <span className="grow" />
@@ -338,7 +404,13 @@ export default function Home() {
                 <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} aria-label="Your name" />
               </label>
             )}
-            <button className="btn arcane" disabled={offline || !!busy} onClick={() => start('coop')}>{busy === 'coop' ? 'Opening…' : 'Open an invite room'}</button>
+            <button className="btn arcane" disabled={offline || !!busy} onClick={() => start('coop', partyBounty && !!bounty)}>{busy === 'coop' ? 'Opening…' : 'Open an invite room'}</button>
+            {bounty && (
+              <label className="party-bounty">
+                <input type="checkbox" checked={partyBounty} onChange={(e) => setPartyBounty(e.target.checked)} />
+                Take today&apos;s bounty ({bounty.modifier.name}, ×{bounty.xpMultiplier} XP)
+              </label>
+            )}
             <span className="engraved">Join with a code</span>
             <form className="row" onSubmit={(e) => { e.preventDefault(); if (code.length >= 6) void join(false); }}>
               <label className="sr-only" htmlFor="code">Room code</label>

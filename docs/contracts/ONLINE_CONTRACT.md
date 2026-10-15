@@ -52,6 +52,16 @@ Differences in online mode:
   credentials (coturn `use-auth-secret`): `username = "<unixExpiry>:<accountId>"`,
   `credential = base64(HMAC-SHA1(TURN_SECRET, username))`, ttl 6 h.
 - `GET /healthz` → `{ ok, build, minClientBuild }`.
+- Progression (content `progression.ts`): `POST /runs` also takes `bounty: { id, modifierId } | null` and credits the
+  submitter's XP once per (account, run) (`xp_awards`); the response adds `xp: { xp, baseXp, bounty, xpBefore, xpAfter,
+  levelBefore, levelAfter, unlocked }` and `progress`. `GET /account/progress` → `{ level, xp, xpIntoLevel, xpForNext,
+  unlockedClasses, nextUnlock }`.
+- Daily bounty (content `bounties.ts`): `GET /bounty` → `{ bounty: { id, modifier: { id, name, short, description, color },
+  createdAt, expiresAt, serverNow, completed, xpMultiplier } }` (`completed` is null for signed-out callers). The cloud is the
+  source of truth: a polled job (every 60 s) and every read run the same check, which rolls a new modifier (never the previous
+  one) once the latest `daily_bounties` row is 24 h old, under `pg_advisory_xact_lock` so checks never double-roll. A
+  submitted run whose bounty is real, matches its modifier, cleared ≥ 1 round and is reported within 6 h of the bounty's expiry
+  marks it completed (`bounty_completions`); only that first completion doubles the run's XP.
 Errors: `{ requestId, error: { code, message } }`, same codes as local.
 
 ## Presence and signaling (WebSocket `${cloudUrl → ws(s)}/api/v1/presence`)
@@ -131,3 +141,12 @@ GCP region `us-central1`; Cloud Run service `cursebound-cloud`; Artifact Registr
 - **Public access:** Cloud Run runs with `--no-invoker-iam-check` (public without an `allUsers` IAM binding), because the
   Workspace organization's domain-restricted sharing forbids `allUsers`.
 - **Presence deps** include optional `identities(ids)` so offline friends are listed by name.
+- **Progression and class gates:** 5 classes start unlocked, 5 unlock at levels 3/6/10/15/20 (content `progression.ts`).
+  The local authority gates seats (`POST /rooms`, `POST /rooms/:code/join`, lobby class changes) by the profile's level:
+  local XP (migration v4 `profiles.xp`, credited at finalization) or, for a linked profile, the larger cloud XP its own
+  client synced through `POST /local/profiles/link { …, cloudXp }`. A linked profile that never synced cloud XP is a guest
+  seated by the host bridge: the host cannot see their cloud level, so their own client gates the picker before joining.
+  Local: `GET /api/v1/local/profiles/:id/progress`, `GET /api/v1/local/bounty?profileId=` (the same bounty job on SQLite for
+  offline play). `POST /rooms { bounty: true | { id, modifierId } }` starts a bounty run (local bounty, or the cloud bounty
+  passed through; the modifier id is validated against content). Bounty runs rank in their own board division
+  (`…|bounty:<modifierId>`).

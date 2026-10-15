@@ -1,5 +1,6 @@
 import { Big } from '@cursebound/numeric';
-import { SKILL_BY_ID, DODGE } from '@cursebound/content';
+import { SKILL_BY_ID, DODGE, RULES } from '@cursebound/content';
+import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { cohortHpFrac, cohortTotalHp } from './combat';
 import { ccSnapFlags } from './cc';
 import { afflictionSnapshot } from './afflictions';
@@ -109,10 +110,10 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
           const base = s.full ?? SKILL_BY_ID[s.skillId].cooldownSec;
           return [s.skillId, base > 0 && s.charges < s.maxCharges ? r3(Math.min(1, Math.max(0, s.cooldown) / base)) : 0, s.charges, s.maxCharges] as [string, number, number, number];
         }),
-        dodge: r3(p.dodgeCooldown / DODGE.cooldownSec), down: r3(p.downTimer), rev: r3(p.reviveProgress / 3), self: r3(p.selfReviveChannel),
+        dodge: r3(p.dodgeCooldown / DODGE.cooldownSec), down: r3(p.downTimer), rev: r3(p.reviveProgress / (RULES.reviveChannelSec * (bountyRules(state).reviveChannelFactor ?? 1))), self: r3(p.selfReviveChannel),
         con: p.connected, guard: p.guardTimer > 0, buffs: p.buffs.map((b) => b.id), seq: p.lastInputSeq, downs: p.downsThisRound,
         spd: moveSpeedOf(state, p), dt: r3(p.dodgeTimer), ddx: r3(p.dodgeDirX), ddy: r3(p.dodgeDirY), dcd: r3(p.dodgeCooldown),
-        dc: p.dodgeCharges ?? DODGE.charges, dcm: DODGE.charges, sg: r3(p.surgeTimer ?? 0), rr: r3(toFloatClamped(pd.recovery, 1e12)),
+        dc: p.dodgeCharges ?? DODGE.charges, dcm: dodgeMaxOf(p), sg: r3(p.surgeTimer ?? 0), rr: r3(toFloatClamped(pd.recovery, 1e12)),
         ...kitVars(p.vars),
         ...gearSnapshot(state, p),
         ...afflictionSnapshot(state, p),

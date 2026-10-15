@@ -1,13 +1,17 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import crypto from 'node:crypto';
-import { CLASS_BY_ID, CONTENT_MANIFEST, RULES_VERSION, SCORE_VERSION, contentHash, validateContent } from '@cursebound/content';
+import {
+  BOUNTY_BY_ID, CLASS_BY_ID, CONTENT_MANIFEST, RULES_VERSION, SCORE_VERSION, bountyView, classUnlockLevel, contentHash, isClassUnlocked, levelForXp,
+  progressFor, validateContent,
+} from '@cursebound/content';
 import { BUILD_ID, PROTOCOL_VERSION, sanitizeName } from '@cursebound/protocol';
 import { NUMERIC_VERSION } from '@cursebound/numeric';
 import type { ServerConfig } from './config';
 import type { Logger } from './persistence/logger';
 import type { Store } from './persistence/store';
 import { replayJournals } from './replay';
-import type { RoomManager } from './rooms';
+import type { RoomBounty, RoomManager } from './rooms';
+import { BountyService } from './bounty';
 import { hostAllowed, originAllowed } from './security';
 import { SESSION_COOKIE, readCookie } from './auth';
 import { registerAccountRoutes } from './accountRoutes';
@@ -22,7 +26,7 @@ export { HttpError, readBody, type AuthState, type RouteCtx, type RouteFn } from
 const MAX_IMPORT = 8 * 1024 * 1024;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, log: Logger) {
+export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, log: Logger, bounties: BountyService = new BountyService(store, log)) {
   const idem = new Map<string, { at: number; status: number; body: unknown }>();
   setInterval(() => { const now = Date.now(); for (const [k, v] of idem) if (now - v.at > 10 * 60000) idem.delete(k); }, 60000).unref();
 
@@ -52,6 +56,22 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     if (!a || a.account.id !== owner.id) throw new HttpError(403, 'UNAUTHORIZED', 'that profile belongs to an account — sign in to use it');
   };
 
+  /**
+   * Progression level the class gate uses for a profile (content progression.ts): local XP, or the larger cloud XP its
+   * own client synced for a linked account. null = a cloud-linked profile that never synced its XP here, i.e. a guest
+   * seated by the host bridge (online co-op): this machine cannot know their level, so their own client gates them.
+   */
+  const gateLevel = async (profileId: string): Promise<number | null> => {
+    const pr = await store.getProgress(profileId);
+    if (!pr) return 1;
+    if (pr.linked && pr.cloudXp === null) return null;
+    return levelForXp(Math.max(pr.xp, pr.cloudXp ?? 0));
+  };
+  const assertUnlocked = (classId: string, level: number | null) => {
+    if (level === null || isClassUnlocked(classId, level)) return;
+    throw new HttpError(403, 'CLASS_LOCKED', `${CLASS_BY_ID[classId]?.name ?? classId} unlocks at level ${classUnlockLevel(classId)}`);
+  };
+
   route('GET', '/health', async () => {
     const h = await store.health().catch(() => ({ ok: false, schemaVersion: 0, walBytes: 0, queueDepth: 0, lastQueueAgeMs: 0 }));
     return { ok: h.ok, service: 'cursebound', build: BUILD_ID, protocol: PROTOCOL_VERSION, contentHash: contentHash(), rulesVersion: RULES_VERSION, scoreVersion: SCORE_VERSION, numericVersion: NUMERIC_VERSION, persistence: h, lan: cfg.lan, contentValid: validateContent().length === 0 };
@@ -74,10 +94,26 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
   // online mode (docs/contracts/ONLINE_CONTRACT.md): the local profile a cloud account plays as, created on first
   // use; the display name follows the account. The client links itself after sign-in, the host bridge its guests.
   route('POST', '/local/profiles/link', async (_m, req) => {
-    const b = (await readBody(req)) as { accountId?: unknown; displayName?: unknown };
+    const b = (await readBody(req)) as { accountId?: unknown; displayName?: unknown; cloudXp?: unknown };
     const accountId = assertId(typeof b.accountId === 'string' ? b.accountId : '', 'account');
-    const p = await store.linkCloudProfile(accountId, sanitizeName(typeof b.displayName === 'string' ? b.displayName : 'Wanderer'));
+    // cloudXp: the client's own cloud progress (GET /account/progress), so class gates here match the cloud level
+    const cloudXp = typeof b.cloudXp === 'number' && Number.isSafeInteger(b.cloudXp) && b.cloudXp >= 0 ? b.cloudXp : null;
+    const p = await store.linkCloudProfile(accountId, sanitizeName(typeof b.displayName === 'string' ? b.displayName : 'Wanderer'), cloudXp);
     return { id: p.id, displayName: p.displayName };
+  });
+  // progression (content progression.ts): level, XP bar and class unlocks of a local profile
+  route('GET', '/local/profiles/:id/progress', async (m) => {
+    const pr = await store.getProgress(assertId(m[1], 'profile'));
+    if (!pr) throw new HttpError(404, 'NOT_FOUND', 'profile not found');
+    return { ...progressFor(Math.max(pr.xp, pr.cloudXp ?? 0)), localXp: pr.xp, cloudXp: pr.cloudXp };
+  });
+  // the local daily bounty (offline / local mode; online clients use the cloud's GET /bounty): checked lazily here and
+  // by the polled job (bounty.ts); `completed` for the given profile
+  route('GET', '/local/bounty', async (_m, _req, url) => {
+    const b = await bounties.current();
+    const profileId = url.searchParams.get('profileId');
+    const completed = profileId && /^[A-Za-z0-9_-]{1,64}$/.test(profileId) ? await store.bountyCompleted(b.id, profileId) : null;
+    return { bounty: bountyView(b, completed, bounties.clock()) };
   });
   route('GET', '/local/settings/:id', async (m, _req, _url, ctx) => {
     const id = assertId(m[1], 'profile');
@@ -92,18 +128,33 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     return { ok: true };
   });
   route('POST', '/rooms', async (_m, req, _url, ctx) => {
-    const b = (await readBody(req)) as { profileId?: string; mode?: string; classId?: string; challenge?: string; tutorial?: boolean; training?: boolean };
+    const b = (await readBody(req)) as { profileId?: string; mode?: string; classId?: string; challenge?: string; tutorial?: boolean; bounty?: unknown; training?: boolean };
     const profile = await store.getProfile(assertId(String(b.profileId ?? ''), 'profile'));
     if (!profile) throw new HttpError(404, 'NOT_FOUND', 'profile not found');
     await assertProfileUse(profile.id, ctx);
     const mode = b.mode === 'coop' ? 'coop' : 'solo';
     const tutorial = !!b.tutorial && mode === 'solo';
     const challenge = b.challenge === 'daily' ? 'daily' : 'random';
-    // training grounds (rooms.ts): a sandbox room, never scored or recorded
+    const classId = CLASS_BY_ID[String(b.classId)] ? String(b.classId) : 'vanguard';
+    const level = await gateLevel(profile.id);
+    // training grounds (rooms.ts): a sandbox room, never scored or recorded; every class may be tried there
     const training = !!b.training && !tutorial;
-    const room = rooms.createRoom({ mode, challenge: tutorial ? 'tutorial' : challenge, tutorial, ...(training ? { training } : {}) });
-    const { seat, token } = room.addSeat(profile.id, profile.displayName, CLASS_BY_ID[String(b.classId)] ? String(b.classId) : 'vanguard');
-    return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode, ...(training ? { training } : {}) };
+    if (!training) assertUnlocked(classId, level);
+    // daily bounty: `true` = this machine's own bounty (local mode); { id, modifierId } = the cloud bounty passed
+    // through by an online client, its modifier validated against content
+    let bounty: RoomBounty | null = null;
+    if (b.bounty === true && !tutorial) {
+      const cur = await bounties.current();
+      bounty = { id: cur.id, modifierId: cur.modifierId };
+    } else if (b.bounty && typeof b.bounty === 'object' && !tutorial) {
+      const o = b.bounty as { id?: unknown; modifierId?: unknown };
+      if (typeof o.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(o.id) || typeof o.modifierId !== 'string' || !BOUNTY_BY_ID[o.modifierId]) throw new HttpError(400, 'INVALID_INPUT', 'unknown bounty modifier');
+      bounty = { id: o.id, modifierId: o.modifierId };
+    }
+    if (training) bounty = null;
+    const room = rooms.createRoom({ mode, challenge: tutorial ? 'tutorial' : bounty ? 'random' : challenge, tutorial, bounty, ...(training ? { training } : {}) });
+    const { seat, token } = room.addSeat(profile.id, profile.displayName, classId, level);
+    return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode, bounty: bounty?.modifierId ?? null, ...(training ? { training } : {}) };
   });
   route('GET', '/rooms/:code', async (m) => {
     const room = rooms.byCode(m[1]);
@@ -118,11 +169,11 @@ export function createApi(cfg: ServerConfig, store: Store, rooms: RoomManager, l
     if (!profile) throw new HttpError(404, 'NOT_FOUND', 'profile not found');
     await assertProfileUse(profile.id, ctx);
     try {
-      const { seat, token } = room.addSeat(profile.id, profile.displayName, String(b.classId ?? 'arcanist'));
+      const { seat, token } = room.addSeat(profile.id, profile.displayName, String(b.classId ?? 'arcanist'), await gateLevel(profile.id));
       return { roomId: room.id, code: room.code, seatToken: token, slot: seat.slot, mode: room.mode };
     } catch (err) {
       const code = (err as { code?: string }).code ?? 'INVALID_INPUT';
-      throw new HttpError(409, code, (err as Error).message);
+      throw new HttpError(code === 'CLASS_LOCKED' ? 403 : 409, code, (err as Error).message);
     }
   });
   route('GET', '/runs', async (_m, _req, url) => {

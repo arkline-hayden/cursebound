@@ -8,6 +8,7 @@ import { CONSUMABLES, MAX_BLESSINGS, TRAINING_THEME } from './consumables';
 import { canonicalJson, sha256Hex } from './hash';
 import { AFFLICTION_RULES, CONTENT_VERSION, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION } from './rules';
 import { STATS } from './stats';
+import { BOUNTY_MODIFIERS } from './bounties';
 
 export * from './types';
 export * from './stats';
@@ -21,6 +22,8 @@ export * from './consumables';
 export * from './rules';
 export * from './hash';
 export * from './validate';
+export * from './progression';
+export * from './bounties';
 
 /** The immutable content manifest (PRD §15.3, §21.2). Its hash pins runs, rooms and leaderboards. */
 export const CONTENT_MANIFEST = {
@@ -51,6 +54,8 @@ export const CONTENT_MANIFEST = {
   consumables: CONSUMABLES,
   maxBlessings: MAX_BLESSINGS,
   training: TRAINING_THEME,
+  // daily bounty modifiers (bounties.ts): a bounty run applies one at creation, so they are pinned with the content
+  bounties: BOUNTY_MODIFIERS,
 };
 
 let cachedHash: string | null = null;

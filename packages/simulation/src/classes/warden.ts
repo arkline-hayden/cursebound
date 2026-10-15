@@ -1,6 +1,7 @@
 import { Big } from '@cursebound/numeric';
-import { SKILL_BY_ID, TICK_SEC } from '@cursebound/content';
+import { RULES, SKILL_BY_ID, TICK_SEC } from '@cursebound/content';
 import { addDot, addStagger, healPlayer, hitEnemy, shieldPlayer, type CohortResult } from '../combat';
+import { arrived, beyondLeash, blinkTo, clearLane, followStep, ownerSlot, reachableFrom, routeStep, spreadFrom, trackStuck } from '../follow';
 import { registerClassHooks, registerGlobalHooks, type SimHooks } from '../hooks';
 import { inCone, inLine, moveCircle, norm, rayDistance } from '../geometry';
 import { nearestFloor } from '../map';
@@ -30,7 +31,7 @@ const ZERO = Big.ZERO;
 const ROOT_IMMUNE = ticks(1.5);
 const HUNT_R = 9;            // beasts hunt enemies within this distance of the Warden
 const LEASH_R = 10;          // a target beyond this distance of the Warden is dropped
-const RECALL_R = 14;         // beasts this far from the Warden blink back to it
+// beasts beyond RULES.followBlinkRange of the Warden blink back to it (follow.ts leash)
 const COS_SPEAR = cosHalf(80);
 const COS_MAUL = cosHalf(150);
 const COS_SWIPE = cosHalf(120);
@@ -337,16 +338,17 @@ function callPack(state: SimState, ev: SimEvent[], p: PlayerState, ax: number, a
 /** Pick (or keep) a beast's target: the Alpha mark first, else the current target, else the nearest enemy within HUNT_R of the Warden. */
 function acquire(state: SimState, h: Hazard, p: PlayerState): EnemyState | undefined {
   const v = h.vars!;
+  const unr = (v.unrT ?? 0) > state.tick ? v.unr : 0;   // a target this beast just failed to reach (huntStep)
   if (has(p, 'w_alpha_wild') && (p.vars.w_markUntil ?? 0) > state.tick) {
     const m = enemyById(state, p.vars.w_mark);
-    if (m && d2(m.x, m.y, p.x, p.y) <= (LEASH_R + 2) ** 2) { v.tgt = m.id; return m; }
+    if (m && m.id !== unr && d2(m.x, m.y, p.x, p.y) <= (LEASH_R + 2) ** 2) { v.tgt = m.id; return m; }
   }
   let e = enemyById(state, v.tgt);
   if (e && d2(e.x, e.y, p.x, p.y) > LEASH_R * LEASH_R) e = undefined;
   if (!e) {
     let bd = Infinity;
     for (const c of state.enemies) {
-      if (!isLive(c) || d2(c.x, c.y, p.x, p.y) > HUNT_R * HUNT_R) continue;
+      if (!isLive(c) || c.id === unr || d2(c.x, c.y, p.x, p.y) > HUNT_R * HUNT_R) continue;
       const d = d2(c.x, c.y, h.x, h.y);
       if (d < bd) { bd = d; e = c; }
     }
@@ -355,19 +357,57 @@ function acquire(state: SimState, h: Hazard, p: PlayerState): EnemyState | undef
   return e;
 }
 
-function moveBeast(state: SimState, h: Hazard, tx: number, ty: number, maxStep: number) {
-  const d = Math.sqrt(d2(h.x, h.y, tx, ty));
-  if (d < 1e-4) return;
-  const step = Math.min(d, maxStep);
-  const r = moveCircle(state.map!, h.x, h.y, ((tx - h.x) / d) * step, ((ty - h.y) / d) * step, Math.min(0.4, h.radius));
-  h.x = r.x; h.y = r.y;
+// ---------------- beast movement (routing: ../follow.ts) ----------------
+// Beasts walk around walls and chasm voids on throttled A* routes, never stay stuck (stalled progress re-paths, then
+// blinks back to the Warden's side when following, or gives the target up when hunting), and spread so the pack
+// does not stack. Speeds are authored x RULES.minionMoveSpeedMult.
+
+/** Collision radius a beast walks with. */
+const beastBody = (h: Hazard) => Math.min(0.4, h.radius);
+/** Ursa's own formation slot (it used to share wolf slot 2 and stood inside that wolf). */
+const URSA_OFF: [number, number] = [-2.4, -1.0];
+/** Ticks a target the beast could not reach is ignored by acquire. */
+const UNREACHABLE_TICKS = ticks(1.5);
+
+function beastPeers(state: SimState, p: PlayerState): Hazard[] {
+  return state.hazards.filter((h) => (h.kind === 'w_wolf' || h.kind === 'w_ursa') && h.owner === 'player' && h.ownerId === p.slot && h.untilTick > state.tick);
 }
 
-function followOwner(state: SimState, h: Hazard, p: PlayerState, idx: number, speed: number) {
-  const [along, side] = FOLLOW_OFF[idx % FOLLOW_OFF.length];
-  const tx = p.x + p.aimX * along - p.aimY * side, ty = p.y + p.aimY * along + p.aimX * side;
+/** Formation slot (along aim, sideways) beside the Warden, on the Warden's side of every wall and gap. */
+function beastSlot(state: SimState, p: PlayerState, off: [number, number], body: number): [number, number] {
+  const [along, side] = off;
+  return ownerSlot(state, p, p.aimX * along - p.aimY * side, p.aimY * along + p.aimX * side, body);
+}
+
+/** Leash: a beast past the follow range blinks to its formation slot. Returns true if it blinked. */
+function leashBeast(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState, off: [number, number]): boolean {
+  if (!beyondLeash(h, p)) return false;
+  const [sx, sy] = beastSlot(state, p, off, beastBody(h));
+  blinkTo(state, ev, h, p, sx, sy);
+  h.vars!.tgt = 0;
+  return true;
+}
+
+function followOwner(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState, off: [number, number], speed: number) {
+  const body = beastBody(h);
+  const [tx, ty] = beastSlot(state, p, off, body);
   const d = Math.sqrt(d2(h.x, h.y, tx, ty));
-  if (d > 0.25) moveBeast(state, h, tx, ty, speed * (d > 3 ? 1.75 : 1.25) * DT);   // catch up faster when left behind
+  followStep(state, ev, h, p, tx, ty, speed * (d > 3 ? 1.75 : 1.25), body);   // catch up faster when left behind
+}
+
+/** Hunt toward (tx, ty) beside target e. A target the beast cannot reach (no route, a long detour around a gap, or
+ *  stuck twice) is dropped and ignored for a moment so acquire picks a reachable one. */
+function huntStep(state: SimState, h: Hazard, e: EnemyState, tx: number, ty: number, maxStep: number) {
+  const v = h.vars!;
+  const res = routeStep(state, h, tx, ty, maxStep, beastBody(h));
+  const strikes = res === 'fail' ? 2 : trackStuck(state, h, tx, ty, Math.sqrt(d2(h.x, h.y, tx, ty)));
+  if (strikes >= 2) { v.unr = e.id; v.unrT = state.tick + UNREACHABLE_TICKS; v.tgt = 0; arrived(h); }
+}
+
+/** Approach point at distance `reach` from e on the beast's side, rotated sideways by `side`; reachable from e. */
+function besideTarget(state: SimState, h: Hazard, e: EnemyState, reach: number, side: number): [number, number] {
+  const [ux, uy] = norm(h.x - e.x, h.y - e.y);
+  return reachableFrom(state, e.x, e.y, ux * reach - uy * side, uy * reach + ux * side, beastBody(h));
 }
 
 function landLeap(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState) {
@@ -389,14 +429,11 @@ function landLeap(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState) {
 function stepWolf(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState) {
   const v = h.vars!;
   const ox = h.x, oy = h.y;
-  const speed = 7.5 * beastSpeedMul(state, p);
+  const speed = 7.5 * beastSpeedMul(state, p) * RULES.minionMoveSpeedMult;
+  const off = FOLLOW_OFF[v.i % FOLLOW_OFF.length];
   h.outer = frenzied(state, p) ? 1 : 0;
   let faceX = 0, faceY = 0;
-  if (v.leap <= 0 && d2(h.x, h.y, p.x, p.y) > RECALL_R * RECALL_R) {
-    const [sx, sy] = SPAWN_OFF[v.i % SPAWN_OFF.length];
-    const r = moveCircle(state.map!, p.x, p.y, sx, sy, 0.25);
-    h.x = r.x; h.y = r.y; v.tgt = 0;
-  }
+  if (v.leap <= 0) leashBeast(state, ev, h, p, off);
   if (v.leap > 0) {
     const e = enemyById(state, v.tgt);
     if (e) {
@@ -413,24 +450,28 @@ function stepWolf(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState) {
       const dist = Math.sqrt(d2(h.x, h.y, e.x, e.y));
       const gap = dist - e.radius - h.radius;
       faceX = e.x - h.x; faceY = e.y - h.y;
-      if (gap > 1.6 && gap < 4.5 && state.tick >= v.pcd) {
+      if (gap > 1.6 && gap < 4.5 && state.tick >= v.pcd && clearLane(state.map!, h.x, h.y, e.x, e.y, 0.25)) {
+        // pounce only along an open lane (never into a wall or across a chasm)
         startLeap(state, h, e, 1);
         v.pcd = state.tick + ticks(4);
       } else if (gap > 0.3) {
         // approach a flank slot around the target so the pack spreads out
-        const [ux, uy] = norm(h.x - e.x, h.y - e.y);
         const side = (v.i % 2 ? 1 : -1) * Math.min(2, v.i) * 0.3;
-        const reach = e.radius + h.radius + 0.15;
-        moveBeast(state, h, e.x + ux * reach - uy * side, e.y + uy * reach + ux * side, speed * DT);
-      } else if (state.tick >= h.nextTick) {
-        const dmg = hitDamage(state, p, 'w_wolf_bite', 'physical').mul(wolfMul(state, p, e));
-        const res = hitEnemy(state, ev, e, dmg, ONE, { dtype: 'physical', srcSlot: p.slot, skillId: 'w_wolf_bite', fromX: h.x, fromY: h.y, allowCrit: true, dot: wolfBleed(p) });
-        beastAfterHit(state, p, ev, e, res);
-        flinch(state, e, h.x, h.y, 0.1);
-        h.nextTick = state.tick + biteInterval(state, p, 0.9);
-        v.bite = state.tick;
+        const [tx, ty] = besideTarget(state, h, e, e.radius + h.radius + 0.15, side);
+        huntStep(state, h, e, tx, ty, speed * DT);
+      } else {
+        arrived(h);   // in bite range: no stuck window running
+        if (state.tick >= h.nextTick) {
+          const dmg = hitDamage(state, p, 'w_wolf_bite', 'physical').mul(wolfMul(state, p, e));
+          const res = hitEnemy(state, ev, e, dmg, ONE, { dtype: 'physical', srcSlot: p.slot, skillId: 'w_wolf_bite', fromX: h.x, fromY: h.y, allowCrit: true, dot: wolfBleed(p) });
+          beastAfterHit(state, p, ev, e, res);
+          flinch(state, e, h.x, h.y, 0.1);
+          h.nextTick = state.tick + biteInterval(state, p, 0.9);
+          v.bite = state.tick;
+        }
       }
-    } else followOwner(state, h, p, v.i, speed);
+    } else followOwner(state, ev, h, p, off, speed);
+    spreadFrom(state, h, beastBody(h), beastPeers(state, p), beastBody);
   }
   finishBeastStep(h, ox, oy, faceX, faceY);
   h.length = Math.max(0, v.leap);
@@ -448,33 +489,36 @@ function finishBeastStep(h: Hazard, ox: number, oy: number, faceX: number, faceY
 function stepUrsa(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState) {
   const v = h.vars!;
   const ox = h.x, oy = h.y;
-  const speed = 5 * beastSpeedMul(state, p);
+  const speed = 5 * beastSpeedMul(state, p) * RULES.minionMoveSpeedMult;
   h.outer = frenzied(state, p) ? 1 : 0;
   let faceX = 0, faceY = 0;
-  if (d2(h.x, h.y, p.x, p.y) > RECALL_R * RECALL_R) {
-    const r = moveCircle(state.map!, p.x, p.y, -p.aimX * 1.2, -p.aimY * 1.2, 0.4);
-    h.x = r.x; h.y = r.y; v.tgt = 0;
-  }
+  leashBeast(state, ev, h, p, URSA_OFF);
   const e = acquire(state, h, p);
   if (e) {
     const dist = Math.sqrt(d2(h.x, h.y, e.x, e.y));
     const gap = dist - e.radius - h.radius;
     faceX = e.x - h.x; faceY = e.y - h.y;
-    if (gap > 0.8) moveBeast(state, h, e.x, e.y, Math.min(speed * DT, gap - 0.6));
-    else if (state.tick >= h.nextTick) {
-      const [fx, fy] = norm(faceX, faceY);
-      const base = hitDamage(state, p, 'w_ursa_swipe', 'physical');
-      for (const t of livingEnemies(state)) {
-        if (!inCone(h.x, h.y, fx, fy, 1.8 + h.radius, COS_SWIPE, t.x, t.y, t.radius)) continue;
-        const res = hitEnemy(state, ev, t, base.mul(beastMul(state, p, t)), ONE, { dtype: 'physical', srcSlot: p.slot, skillId: 'w_ursa_swipe', fromX: h.x, fromY: h.y, coverage: areaCoverage(t, 1.8), allowCrit: true, stagger: 40 });
-        beastAfterHit(state, p, ev, t, res);
-        flinch(state, t, h.x, h.y, 0.35);
+    if (gap > 0.8) {
+      const [tx, ty] = besideTarget(state, h, e, e.radius + h.radius + 0.5, 0);
+      huntStep(state, h, e, tx, ty, Math.min(speed * DT, gap - 0.6));
+    } else {
+      arrived(h);   // in swipe range: no stuck window running
+      if (state.tick >= h.nextTick) {
+        const [fx, fy] = norm(faceX, faceY);
+        const base = hitDamage(state, p, 'w_ursa_swipe', 'physical');
+        for (const t of livingEnemies(state)) {
+          if (!inCone(h.x, h.y, fx, fy, 1.8 + h.radius, COS_SWIPE, t.x, t.y, t.radius)) continue;
+          const res = hitEnemy(state, ev, t, base.mul(beastMul(state, p, t)), ONE, { dtype: 'physical', srcSlot: p.slot, skillId: 'w_ursa_swipe', fromX: h.x, fromY: h.y, coverage: areaCoverage(t, 1.8), allowCrit: true, stagger: 40 });
+          beastAfterHit(state, p, ev, t, res);
+          flinch(state, t, h.x, h.y, 0.35);
+        }
+        castEv(ev, p, 'w_ursa_swipe', h.x, h.y, fx, fy);
+        h.nextTick = state.tick + biteInterval(state, p, 1.4);
+        v.bite = state.tick;
       }
-      castEv(ev, p, 'w_ursa_swipe', h.x, h.y, fx, fy);
-      h.nextTick = state.tick + biteInterval(state, p, 1.4);
-      v.bite = state.tick;
     }
-  } else followOwner(state, h, p, 2, speed);
+  } else followOwner(state, ev, h, p, URSA_OFF, speed);
+  spreadFrom(state, h, beastBody(h), beastPeers(state, p), beastBody);
   finishBeastStep(h, ox, oy, faceX, faceY);
   h.length = 0;
   h.width = v.bite;

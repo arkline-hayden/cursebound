@@ -118,9 +118,45 @@ END $$;
 ALTER TABLE friendships ADD CONSTRAINT friendships_pair_order CHECK ((account_a COLLATE "C") < (account_b COLLATE "C"));
 `;
 
+// Player progression and the daily bounty (content progression.ts / bounties.ts). accounts.xp is the account's total;
+// xp_awards holds one award per (account, run) so a re-submitted run never pays twice. daily_bounties is the bounty
+// roll (polled job + lazy check, apps/cloud/src/bounty.ts); bounty_completions marks the first bounty run per account
+// (that run's XP is doubled).
+const V3 = `
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS xp BIGINT NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS xp_awards(
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  run_id TEXT NOT NULL,
+  xp INTEGER NOT NULL CHECK (xp >= 0),
+  base_xp INTEGER NOT NULL CHECK (base_xp >= 0),
+  bounty BOOLEAN NOT NULL DEFAULT false,
+  xp_before BIGINT NOT NULL,
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (account_id, run_id)
+);
+
+CREATE TABLE IF NOT EXISTS daily_bounties(
+  id TEXT PRIMARY KEY,
+  modifier_id TEXT NOT NULL CHECK (char_length(modifier_id) BETWEEN 1 AND 64),
+  created_at BIGINT NOT NULL,
+  expires_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS daily_bounties_created_idx ON daily_bounties(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS bounty_completions(
+  bounty_id TEXT NOT NULL REFERENCES daily_bounties(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  run_id TEXT NOT NULL,
+  completed_at BIGINT NOT NULL,
+  PRIMARY KEY (bounty_id, account_id)
+);
+`;
+
 export const CLOUD_MIGRATIONS: readonly CloudMigration[] = [
   { version: 1, name: 'accounts_friends_builds_runs', sql: V1 },
   { version: 2, name: 'friendships_bytewise_pair_order', sql: V2 },
+  { version: 3, name: 'progression_daily_bounty', sql: V3 },
 ];
 
 export const CLOUD_SCHEMA_VERSION = CLOUD_MIGRATIONS[CLOUD_MIGRATIONS.length - 1]!.version;

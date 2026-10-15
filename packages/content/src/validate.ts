@@ -4,6 +4,8 @@ import { BRANCH_TIER_POINTS, CLASSES, NODES, NODE_BY_ID, SKILLS, SKILL_BY_ID } f
 import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
 import { STAT_BY_ID, isKnownStat } from './stats';
 import { validateLegendaries } from './legendaries';
+import { BOUNTY_MODIFIERS } from './bounties';
+import { CLASS_UNLOCKS, STARTER_CLASSES } from './progression';
 import type { CardDef, NodeDef } from './types';
 
 // Authoring-time content validation (PRD §8.2, §15.3, §21.2). Invalid content is rejected during authoring,
@@ -208,5 +210,43 @@ export function validateContent(): string[] {
     if (a.inflict && !(a.inflict.sec > 0 && a.inflict.sec <= 4)) errs.push(`${e.id}/${a.id}: affliction durations must be short (0..4 s)`);
   }
   errs.push(...validateLegendaries());
+  errs.push(...validateProgression());
+  return errs;
+}
+
+/** Daily bounty modifiers (bounties.ts) and the class unlock table (progression.ts). */
+export function validateProgression(): string[] {
+  const errs: string[] = [];
+  const seen = new Set<string>();
+  for (const m of BOUNTY_MODIFIERS) {
+    if (seen.has(m.id)) errs.push(`duplicate bounty ${m.id}`);
+    seen.add(m.id);
+    if (!/^[a-z0-9_]{1,32}$/.test(m.id)) errs.push(`bounty ${m.id}: id must be [a-z0-9_]{1,32}`);
+    if (!/^#[0-9a-f]{6}$/i.test(m.color)) errs.push(`bounty ${m.id}: color must be #rrggbb`);
+    if (!m.short || m.short.length > 48) errs.push(`bounty ${m.id}: short copy must be 1..48 chars (one line on the plaque)`);
+    const effects = (m.stats?.length ?? 0) + (m.mechanics?.length ?? 0) + Object.keys(m.rules ?? {}).length;
+    if (!effects) errs.push(`bounty ${m.id}: changes nothing`);
+    for (const s of m.stats ?? []) {
+      if (!STAT_BY_ID[s.stat]?.fateEligible) errs.push(`bounty ${m.id}: unknown or tree-only stat ${s.stat}`);
+      if (!DECIMAL.test(s.percent) || Number(s.percent) <= -100) errs.push(`bounty ${m.id}: invalid percent ${s.percent}`);
+    }
+    for (const x of m.mechanics ?? []) {
+      const def = MECHANIC_BY_ID[x.id];
+      if (!def) errs.push(`bounty ${m.id}: unknown mechanic ${x.id}`);
+      else if (def.kind !== 'bane') errs.push(`bounty ${m.id}: bounties only bind banes (${x.id} is a ${def.kind})`);
+      if (!POS_DECIMAL.test(x.magnitude) || Number(x.magnitude) <= 0) errs.push(`bounty ${m.id}: invalid magnitude ${x.magnitude}`);
+    }
+    const r = m.rules ?? {};
+    if (r.dodgeCharges !== undefined && !(Number.isInteger(r.dodgeCharges) && r.dodgeCharges >= 1)) errs.push(`bounty ${m.id}: dodgeCharges must be an integer >= 1`);
+    for (const k of ['downedSecFactor', 'reviveChannelFactor'] as const) if (r[k] !== undefined && !((r[k] as number) > 0)) errs.push(`bounty ${m.id}: ${k} must be positive`);
+    if (r.intermissionHealFactor !== undefined && !(r.intermissionHealFactor >= 0)) errs.push(`bounty ${m.id}: intermissionHealFactor must be >= 0`);
+    if (r.fatePriceCopies !== undefined && !(Number.isInteger(r.fatePriceCopies) && r.fatePriceCopies >= 1 && r.fatePriceCopies <= 4)) errs.push(`bounty ${m.id}: fatePriceCopies must be 1..4`);
+  }
+  if (BOUNTY_MODIFIERS.length < 2) errs.push('the daily bounty needs at least two modifiers (it never repeats)');
+  const unlockIds = new Set<string>([...STARTER_CLASSES, ...CLASS_UNLOCKS.map((u) => u.classId)]);
+  for (const cls of CLASSES) if (!unlockIds.has(cls.id)) errs.push(`${cls.id}: not in STARTER_CLASSES or CLASS_UNLOCKS`);
+  for (const id of unlockIds) if (!CLASSES.some((c) => c.id === id)) errs.push(`unlock table names unknown class ${id}`);
+  if (unlockIds.size !== STARTER_CLASSES.length + CLASS_UNLOCKS.length) errs.push('a class is listed twice in the unlock table');
+  for (let i = 1; i < CLASS_UNLOCKS.length; i++) if (CLASS_UNLOCKS[i].level <= CLASS_UNLOCKS[i - 1].level) errs.push('CLASS_UNLOCKS must ascend by level');
   return errs;
 }

@@ -24,3 +24,6 @@ export * from './doors';
 export * from './blessing';
 export * from './training';
 export * from './courtyard';
+export * from './follow';
+export * from './bounty';
+export * from './bountyRules';

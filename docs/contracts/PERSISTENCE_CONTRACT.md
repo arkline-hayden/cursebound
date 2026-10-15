@@ -42,6 +42,12 @@ Document rollback instructions in `docs/OPERATIONS.md` (restore the pre-migratio
 - verification(run_id TEXT PK REFERENCES runs(id), status TEXT CHECK(status IN ('local','pending','verified','invalid','archived')), reason_code TEXT, reviewer TEXT, updated_at INTEGER)
 - verification_audit(id INTEGER PK AUTOINCREMENT, run_id TEXT, actor TEXT, prior_status TEXT, new_status TEXT, reason TEXT, created_at INTEGER)
 
+- v4 (progression and the daily bounty): `profiles.xp INTEGER NOT NULL DEFAULT 0`, `profiles.cloud_xp INTEGER NULL`;
+  xp_awards(run_id, profile_id, xp, base_xp, bounty, xp_before, created_at, PRIMARY KEY(run_id, profile_id));
+  daily_bounties(id TEXT PK, modifier_id, created_at, expires_at); bounty_completions(bounty_id, profile_id, run_id, completed_at,
+  PRIMARY KEY(bounty_id, profile_id)). `finalizeRun({ …, progress })` credits each member in the same transaction (finalized runs
+  only, once per run and profile) and returns `{ existing, awards }`; `ensureBounty` rolls inside one transaction.
+
 Timestamps are epoch ms UTC integers. Score is ONLY ever TEXT (never REAL/INTEGER).
 
 ## Store facade (`apps/server/src/persistence/store.ts`)

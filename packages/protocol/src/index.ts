@@ -50,7 +50,7 @@ export interface SeatView { slot: number; name: string; classId: string; ready: 
 
 export type ServerMessage =
   | { t: 'WELCOME'; slot: number; roomId: string; code: string; protocol: number; contentHash: string; build: string; mode: 'solo' | 'coop'; trust: string; runId: string | null; resumed: boolean; tutorial: boolean; challengeId: string | null; tickRate: number }
-  | { t: 'ROOM'; roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: SeatView[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null }
+  | { t: 'ROOM'; roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: SeatView[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null; /** daily bounty modifier id of a bounty room */ bounty?: string | null }
   | { t: 'SNAPSHOT'; ack: number; snap: unknown }
   | { t: 'EVENTS'; tick: number; events: unknown[] }
   | { t: 'PHASE'; phase: string; round: number; tick: number; data: unknown }
@@ -155,8 +155,12 @@ export function sanitizeName(s: string): string {
   return clean.slice(0, LIMITS.nameLength) || 'Wanderer';
 }
 
-export function boardKey(p: { rulesVersion: string; contentHash: string; scoreVersion: string; n: number; mode: string; challengeId: string | null; trust: string }): string {
-  return [p.rulesVersion, p.contentHash, p.scoreVersion, `n${p.n}`, p.mode, p.challengeId ?? 'open', p.trust].join('|');
+/** Leaderboard division. Daily bounty runs get their own division per modifier (a trailing `bounty:<id>` segment), so a
+ *  handicapped run never competes with open runs and every modifier is ranked among its own; keys without it are unchanged. */
+export function boardKey(p: { rulesVersion: string; contentHash: string; scoreVersion: string; n: number; mode: string; challengeId: string | null; trust: string; bounty?: string | null }): string {
+  const parts = [p.rulesVersion, p.contentHash, p.scoreVersion, `n${p.n}`, p.mode, p.challengeId ?? 'open', p.trust];
+  if (p.bounty) parts.push(`bounty:${p.bounty}`);
+  return parts.join('|');
 }
 
 export const BUILD_ID = 'cursebound-0.1.0';

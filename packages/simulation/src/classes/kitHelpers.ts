@@ -2,6 +2,7 @@ import { Big } from '@cursebound/numeric';
 import { DODGE, RULES, TICK_SEC, type DamageType } from '@cursebound/content';
 import { hitEnemy, type CohortResult, type HitOpts } from '../combat';
 import { moveCircle, norm, q, rayDistance } from '../geometry';
+import { dodgeMaxOf } from '../bountyRules';
 import { nearestFloor } from '../map';
 import { areaCoverage, newProjectileId } from '../players';
 import { B, ONE, playerDerived } from '../stats';
@@ -142,7 +143,7 @@ export function grantRally(p: PlayerState, untilTick: number) {
 /** Refill dodge charges and clear the recharge clock. */
 export function restoreDodge(p: PlayerState) {
   p.dodgeCooldown = 0;
-  if (typeof p.dodgeCharges === 'number') p.dodgeCharges = Math.max(p.dodgeCharges, DODGE.charges);
+  if (typeof p.dodgeCharges === 'number') p.dodgeCharges = Math.max(p.dodgeCharges, dodgeMaxOf(p));
 }
 
 // ---------------- scripted dashes (charges, whirls, blazing dashes) ----------------

@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { CARD_BY_ID, CLASS_BY_ID, NODE_BY_ID, TUTORIAL_CARD } from '@cursebound/content';
+import { BOUNTY_BY_ID, CARD_BY_ID, CLASS_BY_ID, NODE_BY_ID, TUTORIAL_CARD, totalXpForLevel, xpToNext, type XpAward } from '@cursebound/content';
 import { netStore, type GameConnection } from '@/lib/net';
-import { clearSeat } from '@/lib/profile';
+import { cachedProfile, clearSeat } from '@/lib/profile';
 import { useStore } from '@/lib/store';
 import { accountApi, api, onlineMode } from '@/lib/api';
 import { cloudSummary, submitRunOnce, type RunResults } from '@/lib/onlineRuns';
+import { refreshProgress } from '@/lib/progress';
 import { authStore, refreshAuth } from '@/lib/auth';
 import { fmt, score, whole } from '@/lib/format';
 import { CardIcon, ClassEmblem } from './icons';
@@ -17,10 +18,29 @@ import { FATES_BLESSING, LEGENDARY_BY_ID } from '@cursebound/content';
 
 // RESULTS (PRD §16.1, §13): collective score, clear depth, end reason, builds, Fate timeline, score breakdown
 // and death recap. Local records are labelled Local and never presented as verified competition.
+// Progression: the XP the run earned (x2 for the day's first bounty run) and any level-up / class unlock. Online and
+// signed in, the cloud's award for this account (from the run report); otherwise the local authority's (summary.progress).
 
 const END_LABEL: Record<string, string> = {
   wipe: 'Party wipe', retired: 'Retired', aborted_infrastructure: 'Aborted — infrastructure failure (not a defeat)', invalidated: 'Invalidated run',
 };
+
+/** XP gained, the bounty doubling, the new XP bar, level-ups and class unlocks (progression). */
+function XpLine({ award }: { award: XpAward }) {
+  const into = award.xpAfter - totalXpForLevel(award.levelAfter);
+  const pct = Math.max(0, Math.min(100, (into / xpToNext(award.levelAfter)) * 100));
+  return (
+    <div className="res-xp" role="status">
+      <span className="res-xp-gain">+{award.xp} XP</span>
+      {award.bounty && <span className="chip warn" data-tip={`${award.baseXp} XP doubled: first bounty run today`}>Bounty ×2</span>}
+      <span className="bar thin xp" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
+      {award.levelAfter > award.levelBefore
+        ? <span className="chip gold">Level up · {award.levelBefore} → {award.levelAfter}</span>
+        : <span className="chip">Level {award.levelAfter}</span>}
+      {award.unlocked.map((id) => <span key={id} className="chip good">{CLASS_BY_ID[id]?.name ?? id} unlocked</span>)}
+    </div>
+  );
+}
 
 export function Results({ net }: { net: GameConnection }) {
   const results = useStore(netStore, (s) => s.results);
@@ -32,6 +52,7 @@ export function Results({ net }: { net: GameConnection }) {
   const mySlot = useStore(netStore, (s) => s.slot);
   const [online, setOnline] = useState(false);
   const [onlineRank, setOnlineRank] = useState<number | null>(null);
+  const [cloudAward, setCloudAward] = useState<XpAward | null>(null);
   useEffect(() => {
     if (authStore.get().status === 'unknown') refreshAuth().catch(() => undefined);
     onlineMode().then(setOnline).catch(() => undefined);
@@ -40,8 +61,15 @@ export function Results({ net }: { net: GameConnection }) {
   useEffect(() => {
     const acc = authStore.get().account;
     if (!results || !online || !signedIn || !acc || results.training) return;   // training grounds runs are never reported
-    submitRunOnce(results as RunResults, mySlot, acc.id).then((x) => { if (x) setOnlineRank(x.rank); }).catch(() => undefined);
+    submitRunOnce(results as RunResults, mySlot, acc.id).then((x) => {
+      if (!x) return;
+      setOnlineRank(x.rank);
+      setCloudAward(x.xp);
+      void refreshProgress(acc.profileId);
+    }).catch(() => undefined);
   }, [results, online, signedIn, mySlot]);
+  // local progression: the authority credited the profile; refresh the cached progress for the title and lobby
+  useEffect(() => { if (results && !(online && signedIn)) void refreshProgress(authStore.get().account?.profileId ?? cachedProfile()?.id ?? null); }, [results, online, signedIn]);
   useEffect(() => {
     if (!results) return;
     api<{ rows: { runId: string; rank: number }[] }>('GET', `/boards?key=${encodeURIComponent(results.boardKey)}&limit=100&practice=1`).then((b) => {
@@ -76,6 +104,9 @@ export function Results({ net }: { net: GameConnection }) {
     } catch (e) { setSaved((e as Error).message); }
   };
   const lastRecap = (r.deathRecaps as any[]).slice(-3);
+  const localAward = ((r.progress as (XpAward | null)[] | undefined) ?? [])[mySlot] ?? null;
+  const award = online && signedIn ? cloudAward ?? null : localAward;
+  const runBounty = r.bounty?.modifierId ? BOUNTY_BY_ID[r.bounty.modifierId] : null;
   const headline = r.endReason === 'wipe' ? 'You Have Fallen' : r.endReason === 'retired' ? 'You Withdrew' : 'The Run Ends';
   return (
     <div className="overlay">
@@ -88,11 +119,13 @@ export function Results({ net }: { net: GameConnection }) {
             </div>
             <h2 id="res-h" className="res-score">{score(r.scoreText)}</h2>
             <div className="panel-sub">{END_LABEL[r.endReason] ?? r.endReason} · depth {r.depth} · {Math.round(r.activeTicks / 60)}s of combat · party of {r.n}</div>
+            {award && <XpLine award={award} />}
           </div>
           <div className="res-chips">
             <span className="chip">{r.trustLabel}</span>
             {r.practice && <span className="chip warn">Practice attempt (not ranked)</span>}
             {r.resumed && <span className="chip info">Resumed from checkpoint</span>}
+            {runBounty && <span className="chip warn" data-tip={runBounty.description}>Bounty · {runBounty.name}</span>}
             {rank !== null && !r.practice && <span className="chip gold">Local board rank #{rank}</span>}
             {onlineRank !== null && !r.practice && <span className="chip gold">Online board rank #{onlineRank}</span>}
           </div>

@@ -100,6 +100,8 @@ export interface PlayerState {
   dodgeTimer: number;              // seconds remaining in dodge travel
   dodgeCooldown: number;           // seconds until the next dodge charge returns (0 when full)
   dodgeCharges: number;            // dashes available (DODGE.charges max)
+  /** maximum dodge charges when a bounty changes it (bounty.ts, "Hobbled"); absent = DODGE.charges */
+  dodgeMax?: number;
   surgeTimer: number;              // post-dash speed surge remaining (seconds)
   dodgeDirX: number; dodgeDirY: number;
   iframes: number;
@@ -275,6 +277,8 @@ export interface Hazard {
   armTick?: number;
   /** Class-kit hazard counters (e.g. Warden spirit beasts: target, cooldowns, leap). Plain numbers, deterministic. */
   vars?: Record<string, number>;
+  /** Follower routing (follow.ts): remaining A* waypoints (tile indices) of a summon walking around walls / voids. */
+  route?: number[];
 }
 
 /** Ground pickup (pickups.ts). Generic: `kind` 'potion' heals, 'orb' (haste orb) cuts skill cooldowns; other modules may add kinds. */
@@ -512,6 +516,8 @@ export interface SimState {
   cinematicUntilTick?: number;
   /** Training grounds (training.ts): present only in training runs (no scoring, no records, no Fate, no wipe). */
   training?: TrainingState | null;
+  /** Daily bounty modifier the run was created with (content bounties.ts, applied by bounty.ts). Absent = none. */
+  bounty?: string | null;
 }
 
 /** Training-room switches (training.ts). Plain data, part of the replayed state. */
@@ -596,6 +602,9 @@ export type SimEvent =
   | { t: 'foe_fx'; id: number; fx: string; x: number; y: number; tx?: number; ty?: number; r?: number }
   /** an idle pack noticed the heroes (director.ts activation) */
   | { t: 'aggro'; id: number; pack: number; x: number; y: number }
+  /** a hero's summon / pet (hazard `id` of `kind`) lost its route and blinked from fx,fy back to x,y at its owner's
+   *  side (follow.ts leash): the client dissolves it at the origin and reforms it at the destination */
+  | { t: 'summon_blink'; slot: number; id: number; kind: string; fx: number; fy: number; x: number; y: number }
   /** Fate's Blessing (blessing.ts): a hero picked one up (id = ground item), or blessed card `card` of the current offer */
   | { t: 'blessing'; op: 'pickup' | 'apply'; slot: number; x: number; y: number; card?: number; id?: number }
   /** Training grounds (training.ts): a hero respawned in place ('respawn'), or used a tool (the TRAIN op) */
