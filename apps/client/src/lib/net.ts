@@ -1,6 +1,6 @@
 import { contentHash, DODGE, RULES } from '@cursebound/content';
 import { BUILD_ID, PROTOCOL_VERSION, type EventOp, type ServerMessage, type TrainOp } from '@cursebound/protocol';
-import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type Snapshot, type SimEvent } from '@cursebound/simulation';
+import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type RecapEntry, type Snapshot, type SimEvent } from '@cursebound/simulation';
 import { wsTransport, type GameTransport } from './p2p/transport';
 import { roomWsUrl } from './runtime';
 import { createStore } from './store';
@@ -23,6 +23,8 @@ export interface PhaseData {
   players: { slot: number; name: string; classId: string; ranks: Record<string, number>; skillPoints: number; spentByBranch: Record<string, number>; mastery: { damage: number; health: number; recovery: number }; ready: boolean; hpT: string; mhpT: string; connected: boolean; life: string; canMastery: boolean }[];
   /** training grounds run (simulation training.ts): no score, records or Fate; TRAIN tools available */
   training?: boolean;
+  /** guided first-run tutorial (simulation tutorialRoom.ts): prompts from the snapshot's `gd`, never recorded */
+  guided?: boolean;
 }
 
 export interface RoomInfo { roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null; /** daily bounty modifier of a bounty room */ bounty?: string | null }
@@ -48,12 +50,14 @@ export interface NetState {
   rttMs: number;
   serverTick: number;
   hud: Snapshot | null;           // throttled snapshot copy for React HUD (~10 Hz)
+  /** your latest death recap this round (the 'recap' event; simulation runStats.ts), for the "You died to…" card */
+  recap: RecapEntry | null;
 }
 
 export const netStore = createStore<NetState>({
   status: 'idle', error: null, slot: 0, welcome: null, room: null, phase: null, offer: null, votes: null,
   myVote: { cardSlot: null, locked: false, pending: false, seq: 0 }, commit: null, ledger: null, results: null, notices: [],
-  paused: { paused: false, reason: '' }, rttMs: 0, serverTick: 0, hud: null,
+  paused: { paused: false, reason: '' }, rttMs: 0, serverTick: 0, hud: null, recap: null,
 });
 
 let nextNoticeId = 1;
@@ -147,7 +151,15 @@ export class GameConnection {
       case 'WELCOME': netStore.set({ welcome: m, slot: m.slot }); break;
       case 'ROOM': netStore.set({ room: m }); break;
       case 'SNAPSHOT': this.onSnap(m.snap as Snapshot, m.ack); break;
-      case 'EVENTS': for (const e of m.events as SimEvent[]) this.events.push(e); if (this.events.length > 2000) this.events.splice(0, this.events.length - 2000); break;
+      case 'EVENTS': {
+        const me = netStore.get().slot;
+        for (const e of m.events as SimEvent[]) {
+          this.events.push(e);
+          if (e.t === 'recap' && e.slot === me) netStore.set({ recap: e.recap });   // the live "You died to…" card
+        }
+        if (this.events.length > 2000) this.events.splice(0, this.events.length - 2000);
+        break;
+      }
       case 'PHASE': {
         const d = m.data as PhaseData;
         if (d.map && (!this.map || this.map.tiles !== d.map.tiles)) {
@@ -155,7 +167,7 @@ export class GameConnection {
         }
         const patch: Partial<NetState> = { phase: d };
         if (d.phase !== 'VOTING' && d.phase !== 'FATE_COMMIT') { patch.offer = null; patch.votes = null; }
-        if (d.phase === 'ROUND_SETUP') { patch.commit = null; this.pred.valid = false; }
+        if (d.phase === 'ROUND_SETUP') { patch.commit = null; patch.recap = null; this.pred.valid = false; }
         netStore.set(patch);
         break;
       }

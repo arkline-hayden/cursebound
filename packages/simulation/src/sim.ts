@@ -20,6 +20,7 @@ import './minibosses';   // named mini-bosses: director slots, mechanics and loo
 import { STATE_SCHEMA, stateHash } from './serialize';
 import { applyTraining, setupTraining, topUpTrainingPoints, trainingAiOff, trainingIdleEnemy, trainingTick } from './training';   // training grounds
 import { applyBlessing, blessingOn } from './blessing';   // Fate's Blessing
+import { GUIDE_STEPS, guideAtDoors, guideIdle, guideTick, newGuide, setupGuide } from './tutorialRoom';   // guided first-run tutorial
 import { applyBounty } from './bounty';
 import { bountyRules } from './bountyRules';
 import { B, ONE, derivePlayer } from './stats';
@@ -48,6 +49,8 @@ export interface CreateRunParams {
   training?: boolean;
   /** daily bounty modifier id (content bounties.ts), applied at creation by bounty.ts; absent/null = none */
   bounty?: string | null;
+  /** guided first-run tutorial (tutorialRoom.ts): the tutorial crypt and its prompted steps, then the Fate doors */
+  guided?: boolean;
 }
 
 function newPlayer(e: RosterEntry): PlayerState {
@@ -117,6 +120,7 @@ export function createRun(params: CreateRunParams): SimState {
   };
   if (params.mode === 'coop') state.phaseDeadlineTick = null;
   if (params.training) state.training = { ai: true };   // training grounds (training.ts)
+  else if (params.guided) state.guide = newGuide();     // guided tutorial (tutorialRoom.ts); absent keeps old hashes
   if (params.bounty) applyBounty(state, params.bounty);   // daily bounty modifier (bounty.ts); absent keeps old hashes
   return state;
 }
@@ -291,8 +295,9 @@ function enterRoundSetup(state: SimState, ev: SimEvent[]) {
   resetRoomEvents(state);   // so are the last floor's shrines, altar and merchant (roomEvents.ts)
   setPhase(state, ev, 'ROUND_SETUP');
   if (state.training) setupTraining(state, ev);   // the courtyard (training.ts)
+  else if (state.guide) setupGuide(state, ev);    // the tutorial crypt (tutorialRoom.ts)
   else setupRound(state, ev);
-  if (state.tutorial && state.round === 1) {
+  if (state.tutorial && state.round === 1 && !state.guide) {
     // tutorial: a gentle first encounter teaching movement and one enemy attack
     const enc = state.encounter!;
     enc.groups = enc.groups.slice(0, 2).map((g, i) => ({ ...g, archetype: 'pursuer', wave: 0, countText: '1', id: i }));
@@ -321,7 +326,7 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
   state.hazards = state.hazards.filter((h) => h.untilTick > state.tick);
   // statuses, AI and enemy attacks
   const idle = trainingAiOff(state);   // training grounds: foes may stand still like dummies
-  for (const e of state.enemies) (idle ? trainingIdleEnemy : stepEnemy)(state, ev, e);
+  for (const e of state.enemies) (idle || guideIdle(state, e) ? trainingIdleEnemy : stepEnemy)(state, ev, e);   // tutorial dummies too
   separateEnemies(state);
   hooks.onTick(state, ev);
   // deaths -> progression
@@ -362,6 +367,7 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
     }
   }
   if (state.training) { trainingTick(state, ev); return; }   // training grounds: no clear, no wipe (heroes respawn)
+  if (state.guide) { if (guideTick(state, ev)) enterRoundClear(state, ev); return; }   // tutorial: its steps clear the hall
   // clear and wipe checks (simultaneous boss kill and wipe: objective credit first, then wipe)
   const cleared = enc.wave >= enc.waveCount - 1 && enc.groups.every((g) => g.defeated);
   const anyAlive = state.players.some((p) => p.lifeState === 'alive' || p.selfReviveChannel > 0);
@@ -495,8 +501,8 @@ export function step(state: SimState, inputs: (PlayerInput | null | undefined)[]
   switch (state.phase) {
     case 'LOADOUT_LOCK':
       if (retire) { state.endReason = 'retired'; enterFinalize(state, ev, false); break; }
-      // training grounds open at once (no loadout to confirm)
-      if ((state.players.every((p) => p.ready || !p.connected) || state.training) && state.players.some((p) => p.connected)) {
+      // training grounds and the tutorial open at once (no loadout to confirm)
+      if ((state.players.every((p) => p.ready || !p.connected) || state.training || state.guide) && state.players.some((p) => p.connected)) {
         for (const p of state.players) p.ready = false;
         ev.push({ t: 'domain', type: 'run_started', payload: { n: state.n, seed: state.seed, roster: state.players.map((p) => ({ slot: p.slot, classId: p.classId, ranks: p.ranks })) } });
         enterRoundSetup(state, ev);
@@ -506,7 +512,7 @@ export function step(state: SimState, inputs: (PlayerInput | null | undefined)[]
       if (retire) { state.endReason = 'retired'; enterFinalize(state, ev, false); break; }
       if (state.phaseTimer >= RULES.setupSec) {
         setPhase(state, ev, 'COMBAT');
-        spawnWave(state, ev, 0);   // boss rounds: boss_intro + cinematic hold (director.ts)
+        if (!state.guide) spawnWave(state, ev, 0);   // boss rounds: boss_intro + cinematic hold (director.ts); the tutorial has no waves
         if (!inCinematic(state)) hooks.onRoundStart(state, ev);   // held rounds start when the hold releases
       }
       break;
@@ -517,6 +523,7 @@ export function step(state: SimState, inputs: (PlayerInput | null | undefined)[]
       combatTick(state, ev, inputs);
       break;
     case 'ROUND_CLEAR':
+      if (state.phaseTimer >= RULES.clearSummarySec && state.guide) { startOffer(state, ev); guideAtDoors(state); break; }   // tutorial: straight to the doors
       if (state.phaseTimer >= RULES.clearSummarySec) {
         setPhase(state, ev, 'SKILL_ALLOCATION');
         if (state.mode === 'coop') state.phaseDeadlineTick = state.tick + RULES.voteWindowSec * TICK_RATE;
@@ -540,6 +547,12 @@ export function step(state: SimState, inputs: (PlayerInput | null | undefined)[]
     }
     case 'FATE_COMMIT':
       // the door walk-through plays for at least RULES.doorWalkSec, and the commit must be durable
+      if (state.awaitingDurable === null && state.phaseTimer >= RULES.doorWalkSec - 1e-9 && state.guide) {
+        state.guide.step = GUIDE_STEPS.length;   // tutorial: through the door, "You're ready" (no round 2)
+        state.endReason = 'retired';
+        enterFinalize(state, ev, false);
+        break;
+      }
       if (state.awaitingDurable === null && state.phaseTimer >= RULES.doorWalkSec - 1e-9) {
         setPhase(state, ev, 'SAFE_CHECKPOINT');
         ev.push({ t: 'domain', type: 'checkpoint_saved', payload: { round: state.round } });

@@ -31,3 +31,5 @@ export * from './bountyRules';
 export * from './coins';
 export * from './roomEvents';
 export * from './minibosses';
+export * from './runStats';
+export * from './tutorialRoom';

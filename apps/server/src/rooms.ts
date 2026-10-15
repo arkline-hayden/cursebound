@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { CLASS_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, TICK_RATE, classUnlockLevel, contentHash, isClassUnlocked } from '@cursebound/content';
 import { BUILD_ID, LIMITS, PROTOCOL_VERSION, boardKey, parseClientMessage, quantizeInput, sanitizeName, type ClientMessage, type SeatView, type ServerMessage } from '@cursebound/protocol';
-import { createRun, deserializeState, type CreateRunParams, type SimState } from '@cursebound/simulation';
+import { createRun, deserializeState, restoreBreakdown, type CreateRunParams, type SimState } from '@cursebound/simulation';
 import { RunAuthority, type AuthorityHost, type SeatLink } from './authority';
 import type { ServerConfig } from './config';
 import type { Logger } from './persistence/logger';
@@ -209,6 +209,7 @@ export class Room implements AuthorityHost {
       roster: this.seats.map((s) => ({ slot: s.slot, profileId: s.profileId, name: s.name, classId: s.classId })),
       ...(this.bounty ? { bounty: this.bounty.modifierId } : {}),   // daily bounty modifier (simulation bounty.ts)
       ...(this.training ? { training: true } : {}),   // training grounds (simulation training.ts)
+      ...(this.tutorial ? { guided: true } : {}),     // "First Descent": the guided tutorial crypt (simulation tutorialRoom.ts)
     };
     const state = createRun(params);
     // dev tools only (CURSEBOUND_DEV_TOOLS=1 CURSEBOUND_DEV_THEME=<id>): the first floor uses a chosen theme, like a door
@@ -217,7 +218,8 @@ export class Room implements AuthorityHost {
     const key = boardKey({ rulesVersion: RULES_VERSION, contentHash: contentHash(), scoreVersion: SCORE_VERSION, n: state.n, mode: this.mode, challengeId: this.challengeId, trust: this.trust, bounty: this.bounty?.modifierId });
     let practice = this.tutorial || this.training;
     if (!practice && this.challengeId) practice = await this.mgr.store.hasRankedAttempt(key, this.seats.map((s) => s.profileId)).catch(() => false);
-    this.authority = new RunAuthority({ state, store: this.mgr.store, logger: this.mgr.log, host: this, boardKey: key, practice, createParams: params, bountyId: this.bounty?.id ?? null, ...(this.training ? { training: true } : {}) });
+    // training grounds and the guided tutorial are never persisted (no run record, board, replay or Records entry)
+    this.authority = new RunAuthority({ state, store: this.mgr.store, logger: this.mgr.log, host: this, boardKey: key, practice, createParams: params, bountyId: this.bounty?.id ?? null, ...(this.training ? { training: true } : {}), ...(this.tutorial ? { guided: true } : {}) });
     this.mgr.log.info('run_started', { roomId: this.id, runId, n: state.n, mode: this.mode, practice });
     this.broadcastRoom();
     for (const l of this.seatLinks.values()) this.authority.resync(l);
@@ -262,7 +264,7 @@ export class RoomManager {
       const idle = now - r.lastActivity;
       const ended = r.authority?.state.phase === 'RESULTS';
       const empty = r.seats.every((s) => !s.socket);
-      if ((r.training && empty && idle > 120000) || (ended && empty && idle > 60000) || (r.stage === 'LOBBY' && empty && idle > 10 * 60000) || (empty && idle > 6 * 3600 * 1000)) {
+      if (((r.training || r.authority?.ephemeral) && empty && idle > 120000) || (ended && empty && idle > 60000) || (r.stage === 'LOBBY' && empty && idle > 10 * 60000) || (empty && idle > 6 * 3600 * 1000)) {
         r.authority?.dispose();
         this.rooms.delete(id);
       }
@@ -305,8 +307,9 @@ export class RoomManager {
     if (!run.members.some((m) => m.profileId === profileId)) throw Object.assign(new Error('not a member of this run'), { code: 'UNAUTHORIZED' });
     const ck = await this.store.latestCheckpoint(runId);
     if (!ck) throw Object.assign(new Error('no safe checkpoint yet (runs resume from the last Fate commit)'), { code: 'NOT_FOUND' });
-    const wrap = JSON.parse(ck.stateBlob) as { v: number; persistSeq: number; chunkNo: number; state: string; boardKey: string; practice: boolean; bountyId?: string | null };
+    const wrap = JSON.parse(ck.stateBlob) as { v: number; persistSeq: number; chunkNo: number; state: string; boardKey: string; practice: boolean; bountyId?: string | null; breakdown?: unknown };
     const state = deserializeState(wrap.state);
+    if (wrap.breakdown) restoreBreakdown(state, wrap.breakdown);   // post-run breakdown carried outside the hashed state
     const room = new Room(this, { mode: 'solo', seed: state.seed, challengeId: state.challengeId, tutorial: state.tutorial, trust: 'local', bounty: state.bounty && wrap.bountyId ? { id: wrap.bountyId, modifierId: state.bounty } : null });
     const p = state.players[0];
     const { token } = room.addSeat(p.profileId, p.name, p.classId);

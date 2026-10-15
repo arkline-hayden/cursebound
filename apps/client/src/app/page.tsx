@@ -383,6 +383,7 @@ export default function Home() {
               </label>
             )}
             <span className="engraved" id="cls-label">Choose your vessel</span>
+            {intent === 'tutorial' && <p className="muted">One short guided room: walking, skills, dodging, loot and the Fate doors. Skippable, never scored.</p>}
             {intent === 'bounty' && bounty && <p className="muted">Today&apos;s modifier: <b className="gold-text">{bounty.modifier.name}</b> — {bounty.modifier.description}{bounty.completed ? '' : ` First finished run earns ×${bounty.xpMultiplier} XP.`}</p>}
             <ClassPicker value={classId} onChange={chooseClass} labelledBy="cls-label" idPrefix="title-vessel" level={progress?.level ?? null} />
             {err && <p className="neg" role="alert">{err}</p>}

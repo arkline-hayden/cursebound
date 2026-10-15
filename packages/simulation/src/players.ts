@@ -5,6 +5,7 @@ import { breakChain } from './afflictions';
 import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { hooks } from './hooks';
 import { cancelSlide, knockScale } from './knock';
+import { tallyBegin, tallyBleedOut, tallyEnd, tallyEnter, tallyRevive } from './runStats';   // post-run breakdown (observation only)
 import { dir8, inCone, inLine, isWallAt, moveCircle, norm, q, rayDistance } from './geometry';
 import { nearestFloor } from './map';
 import { nextFloat } from './rng';
@@ -542,6 +543,8 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
       p.downTimer -= DT;
       if (p.downTimer <= 0) {
         p.lifeState = 'dead';
+        const recap = tallyBleedOut(state, p);   // breakdown: the fall becomes a death (runStats.ts)
+        if (recap) ev.push(recap);
         ev.push({ t: 'dead', slot: p.slot });
         ev.push({ t: 'domain', type: 'player_dead', payload: { slot: p.slot, round: state.round, attack: 'bled out' } });
       }
@@ -625,7 +628,10 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
   const work = Big.from(p.attackWork).add(pd.attackFreq.mul(DT_B));
   if (pressed & ACTION.ATTACK && p.guardTimer <= 0 && p.dodgeTimer <= 0 && !frozen) {
     const k = work.floorInt();
-    if (k > 0n) { fireBasic(state, ev, p, Big.from(k)); hooks.onBasicAttack(state, ev, p, Big.from(k)); }
+    if (k > 0n) {
+      const tk = tallyBegin(state, p.slot, CLASS_BY_ID[p.classId]?.basicSkill ?? '');   // breakdown attribution (runStats.ts)
+      try { fireBasic(state, ev, p, Big.from(k)); hooks.onBasicAttack(state, ev, p, Big.from(k)); } finally { tallyEnd(state, tk); }
+    }
     p.attackWork = work.sub(Big.from(k)).toNumber();
   } else {
     p.attackWork = Math.min(1, work.toNumber());    // readiness when idle (not a rate cap)
@@ -642,13 +648,16 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
     const returning = s.skillId === 'a_phase_step' && s.mark && s.mark.until > state.tick;
     if (!returning && s.charges <= 0) continue;
     if (s.skillId === 'v_guard_stance' && p.guardTimer > 0) continue;
-    if (castSkill(state, ev, p, s.skillId)) {
-      if (!returning) {
-        s.charges--;
-        if (s.cooldown <= 0) { s.cooldown = cooldownOf(state, p, s.skillId); s.full = s.cooldown; }
+    const tk = tallyBegin(state, p.slot, s.skillId);   // breakdown attribution: the cast and what it leaves behind (runStats.ts)
+    try {
+      if (castSkill(state, ev, p, s.skillId)) {
+        if (!returning) {
+          s.charges--;
+          if (s.cooldown <= 0) { s.cooldown = cooldownOf(state, p, s.skillId); s.full = s.cooldown; }
+        }
+        hooks.onCast(state, ev, p, s.skillId);
       }
-      hooks.onCast(state, ev, p, s.skillId);
-    }
+    } finally { tallyEnd(state, tk); }
   }
   p.prevButtons = pressed;
 
@@ -667,7 +676,10 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
       break;
     }
   }
-  if (p.lifeState === 'alive') hooks.onPlayerTick(state, ev, p);
+  if (p.lifeState === 'alive') {
+    const tk = tallyBegin(state, p.slot, '');   // breakdown: passives heal / hit as this hero (runStats.ts)
+    try { hooks.onPlayerTick(state, ev, p); } finally { tallyEnd(state, tk); }
+  }
 }
 
 export function revivePlayer(state: SimState, ev: SimEvent[], p: PlayerState, by: number | null) {
@@ -676,6 +688,7 @@ export function revivePlayer(state: SimState, ev: SimEvent[], p: PlayerState, by
   p.reviveProgress = 0;
   p.downTimer = 0;
   p.iframes = 1.0;
+  tallyRevive(state, p, by);   // breakdown (runStats.ts)
   ev.push({ t: 'revived', slot: p.slot, by });
   ev.push({ t: 'domain', type: 'player_revived', payload: { slot: p.slot, by, round: state.round } });
 }
@@ -683,6 +696,11 @@ export function revivePlayer(state: SimState, ev: SimEvent[], p: PlayerState, by
 // ---------------- Player projectiles & hazards ----------------
 
 export function stepPlayerProjectile(state: SimState, ev: SimEvent[], pr: Projectile): boolean {
+  const tk = tallyEnter(state, pr);   // breakdown: hits count for the skill that made the projectile (runStats.ts)
+  try { return stepProjectile(state, ev, pr); } finally { tallyEnd(state, tk); }
+}
+
+function stepProjectile(state: SimState, ev: SimEvent[], pr: Projectile): boolean {
   const map = state.map!;
   const sp = Math.sqrt(pr.vx * pr.vx + pr.vy * pr.vy);
   let travel = sp * DT;
@@ -718,6 +736,11 @@ export function stepPlayerProjectile(state: SimState, ev: SimEvent[], pr: Projec
 }
 
 export function stepPlayerHazard(state: SimState, ev: SimEvent[], h: Hazard) {
+  const tk = tallyEnter(state, h);   // breakdown: summons, turrets and fields count for the skill that made them (runStats.ts)
+  try { stepHazard(state, ev, h); } finally { tallyEnd(state, tk); }
+}
+
+function stepHazard(state: SimState, ev: SimEvent[], h: Hazard) {
   if (hooks.hazardTick(state, ev, h)) return;
   if (h.kind === 'bastion' || state.tick < h.nextTick) return;
   h.nextTick = state.tick + Math.max(1, h.interval);

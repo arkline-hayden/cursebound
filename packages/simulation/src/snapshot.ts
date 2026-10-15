@@ -9,6 +9,7 @@ import { gearSnapshot, lootSnapshot } from './gear';
 import { doorSnapshot, type SnapDoor } from './doors';
 import { playerEventSnap, roomEventSnapshot, type SnapRoomEvent } from './roomEvents';
 import { playerDerived, toFloatClamped } from './stats';
+import { guideSnapshot, type SnapGuide } from './tutorialRoom';
 import type { SimState } from './types';
 
 // Bounded, stable-schema snapshot for clients (REQ NET01, PRD §19.2). Presentation only: clients never
@@ -87,6 +88,8 @@ export interface Snapshot {
   tr?: { ai: 0 | 1 };
   /** room events (roomEvents.ts): shrines, altars, the merchant and living treasure imps; absent when none */
   rev?: SnapRoomEvent[];
+  /** guided tutorial (tutorialRoom.ts); present only in tutorial runs: step, sub-goal bits (-1 = step done), walk mark */
+  gd?: SnapGuide;
 }
 
 export interface SnapLoot { i: number; it: string; x: number; y: number }
@@ -163,6 +166,7 @@ export function buildSnapshot(state: SimState, debug = false): Snapshot {
     ...(state.tick < (state.cinematicUntilTick ?? 0) ? { cu: state.cinematicUntilTick } : {}),
     ...(state.training ? { tr: { ai: state.training.ai ? 1 : 0 } as const } : {}),
     ...roomEventSnapshot(state),
+    ...(state.guide ? { gd: guideSnapshot(state) } : {}),
   };
 }
 

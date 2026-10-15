@@ -1,6 +1,7 @@
 import type { Big } from '@cursebound/numeric';
 import type { DamageType, GearSlot, TelegraphShape } from '@cursebound/content';
 import type { RngState } from './rng';
+import type { RecapEntry } from './runStats';
 
 // Authoritative simulation state (PRD §3.1, §17.2). Plain serializable data: Big values are immutable objects
 // encoded as {$b: compact} in checkpoints. Entity collections are arrays (deterministic iteration order).
@@ -549,6 +550,8 @@ export interface SimState {
   bounty?: string | null;
   /** Room events of the current floor (roomEvents.ts): shrines, altar, merchant, the pending treasure imp. */
   roomEvents?: RoomEventState | null;
+  /** Guided first-run tutorial (tutorialRoom.ts): present only in tutorial-room runs (never scored or recorded). */
+  guide?: GuideState | null;
 }
 
 /** A room event on the current floor (roomEvents.ts): a shrine (`type` = content SHRINES id), a cursed altar
@@ -570,6 +573,28 @@ export interface RoomEventState {
   list: RoomEvent[];
   /** tick at which this floor's treasure imp appears (absent = none, or already out) */
   runnerAt?: number;
+}
+
+/** Guided tutorial progress (tutorialRoom.ts GUIDE_STEPS). Plain data, part of the replayed state. */
+export interface GuideState {
+  /** current step (GUIDE_STEPS index) */
+  step: number;
+  /** tick the step began (or completed, while `done` is -1) */
+  at: number;
+  /** sub-goals done in this step (bit i), -1 = the step is complete and the next one is about to start */
+  done: number;
+  /** foes / ground items the step placed (entity ids) */
+  ids: number[];
+  /** walk mark (world units) of the move step */
+  mx?: number; my?: number;
+  /** dodge step: tick of a dodge made while a foe attack was on its way (0 none); tick the hero last took damage */
+  dodge: number; hurt: number;
+  /** damage taken so far (compact text), to notice new hits */
+  taken: string;
+  /** loot step: consecutive ticks stood beside the second legendary (its quick-compare) */
+  near: number;
+  /** loot step: the two legendaries it drops (worn first, compared second) */
+  items?: [string, string];
 }
 
 /** Training-room switches (training.ts). Plain data, part of the replayed state. */
@@ -669,4 +694,7 @@ export type SimEvent =
   | { t: 'room_event'; op: 'shrine' | 'altar' | 'buy' | 'merchant' | 'runner' | 'portal' | 'escape' | 'shower'; id: number; slot: number; x: number; y: number; k?: string }
   /** Named mini-bosses (minibosses.ts): 'spawn' (placed on the floor), 'awake' (the heroes found it: announcement),
    *  'slain' (pts = score burst text), and mechanic cues ('slam_warn', 'slam', 'summon', 'enrage', 'shield') */
-  | { t: 'miniboss'; id: number; op: string; name: string; x: number; y: number; k?: string; pts?: string; r?: number };
+  | { t: 'miniboss'; id: number; op: string; name: string; x: number; y: number; k?: string; pts?: string; r?: number }
+  /** A hero fell (downed, slain, or a downed hero bled out): the death recap for the live "You died to…" card
+   *  (runStats.ts; presentation only, never part of the state) */
+  | { t: 'recap'; slot: number; recap: RecapEntry };

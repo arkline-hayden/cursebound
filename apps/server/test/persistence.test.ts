@@ -402,6 +402,20 @@ describe('finalization', () => {
     expect(await store.listRuns({ status: 'finalized', limit: 10 })).toEqual([expect.objectContaining({ id: 'run-fin' })]);
   });
 
+  it('stores the post-run breakdown with the run record (schema v5) and bounds it', async () => {
+    const store = await open();
+    await setupRun(store, 'run-bd');
+    await setupRun(store, 'run-nobd');
+    const breakdown = JSON.stringify({ v: 1, heroes: [{ slot: 0, dealt: '5', skills: [{ id: 'w_thornspear', dmg: '5', kills: '1', hits: 2 }] }], recaps: [] });
+    await store.finalizeRun({ ...finalize('run-bd', '10'), breakdownJson: breakdown });
+    await store.finalizeRun(finalize('run-nobd', '5'));
+    expect((await store.getRun('run-bd'))!.breakdownJson).toBe(breakdown);
+    expect((await store.getRun('run-nobd'))!.breakdownJson).toBeNull();
+    await setupRun(store, 'run-bad');
+    await expectCode(store.finalizeRun({ ...finalize('run-bad', '1'), breakdownJson: 'not json' }), 'INVALID_INPUT');
+    expect(MIGRATIONS.find((m) => m.version === 5)?.name).toBe('run_breakdown');
+  });
+
   it('keeps pending_storage runs re-finalizable and off the board', async () => {
     const store = await open();
     await setupRun(store, 'run-pend');

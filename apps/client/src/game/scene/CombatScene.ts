@@ -28,6 +28,7 @@ import { InputController, type Sample } from '@/lib/input';
 import { ClickMove, type DriveOut } from '../input/ClickMove';
 import { basicReach, pickEnemy, pickGround, type GroundThing } from '../input/targeting';
 import { ClickFx } from '../render/ClickFx';
+import { GuideMark } from '../render/GuideMark';
 import { gameCursor, type GameCursor } from '@/ui/pixelCursors';
 import { cinematicHeld, movesIn, netStore, type GameConnection } from '@/lib/net';
 import { settingsStore } from '@/lib/settings';
@@ -165,6 +166,8 @@ export class CombatScene extends Phaser.Scene {
   /** Diablo-style click-to-move (game/input/ClickMove.ts), its ground markers (render/ClickFx.ts) and the canvas cursor */
   private clickMove = new ClickMove();
   private clickFx: ClickFx | null = null;
+  /** guided tutorial: the walk mark (render/GuideMark.ts) */
+  private guideMark: GuideMark | null = null;
   private clickHover: { enemy: SnapEnemy | null; ground: GroundThing | null; combat: boolean } = { enemy: null, ground: null, combat: false };
   private cursorKind: GameCursor | '' = '';
   private cursorCss = '';
@@ -232,6 +235,7 @@ export class CombatScene extends Phaser.Scene {
     this.events.once('shutdown', () => this.input2.detach());
     this.events.once('destroy', () => this.input2.detach());
     this.clickFx = new ClickFx(this);
+    this.guideMark = new GuideMark(this);
     // contract: any UI (minimap, door panel) can ask the hero to walk somewhere, in world tile coordinates
     const onMoveTo = (e: Event) => { const d = (e as CustomEvent<{ x: number; y: number }>).detail; if (d) this.clickMove.moveTo(Number(d.x), Number(d.y)); };
     const onDoorHover = (e: Event) => { const i = (e as CustomEvent<{ i: number | null }>).detail?.i; this.doorHover = typeof i === 'number' ? i : null; };
@@ -963,6 +967,7 @@ export class CombatScene extends Phaser.Scene {
     this.pickupsR.update(latest.pickups, latest.tick, this.time.now, delta);
     this.aff.drawCaches(latest.pickups);   // cursed caches (render/Afflictions.ts)
     this.roomFx?.update(latest, this.renderSelf.init ? this.renderSelf : null, delta);
+    this.guideMark?.update(latest, this.time.now, this.settings().reducedMotion);   // tutorial walk mark
     this.drawDebug(latest);
     this.drawFx();
     this.doorsR?.update(latest, this.renderSelf.init ? this.renderSelf : null, me, delta);

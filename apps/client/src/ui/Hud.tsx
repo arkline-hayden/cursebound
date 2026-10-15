@@ -136,6 +136,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
   const lowHp = me.life === 'alive' && me.hp < 0.3;
   const isBossRound = !!enc?.boss;
   const training = !!phase.training;   // training grounds: no rounds, score or Fate (TrainingPanel holds the tools)
+  const guided = !!phase.guided;       // First Descent: no score plate or ledger (nothing is bound or scored yet)
   return (
     <div className={`hud ${cine ? 'cine-hidden' : ''}`}>
       <div className="vignette-screen soft" aria-hidden="true" />
@@ -146,7 +147,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
       <div className="hud-top" aria-hidden="true">
         <div className="hud-round">
           <div className="hud-wing left">
-            {training && !enc?.boss ? <span>Training</span> : enc ? (enc.boss ? <span>Phase <b>{enc.bossPhase + 1}</b>/3</span>
+            {training && !enc?.boss ? <span>Training</span> : guided ? <span>First Descent</span> : enc ? (enc.boss ? <span>Phase <b>{enc.bossPhase + 1}</b>/3</span>
               : enc.packsLeft !== undefined ? <span>Packs <b>{enc.packsLeft}</b> left</span>
               : <span>Wave <b>{enc.wave + 1}</b>/{enc.waves} · <b>{enc.done}</b>/{enc.total}</span>) : <span>Gathering</span>}
           </div>
@@ -155,7 +156,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
             <span className="tag">{isBossRound ? 'Boss' : training ? 'Level' : 'Round'}</span>
           </div>
           <div className="hud-wing right">
-            {training ? <span><b>{snap.enemies.filter((e) => e.st !== 'dying').length}</b> foes</span> : <span><b className={t > ref ? 'late' : 'ontime'}>{t.toFixed(0)}s</b>/{ref.toFixed(0)}s</span>}
+            {training ? <span><b>{snap.enemies.filter((e) => e.st !== 'dying').length}</b> foes</span> : guided ? <span>Tutorial</span> : <span><b className={t > ref ? 'late' : 'ontime'}>{t.toFixed(0)}s</b>/{ref.toFixed(0)}s</span>}
             {!training && enc && !enc.boss && (enc.foesLeft ?? enc.logicalEnemies) !== '0' && <span>· {whole(enc.foesLeft ?? enc.logicalEnemies)} foes</span>}
           </div>
         </div>
@@ -204,12 +205,12 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
 
       {/* top right: score, Fate Ledger, menu */}
       <div className="hud-right">
-        {!training && <div className="score-plate" aria-hidden="true">
+        {!training && !guided && <div className="score-plate" aria-hidden="true">
           <span className="lbl">Score</span>
           <span className="val">{score(snap.scoreText)}</span>
         </div>}
         <CoinChip />
-        {!training && <button className="ledger-btn" onClick={onLedger} aria-label={`Open Fate Ledger. ${phase.fate.length} cards bound.`}>
+        {!training && !guided && <button className="ledger-btn" onClick={onLedger} aria-label={`Open Fate Ledger. ${phase.fate.length} cards bound.`}>
           <span className="lhead"><span>Fate Ledger · {phase.fate.length}</span><span className="kbd">{cap('ledger', 'Tab')}</span></span>
           <span className="lcards">
             {phase.fate.slice(-5).map((c, i) => <span key={i} data-tip={CARD_BY_ID[c.cardId]?.name}><CardIcon cardId={c.cardId} size={32} /></span>)}

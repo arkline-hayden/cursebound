@@ -288,11 +288,18 @@ CREATE TABLE bounty_completions(
 );
 `;
 
+// Post-run breakdown (simulation runStats.ts): damage per skill, damage taken by source and death recaps, stored with
+// the finished run so the Records screen can show it for past runs. NULL for older runs and practice-free imports.
+const V5 = `
+ALTER TABLE runs ADD COLUMN breakdown_json TEXT NULL CHECK(breakdown_json IS NULL OR length(breakdown_json) <= 131072);
+`;
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial_schema', sql: V1 },
   { version: 2, name: 'accounts_builds_friends', sql: V2 },
   { version: 3, name: 'profiles_cloud_account', sql: V3 },
   { version: 4, name: 'progression_daily_bounty', sql: V4 },
+  { version: 5, name: 'run_breakdown', sql: V5 },
 ];
 
 export const LATEST_SCHEMA_VERSION: number = MIGRATIONS[MIGRATIONS.length - 1]!.version;

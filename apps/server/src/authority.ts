@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { BOUNTY_MIN_DEPTH, CARD_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION, CONTENT_VERSION, TICK_RATE, contentHash, describeAward, xpForRun, type XpAward } from '@cursebound/content';
 import { BUILD_ID, LIMITS, type ServerMessage } from '@cursebound/protocol';
 import {
-  buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, serializeState, stateHash, step,
+  buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, runBreakdown, serializeState, stateHash, step,
   voteCounts, type Command, type CreateRunParams, type PlayerInput, type SimEvent, type SimState, STATE_SCHEMA,
 } from '@cursebound/simulation';
 import type { Logger } from './persistence/logger';
@@ -31,7 +31,9 @@ export interface RunEndSummary { runId: string; endReason: string; scoreText: st
 interface JournalTick { t: number; i?: [number, number, number, number, number, number, number][]; c?: Command[] }
 interface Journal { v: 1; runId: string; header?: CreateRunParams; resumeFrom?: { tick: number }; ticks: JournalTick[] }
 
-const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training', /* room events (simulation roomEvents.ts) */ 'room_event']);
+// Sim events forwarded to clients (EVENTS). Any type the client reacts to must be listed (test/presentation.test.ts).
+// 'recap': a hero's death recap for the live "You died to…" card (simulation runStats.ts)
+export const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training', 'recap', 'room_event', 'miniboss', 'summon_blink', 'boss_adds']);
 const MAX_EVENTS_PER_BATCH = 240;
 const SNAPSHOT_EVERY = Math.round(TICK_RATE / 20);
 const TICK_MS = 1000 / TICK_RATE;
@@ -47,6 +49,8 @@ export interface AuthorityOptions {
   resume?: { persistSeq: number; chunkNo: number };
   /** training grounds (rooms.ts): nothing is persisted — no run record, events, commits, replay chunks, boards or records */
   training?: boolean;
+  /** guided first-run tutorial (rooms.ts, simulation tutorialRoom.ts): persisted exactly like training — never */
+  guided?: boolean;
   /** daily bounty id (local or cloud) a bounty run counts toward; its modifier is in the state (SimState.bounty) */
   bountyId?: string | null;
 }
@@ -60,6 +64,10 @@ export class RunAuthority {
   practice: boolean;
   /** training grounds run: never touches the store (see AuthorityOptions.training) */
   readonly training: boolean;
+  /** guided tutorial run (AuthorityOptions.guided) */
+  readonly guided: boolean;
+  /** never touches the store: training grounds and the guided tutorial */
+  get ephemeral(): boolean { return this.training || this.guided; }
   readonly bountyId: string | null;
   /** progression: XP awarded to each member's profile at finalization (by profile id), shown on RESULTS */
   private awards = new Map<string, XpAward>();
@@ -95,6 +103,7 @@ export class RunAuthority {
     this.boardKey = o.boardKey;
     this.practice = o.practice;
     this.training = !!o.training;
+    this.guided = !!o.guided;
     this.bountyId = o.bountyId ?? null;
     this.persistSeq = o.resume?.persistSeq ?? 0;
     this.chunkNo = o.resume?.chunkNo ?? 0;
@@ -103,7 +112,7 @@ export class RunAuthority {
     if (o.resume) this.journal.resumeFrom = { tick: o.state.tick };
     this.lastPhase = o.state.phase;
     for (let i = 0; i < o.state.n; i++) { this.queues.push([]); this.last.push(null); this.buckets.push({ tokens: LIMITS.inputBurst, at: Date.now() }); }
-    this.created = o.createParams && !this.training ? this.createRunRecord() : Promise.resolve();
+    this.created = o.createParams && !this.ephemeral ? this.createRunRecord() : Promise.resolve();
     if (o.resume && this.state.awaitingDurable === 'commit') {
       // the restored checkpoint already contains the committed card: acknowledge durability, never reapply
       this.pending.push({ cmd: { type: 'DURABLE', what: 'commit' } });
@@ -215,7 +224,7 @@ export class RunAuthority {
       this.incident(`Simulation error: ${(err as Error).message}`);
       return;
     }
-    if ((jIn.length || cmds.length) && !this.training) {   // training runs keep no replay journal
+    if ((jIn.length || cmds.length) && !this.ephemeral) {   // training / tutorial runs keep no replay journal
       const jt: JournalTick = { t: tickNo };
       if (jIn.length) jt.i = jIn;
       if (cmds.length) jt.c = cmds;
@@ -247,16 +256,25 @@ export class RunAuthority {
     this.lastPhase = this.state.phase;
     this.broadcast({ t: 'NOTICE', level: 'error', code: 'TECHNICAL_RECOVERY', text: `Technical recovery: ${reason}. Your run is checkpointed at the last safe intermission; this is not a defeat.` });
     this.sendPhase();
-    if (this.training) return;
+    if (this.ephemeral) return;
     void this.store.updateRunProgress({ id: this.state.runId, round: this.state.round, ticks: this.state.totalActiveTicks, scoreText: this.state.scoreText, status: 'pending_storage' }).catch(() => undefined);
   }
 
   // ---------------- Persistence pipeline ----------------
 
   private handleEvents(events: SimEvent[]) {
-    if (this.training) {
-      // training grounds: nothing is stored; leaving the yard (retire / abort) finalizes without a record
-      if (events.some((e) => e.t === 'domain' && e.type === 'run_finalized')) this.pending.push({ cmd: { type: 'DURABLE', what: 'finalize' } });
+    if (this.ephemeral) {
+      // training grounds / tutorial: nothing is stored; a commit (the tutorial's Fate door) and the finalize are
+      // acknowledged at once, so the run never waits on storage and never leaves a record, board entry or replay
+      for (const e of events) {
+        if (e.t !== 'domain') continue;
+        if (e.type === 'fate_committed') {
+          const p = e.payload;
+          this.broadcast({ t: 'COMMIT', eventId: this.state.eventSeq, offerId: p.offerId as string, cardId: p.cardId as string, cardSlot: p.cardSlot as number, tieEvidence: p.tieEvidence, newStateHash: p.resultingStateHash as string, durable: true });
+          this.pending.push({ cmd: { type: 'DURABLE', what: 'commit' } });
+        }
+        if (e.type === 'run_finalized') this.pending.push({ cmd: { type: 'DURABLE', what: 'finalize' } });
+      }
       return;
     }
     const s = this.state;
@@ -301,7 +319,7 @@ export class RunAuthority {
 
   private chain: Promise<unknown> = Promise.resolve();
   private persist(fn: () => Promise<unknown>) {
-    if (this.training) return;
+    if (this.ephemeral) return;
     this.chain = this.chain.then(() => this.created).then(fn).catch((err) => {
       this.log.error('persist_failed', { err: err as Error });
       this.storageNotice(err as Error);
@@ -314,7 +332,8 @@ export class RunAuthority {
   }
 
   private checkpointBlob(): { blob: string; sum: string } {
-    const blob = JSON.stringify({ v: 1, persistSeq: this.persistSeq, chunkNo: this.chunkNo + 1, state: serializeState(this.state), boardKey: this.boardKey, practice: this.practice, bountyId: this.bountyId });
+    // `breakdown` (runStats.ts) lives outside the hashed state; the wrapper carries it so a resumed run keeps its totals
+    const blob = JSON.stringify({ v: 1, persistSeq: this.persistSeq, chunkNo: this.chunkNo + 1, state: serializeState(this.state), boardKey: this.boardKey, practice: this.practice, bountyId: this.bountyId, breakdown: runBreakdown(this.state) });
     return { blob, sum: checksum(blob) };
   }
 
@@ -381,8 +400,11 @@ export class RunAuthority {
         stats: { damageDealt: p.stats.damageDealt.toCompact(), damageTaken: p.stats.damageTaken.toCompact(), healing: p.stats.healing.toCompact(), prevented: p.stats.prevented.toCompact(), revives: p.stats.revives, downs: p.stats.downs },
       })),
       deathRecaps: s.deathRecaps.slice(-10),
+      // post-run breakdown: damage per skill, damage taken by source, death recaps (simulation runStats.ts)
+      breakdown: runBreakdown(s),
       legendaries: s.lootFound ?? [],
       ...(this.training ? { training: true } : {}),
+      ...(this.guided ? { guided: true } : {}),   // guided tutorial: Results shows "You're ready"
       // daily bounty and progression (content bounties.ts / progression.ts): the XP award per slot (null until the
       // finalize transaction credited it, or for a profile this machine does not hold)
       bounty: s.bounty ? { id: this.bountyId, modifierId: s.bounty } : null,
@@ -394,13 +416,14 @@ export class RunAuthority {
 
   private persistFinalize() {
     const s = this.state;
-    const sum = this.summary();
+    const { breakdown, ...sum } = this.summary();   // the breakdown is stored in its own column (runs.breakdown_json)
     const journal = this.takeJournal();
     const status = s.endReason === 'aborted_infrastructure' ? 'aborted' : s.endReason === 'invalidated' ? 'invalidated' : 'finalized';
     const input = {
       runId: s.runId, status: status as 'finalized' | 'aborted' | 'invalidated', endReason: s.endReason ?? 'retired', scoreText: s.scoreText,
       depth: clearedDepth(s), activeTicks: s.totalActiveTicks, boardKey: this.boardKey, trust: s.trust,
       participantsJson: JSON.stringify(s.players.map((p) => ({ name: p.name, classId: p.classId }))), summaryJson: JSON.stringify(sum), practice: this.practice,
+      breakdownJson: breakdown ? JSON.stringify(breakdown) : null,
       // progression: every member's profile earns the run's XP; a bounty run that cleared a round doubles each member's
       // first completion of that bounty
       progress: {
@@ -467,7 +490,7 @@ export class RunAuthority {
       bossId: s.encounter?.bossId ?? null,
       round: s.round, phase: s.phase, deadlineTick: s.phaseDeadlineTick, tick: s.tick, scoreText: s.scoreText, retire: s.retireVotes,
       lastClear: s.lastClear, rounds: s.rounds.slice(-30), endReason: s.endReason, incident: s.incident, resumed: s.resumed,
-      storagePending: this.storagePending, practice: this.practice, boardKey: this.boardKey, training: this.training,
+      storagePending: this.storagePending, practice: this.practice, boardKey: this.boardKey, training: this.training, guided: !!s.guide,
       nextRound: s.round + 1, nextIsBoss: (s.round + 1) % RULES.bossEvery === 0,
       fate: s.commits.slice(-60).map((c) => ({ round: c.round, cardId: c.cardId })),
       deathRecaps: s.deathRecaps.filter((d) => d.round === s.round),

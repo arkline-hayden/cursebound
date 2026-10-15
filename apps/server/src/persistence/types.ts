@@ -78,6 +78,8 @@ export interface RunSummary extends RunListItem {
   contentHash: string;
   scoreVersion: string;
   summaryJson: string | null;
+  /** post-run breakdown (runs.breakdown_json, schema v5); null for older runs */
+  breakdownJson: string | null;
   verification: VerificationStatus | null;
   members: RunMember[];
   rounds: RoundResult[];
@@ -143,6 +145,8 @@ export interface FinalizeRunInput {
   trust: string;
   participantsJson: string;
   summaryJson: string;
+  /** post-run breakdown (simulation runStats.ts RunBreakdown as JSON); absent = none recorded */
+  breakdownJson?: string | null;
   practice: boolean;
   /**
    * Player progression (content progression.ts): XP credited to each member's profile in the same transaction, only

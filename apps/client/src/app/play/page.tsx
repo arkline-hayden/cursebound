@@ -23,6 +23,7 @@ import { Toasts } from '@/ui/Toasts';
 import { GearLayer } from '@/ui/GearLayer';
 import { ClearSummary } from '@/ui/ClearSummary';
 import { TutorialHints } from '@/ui/TutorialHints';
+import { TutorialGuide } from '@/ui/TutorialGuide';
 import { Minimap } from '@/ui/Minimap';
 import { CinematicOverlay } from '@/ui/CinematicOverlay';
 import { TrainingPanel } from '@/ui/TrainingPanel';
@@ -213,7 +214,9 @@ export default function Play() {
       {net && stage === 'RUN' && <CinematicOverlay />}
       {net && stage === 'RUN' && (ph === 'COMBAT' || ph === 'ROUND_SETUP') && <Hud net={net} onLedger={() => setShowLedger(true)} onPause={() => setPaused(true)} />}
       {net && stage === 'RUN' && (ph === 'COMBAT' || ph === 'ROUND_SETUP' || ph === 'VOTING' || ph === 'FATE_COMMIT' || ph === 'FATE_OFFER') && <Minimap net={net} audio={audio} />}
-      {phase?.tutorial && <TutorialHints />}
+      {phase?.tutorial && !phase.guided && <TutorialHints />}
+      {/* First Descent: step prompts beside the hero (ui/TutorialGuide.tsx) */}
+      {net && stage === 'RUN' && phase?.guided && <TutorialGuide net={net} />}
       {net && stage === 'RUN' && phase?.training && (ph === 'COMBAT' || ph === 'ROUND_SETUP') && <TrainingPanel net={net} />}
       <main id="main">{overlay}</main>
       {showLedger && net && <Ledger net={net} onClose={() => setShowLedger(false)} />}
