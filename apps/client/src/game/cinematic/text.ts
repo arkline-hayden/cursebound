@@ -21,6 +21,7 @@ export function bossEpithet(kind: string): string {
 /** Light / flare colour for a dungeon theme (doors, entry portals). */
 const THEME_GLOW: Record<string, number> = {
   catacombs: 0xffb060, flooded: 0x6ac8ff, ossuary: 0xf4e4b0, sanctum: 0xff3a4a, fungal: 0x6af0c0, forge: 0xff7a2a, frost: 0xa8e8ff,
+  sky: 0xffe0a0, moon: 0xcfe4ff, server: 0x50f0ff,
 };
 
 export function themeGlow(th: string | undefined): number {

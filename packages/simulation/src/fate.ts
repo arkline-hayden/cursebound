@@ -54,7 +54,7 @@ export function drawDoorThemes(rng: RngState, current: string | null, k = 3): st
   const pool = DUNGEON_THEMES.map((t) => t.id).filter((id) => id !== current);
   const out: string[] = [];
   for (let i = 0; i < k && pool.length > 0; i++) out.push(pool.splice(nextInt(rng, pool.length), 1)[0]);
-  // fewer themes than doors (never with the shipped seven): repeat in order rather than leave a door themeless
+  // fewer themes than doors (never with the shipped ten): repeat in order rather than leave a door themeless
   for (let i = 0; out.length < k && out.length > 0; i++) out.push(out[i]);
   return out;
 }

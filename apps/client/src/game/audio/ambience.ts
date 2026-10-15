@@ -32,6 +32,8 @@ export class AmbienceBed {
   private readonly out: GainNode;
   private readonly pans: AudioNode[] = [];
   private readonly layers: Layer[] = [];
+  /** steady tonal sources (the server room's mains hum), stopped with the bed */
+  private readonly oscs: OscillatorNode[] = [];
   private readonly events: Event[] = [];
   private readonly distant: BiquadFilterNode;
   private stopped = false;
@@ -87,6 +89,37 @@ export class AmbienceBed {
     gain.connect(this.out);
     src.start(t, this.s.rand() * 1.5);
     this.layers.push({ src, filter, gain, fRange: o.f, gRange: o.g, period: o.period ?? [2, 5], next: t });
+  }
+
+  /** A steady electrical hum: a few harmonics of `f` through a soft lowpass, its level breathing a little. */
+  private hum(t: number, f: number, gain: number): void {
+    const ctx = this.s.ctx;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    lp.connect(g);
+    g.connect(this.out);
+    for (const [mul, type, amp] of [[1, 'sine', 1], [2, 'square', 0.18], [3, 'sine', 0.3], [5, 'sine', 0.08]] as const) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f * mul;
+      const a = ctx.createGain();
+      a.gain.value = amp;
+      o.connect(a);
+      a.connect(lp);
+      o.start(t);
+      this.oscs.push(o);
+    }
+    const l = ctx.createOscillator();
+    l.frequency.value = 0.31;
+    const lg = ctx.createGain();
+    lg.gain.value = gain * 0.25;
+    l.connect(lg);
+    lg.connect(g.gain);
+    l.start(t);
+    this.oscs.push(l);
   }
 
   private every(t: number, min: number, max: number, fire: (out: AudioNode, t: number) => void, firstDelay = 1): void {
@@ -210,6 +243,57 @@ export class AmbienceBed {
         }, 3);
         this.every(t, 5, 12, (o, tt) => { const n = 2 + Math.floor(r() * 3); for (let k = 0; k < n; k++) s.click('glass', o, tt + k * (0.08 + r() * 0.1), 0.7); }, 2);
         break;
+      case 'sky':
+        // open-air wind: a broad gusting band, a whistle over the rim, and the wind-flap of cloth and wings
+        this.layer(t, { type: 'bandpass', q: 1.2, f: [250, 700], g: [0.012, 0.05], period: [1.5, 3.5] });
+        this.layer(t, { type: 'bandpass', q: 9, f: [1100, 2100], g: [0.0015, 0.008], period: [2, 5] });
+        this.layer(t, { brown: true, type: 'lowpass', q: 0.7, f: [120, 260], g: [0.01, 0.03], period: [2.5, 5] });
+        this.every(t, 4, 10, (o, tt) => {
+          // a bird's call high overhead: two falling chirps
+          const f = 2600 + r() * 900;
+          s.tone(o, tt, { f, f2: f * 0.7, dur: 0.12, gain: 0.012, glide: 0.1 });
+          s.tone(o, tt + 0.18, { f: f * 0.95, f2: f * 0.62, dur: 0.14, gain: 0.01, glide: 0.12 });
+        }, 3);
+        this.every(t, 7, 15, (o, tt) => {
+          // wings or cloth snapping in a gust
+          for (let k = 0; k < 3; k++) s.noiseHit(o, tt + k * (0.06 + r() * 0.05), { dur: 0.05, type: 'bandpass', f: 600 + r() * 500, q: 1.5, gain: 0.02, attack: 0.004 });
+        }, 5);
+        this.every(t, 25, 45, (_o, tt) => rumble(this.distant, tt, 0.035, 4), 14);
+        break;
+      case 'moon':
+        // airless quiet: a sub-bass pressure, a faint high whine in the ears, a distant beacon and radio static
+        this.layer(t, { brown: true, type: 'lowpass', q: 0.8, f: [50, 110], g: [0.02, 0.04], period: [4, 9] });
+        this.layer(t, { type: 'bandpass', q: 25, f: [5800, 6400], g: [0.0006, 0.0018], period: [5, 10] });
+        this.every(t, 6, 12, (o, tt) => s.click('blip', o, tt, 0.6), 2);
+        this.every(t, 12, 24, (o, tt) => {
+          // a burst of radio static with a voice-like formant buried in it
+          s.noiseHit(o, tt, { dur: 0.9, type: 'bandpass', f: 1400, f2: 900, q: 1.4, gain: 0.018, attack: 0.05 });
+          s.whisper(o, tt + 0.2, 0.6, 0.012);
+        }, 7);
+        this.every(t, 18, 34, (o, tt) => {
+          // the hull of the outpost ticking as it cools in the shadow
+          for (let k = 0; k < 4; k++) s.click('bone', o, tt + k * (0.3 + r() * 0.4), 0.18);
+        }, 9);
+        break;
+      case 'server':
+        // mains hum and fan noise, drive clicks, data chirps and the odd glitch through the speakers
+        this.hum(t, 60, 0.012);
+        this.layer(t, { type: 'bandpass', q: 0.8, f: [900, 2200], g: [0.006, 0.014], period: [3, 6] });
+        this.layer(t, { brown: true, type: 'lowpass', q: 0.7, f: [140, 300], g: [0.012, 0.024], period: [3, 6] });
+        this.every(t, 0.6, 2.4, (o, tt) => { const n = 1 + Math.floor(r() * 3); for (let k = 0; k < n; k++) s.noiseHit(o, tt + k * 0.03, { dur: 0.006, type: 'highpass', f: 4000, gain: 0.01, attack: 0.001 }); }, 0.5);
+        this.every(t, 4, 9, (o, tt) => {
+          // a data chirp: a fast square arpeggio
+          const base = 900 + r() * 600;
+          for (let k = 0; k < 6; k++) s.tone(o, tt + k * 0.035, { type: 'square', f: base * (1 + (k % 3) * 0.25), dur: 0.025, gain: 0.006, filter: 3000 });
+        }, 2);
+        this.every(t, 10, 20, (o, tt) => s.click('glitch', o, tt, 0.6), 6);
+        this.every(t, 22, 40, (_o, tt) => s.whisper(this.distant, tt, 1, 0.02), 12);
+        break;
+      default: {
+        // every theme has a bed: a new AudioTheme without a case is a compile error here
+        const missing: never = id;
+        void missing;
+      }
     }
   }
 
@@ -239,6 +323,7 @@ export class AmbienceBed {
     this.out.gain.setValueAtTime(Math.max(0.0001, this.out.gain.value), t);
     this.out.gain.linearRampToValueAtTime(0.0001, t + fade);
     for (const L of this.layers) L.src.stop(t + fade + 0.1);
+    for (const o of this.oscs) o.stop(t + fade + 0.1);
     const out = this.out;
     setTimeout(() => { try { out.disconnect(); } catch { /* gone */ } }, (fade + 0.5) * 1000);
   }

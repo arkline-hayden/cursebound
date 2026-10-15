@@ -50,8 +50,8 @@ export const DOOR_FRAMES = { frame: 1, portal: 6, leaves: 6, glow: 4 } as const;
 const { FW, FH, TEX_H, OPEN_X0, OPEN_X1, SPRING, R_IN, R_OUT, CX } = DOOR_GEOM;
 const FLOOR = FH - 1;
 
-type Crown = 'stepped' | 'broken' | 'skull' | 'spire' | 'mound' | 'horns' | 'peak';
-type LeafPattern = 'planks' | 'rotted' | 'lattice' | 'panels' | 'roots' | 'plates' | 'ice';
+type Crown = 'stepped' | 'broken' | 'skull' | 'spire' | 'mound' | 'horns' | 'peak' | 'wings' | 'crescent' | 'chip';
+type LeafPattern = 'planks' | 'rotted' | 'lattice' | 'panels' | 'roots' | 'plates' | 'ice' | 'sail' | 'hatch' | 'circuit';
 
 interface DoorStyle {
   stone: Ramp;
@@ -113,6 +113,27 @@ const STYLES: Record<string, DoorStyle> = {
     leaf: R(0x18202a, 0x2a3644, 0x3e4e60, 0x5a7086, 0x86a2bc), band: R(0x3a5a7a, 0x5a86aa, 0x8ac0e8, 0xc8ecff, 0xffffff),
     portal: R(0x061428, 0x10305a, 0x3a78c0, 0x9ad0ff, 0xf0faff),
     light: 0x8ac8ff, glow: 0xd0f0ff, crown: 'peak', leafPattern: 'ice',
+  },
+  // weathered sandstone under spread stone wings, ivy, canvas-and-rib leaves; open sky through the opening
+  sky: {
+    stone: R(0x4a4030, 0x6c604a, 0x948668, 0xbcae8c, 0xe0d4b0), trim: GOLD,
+    leaf: R(0x5a4a34, 0x84704e, 0xae9a70, 0xd6c49a, 0xf4e8c4), band: R(0x2a1e12, 0x44321e, 0x60482c, 0x7c623e, 0x9a7e54),
+    portal: R(0x1a4a8a, 0x3a78c8, 0x7ab4e8, 0xd0ecfa, 0xffffff),
+    light: 0xffe0a0, glow: 0xfff0c0, glow2: 0xffffff, crown: 'wings', leafPattern: 'sail',
+  },
+  // an outpost airlock in grey basalt: a crescent crown, hazard-striped hatch leaves; the starfield beyond
+  moon: {
+    stone: R(0x22232a, 0x34363e, 0x4a4c56, 0x666874, 0x8a8c9a), trim: R(0x2a2e36, 0x48505e, 0x6e7a8c, 0x9aa8bc, 0xd0dcec),
+    leaf: R(0x2a2e36, 0x48505e, 0x6e7a8c, 0x9aa8bc, 0xd0dcec), band: R(0x18181c, 0x6a5010, 0xb08a1c, 0xd8a020, 0xf0cc58),
+    portal: R(0x010208, 0x060c22, 0x1a3a7a, 0x6a9ae0, 0xe0ecff),
+    light: 0xcfe4ff, glow: 0xff4a30, glow2: 0xe0ecff, crown: 'crescent', leafPattern: 'hatch',
+  },
+  // a rack chassis crowned with a chip, circuit-traced leaves, LEDs and a magenta curse-light; static beyond
+  server: {
+    stone: R(0x0e1016, 0x1a1e28, 0x282e3c, 0x3a4256, 0x56607a), trim: R(0x14171e, 0x262c38, 0x3a4256, 0x56607a, 0x8a96b0),
+    leaf: R(0x06070a, 0x0c0e12, 0x14171c, 0x1c2028, 0x262c36), band: R(0x04303a, 0x08606e, 0x10a8b8, 0x50f0ff, 0xc8ffff),
+    portal: R(0x0a0418, 0x3a0838, 0xa0189a, 0x40e0ff, 0xe0ffff),
+    light: 0x40e8ff, glow: 0x50f0ff, glow2: 0xff70f0, crown: 'chip', leafPattern: 'circuit',
   },
 };
 
@@ -205,6 +226,25 @@ function inCrown(crown: Crown, x: number, y: number): boolean {
     }
     case 'peak':
       return py >= 26 && py <= 60 && dx <= 1.5 + (py - 26) * 0.5;
+    case 'wings': {
+      // a keystone block with stone wings spread from it, feathers stepping down to the shoulders
+      if (py >= 44 && py <= 60 && dx <= 5) return true;
+      if (py < 30 || py > 60) return false;
+      const reach = 4 + (60 - py) * 0.9;
+      const feather = Math.floor(dx / 4) % 2 === 0 ? 0 : 2;
+      return dx <= Math.min(27, reach) && py >= 34 + dx * 0.55 - feather;
+    }
+    case 'crescent': {
+      // a crescent moon standing on a short plinth
+      if (py >= 52 && py <= 60 && dx <= 6) return true;
+      const r1 = Math.hypot(px - CX, py - 38), r2 = Math.hypot(px - CX - 4, py - 35);
+      return r1 <= 12 && r2 > 10;
+    }
+    case 'chip': {
+      // a square chip on the lintel, its pins running down each side
+      if (py >= 36 && py <= 58 && dx <= 9) return true;
+      return py >= 38 && py <= 56 && (py - 38) % 4 < 2 && dx <= 12;
+    }
   }
 }
 
@@ -304,7 +344,7 @@ function paintFrame(theme: string): PixelBuffer {
   }
   const crownTest: Test = (x, y) => inCrown(s.crown, x, y) && !inOpening(x, y) && !inRing(x, y);
   fillLit(b, inButtress, s.stone, seed, 'course', 1.8);
-  fillLit(b, crownTest, s.stone, seed + 3, s.crown === 'skull' || s.crown === 'mound' ? 'none' : 'course', 2);
+  fillLit(b, crownTest, s.crown === 'chip' ? s.leaf : s.stone, seed + 3, s.crown === 'skull' || s.crown === 'mound' || s.crown === 'crescent' || s.crown === 'chip' ? 'none' : 'course', 2);
   fillLit(b, inJamb, s.stone, seed + 5, 'course', 2.2);
   fillLit(b, inRing, s.crown === 'skull' ? s.stone : s.stone, seed + 7, 'radial', 2.4);
   fillLit(b, inImpost, s.trim, seed + 9, 'none', 2.4);
@@ -401,6 +441,46 @@ function ornamentFrame(b: PixelBuffer, theme: string, s: DoorStyle, seed: number
       for (const [x, y, len] of FROST_ICICLES) for (let k = 0; k < len; k++) b.set(x, y + k, tone(R(0x5a86aa, 0x8ac0e8, 0xc8ecff, 0xf0faff, 0xffffff), 3.4 - k * 0.5, x, y + k));
       break;
     }
+    case 'sky': {
+      // feather grooves in the wings, a gold sun boss on the keystone, ivy climbing both buttresses
+      for (let y = 30; y < 60; y++) for (let x = 0; x < FW; x++) {
+        if (!b.alpha(x, y) || inOpening(x, y) || inRing(x, y)) continue;
+        const dx = Math.abs(pc(x) - CX);
+        if (dx > 6 && Math.floor(dx) % 4 === 0) b.set(x, y, tone(s.stone, 1, x, y));
+      }
+      for (let y = 48; y <= 54; y++) for (let x = CX - 3; x <= CX + 2; x++) if ((pc(x) - CX) ** 2 + (pc(y) - 51) ** 2 <= 8) b.set(x, y, tone(GOLD, 3.2 - (y - 48) * 0.2, x, y));
+      for (const bx of [3, 49]) {
+        let x = bx;
+        for (let y = FLOOR - 1; y > 56; y--) {
+          x += hash2(bx, y, seed) < 0.3 ? (hash2(y, bx, seed) < 0.5 ? -1 : 1) : 0;
+          x = Math.max(bx - 2, Math.min(bx + 4, x));
+          if (b.alpha(x, y)) b.set(x, y, tone(R(0x16300e, 0x285018, 0x3e7a22, 0x5ea432, 0x8ccc50), 2 + hash2(x, y, 3) * 1.6, x, y));
+          if (y % 3 === 0 && b.alpha(x + 1, y)) b.set(x + 1, y, 0x3e7a22);
+        }
+      }
+      break;
+    }
+    case 'moon': {
+      // riveted metal jamb plates, a hazard-striped threshold, regolith banked against the buttresses
+      for (const y of [76, 88]) for (let x = 12; x < 44; x++) if (inJamb(x, y)) b.set(x, y, tone(s.trim, 3, x, y));
+      for (let x = 9; x <= 46; x++) for (let y = FLOOR - 2; y <= FLOOR; y++) b.set(x, y, (x + y) % 6 < 3 ? 0xd8a020 : 0x18181c);
+      for (let x = 0; x < FW; x++) for (let y = FLOOR - 4; y <= FLOOR; y++) if (b.alpha(x, y) && inButtress(x, y) && y > FLOOR - 4 + Math.sin(x * 0.7) * 1.5) b.set(x, y, tone(R(0x4a4c54, 0x6a6c76, 0x8e909a, 0xb4b6c0, 0xdcdee6), 2.4, x, y));
+      break;
+    }
+    case 'server': {
+      // cable bundles drooping over the frame, vent slots in the buttresses, a circuit trace round the ring
+      for (let y = 62; y < FH; y += 3) for (let x = 2; x < FW - 2; x++) if (inButtress(x, y) && x % 9 > 1 && x % 9 < 8) b.set(x, y, 0x040508);
+      for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+        if (!inRing(x, y)) continue;
+        const r = Math.hypot(pc(x) - CX, pc(y) - SPRING);
+        if (Math.abs(r - (R_IN + R_OUT) / 2) < 0.6) b.set(x, y, 0x06303a);
+      }
+      for (const [x0, len] of [[10, 9], [16, 6], [40, 8], [46, 11]] as const) for (let k = 0; k < len; k++) {
+        const x = x0 + Math.round(Math.sin(k * 0.6) * 1.2), y = 60 + k;
+        if (b.alpha(x, y) || k < 3) b.set(x, y, tone(R(0x200608, 0x40100e, 0x6a1c18, 0x983028, 0xc04c40), 2.4, x, y));
+      }
+      break;
+    }
   }
 }
 
@@ -447,7 +527,7 @@ function paintPortal(theme: string, f: number): PixelBuffer {
     const x0 = OPEN_X0 + 1 + Math.floor(hash2(k, 1, theme.length) * (OPEN_X1 - OPEN_X0 - 2));
     const span = 44;
     const y0 = hash2(k, 2, theme.length) * span;
-    const speed = theme === 'frost' ? -1 : theme === 'flooded' || theme === 'forge' || theme === 'fungal' ? 1 : 0.5;
+    const speed = theme === 'frost' ? -1 : theme === 'flooded' || theme === 'forge' || theme === 'fungal' ? 1 : theme === 'server' ? 2.5 : theme === 'sky' ? -0.6 : theme === 'moon' ? 0.15 : 0.5;
     const yy = SPRING - R_IN + ((((y0 - ph * span * speed * (0.6 + hash2(k, 3, 1) * 0.6)) % span) + span) % span);
     const xx = x0 + (theme === 'fungal' || theme === 'ossuary' ? Math.round(Math.sin(ph * Math.PI * 2 + k) * 1.5) : 0);
     const y = Math.floor(yy);
@@ -525,6 +605,23 @@ function leafPixel(s: DoorStyle, u: number, y: number, side: number, x: number):
       const frost = hash2(u + side * 7, y, 3) < 0.25 || (u + y) % 9 === 0;
       return frost ? mix(c, B[3] as number, 0.6) : mix(c, B[2] as number, 0.18);
     }
+    case 'sail': {
+      // stretched canvas on wooden ribs, bellying a little in the wind
+      if (y % 10 === 0 || u === 0) return tone(B, 2.4 + edge, x, y);
+      return tone(L, 2.4 + Math.sin((y % 10) / 10 * Math.PI) * 0.8 + edge, x, y);
+    }
+    case 'hatch': {
+      // an airlock leaf: plate with a porthole, hazard stripes at the foot
+      if (y > FLOOR - 9) return (u + y) % 6 < 3 ? (B[3] as number) : (B[0] as number);
+      if (u >= 3 && u <= 6 && y >= 78 && y <= 84) return (u === 3 || u === 6 || y === 78 || y === 84) ? (L[4] as number) : 0x0a1830;
+      return tone(L, 2.2 + edge - (y % 16 === 0 ? 1 : 0), x, y);
+    }
+    case 'circuit': {
+      // black panels traced in cyan
+      const trace = (u === 4 && y % 12 < 8) || (y % 12 === 7 && u >= 2 && u <= 7) || (u === 7 && y % 12 > 7);
+      if (trace) return tone(B, 2.6, x, y);
+      return tone(L, 2 + edge + (y % 24 === 0 ? 1 : 0), x, y);
+    }
   }
 }
 
@@ -587,6 +684,28 @@ function paintGlow(theme: string, f: number): PixelBuffer {
       FROST_ICICLES.forEach(([x, y, len], i) => { if ((i + f) % 4 === 0) lit(x, y + len - 1, 0xffffff, 255); });
       for (const [x, y] of [[CX, SPRING - R_OUT - 1], [CX - 1, SPRING - R_OUT], [CX + 1, SPRING - R_OUT]]) b.set(x, y, s.glow, Math.round(255 * pulse));
       break;
+    case 'sky':
+      // the sun boss catches the light; motes of pollen drift up past the wings
+      for (const [x, y] of [[CX - 1, 50], [CX, 50], [CX - 1, 51], [CX, 51]]) lit(x, y, s.glow2 ?? 0xffffff, Math.round(255 * pulse));
+      for (let k = 0; k < 5; k++) { const x = 6 + ((k * 13 + f * 2) % 44), y = 56 - ((f * 3 + k * 7) % 22); if (!b.alpha(x, y)) b.set(x, y, s.glow, 170); }
+      break;
+    case 'moon':
+      // beacon lights blinking on the buttress caps, in turn
+      for (const [i, x] of [[0, 6], [1, 49]] as const) if ((f + i * 2) % 4 < 2) { lit(x, 59, s.glow, 255); b.set(x, 58, 0xffb0a0, 220); }
+      for (const [x, y] of [[CX - 4, 40], [CX + 2, 34]]) if (f % 2) b.set(x, y, s.glow2 ?? 0xffffff, 200);
+      break;
+    case 'server': {
+      // LED rows on the chip crown blinking, the circuit trace round the ring pulsing, a magenta warning eye
+      for (let k = 0; k < 6; k++) { const x = CX - 6 + k * 2, on = ((k * 5 + f * 3) % 7) < 4; if (on) lit(x, 46, k % 3 === 0 ? (s.glow2 ?? s.glow) : s.glow, 255); }
+      for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+        if (!inRing(x, y)) continue;
+        const a = Math.atan2(pc(y) - SPRING, pc(x) - CX);
+        const r = Math.hypot(pc(x) - CX, pc(y) - SPRING);
+        if (Math.abs(r - (R_IN + R_OUT) / 2) < 0.6 && Math.abs(((a / Math.PI + 1) * 2 + f * 0.25) % 1 - 0.5) < 0.2) b.set(x, y, s.glow, 230);
+      }
+      lit(CX, 41, s.glow2 ?? s.glow, Math.round(255 * pulse));
+      break;
+    }
   }
   return b;
 }

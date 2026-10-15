@@ -37,9 +37,11 @@ function toNextRound(s: SimState): SimEvent[] {
   return all;
 }
 
+/** Put a hero in a door (ending any dodge still in travel, which would carry them straight back out of it). */
 function stand(s: SimState, slot: number, door: number) {
   const d = s.doors!.list[door];
-  s.players[slot].x = d.x; s.players[slot].y = d.y; s.players[slot].vx = 0; s.players[slot].vy = 0;
+  const p = s.players[slot];
+  p.x = d.x; p.y = d.y; p.vx = 0; p.vy = 0; p.dodgeTimer = 0; p.surgeTimer = 0;
 }
 
 function reach(map: MapState, sx: number, sy: number): Int32Array {

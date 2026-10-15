@@ -23,7 +23,7 @@ const R = (...c: number[]): Ramp => Object.freeze(c);
 
 /** Ambient emitter hint attached to a prop (offsets in sprite px from the prop origin). */
 export interface PropFx {
-  kind: 'smoke' | 'steam' | 'spores' | 'embers' | 'flies' | 'wisp';
+  kind: 'smoke' | 'steam' | 'spores' | 'embers' | 'flies' | 'wisp' | 'sparks';
   dx: number;
   dy: number;
   rate?: number;

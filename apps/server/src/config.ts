@@ -14,6 +14,8 @@ export interface ServerConfig {
   lan: boolean;
   dataDir: string;
   devTools: boolean;
+  /** dev tools only: every new run's first floor uses this dungeon theme (CURSEBOUND_DEV_THEME, art checks) */
+  devTheme?: string | null;
   allowedOrigins: string[];
   allowedHosts: string[];
   /** New accounts allowed per client address per hour (anti-spam when LAN sharing is on). */
@@ -58,6 +60,7 @@ export function loadConfig(env = process.env): ServerConfig {
     host: lan ? '0.0.0.0' : '127.0.0.1',
     dataDir,
     devTools: env.CURSEBOUND_DEV_TOOLS === '1',
+    devTheme: env.CURSEBOUND_DEV_TOOLS === '1' ? env.CURSEBOUND_DEV_THEME || null : null,
     // serving the client itself (desktop), the only page origin is the authority's own; no separate Next.js port
     allowedOrigins: staticDir ? [] : hosts.flatMap((h) => [`http://${h}:${clientPort}`]),
     allowedHosts: hosts.flatMap((h) => [`${h}:${port}`, `${h}:${clientPort}`, h]),

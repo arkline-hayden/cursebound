@@ -209,6 +209,8 @@ export class Room implements AuthorityHost {
       ...(this.training ? { training: true } : {}),   // training grounds (simulation training.ts)
     };
     const state = createRun(params);
+    // dev tools only (CURSEBOUND_DEV_TOOLS=1 CURSEBOUND_DEV_THEME=<id>): the first floor uses a chosen theme, like a door
+    if (this.mgr.cfg.devTheme && !this.tutorial) state.nextTheme = { round: 1, theme: this.mgr.cfg.devTheme };
     // bounty runs rank in their own division per modifier (protocol boardKey)
     const key = boardKey({ rulesVersion: RULES_VERSION, contentHash: contentHash(), scoreVersion: SCORE_VERSION, n: state.n, mode: this.mode, challengeId: this.challengeId, trust: this.trust, bounty: this.bounty?.modifierId });
     let practice = this.tutorial || this.training;

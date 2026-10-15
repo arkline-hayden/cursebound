@@ -425,6 +425,36 @@ function openness(g: Grid, i: number): number {
   return n;
 }
 
+/**
+ * Sky floors are one shard of earth adrift in open air: the rock mass around and between the rooms (every wall tile
+ * 4-connected to the map border) falls away into sky, except the back walls the camera sees (a wall directly north
+ * or west of floor), which stay as the shard's raised rim so the Fate doors still have a face to stand in. Furniture
+ * the room kinds carved stands free of that mass and keeps its tiles. Front edges therefore drop straight into the
+ * void (the client hangs the shard's underside there). Pure function of the grid: no RNG draw, so the macro geometry
+ * and every later draw of the map stream are identical to any other theme's.
+ */
+function skyVoids(g: Grid): Uint8Array {
+  const out = new Uint8Array(g.w * g.h);
+  const outer = new Uint8Array(g.w * g.h);
+  const q: number[] = [];
+  for (let x = 0; x < g.w; x++) for (const y of [0, g.h - 1]) { const i = idx(g, x, y); if (!outer[i]) { outer[i] = 1; q.push(i); } }
+  for (let y = 0; y < g.h; y++) for (const x of [0, g.w - 1]) { const i = idx(g, x, y); if (!outer[i]) { outer[i] = 1; q.push(i); } }
+  for (let k = 0; k < q.length; k++) {
+    const c = q[k], x = c % g.w, y = (c / g.w) | 0;
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+      if (nx < 0 || ny < 0 || nx >= g.w || ny >= g.h) continue;
+      const n = idx(g, nx, ny);
+      if (!outer[n] && g.t[n] === WALL) { outer[n] = 1; q.push(n); }
+    }
+  }
+  const floorAt = (x: number, y: number) => x >= 0 && y >= 0 && x < g.w && y < g.h && g.t[idx(g, x, y)] === FLOOR;
+  for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+    const i = idx(g, x, y);
+    if (outer[i] && !floorAt(x, y + 1) && !floorAt(x + 1, y)) out[i] = 1;
+  }
+  return out;
+}
+
 function finish(gen: Gen, rng: RngState, layout: string, theme: string, attempt: number, boss: boolean): MapState | null {
   const g = gen.g;
   // seal the border
@@ -496,7 +526,8 @@ function finish(gen: Gen, rng: RngState, layout: string, theme: string, attempt:
   if (enemySpawns.length < 4) return null;
   const rooms = finalRooms(g, gen.rooms, kinds, rng);
   const voids: number[] = [];
-  if (gen.voids) for (let i = 0; i < g.t.length; i++) if (gen.voids[i] && g.t[i] === WALL) voids.push(i);
+  const open = theme === 'sky' ? skyVoids(g) : null;
+  if (gen.voids || open) for (let i = 0; i < g.t.length; i++) if ((gen.voids?.[i] || open?.[i]) && g.t[i] === WALL) voids.push(i);
   const m: MapState = {
     w: g.w, h: g.h, tiles: g.t, topology: layout, playerSpawns, enemySpawns, fallback: false, decorSeed: attempt + nextInt(rng, 100000), theme, layout,
     rooms,

@@ -3,8 +3,9 @@
  * (framework-free). Critters are deliberately tiny, dark and low-contrast so they never read as enemies.
  *
  * Keys:
- *   decal:coins (3)  decal:wax (2)  decal:claw (2)  decal:chalk (2)  decal:edge (14 = 7 growth kinds x 2)
+ *   decal:coins (3)  decal:wax (2)  decal:claw (2)  decal:chalk (2)  decal:edge (20 = 10 growth kinds x 2)
  *   critter:rat (10: run down-left 0-3, run up-left 4-7, sniff 8/9)  critter:bat (4)  critter:flies (4)  critter:spider (2)
+ *   critter:bird (4)
  *   amb:wisp (3)  amb:ripple  amb:drop  amb:mote  amb:streak
  */
 import { MATERIALS, PALETTES } from './palette';
@@ -24,7 +25,7 @@ export interface FlatSpec {
 }
 
 /** Edge growth kinds baked along floor/wall seams: frame = kind * 2 + variant. */
-export const EDGE_KINDS = ['moss', 'algae', 'dust', 'wax', 'mycel', 'soot', 'rime'] as const;
+export const EDGE_KINDS = ['moss', 'algae', 'dust', 'wax', 'mycel', 'soot', 'rime', 'turf', 'regolith', 'cable'] as const;
 export type EdgeKind = (typeof EDGE_KINDS)[number];
 
 function noise(x: number, y: number, cell: number, seed: number): number {
@@ -50,6 +51,9 @@ const EDGE_PAL: Record<EdgeKind, { ramp: Ramp; alpha: number; reach: number; spe
   mycel: { ramp: R(0x0e2a24, 0x1c4a40, 0x2e7a6a, 0x5ac8b0, 0xb0fff0), alpha: 200, reach: 10, speck: STYLES.fungal.growth[3] as number },
   soot: { ramp: R(0x040303, 0x0c0909, 0x161212, 0x221c1c), alpha: 200, reach: 9, speck: 0x7a2a0a },
   rime: { ramp: STYLES.frost.growth, alpha: 220, reach: 9, speck: 0xffffff },
+  turf: { ramp: STYLES.sky.growth, alpha: 230, reach: 9, speck: 0xfff4b8 },
+  regolith: { ramp: STYLES.moon.growth, alpha: 200, reach: 8, speck: STYLES.moon.floor[4] as number },
+  cable: { ramp: R(0x040506, 0x0a0c10, 0x14171e, 0x1e222c, 0x2a303c), alpha: 210, reach: 5, speck: STYLES.server.growth[3] as number },
 };
 
 function edgeDecal(buf: PixelBuffer, i: number): void {
@@ -246,6 +250,18 @@ function bat(buf: PixelBuffer, i: number): void {
   buf.set(7, 2, BAT[2] as number);
 }
 
+/** A gull-like sky bird: pale body, wings beating through four frames (the sky island's answer to the bat). */
+function bird(buf: PixelBuffer, i: number): void {
+  const p = new Painter(buf);
+  const W = R(0x5a5e66, 0x8a909a, 0xbcc2ca, 0xe4e8ee, 0xffffff);
+  const tip = [[1, 0, 13, 0], [0, 3, 14, 3], [1, 6, 13, 6], [0, 4, 14, 4]][i]!;
+  p.poly([7, 4, tip[0]!, tip[1]!, 3, 4, 5, 5]).poly([7, 4, tip[2]!, tip[3]!, 11, 4, 9, 5]).fill(W, { mode: 'flat', tone: 3, inner: false });
+  p.ellipse(7, 4.5, 2, 1.2).fill(W, { mode: 'sphere', light: 0.3 });
+  buf.set(9, 4, 0xd8a020);
+  buf.set(tip[0]!, tip[1]!, W[1] as number);
+  buf.set(tip[2]!, tip[3]!, W[1] as number);
+}
+
 function flies(buf: PixelBuffer, i: number): void {
   const r = rng(77);
   for (let k = 0; k < 7; k++) {
@@ -275,6 +291,7 @@ export const CRITTER_SPECS: FlatSpec[] = [
   { key: 'critter:bat', w: 12, h: 8, frames: 4, draw: bat },
   { key: 'critter:flies', w: 16, h: 12, frames: 4, draw: flies },
   { key: 'critter:spider', w: 7, h: 6, frames: 2, draw: spider },
+  { key: 'critter:bird', w: 14, h: 8, frames: 4, draw: bird },
 ];
 
 // ---------------------------------------------------------------- ambient motion textures (white; tinted at runtime)

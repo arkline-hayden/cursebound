@@ -300,6 +300,83 @@ export const VIGNETTES: Record<string, Vignette> = {
       { id: 'pack', u: 0.6, v: 1.3, p: 0.6 },
     ],
   },
+  // ---- sky island: a wind shrine on the rim, a little meadow with a grounded sky crystal
+  skyshrine: {
+    id: 'skyshrine',
+    len: 3,
+    depth: 2,
+    items: [
+      { id: 'lantern_post', u: 0.45, v: 0.4 },
+      { id: 'statue_broken', u: 1.5, v: 0.3 },
+      { id: 'offering', u: 1.55, v: 1.2 },
+      { id: 'wildflowers', u: 2.4, v: 0.9 },
+      { id: 'boulder', u: 2.6, v: 0.45, p: 0.6 },
+    ],
+  },
+  meadow: {
+    id: 'meadow',
+    len: 3,
+    depth: 2,
+    items: [
+      { id: 'bush', u: 0.6, v: 0.5 },
+      { id: 'sky_crystal', u: 1.6, v: 0.6 },
+      { id: 'grass_tuft', u: 1.2, v: 1.4 },
+      { id: 'wildflowers', u: 2.3, v: 1.2 },
+      { id: 'boulder', u: 2.5, v: 0.4, p: 0.7 },
+    ],
+  },
+  // ---- moon: the lander that brought them, and the outpost's last camp
+  landing: {
+    id: 'landing',
+    len: 3,
+    depth: 2,
+    trail: 'boots',
+    items: [
+      { id: 'lander', u: 1.5, v: 0.75 },
+      { id: 'flag_pole', u: 2.75, v: 0.3 },
+      { id: 'canister', u: 0.3, v: 1.4, p: 0.8 },
+      { id: 'debris_panel', u: 2.4, v: 1.5, p: 0.8 },
+    ],
+  },
+  outpost: {
+    id: 'outpost',
+    len: 3,
+    depth: 2,
+    trail: 'boots',
+    items: [
+      { id: 'spacesuit', u: 0.5, v: 0.2 },
+      { id: 'solar_panel', u: 1.6, v: 0.6 },
+      { id: 'canister', u: 2.5, v: 0.45 },
+      { id: 'flare', u: 1.4, v: 1.5, p: 0.7 },
+      { id: 'drill_rig', u: 2.6, v: 1.4, p: 0.5 },
+    ],
+  },
+  // ---- server room: a sysadmin's last workstation, a bay of racks with their cabling spilled out
+  workstation: {
+    id: 'workstation',
+    len: 3,
+    depth: 2,
+    items: [
+      { id: 'terminal', u: 1.1, v: 0.45 },
+      { id: 'server_cart', u: 2.3, v: 0.6 },
+      { id: 'cable_coil', u: 1.5, v: 1.4 },
+      { id: 'chip_debris', u: 0.5, v: 1.3, p: 0.8 },
+      { id: 'skeleton_slump', u: 2.6, v: 0.25, p: 0.6 },
+    ],
+    decals: [{ key: 'decal:glitch', u: 1.4, v: 1.2, sx: 1.2, sy: 0.6, alpha: 0.8 }],
+  },
+  rackbay: {
+    id: 'rackbay',
+    len: 3,
+    depth: 2,
+    items: [
+      { id: 'rack_hug', u: 0.5, v: 0.2 },
+      { id: 'rack_hug', u: 1.5, v: 0.2 },
+      { id: 'rack_small', u: 2.5, v: 0.55 },
+      { id: 'cable_coil', u: 1.1, v: 1.3 },
+      { id: 'ups_unit', u: 2.4, v: 1.45, p: 0.7 },
+    ],
+  },
 };
 
 /** Floor clutter scattered along the walls: `standing` props need a back wall, `low` props are baked flat. */
@@ -314,6 +391,8 @@ export interface ThemeDressing {
   edgeChance: number;
   /** per-theme prop swaps for vignette items (e.g. frost: campfire -> campfire_cold) */
   swap: Record<string, string>;
+  /** per-theme prop swaps for the typed rooms' furniture, wall decor and blocker props (roomDressing.ts) */
+  rooms?: Record<string, string>;
   /** ambient life */
   critters: { rats: number; bats: boolean; spiders: boolean; drips: boolean; gusts: boolean };
   /** colour of old blood / story trails */
@@ -326,6 +405,48 @@ const COMMON_STANDING: [string, number][] = [
   ['barrel_broken', 2], ['crate_broken', 2], ['sacks', 1], ['bucket', 1], ['stool', 1], ['skeleton_slump', 2], ['shield_lean', 1], ['cartwheel', 0.6], ['table_over', 1],
 ];
 const COMMON_LOW: [string, number][] = [['parchment', 2], ['skeleton_lying', 1], ['bricks', 1], ['books_spilled', 0.5]];
+
+// The sky island, moon and server room re-dress the dungeon's furniture in their own: these swaps apply to vignette
+// items and to every typed room (scriptorium shelves become rack rows, crypt statues monoliths, braziers lamps, ...).
+const SKY_SWAP: Record<string, string> = {
+  bookcase_free: 'standing_stone', bookshelf: 'ruin_wall', guardian: 'sky_obelisk', obelisk: 'sky_obelisk', stalagmite: 'sky_tree',
+  candle_stand: 'lantern_post', candelabra: 'lantern_post', brazier_great: 'lantern_post', lantern: 'lantern_post',
+  shroom_giant: 'bush', shroom: 'wildflowers', shroom2: 'grass_tuft', sporepod: 'bush', mushroom_ring: 'wildflowers', shroom_tiny: 'wildflowers',
+  pipe_outlet: 'ivy', crate: 'boulder', barrel: 'boulder', parchment: 'wildflowers', books_spilled: 'grass_tuft', bricks: 'grass_tuft',
+  masonry_heap: 'boulder_big', rubble_big: 'boulder', bell_post: 'sky_obelisk', brazier_column: 'sky_obelisk',
+  rowboat: 'bush', piling: 'boulder', nets: 'grass_tuft', beam: 'grass_tuft',
+};
+const MOON_SWAP: Record<string, string> = {
+  bookcase_free: 'rack_free', bookshelf: 'rack_hug', guardian: 'monolith', obelisk: 'monolith', statue: 'spacesuit', statue_broken: 'spacesuit',
+  sarcophagus: 'cold_storage', stalagmite: 'moonrock_big', masonry_heap: 'moonrock_big', furnace: 'power_core', anvil: 'ups_unit',
+  forge_hearth: 'drill_rig', quench: 'canister', orepile: 'debris_panel', minecart: 'rover', armor_stand: 'spacesuit', weapon_barrel: 'canister',
+  chest_gold: 'data_crate', chest_open: 'canister', coin_heap: 'debris_panel', urn: 'canister', bucket: 'canister', well: 'drill_rig',
+  candle_stand: 'lamp_post_moon', candelabra: 'lamp_post_moon', brazier_great: 'lamp_post_moon', brazier: 'lamp_post_moon', lantern: 'flare', candles: 'flare',
+  banner_pole: 'flag_pole', reading_table: 'terminal', lectern: 'terminal', parchment: 'debris_panel', books_spilled: 'debris_panel',
+  rubble_big: 'moonrock', bricks: 'debris_panel', crate: 'data_crate', crate_broken: 'debris_panel', barrel: 'canister', barrel_broken: 'canister',
+  campfire: 'flare', bedroll: 'debris_panel', bell_post: 'monolith', brazier_column: 'monolith',
+  rowboat: 'rover', piling: 'lamp_post_moon', nets: 'debris_panel', beam: 'debris_panel', lilies: 'debris_panel',
+  shroom_giant: 'moonrock', shroom: 'moonrock', shroom2: 'canister', sporepod: 'moonrock', mushroom_ring: 'debris_panel', shroom_tiny: 'debris_panel',
+  roots_floor: 'debris_panel', beam_broken: 'solar_panel', roots: 'cable_wall', glowmoss: 'porthole', wallshrooms: 'hull_vent', crack_roots: 'cable_wall',
+  banner: 'porthole', tapestry: 'hull_vent', tapestry_red: 'hull_vent', shield_crest: 'porthole', sconce: 'lamp_moon', shelf_jars: 'hull_vent',
+  chains: 'cable_wall', chainhooks: 'cable_wall', manacles: 'cable_wall', toolrack: 'cable_wall', runes: 'hull_vent', niche_urns: 'porthole',
+};
+const SERVER_SWAP: Record<string, string> = {
+  bookcase_free: 'rack_free', bookshelf: 'rack_hug', reading_table: 'terminal', lectern: 'terminal', candelabra: 'holo_pylon', candle_stand: 'holo_pylon',
+  parchment: 'chip_debris', books_spilled: 'cable_coil', guardian: 'core_pylon', obelisk: 'core_pylon', statue: 'holo_statue', statue_broken: 'rack_small',
+  sarcophagus: 'cold_storage', iron_maiden: 'containment_pod', pillory: 'rack_free', furnace: 'power_core', anvil: 'ups_unit', forge_hearth: 'power_core',
+  quench: 'coolant_tank', orepile: 'cable_coil', minecart: 'server_cart', masonry_heap: 'rack_toppled', stalagmite: 'rack_toppled',
+  chest_gold: 'data_crate', chest_open: 'data_crate', coin_heap: 'chip_debris', urn: 'ups_unit', armor_stand: 'rack_free', weapon_barrel: 'ups_unit',
+  well: 'coolant_tank', bucket: 'ups_unit', brazier_great: 'holo_pylon_m', brazier: 'holo_pylon', banner_pole: 'holo_pylon_m', lantern: 'holo_pylon',
+  rubble_big: 'ups_unit', bricks: 'chip_debris', crate: 'data_crate', crate_broken: 'chip_debris', barrel: 'ups_unit', barrel_broken: 'ups_unit',
+  table: 'server_cart', bedroll: 'cable_coil', campfire: 'holo_pylon', bell_post: 'core_pylon', brazier_column: 'core_pylon', beam_broken: 'rack_small',
+  rowboat: 'server_cart', piling: 'holo_pylon', nets: 'cable_coil', beam: 'cable_coil', lilies: 'chip_debris',
+  shroom_giant: 'rack_small', shroom: 'ups_unit', shroom2: 'terminal', sporepod: 'ups_unit', mushroom_ring: 'floor_vent', shroom_tiny: 'chip_debris',
+  roots_floor: 'cable_coil', roots: 'cable_wall', wallshrooms: 'rack_wall',
+  banner: 'neon_magenta', tapestry: 'rack_wall', tapestry_red: 'neon_magenta', shield_crest: 'warning_sign', sconce: 'neon_cyan', shelf_jars: 'rack_wall',
+  chains: 'cable_wall', chainhooks: 'cable_wall', manacles: 'cable_wall', toolrack: 'cable_wall', runes: 'warning_sign', tally: 'warning_sign',
+  niche_urns: 'rack_wall', skullwall: 'rack_wall', bonecandle: 'warning_sign', crack_roots: 'cable_wall', glowmoss: 'neon_cyan',
+};
 
 export const THEME_DRESSING: Record<ThemeId, ThemeDressing> = {
   catacombs: {
@@ -404,6 +525,43 @@ export const THEME_DRESSING: Record<ThemeId, ThemeDressing> = {
     swap: { campfire: 'campfire_cold', crate: 'crate_snow', barrel: 'crate_snow', skeleton_slump: 'frozencorpse', candles: 'icecrystal', lantern: 'icecrystal', sacks: 'snowpile' },
     critters: { rats: 0, bats: true, spiders: false, drips: false, gusts: true },
     trailTint: 0x2a3a4a,
+  },
+  // the shard's walls are a low rim (no wall dressing); birds cross overhead, the wind gusts through
+  sky: {
+    vignettes: W([['meadow', 4], ['skyshrine', 3], ['camp', 1], ['collapse', 2]]),
+    standing: W([['bush', 2], ['boulder', 2], ['lantern_post', 0.8], ['skeleton_slump', 0.5], ['statue_broken', 0.6]]),
+    low: W([['grass_tuft', 4], ['wildflowers', 3], ['skeleton_lying', 0.4], ['offering', 0.3]]),
+    wall: W([['ivy', 2]]),
+    edge: 'turf',
+    edgeChance: 0.55,
+    swap: SKY_SWAP,
+    rooms: SKY_SWAP,
+    critters: { rats: 0, bats: true, spiders: false, drips: false, gusts: true },
+    trailTint: 0x3a2a14,
+  },
+  moon: {
+    vignettes: W([['landing', 3], ['outpost', 3], ['collapse', 2], ['storage', 1]]),
+    standing: W([['moonrock', 3], ['canister', 1.5], ['solar_panel', 0.8], ['lamp_post_moon', 0.6], ['skeleton_slump', 0.5]]),
+    low: W([['debris_panel', 3], ['skeleton_lying', 0.5]]),
+    wall: W([['porthole', 1.5], ['hull_vent', 1.5], ['cable_wall', 1]]),
+    edge: 'regolith',
+    edgeChance: 0.5,
+    swap: MOON_SWAP,
+    rooms: MOON_SWAP,
+    critters: { rats: 0, bats: false, spiders: false, drips: false, gusts: false },
+    trailTint: 0x1a1c22,
+  },
+  server: {
+    vignettes: W([['workstation', 4], ['rackbay', 4], ['ritual', 1], ['storage', 1]]),
+    standing: W([['rack_small', 2], ['terminal', 1], ['coolant_tank', 1], ['server_cart', 1], ['ups_unit', 1.5], ['skeleton_slump', 0.8]]),
+    low: W([['cable_coil', 3], ['chip_debris', 3], ['skeleton_lying', 0.5]]),
+    wall: W([['rack_wall', 2], ['cable_wall', 2], ['neon_magenta', 1], ['warning_sign', 1]]),
+    edge: 'cable',
+    edgeChance: 0.4,
+    swap: SERVER_SWAP,
+    rooms: SERVER_SWAP,
+    critters: { rats: 2, bats: false, spiders: true, drips: false, gusts: false },
+    trailTint: 0x0a0c10,
   },
 };
 

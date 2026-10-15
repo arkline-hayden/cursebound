@@ -9,13 +9,13 @@
 
 import { Drone, Pad, type Synth } from './synth';
 import {
-  STEMS, degreeMidi, hash32, mtof, patternHit, rngAt, stemLevel,
+  DRUM_KINDS, STEMS, degreeMidi, hash32, mtof, patternHit, rngAt, stemLevel,
   type MotifNote, type PercVoice, type SongSpec, type Stem,
 } from './music';
 
 const MAX_NOTES = 40;
 
-const DRONE_LEVEL: Record<SongSpec['drone'], number> = { cello: 0.07, water: 0.08, hollow: 0.05, organ: 0.07, reed: 0.06, growl: 0.075, air: 0.06, ghost: 0.07 };
+const DRONE_LEVEL: Record<SongSpec['drone'], number> = { cello: 0.07, water: 0.08, hollow: 0.05, organ: 0.07, reed: 0.06, growl: 0.075, air: 0.06, ghost: 0.07, wind: 0.065, void: 0.08, hum: 0.05 };
 const PAD_LEVEL: Record<SongSpec['pad'], number> = { choir: 0.05, whisperChoir: 0.045, softTri: 0.07, organ: 0.06, woodwind: 0.05, lowBrass: 0.05, glass: 0.05 };
 const STEM_TRIM: Record<Stem, number> = { bed: 1, motif: 1, bass: 1, perc: 0.85, heavy: 0.9 };
 
@@ -340,8 +340,7 @@ export class MusicDirector {
   }
 
   private perc(kind: string, out: AudioNode, t: number, vel: number): void {
-    const drums = ['taiko', 'muffled', 'frame', 'timpani', 'log', 'tom', 'iceDrum', 'hoof'];
-    if (drums.includes(kind)) {
+    if ((DRUM_KINDS as readonly string[]).includes(kind)) {
       this.s.drum(kind as Parameters<Synth['drum']>[0], out, t, vel);
       this.note(t, kind === 'timpani' ? 1.2 : 0.4);
     } else {
@@ -384,6 +383,13 @@ export class MusicDirector {
       case 'harp': len = s.harp(out, t, f, 1.4, 0.06 * vel); break;
       case 'theremin': len = s.theremin(out, t, f, Math.max(0.3, dur), 0.05 * vel, song.lastMotifF || undefined); break;
       case 'tollBell': len = s.bigBell(out, t, f / 2, 2.6, 0.07 * vel); break;
+      // the moon: a sonar ping, a pure sine with a soft fifth that rings out into the echo
+      case 'sonar':
+        len = s.tone(out, t, { f, dur: Math.max(1.6, dur), gain: 0.06 * vel, attack: 0.004 });
+        s.tone(out, t + 0.02, { f: f * 1.5, dur: 0.9, gain: 0.015 * vel });
+        break;
+      // the server room: a filtered square-wave arpeggio note, tight and digital
+      case 'arp': len = s.tone(out, t, { type: 'square', f, dur: Math.min(0.16, dur), gain: 0.035 * vel, attack: 0.002, filter: 2400, q: 2 }); break;
     }
     this.note(t, len);
   }

@@ -23,6 +23,8 @@ export const SCALES = {
   phrygianDominant: [0, 1, 4, 5, 7, 8, 10],
   locrian: [0, 1, 3, 5, 6, 8, 10],
   hungarianMinor: [0, 2, 3, 6, 7, 8, 11],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
 } as const;
 
 /** MIDI note for a (possibly negative / >6) scale degree above `root`. */
@@ -58,15 +60,17 @@ export function rngAt(seed: number, a: number, b = 0): number {
 
 // ------------------------------------------------------------------ song specs
 
-export type DroneKind = 'cello' | 'water' | 'hollow' | 'organ' | 'reed' | 'growl' | 'air' | 'ghost';
+export type DroneKind = 'cello' | 'water' | 'hollow' | 'organ' | 'reed' | 'growl' | 'air' | 'ghost' | 'wind' | 'void' | 'hum';
 export type PadKind = 'choir' | 'softTri' | 'whisperChoir' | 'organ' | 'woodwind' | 'lowBrass' | 'glass';
-export type MotifKind = 'cello' | 'pluckEcho' | 'boneMarimba' | 'bells' | 'flute' | 'brassStab' | 'celesta' | 'harp' | 'theremin' | 'tollBell';
+export type MotifKind = 'cello' | 'pluckEcho' | 'boneMarimba' | 'bells' | 'flute' | 'brassStab' | 'celesta' | 'harp' | 'theremin' | 'tollBell' | 'sonar' | 'arp';
 export type BassKind = 'tri' | 'sub' | 'marimba' | 'pedal' | 'reed' | 'dist';
 export type LeadKind = 'brass' | 'bowed' | 'choirFull' | 'reedDist' | 'tremolo';
 /** Percussion voices: low drum, mid drum, theme accent, high ticker. */
 export type PercVoice = 'low' | 'mid' | 'accent' | 'tick';
-export type DrumKind = 'taiko' | 'muffled' | 'frame' | 'timpani' | 'log' | 'tom' | 'iceDrum' | 'hoof';
-export type ClickKind = 'chain' | 'drip' | 'bone' | 'bell' | 'bloop' | 'anvil' | 'glass' | 'shaker' | 'rattle' | 'insect' | 'hat' | 'ice' | 'whisper';
+export type DrumKind = 'taiko' | 'muffled' | 'frame' | 'timpani' | 'log' | 'tom' | 'iceDrum' | 'hoof' | 'pulse';
+export type ClickKind = 'chain' | 'drip' | 'bone' | 'bell' | 'bloop' | 'anvil' | 'glass' | 'shaker' | 'rattle' | 'insect' | 'hat' | 'ice' | 'whisper' | 'glitch' | 'blip';
+/** Every DrumKind (the director routes percussion lines by it; the rest are clicks). */
+export const DRUM_KINDS: readonly DrumKind[] = ['taiko', 'muffled', 'frame', 'timpani', 'log', 'tom', 'iceDrum', 'hoof', 'pulse'];
 
 /** Motif note: [step in bar, degree relative to the bar's chord root, length in steps]. */
 export type MotifNote = readonly [number, number, number];
@@ -243,6 +247,60 @@ export const THEME_SONGS: Record<AudioTheme, SongSpec> = {
     },
     fill: '.........ooo',
     reverb: 0.8, echo: 0.4, level: 0.9, calmDensity: 0.6,
+  },
+  // open-air wind drone, harp in a wistful lydian 6/8, wind-chime glass and frame drum
+  sky: {
+    id: 'sky', root: 55, scale: S.lydian, bpm: 84, steps: 12,
+    progressions: [[0, 1, 0, 4], [0, 5, 1, 4], [3, 1, 0, 0], [0, 4, 5, 1]],
+    drone: 'wind', pad: 'softTri', motif: 'harp', motifOct: 24,
+    motifA: [[0, 4, 3], [3, 3, 1], [4, 2, 2], [6, 4, 6]],
+    motifB: [[0, 6, 2], [2, 5, 1], [3, 4, 3], [6, 1, 6]],
+    bass: 'tri', bassPattern: 'x.....o.....',
+    lead: 'bowed', leadSteps: [0, 6],
+    perc: {
+      low: { kind: 'frame', calm: 'x...........', combat: 'x.....x.....', heavy: 'x..x..x..x.x' },
+      accent: { kind: 'glass', calm: '......g.....', combat: '...o.....o..', heavy: '.o.o..o..o.o' },
+      tick: { kind: 'shaker', combat: 'g.g.g.g.g.g.', heavy: 'gggggggggggg' },
+      mid: { kind: 'tom', heavy: '.....o.....o' },
+    },
+    fill: '.........ooo',
+    reverb: 0.7, echo: 0.45, level: 0.9, calmDensity: 0.65,
+  },
+  // the void's sub drone and beating sines, sonar pings in a cold locrian, sparse muffled thuds and radio blips
+  moon: {
+    id: 'moon', root: 44, scale: S.locrian, bpm: 56, steps: 16,
+    progressions: [[0, 1, 0, 4], [0, 5, 4, 1], [0, 0, 1, 0], [3, 4, 1, 0]],
+    drone: 'void', pad: 'whisperChoir', motif: 'sonar', motifOct: 24,
+    motifA: [[0, 0, 8], [8, 4, 8]],
+    motifB: [[0, 2, 6], [6, 1, 2], [8, -1, 8]],
+    bass: 'sub', bassPattern: 'x...............',
+    lead: 'tremolo', leadSteps: [0, 8],
+    perc: {
+      low: { kind: 'muffled', calm: 'x...............', combat: 'x.......x.......', heavy: 'x.....x.x.....x.' },
+      accent: { kind: 'blip', calm: '..........g.....', combat: '....o.......o...', heavy: '..o...o...o...o.' },
+      tick: { kind: 'ice', combat: '..g.......g.....', heavy: 'g.g.g.g.g.g.g.g.' },
+      mid: { kind: 'tom', heavy: '.......o.......o' },
+    },
+    fill: '............o..o',
+    reverb: 0.85, echo: 0.5, level: 0.95, calmDensity: 0.45,
+  },
+  // electrical hum, a cursed square-wave arpeggio, a pulse kick, glitch stutters and hats
+  server: {
+    id: 'server', root: 45, scale: S.aeolian, bpm: 112, steps: 16, sevenths: true,
+    progressions: [[0, 5, 3, 4], [0, 6, 5, 4], [0, 3, 6, 4], [5, 6, 0, 0]],
+    drone: 'hum', pad: 'lowBrass', motif: 'arp', motifOct: 24,
+    motifA: [[0, 0, 1], [2, 2, 1], [4, 4, 1], [6, 7, 1], [8, 4, 1], [10, 2, 1], [12, 0, 1], [14, 2, 1]],
+    motifB: [[0, 0, 1], [2, 3, 1], [4, 5, 1], [6, 7, 1], [8, 9, 1], [10, 7, 1], [12, 5, 2], [15, 3, 1]],
+    bass: 'dist', bassPattern: 'x..x..x.x..x..o.',
+    lead: 'reedDist', leadSteps: [0, 8],
+    perc: {
+      low: { kind: 'pulse', calm: 'x.......x.......', combat: 'x...x...x...x...', heavy: 'x...x...x...x.x.' },
+      accent: { kind: 'glitch', calm: '..............g.', combat: '......o.......x.', heavy: '..x...o...x...xo' },
+      tick: { kind: 'hat', combat: '..o...o...o...o.', heavy: 'gogogogogogogogo' },
+      mid: { kind: 'tom', heavy: '....o.......o...' },
+    },
+    fill: '............xxox',
+    reverb: 0.4, echo: 0.35, level: 0.85, calmDensity: 0.55,
   },
 };
 
