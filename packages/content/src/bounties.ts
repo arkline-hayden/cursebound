@@ -1,3 +1,5 @@
+import { BOUNTY_XP_MULTIPLIER } from './progression';
+
 // Daily bounty modifiers. Once a day the backend rolls one of these negative modifiers (never the same one twice in a
 // row); a run started with "Take the bounty" carries it for its whole length, and the first such run an account
 // finishes that day earns double XP (progression.ts BOUNTY_XP_MULTIPLIER).
@@ -100,8 +102,44 @@ export const BOUNTY_BY_ID: Record<string, BountyModifierDef> = Object.fromEntrie
 /** Ledger / provenance id of a bounty's effects ("cards" applied before round 1). */
 export const bountyCardId = (modifierId: string) => `bounty:${modifierId}`;
 
+/** A bounty run marks the bounty completed (and earns the double XP) only after clearing at least this many rounds. */
+export const BOUNTY_MIN_DEPTH = 1;
+
 /** Roll the next bounty: uniform over the list, never the previous modifier. `random` returns [0, 1). */
 export function pickBountyModifier(previousId: string | null, random: () => number = Math.random): string {
   const pool = BOUNTY_MODIFIERS.map((m) => m.id).filter((id) => id !== previousId);
   return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+}
+
+/** Every modifier id in a uniformly random order (Fisher-Yates). A backend rolls by taking the first one that differs
+ *  from the previous bounty inside its roll transaction, which is uniform over the rest and never a repeat. */
+export function shuffledBountyIds(random: () => number = Math.random): string[] {
+  const ids = BOUNTY_MODIFIERS.map((m) => m.id);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.min(i, Math.floor(random() * (i + 1)));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  return ids;
+}
+
+/** The bounty as both backends serve it (`GET /api/v1/bounty`, `GET /api/v1/local/bounty`). */
+export interface BountyView {
+  id: string;
+  modifier: { id: string; name: string; short: string; description: string; color: string };
+  createdAt: number;
+  expiresAt: number;
+  /** the server clock when answering, so clients can run the countdown against server time */
+  serverNow: number;
+  /** null when the caller is unknown (signed out) */
+  completed: boolean | null;
+  xpMultiplier: number;
+}
+
+export function bountyView(b: { id: string; modifierId: string; createdAt: number; expiresAt: number }, completed: boolean | null, now: number, xpMultiplier = BOUNTY_XP_MULTIPLIER): BountyView {
+  const m = BOUNTY_BY_ID[b.modifierId];
+  return {
+    id: b.id,
+    modifier: m ? { id: m.id, name: m.name, short: m.short, description: m.description, color: m.color } : { id: b.modifierId, name: b.modifierId, short: '', description: '', color: '#888888' },
+    createdAt: b.createdAt, expiresAt: b.expiresAt, serverNow: now, completed, xpMultiplier,
+  };
 }

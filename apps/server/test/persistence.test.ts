@@ -386,8 +386,8 @@ describe('finalization', () => {
       store.recordRoundResult({ runId: 'run-fin', roundNo: 1, objectiveTotal: 10, completedWeight: 10, activeTicks: 300, scoreText: '151', cleared: true, detailJson: '{}' }),
       'CONFLICT',
     );
-    expect(await store.finalizeRun(finalize('run-fin', '150', { depth: 1 }))).toEqual({ existing: false });
-    expect(await store.finalizeRun(finalize('run-fin', '99999', { depth: 9 }))).toEqual({ existing: true });
+    expect(await store.finalizeRun(finalize('run-fin', '150', { depth: 1 }))).toEqual({ existing: false, awards: [] });
+    expect(await store.finalizeRun(finalize('run-fin', '99999', { depth: 9 }))).toEqual({ existing: true, awards: [] });
 
     const run = await store.getRun('run-fin');
     expect(run).toMatchObject({ status: 'finalized', scoreText: '150', endReason: 'wipe', verification: 'local' });
@@ -405,9 +405,9 @@ describe('finalization', () => {
   it('keeps pending_storage runs re-finalizable and off the board', async () => {
     const store = await open();
     await setupRun(store, 'run-pend');
-    expect(await store.finalizeRun({ ...finalize('run-pend', '10'), status: 'pending_storage' })).toEqual({ existing: false });
+    expect(await store.finalizeRun({ ...finalize('run-pend', '10'), status: 'pending_storage' })).toEqual({ existing: false, awards: [] });
     expect((await store.queryBoard({ boardKey: BOARD, limit: 10 })).rows).toHaveLength(0);
-    expect(await store.finalizeRun(finalize('run-pend', '10'))).toEqual({ existing: false });
+    expect(await store.finalizeRun(finalize('run-pend', '10'))).toEqual({ existing: false, awards: [] });
     expect((await store.queryBoard({ boardKey: BOARD, limit: 10 })).rows).toHaveLength(1);
   });
 });

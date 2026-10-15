@@ -8,6 +8,7 @@ import { createApi } from './http';
 import { createLogger } from './persistence/logger';
 import { openStore } from './persistence/store';
 import { RoomManager } from './rooms';
+import { BountyService } from './bounty';
 import { hostAllowed, originAllowed } from './security';
 
 // CURSEBOUND authoritative backend: HTTP API + WebSocket rooms + isolated SQLite writer (PRD §17.2).
@@ -20,7 +21,8 @@ export async function startServer(env = process.env) {
   const store = await openStore({ dataDir: cfg.dataDir, logger: log } as Parameters<typeof openStore>[0]);
   await store.ensureContentVersion({ hash: contentHash(), rulesVersion: RULES_VERSION, manifestPath: `packages/content@${CONTENT_VERSION}` });
   const rooms = new RoomManager(cfg, store, log);
-  const api = createApi(cfg, store, rooms, log);
+  const bounties = new BountyService(store, log);   // the local daily bounty: polled job + lazy check on read
+  const api = createApi(cfg, store, rooms, log, bounties);
   const server = http.createServer((req, res) => { void api(req, res); });
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024, perMessageDeflate: false });
   server.on('upgrade', (req, socket, head) => {
@@ -39,16 +41,18 @@ export async function startServer(env = process.env) {
   // port 0 = a random free port (desktop app); the desktop client is served by, and talks to, this same origin
   if (cfg.port === 0 || cfg.staticDir) allowListeningPort(cfg, (server.address() as AddressInfo).port);
   rooms.start();
+  bounties.start();
   log.info('server_started', { port: cfg.port, lan: cfg.lan, static: !!cfg.staticDir });
   const shutdown = async () => {
     log.info('server_stopping', {});
+    bounties.stop();
     await rooms.shutdown();
     wss.close();
     await new Promise<void>((r) => server.close(() => r()));
     await store.close();
     await log.close();
   };
-  return { cfg, server, store, rooms, shutdown };
+  return { cfg, server, store, rooms, bounties, shutdown };
 }
 
 /** Electron's utilityProcess exposes `process.parentPort` (a MessagePort-like emitter) instead of stdin. */

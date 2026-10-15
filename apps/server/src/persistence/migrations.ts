@@ -250,10 +250,49 @@ ALTER TABLE profiles ADD COLUMN cloud_account_id TEXT NULL;
 CREATE UNIQUE INDEX profiles_cloud_account_idx ON profiles(cloud_account_id);
 `;
 
+// Player progression and the daily bounty (content progression.ts / bounties.ts). profiles.xp is the local tally;
+// profiles.cloud_xp is the cloud XP the profile's own client last reported for its linked account (online mode), so a
+// class unlocked through cloud XP is not refused here. xp_awards keeps one award per (run, profile) for idempotent
+// finalization and the results screen. daily_bounties is the local bounty roll (offline mode, polled job in
+// apps/server/src/bounty.ts); bounty_completions records the first bounty run per profile (double XP once).
+const V4 = `
+ALTER TABLE profiles ADD COLUMN xp INTEGER NOT NULL DEFAULT 0 CHECK(xp >= 0);
+ALTER TABLE profiles ADD COLUMN cloud_xp INTEGER NULL;
+
+CREATE TABLE xp_awards(
+  run_id TEXT NOT NULL REFERENCES runs(id),
+  profile_id TEXT NOT NULL REFERENCES profiles(id),
+  xp INTEGER NOT NULL CHECK(xp >= 0),
+  base_xp INTEGER NOT NULL CHECK(base_xp >= 0),
+  bounty INTEGER NOT NULL DEFAULT 0 CHECK(bounty IN (0,1)),
+  xp_before INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(run_id, profile_id)
+);
+CREATE INDEX xp_awards_profile_idx ON xp_awards(profile_id, created_at DESC);
+
+CREATE TABLE daily_bounties(
+  id TEXT PRIMARY KEY,
+  modifier_id TEXT NOT NULL CHECK(length(modifier_id) BETWEEN 1 AND 64),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX daily_bounties_created_idx ON daily_bounties(created_at DESC);
+
+CREATE TABLE bounty_completions(
+  bounty_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL REFERENCES profiles(id),
+  run_id TEXT NOT NULL,
+  completed_at INTEGER NOT NULL,
+  PRIMARY KEY(bounty_id, profile_id)
+);
+`;
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial_schema', sql: V1 },
   { version: 2, name: 'accounts_builds_friends', sql: V2 },
   { version: 3, name: 'profiles_cloud_account', sql: V3 },
+  { version: 4, name: 'progression_daily_bounty', sql: V4 },
 ];
 
 export const LATEST_SCHEMA_VERSION: number = MIGRATIONS[MIGRATIONS.length - 1]!.version;

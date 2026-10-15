@@ -49,7 +49,10 @@ import type {
   CheckpointInput,
   CommitFateInput,
   CreateRunInput,
+  DailyBounty,
   EventInput,
+  ProfileProgress,
+  XpAwardRow,
   FateTimelineEntry,
   FinalizeRunInput,
   Profile,
@@ -208,6 +211,14 @@ function assertRanks(ranks: unknown): Record<string, number> {
 
 const pair = (x: string, y: string): [string, string] => (x < y ? [x, y] : [y, x]);
 
+function toBounty(r: Row): DailyBounty {
+  return { id: str(r.id), modifierId: str(r.modifier_id), createdAt: num(r.created_at), expiresAt: num(r.expires_at) };
+}
+
+function toAward(r: Row): XpAwardRow {
+  return { profileId: str(r.profile_id), xp: num(r.xp), baseXp: num(r.base_xp), bounty: bool(r.bounty), xpBefore: num(r.xp_before) };
+}
+
 export class PersistenceDb {
   private readonly stmts = new Map<string, ReturnType<DatabaseSync['prepare']>>();
   private closed = false;
@@ -345,19 +356,85 @@ export class PersistenceDb {
   }
 
   /** The profile linked to a cloud account (created when absent); its display name follows the account's. */
-  linkCloudProfile(accountId: string, displayName: string): Profile {
+  linkCloudProfile(accountId: string, displayName: string, cloudXp?: number | null): Profile {
     assertId(accountId, 'accountId');
     const name = sanitizeDisplayName(displayName);
+    // the account's cloud XP as its own client reported it (progression: class gates use max(local, cloud)); never lowers
+    const xp = typeof cloudXp === 'number' && Number.isSafeInteger(cloudXp) && cloudXp >= 0 ? cloudXp : null;
     return this.tx(() => {
       const r = this.get('SELECT id, created_at FROM profiles WHERE cloud_account_id = ?', accountId);
       if (r) {
         this.run('UPDATE profiles SET display_name = ? WHERE id = ?', name, str(r.id));
+        if (xp !== null) this.run('UPDATE profiles SET cloud_xp = max(coalesce(cloud_xp, 0), ?) WHERE id = ?', xp, str(r.id));
         return { id: str(r.id), displayName: name, createdAt: num(r.created_at) };
       }
       const p: Profile = { id: randomUUID(), displayName: name, createdAt: Date.now() };
-      this.run('INSERT INTO profiles(id, display_name, created_at, cloud_account_id) VALUES (?, ?, ?, ?)', p.id, p.displayName, p.createdAt, accountId);
+      this.run('INSERT INTO profiles(id, display_name, created_at, cloud_account_id, cloud_xp) VALUES (?, ?, ?, ?, ?)', p.id, p.displayName, p.createdAt, accountId, xp);
       return p;
     });
+  }
+
+  // ---------------------------------------------------------------- progression & daily bounty
+  getProgress(profileId: string): ProfileProgress | null {
+    if (typeof profileId !== 'string' || !ID_RE.test(profileId)) return null;
+    const r = this.get('SELECT id, xp, cloud_xp, cloud_account_id FROM profiles WHERE id = ?', profileId);
+    return r ? { profileId: str(r.id), xp: num(r.xp), cloudXp: numOrNull(r.cloud_xp), linked: r.cloud_account_id !== null && r.cloud_account_id !== undefined } : null;
+  }
+
+  ensureBounty(q: { now: number; periodMs: number; candidates: string[] }): { bounty: DailyBounty; rolled: boolean } {
+    assertInt(q?.now, 'now');
+    assertInt(q.periodMs, 'periodMs', 1);
+    if (!Array.isArray(q.candidates) || q.candidates.length === 0) throw new StoreError('INVALID_INPUT', 'candidates required');
+    return this.tx(() => {
+      const last = this.get('SELECT id, modifier_id, created_at, expires_at FROM daily_bounties ORDER BY created_at DESC, id DESC LIMIT 1');
+      if (last && q.now - num(last.created_at) < q.periodMs) return { bounty: toBounty(last), rolled: false };
+      const prev = last ? str(last.modifier_id) : null;
+      const modifierId = q.candidates.find((c) => c !== prev);
+      if (!modifierId) throw new StoreError('INVALID_INPUT', 'no candidate differs from the previous bounty');
+      assertText(modifierId, 'modifierId', 64);
+      const b: DailyBounty = { id: `bty_${q.now.toString(36)}_${randomUUID().slice(0, 8)}`, modifierId, createdAt: q.now, expiresAt: q.now + q.periodMs };
+      this.run('INSERT INTO daily_bounties(id, modifier_id, created_at, expires_at) VALUES (?, ?, ?, ?)', b.id, b.modifierId, b.createdAt, b.expiresAt);
+      return { bounty: b, rolled: true };
+    });
+  }
+
+  getBounty(id: string): DailyBounty | null {
+    if (typeof id !== 'string' || !ID_RE.test(id)) return null;
+    const r = this.get('SELECT id, modifier_id, created_at, expires_at FROM daily_bounties WHERE id = ?', id);
+    return r ? toBounty(r) : null;
+  }
+
+  bountyCompleted(bountyId: string, profileId: string): boolean {
+    if (typeof bountyId !== 'string' || !ID_RE.test(bountyId) || typeof profileId !== 'string' || !ID_RE.test(profileId)) return false;
+    return !!this.get('SELECT 1 AS x FROM bounty_completions WHERE bounty_id = ? AND profile_id = ?', bountyId, profileId);
+  }
+
+  runAwards(runId: string): XpAwardRow[] {
+    assertId(runId, 'runId');
+    return this.all('SELECT profile_id, xp, base_xp, bounty, xp_before FROM xp_awards WHERE run_id = ? ORDER BY created_at, profile_id', runId).map(toAward);
+  }
+
+  /** Inside finalizeRun's transaction: credit each member once per run, doubling a first bounty completion. */
+  private creditRun(runId: string, p: NonNullable<FinalizeRunInput['progress']>, now: number): XpAwardRow[] {
+    if (p.bountyId !== null) assertId(p.bountyId, 'bountyId');
+    const out: XpAwardRow[] = [];
+    for (const m of p.members) {
+      assertId(m.profileId, 'member profileId');
+      assertInt(m.baseXp, 'baseXp', 0, 1_000_000);
+      if (this.get('SELECT 1 AS x FROM xp_awards WHERE run_id = ? AND profile_id = ?', runId, m.profileId)) continue;
+      const before = this.get('SELECT xp FROM profiles WHERE id = ?', m.profileId);
+      if (!before) continue;
+      let bounty = false;
+      if (p.bountyId !== null && p.bountyEligible) {
+        bounty = this.run('INSERT INTO bounty_completions(bounty_id, profile_id, run_id, completed_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING', p.bountyId, m.profileId, runId, now).changes === 1;
+      }
+      const xp = bounty ? m.baseXp * 2 : m.baseXp;
+      const award: XpAwardRow = { profileId: m.profileId, xp, baseXp: m.baseXp, bounty, xpBefore: num(before.xp) };
+      this.run('INSERT INTO xp_awards(run_id, profile_id, xp, base_xp, bounty, xp_before, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', runId, m.profileId, xp, m.baseXp, bounty ? 1 : 0, award.xpBefore, now);
+      this.run('UPDATE profiles SET xp = xp + ? WHERE id = ?', xp, m.profileId);
+      out.push(award);
+    }
+    return out;
   }
 
   getSettings(profileId: string): unknown | null {
@@ -1163,7 +1240,7 @@ export class PersistenceDb {
   }
 
   // ---------------------------------------------------------------- finalization & boards
-  finalizeRun(f: FinalizeRunInput): { existing: boolean } {
+  finalizeRun(f: FinalizeRunInput): { existing: boolean; awards: XpAwardRow[] } {
     assertId(f?.runId, 'runId');
     if (!['finalized', 'aborted', 'invalidated', 'pending_storage'].includes(f.status)) throw new StoreError('INVALID_INPUT', 'invalid final status');
     assertText(f.endReason, 'endReason', 64);
@@ -1175,9 +1252,10 @@ export class PersistenceDb {
     assertJsonText(f.participantsJson, 'participantsJson', 16_384);
     assertJsonText(f.summaryJson, 'summaryJson', 262_144);
     if (typeof f.practice !== 'boolean') throw new StoreError('INVALID_INPUT', 'practice must be boolean');
+    if (f.progress !== undefined && (!f.progress || !Array.isArray(f.progress.members) || f.progress.members.length > 5)) throw new StoreError('INVALID_INPUT', 'invalid progress');
     return this.tx(() => {
       const run = this.requireRun(f.runId);
-      if (TERMINAL.has(str(run.status))) return { existing: true };
+      if (TERMINAL.has(str(run.status))) return { existing: true, awards: this.runAwards(f.runId) };
       const now = Date.now();
       this.run(
         `UPDATE runs SET status = ?, end_reason = ?, score_text = ?, score_digits = ?, summary_json = ?, completed_at = ? WHERE id = ?`,
@@ -1216,7 +1294,9 @@ export class PersistenceDb {
           now,
         );
       }
-      return { existing: false };
+      // progression: XP only for finalized runs, credited once per (run, profile) in this same transaction
+      const awards = f.status === 'finalized' && f.progress ? this.creditRun(f.runId, f.progress, now) : [];
+      return { existing: false, awards };
     });
   }
 

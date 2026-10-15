@@ -144,7 +144,22 @@ export interface FinalizeRunInput {
   participantsJson: string;
   summaryJson: string;
   practice: boolean;
+  /**
+   * Player progression (content progression.ts): XP credited to each member's profile in the same transaction, only
+   * when the run is finalized (not aborted/invalidated). A non-null bountyId with bountyEligible doubles the award
+   * of each member who had not yet completed that bounty, and records the completion.
+   */
+  progress?: { members: { profileId: string; baseXp: number }[]; bountyId: string | null; bountyEligible: boolean };
 }
+
+/** One profile's XP award for one run (xp_awards). */
+export interface XpAwardRow { profileId: string; xp: number; baseXp: number; bounty: boolean; xpBefore: number }
+
+/** A profile's stored progression: local XP, the cloud XP last synced by its own client (online mode), linkage. */
+export interface ProfileProgress { profileId: string; xp: number; cloudXp: number | null; linked: boolean }
+
+/** A daily bounty row (daily_bounties). */
+export interface DailyBounty { id: string; modifierId: string; createdAt: number; expiresAt: number }
 
 // ---------------------------------------------------------------- accounts
 // Account records are shared with the cloud service (@cursebound/accounts); this Store is a superset of AccountStore.
@@ -179,7 +194,14 @@ export interface Store {
   createProfile(displayName: string): Promise<Profile>;
   getProfile(id: string): Promise<Profile | null>;
   /** The profile linked to a cloud account (online mode), created when absent; updates its display name. */
-  linkCloudProfile(accountId: string, displayName: string): Promise<Profile>;
+  linkCloudProfile(accountId: string, displayName: string, cloudXp?: number | null): Promise<Profile>;
+  getProgress(profileId: string): Promise<ProfileProgress | null>;
+  /** The current daily bounty; rolls a new one (first of `candidates` that differs from the previous modifier) when
+   *  there is none or the latest is at least `periodMs` old. One transaction, so two checks never double-roll. */
+  ensureBounty(q: { now: number; periodMs: number; candidates: string[] }): Promise<{ bounty: DailyBounty; rolled: boolean }>;
+  getBounty(id: string): Promise<DailyBounty | null>;
+  bountyCompleted(bountyId: string, profileId: string): Promise<boolean>;
+  runAwards(runId: string): Promise<XpAwardRow[]>;
   getSettings(profileId: string): Promise<unknown | null>;
   putSettings(profileId: string, json: unknown, schemaVersion: number): Promise<void>;
   ensureContentVersion(v: { hash: string; rulesVersion: string; manifestPath: string }): Promise<void>;
@@ -215,7 +237,7 @@ export interface Store {
     byteCount: number;
   }>;
   readReplay(runId: string): Promise<{ chunkNo: number; firstTick: number; lastTick: number; json: string }[]>;
-  finalizeRun(f: FinalizeRunInput): Promise<{ existing: boolean }>;
+  finalizeRun(f: FinalizeRunInput): Promise<{ existing: boolean; awards: XpAwardRow[] }>;
   queryBoard(q: { boardKey: string; limit: number; cursor?: string | null; includePractice?: boolean; profileIds?: string[] }): Promise<{
     rows: BoardRow[];
     nextCursor: string | null;
