@@ -201,6 +201,9 @@ export const DUNGEON_THEMES: { id: string; name: string; description: string }[]
   { id: 'fungal', name: 'The Fungal Warren', description: 'Root-choked caves lit by glowing mushrooms and drifting spores.' },
   { id: 'forge', name: 'The Ember Forge', description: 'Basalt halls split by rivers of cooling lava.' },
   { id: 'frost', name: 'The Frozen Tomb', description: 'Rime-crusted stone, icicles and the dead locked in ice.' },
+  { id: 'sky', name: 'The Shattered Skyreach', description: 'A torn-off shard of earth adrift in an endless sky: wind, roots and the long fall.' },
+  { id: 'moon', name: 'The Dead Moon', description: 'Grey regolith, black craters and a ruined outpost under a cold blue Earth.' },
+  { id: 'server', name: 'The Cursed Datavault', description: 'Humming racks, cable trays and neon glyphs: a machine tomb that dreams in static.' },
 ];
 
 /** Procedural layout families (mapgen.ts, tier 1: the macro shape of a floor). 'arena' is the boss family. */
@@ -250,6 +253,12 @@ export const THEME_ROOM_WEIGHTS: Record<string, Record<string, number>> = {
   fungal: { grotto: 4, collapsed: 2, cistern: 2, crypt: 1, ossuary: 1, shrine: 1, barracks: 0.6, library: 0.5, pillared: 0.6 },
   forge: { forge: 4, barracks: 2, treasury: 2, torture: 2, collapsed: 1.5, pillared: 1.5, shrine: 0.6, crypt: 0.5 },
   frost: { crypt: 3, collapsed: 2, shrine: 2, cistern: 2, pillared: 2, ossuary: 1.5, barracks: 1, treasury: 1, library: 1 },
+  // sky: meadow groves, toppled ruins and wind shrines on the open rock; ponds stand in for cisterns
+  sky: { grotto: 3, collapsed: 3, shrine: 2.5, cistern: 1.5, pillared: 1.5, barracks: 1, treasury: 0.8, crypt: 0.6, ossuary: 0.4, library: 0.4, forge: 0.3, torture: 0.3 },
+  // moon: crater rubble, outpost quarters, supply depots, machine shops, data rooms and monolith shrines
+  moon: { collapsed: 3, barracks: 2.5, treasury: 1.5, forge: 1.5, library: 1.5, shrine: 1.5, crypt: 1, pillared: 1, ossuary: 0.6, grotto: 0.5, torture: 0.4, cistern: 0.3 },
+  // server: data archives (the scriptorium's shelves become rack rows), rack halls, power plants, vaults, core altars, labs
+  server: { library: 4, pillared: 2.5, forge: 2, treasury: 2, shrine: 1.5, torture: 1.5, barracks: 1, collapsed: 1, crypt: 1, cistern: 1, ossuary: 0.3, grotto: 0.2 },
 };
 
 /** Boss arena designs (mapgen arenas, one hand-designed lair per boss; each is procedurally varied per run). */
@@ -295,6 +304,9 @@ export const THEME_PACKS: Record<string, Record<string, number>> = {
   fungal: { webs: 3, toads: 3, brood: 2, hounds: 1, bats: 1 },
   forge: { gaol: 3, bonewall: 2, hounds: 2, toads: 1, cult: 1 },
   frost: { rime: 3, bats: 2, hounds: 2, gloom: 1, bonewall: 1 },
+  sky: { bats: 3, hounds: 2, gloom: 2, webs: 1, rime: 1, cult: 1 },
+  moon: { gloom: 3, rime: 2, bonewall: 2, hounds: 2, gaol: 1 },
+  server: { cult: 3, gaol: 2, gloom: 2, bonewall: 2, brood: 1, webs: 1 },
 };
 
 /** Affliction an attack inflicts, by attack id (enemy, boss and affix attacks; projectiles outlive their owner). */

@@ -174,6 +174,8 @@ export class Room implements AuthorityHost {
       roster: this.seats.map((s) => ({ slot: s.slot, profileId: s.profileId, name: s.name, classId: s.classId })),
     };
     const state = createRun(params);
+    // dev tools only (CURSEBOUND_DEV_TOOLS=1 CURSEBOUND_DEV_THEME=<id>): the first floor uses a chosen theme, like a door
+    if (this.mgr.cfg.devTheme && !this.tutorial) state.nextTheme = { round: 1, theme: this.mgr.cfg.devTheme };
     const key = boardKey({ rulesVersion: RULES_VERSION, contentHash: contentHash(), scoreVersion: SCORE_VERSION, n: state.n, mode: this.mode, challengeId: this.challengeId, trust: this.trust });
     let practice = this.tutorial;
     if (!practice && this.challengeId) practice = await this.mgr.store.hasRankedAttempt(key, this.seats.map((s) => s.profileId)).catch(() => false);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ARENA_DESIGNS, BOSS_ARENAS, DUNGEON_LAYOUTS, DUNGEON_THEMES, ROOM_KINDS } from '@cursebound/content';
-import { bossForRound, generateDungeon, layoutFor, mapArena, mapBossSpawn, mapRooms, mapVoids, setupRound, spawnWave, themeFor, type MapState } from '@cursebound/simulation';
+import { bossForRound, chooseDoorSlots, doorSlotOk, generateDungeon, layoutFor, mapArena, mapBossSpawn, mapRooms, mapVoids, setupRound, spawnWave, themeFor, type MapState } from '@cursebound/simulation';
 import { newRun } from './run.helpers';
 
 /** Every floor tile reachable from the first player spawn? */
@@ -34,7 +34,7 @@ describe('procedural dungeon floors', () => {
       }
     }
     expect(layouts.size).toBeGreaterThanOrEqual(10);
-    expect(themes.size).toBe(7);
+    expect(themes.size).toBe(DUNGEON_THEMES.length);
   });
   it('is deterministic per seed and round (with and without a door theme)', () => {
     expect(generateDungeon('X', 7, false)).toEqual(generateDungeon('X', 7, false));
@@ -151,5 +151,120 @@ describe('boss arenas', () => {
     spawnWave(st, [], 0);
     const boss = st.enemies.find((e) => e.boss)!;
     expect({ x: boss.x, y: boss.y }).toEqual(st.map!.bossSpawn);
+  });
+});
+
+// The sky island, moon and server room themes: valid floors on every layout, and the sky shard floating in open air.
+describe('sky island, moon and server room themes', () => {
+  const NEW_THEMES = ['sky', 'moon', 'server'] as const;
+  const sampleOf = (theme: string): MapState[] => {
+    const out: MapState[] = [];
+    for (let s = 0; s < 4; s++) for (let r = 1; r <= 15; r++) out.push(generateDungeon('NEWTHEME' + s, r, r % 5 === 0, theme));
+    return out;
+  };
+  const MAPS = Object.fromEntries(NEW_THEMES.map((t) => [t, sampleOf(t)])) as Record<(typeof NEW_THEMES)[number], MapState[]>;
+
+  it('are known themes in the rotation', () => {
+    for (const t of NEW_THEMES) expect(DUNGEON_THEMES.some((d) => d.id === t), t).toBe(true);
+    const seen = new Set<string>();
+    for (const seed of ['ROT-A', 'ROT-B']) for (let r = 1; r <= DUNGEON_THEMES.length; r++) seen.add(themeFor(seed, r));
+    for (const t of NEW_THEMES) expect(seen.has(t), t).toBe(true);
+  });
+
+  it('generate valid, connected floors on every layout with full spawn sets', () => {
+    for (const t of NEW_THEMES) {
+      const layouts = new Set<string>();
+      let fallbacks = 0;
+      for (const m of MAPS[t]) {
+        expect(m.theme).toBe(t);
+        if (m.fallback) { fallbacks++; continue; }
+        layouts.add(m.layout);
+        expect(connected(m), `${t} ${m.layout}`).toBe(true);
+        expect(m.playerSpawns).toHaveLength(5);
+        expect(m.enemySpawns.length).toBeGreaterThanOrEqual(4);
+        for (const s of [...m.playerSpawns, ...m.enemySpawns]) expect(m.tiles[Math.floor(s.y) * m.w + Math.floor(s.x)]).toBe(0);
+        expect(m.rooms!.length).toBeGreaterThan(0);
+        for (const i of m.voids ?? []) expect(m.tiles[i]).toBe(1);
+        const wire = { topology: m.topology };
+        expect(mapRooms(wire)).toEqual(m.rooms ?? []);
+        expect(mapVoids(wire)).toEqual(m.voids ?? []);
+      }
+      expect(fallbacks, t).toBeLessThanOrEqual(2);
+      expect(layouts.size, t).toBeGreaterThanOrEqual(8);
+    }
+  });
+
+  it('are deterministic per seed and round', () => {
+    for (const t of NEW_THEMES) {
+      expect(generateDungeon('DET', 4, false, t)).toEqual(generateDungeon('DET', 4, false, t));
+      expect(generateDungeon('DET', 10, true, t)).toEqual(generateDungeon('DET', 10, true, t));
+    }
+  });
+
+  it('keep the round\'s macro geometry: the sky only adds voids, the layout and size stay', () => {
+    for (let r = 1; r <= 9; r++) {
+      if (r % 5 === 0) continue;
+      const a = generateDungeon('SAMEGEO', r, false, 'sky'), b = generateDungeon('SAMEGEO', r, false, 'catacombs');
+      expect(a.layout).toBe(b.layout);
+      expect([a.w, a.h]).toEqual([b.w, b.h]);
+    }
+  });
+
+  it('float the sky shard in open air: the edges and the rock between rooms are void, back walls stay as its rim', () => {
+    for (const m of MAPS.sky) {
+      if (m.fallback) continue;
+      const v = new Set(m.voids ?? []);
+      const floor = (x: number, y: number) => x >= 0 && y >= 0 && x < m.w && y < m.h && m.tiles[y * m.w + x] === 0;
+      const back = (x: number, y: number) => floor(x, y + 1) || floor(x + 1, y);
+      // every border tile is open sky unless it is the rim behind a floor tile
+      for (let x = 0; x < m.w; x++) for (const y of [0, m.h - 1]) if (!back(x, y)) expect(v.has(y * m.w + x), `border ${x},${y}`).toBe(true);
+      for (let y = 0; y < m.h; y++) for (const x of [0, m.w - 1]) if (!back(x, y)) expect(v.has(y * m.w + x), `border ${x},${y}`).toBe(true);
+      // a void tile is never the rim (chasm and arena layouts carve their own drops); front walls drop away
+      const ownChasm = m.layout === 'chasm' || m.layout === 'arena';
+      let walls = 0;
+      for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
+        const i = y * m.w + x;
+        if (m.tiles[i] !== 1) continue;
+        walls++;
+        if (v.has(i) && !ownChasm) expect(back(x, y), `rim ${x},${y}`).toBe(false);
+        if (!v.has(i) && (floor(x, y - 1) || floor(x - 1, y)) && !back(x, y)) {
+          // a front wall still standing must be free-standing furniture (no wall neighbour connects it to the rock)
+          expect([[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].some(([nx, ny]) => v.has(ny! * m.w + nx!)), `front wall ${x},${y}`).toBe(false);
+        }
+      }
+      expect(v.size).toBeGreaterThan(walls * 0.5);
+    }
+  });
+
+  it('leave the sky floors a wall stretch for the Fate doors', () => {
+    let withDoors = 0, total = 0;
+    for (const m of MAPS.sky.filter((x) => !x.fallback && x.layout !== 'arena')) {
+      total++;
+      const st = newRun(['vanguard', 'arcanist'], 'SKYDOOR');
+      st.map = m;
+      st.round = 1;
+      st.players.forEach((p, i) => { p.x = m.playerSpawns[i]!.x; p.y = m.playerSpawns[i]!.y; });
+      const slots = chooseDoorSlots(st);
+      if (slots.every((s) => doorSlotOk(m, s.fx, s.fy, s.nx, s.ny, false))) withDoors++;
+    }
+    expect(withDoors).toBeGreaterThanOrEqual(Math.ceil(total * 0.9));
+  });
+
+  it('only the sky opens extra voids; moon and server floors keep their walls', () => {
+    for (const t of ['moon', 'server'] as const) for (const m of MAPS[t]) {
+      if (m.layout === 'chasm' || m.layout === 'arena') continue;
+      expect(m.voids ?? [], `${t} ${m.layout}`).toEqual([]);
+    }
+  });
+
+  it('lean the room kinds towards each theme', () => {
+    const count = (theme: string, kind: string) => {
+      let n = 0;
+      for (let s = 0; s < 5; s++) for (let r = 1; r <= 9; r++) if (r % 5) n += (generateDungeon('LEAN' + s, r, false, theme).rooms ?? []).filter((x) => x.kind === kind).length;
+      return n;
+    };
+    expect(count('server', 'library')).toBeGreaterThan(count('sky', 'library'));
+    expect(count('sky', 'grotto')).toBeGreaterThan(count('server', 'grotto'));
+    expect(count('moon', 'barracks')).toBeGreaterThan(count('sky', 'barracks'));
   });
 });
