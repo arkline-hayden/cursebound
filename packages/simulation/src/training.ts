@@ -7,6 +7,7 @@ import { makeElite } from './elites';
 import { nearestFloor } from './map';
 import { seedRng } from './rng';
 import { rebuildSkills } from './sim';
+import { trainingRoomEvent } from './roomEvents';
 import { ONE, derivePlayer } from './stats';
 import type { EnemyState, PlayerState, SimEvent, SimState } from './types';
 
@@ -27,7 +28,7 @@ const DT = TICK_SEC;
 export const TRAINING_POINTS = 999;
 /** Most foes alive in the yard at once (spawn requests past it are refused). */
 export const TRAINING_MAX_ENEMIES = 72;
-export const TRAINING_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level'] as const;
+export const TRAINING_OPS = ['spawn', 'boss', 'clear', 'ai', 'cooldowns', 'heal', 'class', 'level', 'event'] as const;
 export type TrainingOp = typeof TRAINING_OPS[number];
 
 export function isTraining(state: SimState): boolean {
@@ -216,6 +217,8 @@ export function applyTraining(state: SimState, ev: SimEvent[], p: PlayerState, o
       r = { ok: true };
       break;
     }
+    // room events (roomEvents.ts): a shrine of any type, an altar, the merchant, a treasure imp or a heap of coins
+    case 'event': r = trainingRoomEvent(state, ev, p, arg ?? ''); break;
     default: r = { ok: false, code: 'UNKNOWN_OP' };
   }
   if (r.ok) ev.push({ t: 'training', op, slot: p.slot, x: p.x, y: p.y });

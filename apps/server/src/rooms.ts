@@ -191,6 +191,8 @@ export class Room implements AuthorityHost {
       }
       // Fate's Blessing on an offered card (validated by the simulation: phase, offer, a held blessing, one per card)
       case 'BLESS': a?.submitCommand({ type: 'BLESS', slot: seat.slot, offerId: msg.offerId, cardSlot: msg.slot }, { slot: seat.slot, requestId: msg.requestId }); this.later(() => a?.afterCommand('BLESS')); return;
+      // room events: shrine / altar pact / merchant purchase (the simulation validates phase, range, stock and funds)
+      case 'EVENT': a?.submitCommand({ type: 'EVENT', slot: seat.slot, op: msg.op, id: msg.id, ...(msg.choice !== undefined ? { choice: msg.choice } : {}) }, { slot: seat.slot, requestId: msg.requestId }); return;
       case 'HELLO': return;
     }
   }

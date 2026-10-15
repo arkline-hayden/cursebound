@@ -1,5 +1,5 @@
 import { Big } from '@cursebound/numeric';
-import { CLASS_BY_ID, DODGE, RULES, SKILL_BY_ID, TICK_SEC, type SkillDef } from '@cursebound/content';
+import { CLASS_BY_ID, DODGE, RULES, SHRINE_TUNING, SKILL_BY_ID, TICK_SEC, type SkillDef } from '@cursebound/content';
 import { addStagger, cohortRadius, healPlayer, hitEnemy, shieldPlayer } from './combat';
 import { breakChain } from './afflictions';
 import { bountyRules, dodgeMaxOf } from './bountyRules';
@@ -182,7 +182,7 @@ export function moveSpeedOf(state: SimState, p: PlayerState): number {
   let haste = 0;   // Fate Bloodrush (boons.ts): +value movement while active
   for (const b of p.buffs) {
     if ((b.id === 'chill' || b.id === 'slowed') && b.until > state.tick && b.value > slow) slow = b.value;   // afflictions: strongest slow
-    else if (b.id === 'bloodrush' && b.until > state.tick && b.value > haste) haste = b.value;
+    else if ((b.id === 'bloodrush' || b.id === 'shrine_haste') && b.until > state.tick && b.value > haste) haste = b.value;   // + Shrine of Haste (roomEvents.ts)
   }
   const hs = haste > 0 ? Math.min(MAX_SPEED, s * (1 + haste)) : s;
   return slow > 0 ? hs * (1 - Math.min(0.9, slow)) : hs;
@@ -560,7 +560,8 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
   rechargeDodge(p, DT * rec);
   p.iframes = Math.max(0, p.iframes - DT);
   // Skill cooldowns (the only cast gate). Rally (Vanguard) speeds skill recovery by RULES.rallyRecovery.
-  const skillRec = rec * (p.buffs.some((b) => b.id === 'rally') ? RULES.rallyRecovery : 1);
+  const skillRec = rec * (p.buffs.some((b) => b.id === 'rally') ? RULES.rallyRecovery : 1)
+    * (p.buffs.some((b) => b.id === 'shrine_haste') ? SHRINE_TUNING.hasteRecovery : 1);   // room events: Shrine of Haste
   for (const s of p.skills) {
     if (!s.skillId) continue;
     if (s.charges >= s.maxCharges) { s.cooldown = 0; continue; }

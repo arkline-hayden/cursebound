@@ -1,4 +1,5 @@
-import { isBossRound } from '@cursebound/content';
+import { COIN_RULES, isBossRound } from '@cursebound/content';
+import { dropCoins } from './coins';
 import { registerGlobalHooks } from './hooks';
 import { dropPickup, PICKUP_KINDS } from './pickups';
 import { nextInt, seedRng } from './rng';
@@ -70,6 +71,7 @@ function breakCache(state: SimState, ev: SimEvent[], pk: Pickup, slot: number) {
   dropPickup(state, PICKUP_KINDS.potion, pk.x, pk.y, 1);
   dropPickup(state, PICKUP_KINDS.orb, pk.x, pk.y, 1);
   if (nextInt(state.rng.combat, 2) === 0) dropPickup(state, PICKUP_KINDS.potion, pk.x, pk.y, 0);
+  dropCoins(state, pk.x, pk.y, COIN_RULES.cache);   // room events: cursed coins (coins.ts)
 }
 
 registerGlobalHooks({

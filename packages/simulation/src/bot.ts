@@ -1,4 +1,4 @@
-import { CLASS_BY_ID, NODE_BY_ID, SKILL_BY_ID } from '@cursebound/content';
+import { CLASS_BY_ID, NODE_BY_ID, ROOM_EVENT_RULES, SKILL_BY_ID } from '@cursebound/content';
 import { lineOfSight } from './geometry';
 import { canAllocate, hasSpendableNode } from './sim';
 import { ACTION, type Command, type EnemyState, type PlayerInput, type PlayerState, type SimState } from './types';
@@ -145,6 +145,11 @@ export function botCommands(state: SimState, slot: number, voteSeq: number, pick
   } else if (state.phase === 'VOTING' && state.offer) {
     const v = state.offer.votes.find((x) => x.slot === slot);
     if (v && !v.locked) cmds.push({ type: 'VOTE', slot, offerId: state.offer.id, seq: voteSeq, cardSlot: pick(state.offer.cards), locked: true });
+  } else if (state.phase === 'COMBAT' && p.lifeState === 'alive' && state.roomEvents?.list.length) {
+    // room events (roomEvents.ts): a bot takes any unused shrine it passes
+    const R2 = ROOM_EVENT_RULES.useRange ** 2;
+    const re = state.roomEvents.list.find((e) => e.kind === 'shrine' && !e.used && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 <= R2);
+    if (re) cmds.push({ type: 'EVENT', slot, op: 'shrine', id: re.id });
   } else if (state.awaitingDurable) {
     if (slot === 0) cmds.push({ type: 'DURABLE', what: state.awaitingDurable });
   }

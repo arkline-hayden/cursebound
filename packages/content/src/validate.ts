@@ -4,6 +4,7 @@ import { BRANCH_TIER_POINTS, CLASSES, NODES, NODE_BY_ID, SKILLS, SKILL_BY_ID } f
 import { ARENA_DESIGNS, BOSSES, BOSS_ARENAS, DUNGEON_THEMES, ENEMIES, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, ROOM_KINDS, THEME_PACKS, THEME_ROOM_WEIGHTS } from './enemies';
 import { STAT_BY_ID, isKnownStat } from './stats';
 import { validateLegendaries } from './legendaries';
+import { validateRoomEvents } from './roomEvents';
 import { BOUNTY_MODIFIERS } from './bounties';
 import { CLASS_UNLOCKS, STARTER_CLASSES } from './progression';
 import type { CardDef, NodeDef } from './types';
@@ -210,6 +211,7 @@ export function validateContent(): string[] {
     if (a.inflict && !(a.inflict.sec > 0 && a.inflict.sec <= 4)) errs.push(`${e.id}/${a.id}: affliction durations must be short (0..4 s)`);
   }
   errs.push(...validateLegendaries());
+  errs.push(...validateRoomEvents(isKnownStat));   // shrines, altar pacts, merchant wares
   errs.push(...validateProgression());
   return errs;
 }

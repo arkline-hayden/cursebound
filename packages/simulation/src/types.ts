@@ -124,6 +124,11 @@ export interface PlayerState {
   aff?: PlayerAfflictions;
   /** Fate's Blessings carried (blessing.ts; content FATES_BLESSING). Absent = none. */
   bless?: number;
+  /** Cursed coins in this hero's purse (coins.ts; room events). Absent = none. */
+  coins?: number;
+  /** Permanent personal stat changes bound by a cursed altar or bought from the merchant (roomEvents.ts; stats.ts
+   *  applies them after Fate). Absent = none. */
+  pacts?: PactRecord[];
   lastInputSeq: number;
   prevButtons: number;
   lastHitBy: string | null;        // for death recap
@@ -133,6 +138,16 @@ export interface PlayerState {
   stats: { damageDealt: Big; damageTaken: Big; revives: number; downs: number; healing: Big; prevented: Big };
   dpsWindow: Big[];                // last 10 seconds of damage dealt, 1 bucket per second
   dpsBucket: Big;
+}
+
+/** A permanent personal stat change (roomEvents.ts): an altar pact or a merchant run boon. `mods` multiply
+ *  independently after Fate (stats.ts pactFactor); `item` = the legendary a relic pact copied. */
+export interface PactRecord {
+  id: string;
+  src: 'altar' | 'merchant';
+  round: number;
+  mods: { stat: string; factor: string }[];
+  item?: string;
 }
 
 /** Affliction bookkeeping on a hero (afflictions.ts). The statuses themselves live in PlayerState.buffs. */
@@ -472,7 +487,7 @@ export interface SimState {
   telegraphs: Telegraph[];
   map: MapState | null;
   encounter: EncounterState | null;
-  rng: { offers: RngState; combat: RngState; ai: RngState; /** legendary drops (gear.ts); seeded lazily for pre-gear checkpoints */ loot?: RngState };
+  rng: { offers: RngState; combat: RngState; ai: RngState; /** legendary drops (gear.ts); seeded lazily for pre-gear checkpoints */ loot?: RngState; /** room events and coin drops (roomEvents.ts, coins.ts); seeded lazily */ events?: RngState };
   nextId: number;
   nextGen: number;
   fate: {
@@ -518,6 +533,29 @@ export interface SimState {
   training?: TrainingState | null;
   /** Daily bounty modifier the run was created with (content bounties.ts, applied by bounty.ts). Absent = none. */
   bounty?: string | null;
+  /** Room events of the current floor (roomEvents.ts): shrines, altar, merchant, the pending treasure imp. */
+  roomEvents?: RoomEventState | null;
+}
+
+/** A room event on the current floor (roomEvents.ts): a shrine (`type` = content SHRINES id), a cursed altar
+ *  (`offers`: three seeded pact ids, 'relic:<item>' for the relic pact) or the wandering merchant (`stock`). */
+export interface RoomEvent {
+  id: number;
+  kind: 'shrine' | 'altar' | 'merchant';
+  type: string;
+  x: number; y: number;
+  /** shrine / altar spent (dark) */
+  used?: boolean;
+  offers?: string[];
+  /** merchant shelf rows: ware id (content MERCHANT_WARES), price, units left; `item` = the legendary on sale */
+  stock?: { ware: string; price: number; left: number; item?: string }[];
+}
+
+/** The current floor's room events (roomEvents.ts). Reset at ROUND_SETUP. */
+export interface RoomEventState {
+  list: RoomEvent[];
+  /** tick at which this floor's treasure imp appears (absent = none, or already out) */
+  runnerAt?: number;
 }
 
 /** Training-room switches (training.ts). Plain data, part of the replayed state. */
@@ -559,7 +597,9 @@ export type Command =
    *  clear, ai (arg 'on' | 'off'), cooldowns, heal, class (arg class id), level (arg foe level 1..99). */
   | { type: 'TRAIN'; slot: number; op: string; arg?: string; tier?: number }
   /** Fate's Blessing (blessing.ts): lift the price of card `cardSlot` of the current offer during VOTING. */
-  | { type: 'BLESS'; slot: number; offerId: string; cardSlot: number };
+  | { type: 'BLESS'; slot: number; offerId: string; cardSlot: number }
+  /** Room events (roomEvents.ts): activate shrine `id`, take pact `choice` of altar `id`, buy shelf row `choice` of merchant `id`. */
+  | { type: 'EVENT'; slot: number; op: 'shrine' | 'altar' | 'buy'; id: number; choice?: number };
 
 export type SimEvent =
   | { t: 'phase'; phase: Phase; round: number }
@@ -608,4 +648,7 @@ export type SimEvent =
   /** Fate's Blessing (blessing.ts): a hero picked one up (id = ground item), or blessed card `card` of the current offer */
   | { t: 'blessing'; op: 'pickup' | 'apply'; slot: number; x: number; y: number; card?: number; id?: number }
   /** Training grounds (training.ts): a hero respawned in place ('respawn'), or used a tool (the TRAIN op) */
-  | { t: 'training'; op: string; slot: number; x: number; y: number };
+  | { t: 'training'; op: string; slot: number; x: number; y: number }
+  /** Room events (roomEvents.ts): a hero used shrine / altar / merchant `id` (k = shrine type, pact id or ware id); the
+   *  merchant or a treasure imp appeared (imp: id = enemy id); the imp started its portal, escaped, or burst into loot */
+  | { t: 'room_event'; op: 'shrine' | 'altar' | 'buy' | 'merchant' | 'runner' | 'portal' | 'escape' | 'shower'; id: number; slot: number; x: number; y: number; k?: string };

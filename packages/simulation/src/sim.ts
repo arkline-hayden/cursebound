@@ -15,6 +15,7 @@ import './elites';    // champion / rare monster affixes (global hooks)
 import './pickups';   // potions and resource orbs (global hooks)
 import './boons';     // Fate mechanics: boons and banes (global hooks)
 import { settleLoot } from './gear';   // legendary gear: drops, pickup/swap, perks (global hooks; after pickups)
+import { applyRoomEvent, placeMerchant, resetRoomEvents, settleRoomEvents } from './roomEvents';   // room events: shrines, altar, merchant, treasure imps, coins (global hooks)
 import { STATE_SCHEMA, stateHash } from './serialize';
 import { applyTraining, setupTraining, topUpTrainingPoints, trainingAiOff, trainingIdleEnemy, trainingTick } from './training';   // training grounds
 import { applyBlessing, blessingOn } from './blessing';   // Fate's Blessing
@@ -261,6 +262,10 @@ function applyCommand(state: SimState, ev: SimEvent[], cmd: Command): CommandOut
       const r = applyBlessing(state, ev, p!, cmd.offerId, cmd.cardSlot);
       return r.ok ? { cmd, ok: true } : { cmd, ok: false, code: r.code };
     }
+    case 'EVENT': {   // room events (roomEvents.ts): shrine, altar pact, merchant purchase
+      const r = applyRoomEvent(state, ev, p!, cmd.op, cmd.id, cmd.choice);
+      return r.ok ? { cmd, ok: true } : { cmd, ok: false, code: r.code };
+    }
     case 'INCIDENT':
       state.incident = cmd.reason;
       setPhase(state, ev, 'RECOVERY');
@@ -282,6 +287,7 @@ function enterRoundSetup(state: SimState, ev: SimEvent[]) {
   state.round++;
   state.retireVotes = [];
   state.doors = null;   // the threshold of the last intermission is gone (doors.ts)
+  resetRoomEvents(state);   // so are the last floor's shrines, altar and merchant (roomEvents.ts)
   setPhase(state, ev, 'ROUND_SETUP');
   if (state.training) setupTraining(state, ev);   // the courtyard (training.ts)
   else setupRound(state, ev);
@@ -397,6 +403,7 @@ function enterRoundClear(state: SimState, ev: SimEvent[]) {
     p.guardTimer = 0; p.dodgeTimer = 0; p.buffs = [];
   }
   settleLoot(state, ev);   // unclaimed legendaries: nearest open slot, otherwise carried into the next round
+  settleRoomEvents(state, ev);   // unclaimed cursed coins pay the party (roomEvents.ts / coins.ts)
   state.enemies = []; state.projectiles = []; state.hazards = []; state.telegraphs = []; state.reactions = []; state.pendingSpawns = []; state.pickups = [];
   setPhase(state, ev, 'ROUND_CLEAR');
   ev.push({ t: 'domain', type: 'round_cleared', payload: {
@@ -439,6 +446,7 @@ function startOffer(state: SimState, ev: SimEvent[]) {
   setPhase(state, ev, 'VOTING');
   state.phaseDeadlineTick = state.offer.deadlineTick;
   state.doors = placeDoors(state);   // the vote happens in the cleared map: three themed doors (doors.ts)
+  placeMerchant(state, ev);   // a wandering merchant may wait by the doors (roomEvents.ts)
 }
 
 /** `door`: the party completed a hold on that door (doors.ts) and commits to it directly; otherwise plurality of the
