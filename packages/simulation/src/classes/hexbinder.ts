@@ -1,6 +1,7 @@
 import { Big } from '@cursebound/numeric';
-import { SKILL_BY_ID } from '@cursebound/content';
+import { RULES, SKILL_BY_ID } from '@cursebound/content';
 import { addDot, healPlayer, hitEnemy, mitigationFactor } from '../combat';
+import { arrived, followStep, ownerSlot, routeStep, trackStuck } from '../follow';
 import { registerClassHooks, registerGlobalHooks, type SimHooks } from '../hooks';
 import { inLine, moveCircle, norm, rayDistance } from '../geometry';
 import { areaCoverage, cutCooldowns, knockback, makeHazard, spawnPlayerProjectiles } from '../players';
@@ -32,6 +33,8 @@ const WRAITH_KINDS: Record<string, { skill: string; speed: number; reach: number
   hx_legion: { skill: 'h_grave_legion', speed: 6.5, reach: 1.0, interval: 30, dur: 6, max: 3 },
   hx_lesser: { skill: 'h_lesser_wraith', speed: 6, reach: 1.0, interval: 36, dur: 4, max: 4 },
 };
+/** Collision radius summons walk with (h.radius is their strike reach). */
+const WRAITH_BODY = 0.3;
 const SOUL_MAX = 6;
 /** Blood Price: every cast costs `hp` of max health and cooldowns are x`cd` while paying leaves the hero above `floor`. */
 const BLOOD_PRICE = { hp: 0.03, cd: 0.7, floor: 0.35 } as const;
@@ -139,7 +142,7 @@ function summon(state: SimState, ev: SimEvent[], p: PlayerState, kind: string, x
   for (let i = 0; i <= mine.length - cfg.max; i++) mine[i].untilTick = state.tick + 1;   // oldest fades (Death Knell still fires)
   const [fx, fy] = norm(p.aimX, p.aimY);
   state.hazards.push(makeHazard(state, {
-    kind, owner: 'player', ownerId: p.slot, x, y, dx: fx || 1, dy: fy, radius: cfg.reach, speed: cfg.speed,
+    kind, owner: 'player', ownerId: p.slot, x, y, dx: fx || 1, dy: fy, radius: cfg.reach, speed: cfg.speed * RULES.minionMoveSpeedMult,
     untilTick: state.tick + ticks(cfg.dur), nextTick: state.tick + 18, interval: cfg.interval, inner: state.tick + 30, outer: 0,
     damage, dtype: 'decay',
   }));
@@ -167,16 +170,27 @@ function stepWraith(state: SimState, ev: SimEvent[], h: Hazard, p: PlayerState |
     }
     return;
   }
-  const target = nearestEnemy(state, h.x, h.y, 9);
-  let gx: number, gy: number, stopAt: number;
-  if (target) { gx = target.x; gy = target.y; stopAt = Math.max(0.2, target.radius + h.radius * 0.5); }
-  else { const a = (h.id % 6) * 1.0472; gx = p.x + Math.cos(a) * 1.4; gy = p.y + Math.sin(a) * 1.4; stopAt = 0.15; }
-  const vx = gx - h.x, vy = gy - h.y, d = Math.sqrt(vx * vx + vy * vy);
-  if (d > stopAt) {
-    const step = Math.min(cfg.speed * DT, d - stopAt);
-    const r = moveCircle(state.map, h.x, h.y, (vx / d) * step, (vy / d) * step, 0.3);
-    h.x = r.x; h.y = r.y; h.dx = vx / d; h.dy = vy / d;
+  // Movement routes around walls and chasm voids (follow.ts): a foe it cannot reach is skipped for a moment; with no
+  // foe it keeps its spot around the Hexbinder and blinks back when cut off or stuck.
+  const v = (h.vars ??= {});
+  const speed = cfg.speed * RULES.minionMoveSpeedMult;
+  const ox = h.x, oy = h.y;
+  const target = nearestEnemy(state, h.x, h.y, 9, (v.unrT ?? 0) > state.tick ? [v.unr] : undefined);
+  if (target) {
+    const stopAt = Math.max(0.2, target.radius + h.radius * 0.5);
+    const d = Math.sqrt((target.x - h.x) ** 2 + (target.y - h.y) ** 2);
+    if (d > stopAt) {
+      const res = routeStep(state, h, target.x, target.y, Math.min(speed * DT, d - stopAt), WRAITH_BODY);
+      const strikes = res === 'fail' ? 2 : trackStuck(state, h, target.x, target.y, Math.sqrt((target.x - h.x) ** 2 + (target.y - h.y) ** 2));
+      if (strikes >= 2) { v.unr = target.id; v.unrT = state.tick + ticks(1.5); arrived(h); }
+    } else arrived(h);
+  } else {
+    const a = (h.id % 6) * 1.0472;
+    const [sx, sy] = ownerSlot(state, p, Math.cos(a) * 1.4, Math.sin(a) * 1.4, WRAITH_BODY);
+    followStep(state, ev, h, p, sx, sy, speed, WRAITH_BODY, 0.15);
   }
+  const mx = h.x - ox, my = h.y - oy, ml = Math.sqrt(mx * mx + my * my);
+  if (ml > 1e-4 && ml < 2) { h.dx = mx / ml; h.dy = my / ml; }   // face the way it walked (not across a blink)
   if (target && state.tick >= h.nextTick && (target.x - h.x) ** 2 + (target.y - h.y) ** 2 <= (h.radius + target.radius) ** 2) {
     const slash = h.kind === 'hx_banshee' ? h.damage.mul(B('0.5')) : h.damage;
     hitArea(state, ev, h.x, h.y, h.radius, slash, { dtype: 'decay', srcSlot: p.slot, skillId: cfg.skill, allowCrit: true, dot: rotDot(p, 0.15, 3) });
@@ -267,7 +281,7 @@ function stepHazard(state: SimState, ev: SimEvent[], h: Hazard): boolean | undef
         if (t) {
           const vx = t.x - h.x, vy = t.y - h.y, d = Math.sqrt(vx * vx + vy * vy);
           if (d > 0.25) {
-            const step = Math.min(6 * DT, d - 0.2);
+            const step = Math.min(6 * RULES.minionMoveSpeedMult * DT, d - 0.2);   // the swarm's hunting drift is summon movement
             const r = moveCircle(state.map, h.x, h.y, (vx / d) * step, (vy / d) * step, 0.3);
             h.x = r.x; h.y = r.y; h.dx = vx / d; h.dy = vy / d;
           }

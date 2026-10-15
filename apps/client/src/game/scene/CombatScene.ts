@@ -486,6 +486,15 @@ export class CombatScene extends Phaser.Scene {
       }
       case 'death': this.onDeath(e, me, snap); break;
       case 'spawn': { const { x, y } = this.P(e.x, e.y); J.dust(x, y, 6, 0x2a1e2a); J.ring(x, y, 24, 0x6a3a9a, 260); break; }
+      case 'summon_blink': {
+        // a summon lost its route and returned to its owner (sim follow.ts leash): the spirit dissolves where it was
+        // stuck and reforms at the owner's side
+        const tint = e.kind.startsWith('w_') ? 0x9affc8 : e.kind.startsWith('hx_') ? 0xd7a8ff : 0xd8e8ff;
+        const f = this.P(e.fx, e.fy), t = this.P(e.x, e.y);
+        J.embersAt(f.x, f.y - 12, 8, tint); J.ring(f.x, f.y, 18, tint, 220);
+        J.ring(t.x, t.y, 24, tint, 280); J.embersAt(t.x, t.y - 12, 6, tint); J.dust(t.x, t.y, 3, 0x2a3a2a);
+        break;
+      }
       case 'elite': {
         if (e.fx === 'spawn') this.pendingBanners.push({ id: e.id, tier: e.tier ?? 1, until: this.time.now + 700 });
         const mp = this.mePos(snap);

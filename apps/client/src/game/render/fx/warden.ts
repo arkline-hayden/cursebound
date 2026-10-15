@@ -126,7 +126,8 @@ function playAnim(ctx: FxCtx, v: View, i: number, actor: ActorId, state: ActorSt
 function smooth(ctx: FxCtx, v: View, x: number, y: number, fast: boolean) {
   const dt = Math.min(100, Math.max(0, ctx.now - v.lastT));
   v.lastT = ctx.now;
-  if (Math.hypot(x - v.x, y - v.y) > 3) { v.x = x; v.y = y; return; }
+  // snap instead of gliding across a jump (summon_blink leash; walking and leaping beasts stay well under 2 tiles)
+  if (Math.hypot(x - v.x, y - v.y) > 2) { v.x = x; v.y = y; return; }
   const k = 1 - Math.exp(-dt / (fast ? 28 : 55));
   v.x += (x - v.x) * k; v.y += (y - v.y) * k;
 }

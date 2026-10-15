@@ -121,7 +121,7 @@ export const MECHANICS: MechanicDef[] = [
     short: 'A deathless Reaper stalks you: {v} max HP',
     description: 'Each round, {delaySec} s into combat, an unkillable Reaper rises and drifts through walls toward the nearest hero at {speed} units per second. Its touch deals {v} of maximum health (ignores armor), at most once per {strikeSec} s per hero.',
     applicability: 'Every combat round', requires: 'any', color: '#b8b0c8',
-    params: { delaySec: 6, speed: 1.8, radius: 0.9, strikeSec: 1 },
+    params: { delaySec: 6, speed: 1.44, radius: 0.9, strikeSec: 1 },   // speed 1.8 -> 1.44 (rules 1.4: all movement x0.8)
   }),
   m({
     id: 'blood_moon', name: 'Blood Moon', kind: 'bane', stacking: 'compound', unit: 'percent',
