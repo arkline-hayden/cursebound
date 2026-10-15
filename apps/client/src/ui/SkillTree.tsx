@@ -15,8 +15,10 @@ import { NodeIcon, ClassEmblem } from './icons';
 // Presented as a Diablo II skill tree sized for deep trees at 1280x720: three carved branch columns (10-12 sockets
 // over tiers 0..4), a tier-gate gutter, bronze connectors that light once a prerequisite is owned, choice pairs
 // chained with an OR plate (the rival is sealed once one is owned), gold capstone sockets (tier 3) and crowned
-// keystone sockets (tier 4). The detail pane sits to the side; the footer with points and the primary action is
-// pinned. Arrow keys move between sockets, Enter (or double-click) spends a point.
+// keystone sockets (tier 4). Sockets also show their kind: new skill, upgrade of a named skill, or passive (see
+// sortOf). The detail pane sits to the side (one line of copy, a "What changes" before → after box and a compact
+// requirements row); the footer with points and the primary action is pinned. Arrow keys move between sockets,
+// Enter (or double-click) spends a point.
 
 type Player = PhaseData['players'][number];
 type Kind = 'granted' | 'maxed' | 'owned' | 'ready' | 'open' | 'locked' | 'sealed';
@@ -71,28 +73,56 @@ function evolvesFrom(n: NodeDef, cls: ClassDef): NodeDef | null {
 }
 const skillName = (n: NodeDef | null) => (n?.grantsSkill ? SKILL_BY_ID[n.grantsSkill]?.name ?? n.name : n?.name ?? '');
 
-function statName(stat: string) {
-  if (STAT_BY_ID[stat]) return STAT_BY_ID[stat].name;
-  if (stat.startsWith('skill.')) { const [, id, what = 'damage'] = stat.split('.'); return `${SKILL_BY_ID[id]?.name ?? 'Skill'} ${what}`; }
+// Three node kinds, told apart at a glance: a socket that grants a new skill (arcane gems, "New skill" plate), one
+// that upgrades a skill granted elsewhere (ember badge with that skill's icon and an up-chevron, "Upgrade" plate)
+// and a plain passive (bronze, no ornament). `NodeDef.upgrades` is the content's display tag for the second kind.
+type NodeSort = 'grant' | 'upgrade' | 'passive';
+const sortOf = (n: NodeDef): NodeSort => (n.grantsSkill || n.starting ? 'grant' : n.upgrades ? 'upgrade' : 'passive');
+const SORT_WORD: Record<NodeSort, string> = { grant: 'New skill', upgrade: 'Upgrade', passive: 'Passive' };
+const upgradedName = (n: NodeDef) => (n.upgrades ? SKILL_BY_ID[n.upgrades]?.name ?? n.upgrades : '');
+
+/** Node copy with templates filled; upgrade copy loses its "Upgrades <Skill>: " lead (the plate names the skill). */
+function nodeText(n: NodeDef, rank: number) {
+  const d = n.description.replace(/\{rank\}/g, String(rank)).replace(/\{value\}/g, n.modifiers[0]?.factorPerRank ?? '');
+  const lead = `Upgrades ${upgradedName(n)}: `;
+  if (!n.upgrades || !d.startsWith(lead)) return d;
+  const rest = d.slice(lead.length);
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+function statName(stat: string, n?: NodeDef) {
+  if (STAT_BY_ID[stat]) return STAT_BY_ID[stat].name.replace(/^Player /, '').replace(/^\w/, (c) => c.toUpperCase());
+  if (stat.startsWith('skill.')) {
+    const [, id, what = 'damage'] = stat.split('.');
+    return id === n?.upgrades ? what.charAt(0).toUpperCase() + what.slice(1) : `${SKILL_BY_ID[id]?.name ?? 'Skill'} ${what}`;
+  }
   return stat;
 }
 
-function effects(p: Player, n: NodeDef, cls: ClassDef): { text: string; sub?: string }[] {
-  const rank = p.ranks[n.id] ?? 0, next = Math.min(n.rankLimit, rank + 1);
-  const out: { text: string; sub?: string }[] = [];
+const cooldownMeta = (skillId: string) => {
+  const s = SKILL_BY_ID[skillId];
+  return s ? [s.cooldownSec ? `${s.cooldownSec}s cooldown` : '', s.charges > 1 ? `${s.charges} charges` : ''].filter(Boolean).join(' · ') : '';
+};
+
+/** "What changes": compact before → after lines for the next rank (or the current state once fully ranked). */
+type Change = { label?: string; from?: ReactNode; to: ReactNode; meta?: string };
+function changes(p: Player, n: NodeDef, cls: ClassDef): Change[] {
+  const rank = p.ranks[n.id] ?? 0, maxed = rank >= n.rankLimit, next = Math.min(n.rankLimit, rank + 1);
+  const out: Change[] = [];
+  if (n.grantsSkill) {
+    const evo = evolvesFrom(n, cls);
+    const to = <><NodeIcon nodeId={n.grantsSkill} size={16} /> {SKILL_BY_ID[n.grantsSkill]?.name ?? n.name}</>;
+    out.push(evo?.grantsSkill
+      ? { from: <><NodeIcon nodeId={evo.grantsSkill} size={16} /> {skillName(evo)}</>, to, meta: cooldownMeta(n.grantsSkill) }
+      : { label: 'New', to, meta: cooldownMeta(n.grantsSkill) });
+  }
+  if (n.upgrades && !n.modifiers.length) out.push({ to: nodeText(n, rank) });
   for (const m of n.modifiers) {
     const f = Big.from(m.factorPerRank);
-    const cur = fx(f.powInt(rank).toNumber()), nxt = fx(f.powInt(next).toNumber());
-    out.push({ text: rank >= n.rankLimit ? `${statName(m.stat)} ×${cur} (fully ranked)` : `${statName(m.stat)} ×${cur} → ×${nxt}`, sub: `×${m.factorPerRank} per rank, multiplying independently of every other source.` });
+    const cur = `×${fx(f.powInt(rank).toNumber())}`, nxt = `×${fx(f.powInt(next).toNumber())}`;
+    out.push(maxed ? { label: statName(m.stat, n), to: cur, meta: 'max' } : { label: statName(m.stat, n), from: cur, to: nxt });
   }
-  if (n.grantsSkill) {
-    const s = SKILL_BY_ID[n.grantsSkill];
-    if (s) {
-      const meta = [s.resourceCost ? `${s.resourceCost} ${cls.resource.name}` : 'No cost', s.cooldownSec ? `${s.cooldownSec}s cooldown` : 'no cooldown', Number(s.damageCoef) > 0 ? `${s.damageCoef}× base damage (${s.damageType})` : '', s.charges > 1 ? `${s.charges} charges` : ''].filter(Boolean).join(' · ');
-      out.push({ text: `Equips ${s.name}`, sub: `${s.description} ${meta}.` });
-    }
-  }
-  if (!out.length) out.push({ text: 'Changes how a skill behaves', sub: 'Not a stat multiplier; the Forecast recomputes any affected outputs.' });
+  if (!n.grantsSkill && !n.modifiers.length && n.rankLimit > 1) out.push(maxed ? { label: 'Rank', to: `${rank}`, meta: 'max' } : { label: 'Rank', from: `${rank}`, to: `${next}` });
   return out;
 }
 
@@ -219,6 +249,19 @@ function Pips({ rank, max }: { rank: number; max: number }) {
   return <span className="tpips">{Array.from({ length: max }, (_, i) => <i key={i} className={i < rank ? 'on' : ''} />)}</span>;
 }
 
+/** Node-kind plate: "New skill" (naming the skill it replaces, for evolutions), "Upgrade" + the upgraded skill, or "Passive". */
+function KindPlate({ node, evo }: { node: NodeDef; evo: NodeDef | null }) {
+  const sort = sortOf(node);
+  return (
+    <span className={`kind-plate ${sort}`}>
+      {sort === 'upgrade' && <i className="up" aria-hidden="true" />}
+      <span>{SORT_WORD[sort]}</span>
+      {node.upgrades && <b><NodeIcon nodeId={node.upgrades} size={16} />{upgradedName(node)}</b>}
+      {sort === 'grant' && evo && <b>replaces {skillName(evo)}</b>}
+    </span>
+  );
+}
+
 function Branch({ cls, branch, nodes, rows, me, focus, hover, onSelect, onHover, onSpend, onKey, onRoomy }: {
   cls: ClassDef; branch: ClassDef['branches'][number]; nodes: NodeDef[]; rows: number; me: Player; focus: string | null; hover: string | null;
   onSelect: (id: string) => void; onHover: (id: string | null) => void; onSpend: (id: string) => void; onKey: (e: KeyboardEvent<HTMLButtonElement>, n: NodeDef, st: Status) => void;
@@ -248,17 +291,21 @@ function Branch({ cls, branch, nodes, rows, me, focus, hover, onSelect, onHover,
             const st = status(me, n, cls);
             const evo = evolvesFrom(n, cls);
             const word = tierWord(n);
+            const sort = sortOf(n);
+            const kindText = sort === 'upgrade' ? `Upgrades ${upgradedName(n)}` : evo ? `New skill, evolves ${skillName(evo)}` : SORT_WORD[sort];
             return (
               <li key={n.id}>
                 <button type="button" data-node={n.id}
-                  className={`tnode k-${st.kind} ${st.can ? 'can' : ''} ${isKey(n) ? 'key' : isCap(n) ? 'cap' : ''} ${roomy ? 'lg' : ''} ${focus === n.id ? 'sel' : ''}`}
+                  className={`tnode n-${sort} k-${st.kind} ${st.can ? 'can' : ''} ${isKey(n) ? 'key' : isCap(n) ? 'cap' : ''} ${roomy ? 'lg' : ''} ${focus === n.id ? 'sel' : ''}`}
                   style={{ left: p.x - p.s / 2, top: p.y - p.s / 2, width: p.s, height: p.s }}
-                  aria-label={`${n.name}, ${branch.name} tier ${ROMAN[n.tier]}${word ? `, ${word.toLowerCase()}` : ''}, rank ${rank} of ${n.rankLimit}.${evo ? ` Evolves ${skillName(evo)}.` : ''} ${st.can ? 'Available: press Enter to spend a point.' : st.short}.`}
+                  aria-label={`${n.name}, ${kindText}, ${branch.name} tier ${ROMAN[n.tier]}${word ? `, ${word.toLowerCase()}` : ''}, rank ${rank} of ${n.rankLimit}. ${st.can ? 'Available: press Enter to spend a point.' : st.short}.`}
                   aria-describedby="node-detail" aria-pressed={focus === n.id}
                   onClick={() => onSelect(n.id)} onFocus={() => onSelect(n.id)} onDoubleClick={() => st.can && onSpend(n.id)}
                   onMouseEnter={() => onHover(n.id)} onKeyDown={(e) => onKey(e, n, st)}>
                   <span className="tframe" aria-hidden="true" />
+                  {sort === 'grant' && !isKey(n) && <span className="tgems" aria-hidden="true" />}
                   <NodeIcon nodeId={n.id} size={32} className="ticon" />
+                  {n.upgrades && <span className="tupg" aria-hidden="true"><NodeIcon nodeId={n.upgrades} size={16} /></span>}
                   {st.kind === 'sealed' && <span className="tseal" aria-hidden="true" />}
                   {st.kind === 'locked' && <span className="tlock" aria-hidden="true" />}
                 </button>
@@ -280,8 +327,8 @@ function Branch({ cls, branch, nodes, rows, me, focus, hover, onSelect, onHover,
           return (
             <div className={`ttip ${below ? 'below' : ''}`} role="tooltip" style={{ left, top: below ? p.y + p.s / 2 + (roomy ? 58 : 16) : p.y - p.s / 2 - 8, maxWidth: half * 2 }}>
               <b className="ttip-name">{tipNode.name}</b>
+              <KindPlate node={tipNode} evo={evo} />
               <span className="ttip-meta">Rank {me.ranks[tipNode.id] ?? 0}/{tipNode.rankLimit} · Tier {ROMAN[tipNode.tier]}{tierWord(tipNode) ? ` · ${tierWord(tipNode)}` : ''}</span>
-              {evo && <span className="ttip-evo">Evolves {skillName(evo)}</span>}
               <span className={`ttip-state k-${st.kind} ${st.can ? 'can' : ''}`}>{st.short}</span>
             </div>
           );
@@ -317,38 +364,51 @@ function Detail({ me, cls, node, pending, onSpend, mastery }: { me: Player; cls:
   const st = status(me, node, cls);
   const evo = evolvesFrom(node, cls);
   const word = tierWord(node);
+  const sort = sortOf(node);
   const need = tierPoints(node.tier), spent = me.spentByBranch[node.branch] ?? 0;
   const rivals = (node.excludes ?? []).filter((id) => NODE_BY_ID[id]);
+  // requirements in one compact row: branch points, prerequisites, the rival choice and the point cost
   const reqs: { ok: boolean; text: string }[] = [];
-  if (need > 0) reqs.push({ ok: spent >= need, text: `${need} point${need === 1 ? '' : 's'} in ${branchName(cls, node.branch)} (${spent} spent)` });
-  for (const pr of node.prereqs) reqs.push({ ok: (me.ranks[pr.node] ?? 0) >= pr.rank, text: `${nameOf(pr.node)}${pr.rank > 1 ? ` rank ${pr.rank}` : ''}` });
-  if (rivals.length) reqs.push({ ok: !rivals.some((id) => owns(me, id)), text: `Not ${rivals.map(nameOf).join(' or ')} (choice)` });
-  if (!node.starting && rank < node.rankLimit) reqs.push({ ok: me.skillPoints >= node.costPerRank, text: `${node.costPerRank} skill point${node.costPerRank === 1 ? '' : 's'} (${me.skillPoints} to spend)` });
-  const desc = node.description.replace(/\{rank\}/g, String(rank)).replace(/\{value\}/g, node.modifiers[0]?.factorPerRank ?? '');
+  if (need > 0) reqs.push({ ok: spent >= need, text: `${spent}/${need} pts ${branchName(cls, node.branch)}` });
+  for (const pr of node.prereqs) reqs.push({ ok: (me.ranks[pr.node] ?? 0) >= pr.rank, text: `${nameOf(pr.node)}${pr.rank > 1 ? ` ${pr.rank}` : ''}` });
+  if (rivals.length) reqs.push({ ok: !rivals.some((id) => owns(me, id)), text: `Not ${rivals.map(nameOf).join(' / ')}` });
+  if (!node.starting && rank < node.rankLimit) reqs.push({ ok: me.skillPoints >= node.costPerRank, text: `${node.costPerRank} pt` });
+  const delta = changes(me, node, cls);
+  // upgrades with no stat factor state their change in the "What changes" box, so the description is not repeated
+  const desc = sort === 'upgrade' && !node.modifiers.length ? null : nodeText(node, rank);
   return (
     <aside id="node-detail" className="well tree-side" aria-live="polite">
       <div className="td-scroll">
         {mastery}
         <div className="td-head">
-          <span className={`tnode static k-${st.kind} ${st.can ? 'can' : ''} ${isKey(node) ? 'key' : isCap(node) ? 'cap' : ''}`} style={{ width: isKey(node) ? 72 : 56, height: isKey(node) ? 72 : 56 }}>
+          <span className={`tnode static n-${sort} k-${st.kind} ${st.can ? 'can' : ''} ${isKey(node) ? 'key' : isCap(node) ? 'cap' : ''}`} style={{ width: isKey(node) ? 72 : 56, height: isKey(node) ? 72 : 56 }}>
             <span className="tframe" aria-hidden="true" />
+            {sort === 'grant' && !isKey(node) && <span className="tgems" aria-hidden="true" />}
             <NodeIcon nodeId={node.id} size={32} className="ticon" />
           </span>
           <div className="grow">
             <h3 className="td-name">{node.name}</h3>
-            <div className="td-tags">Tier {ROMAN[node.tier]}{word ? ` · ${word}` : ''} · Rank {rank}/{node.rankLimit}</div>
+            <div className="td-tags">Tier {ROMAN[node.tier]}{word ? ` · ${word}` : ''} · Rank {rank}/{node.rankLimit}{rivals.length ? ' · Choice' : ''}</div>
           </div>
         </div>
-        <div className={`td-status k-${st.kind} ${st.can ? 'can' : ''}`}>{st.can ? `Available — costs ${node.costPerRank} point${node.costPerRank === 1 ? '' : 's'}` : st.reason}</div>
-        {evo && <p className="td-evo">Evolves <b>{skillName(evo)}</b>: the highest evolution you own replaces it on your hotbar.</p>}
-        {rivals.length > 0 && <p className="td-choice">Choice: owning this seals {rivals.map(nameOf).join(' and ')}, and owning {rivals.length > 1 ? 'any of them' : 'it'} seals this.</p>}
-        <p className="td-desc">{desc}</p>
-        <h4 className="engraved">Effect</h4>
-        <ul className="td-effects">{effects(me, node, cls).map((e, i) => <li key={i}><b>{e.text}</b>{e.sub && <span>{e.sub}</span>}</li>)}</ul>
-        {reqs.length > 0 && <>
-          <h4 className="engraved">Requires</h4>
-          <ul className="td-reqs">{reqs.map((r, i) => <li key={i} className={r.ok ? 'ok' : 'no'}><span className="sr-only">{r.ok ? 'Met: ' : 'Not met: '}</span>{r.text}</li>)}</ul>
-        </>}
+        <KindPlate node={node} evo={evo} />
+        {desc && <p className="td-desc">{desc}</p>}
+        {delta.length > 0 && (
+          <div className="td-change">
+            <span className="lbl">What changes</span>
+            {delta.map((c, i) => (
+              <span key={i} className="ln">
+                {c.label && <span className="k">{c.label}</span>}
+                {c.from !== undefined && <><span className="from">{c.from}</span><span className="arr" aria-label="becomes">→</span></>}
+                <span className="to">{c.to}</span>
+                {c.meta && <span className="meta">{c.meta}</span>}
+              </span>
+            ))}
+          </div>
+        )}
+        {reqs.length > 0 && (
+          <ul className="td-reqs inline" aria-label="Requires">{reqs.map((r, i) => <li key={i} className={r.ok ? 'ok' : 'no'}><span className="sr-only">{r.ok ? 'Met: ' : 'Not met: '}</span>{r.text}</li>)}</ul>
+        )}
       </div>
       <button className="btn primary td-spend" disabled={!st.can || pending} onClick={() => onSpend(node.id)}>
         {pending ? 'Spending…' : st.can ? `Spend ${node.costPerRank} point${node.costPerRank === 1 ? '' : 's'}` : st.short}

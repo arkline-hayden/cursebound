@@ -1283,3 +1283,31 @@ textarea.input:focus-visible { outline: 2px dashed var(--ember-hi); outline-offs
 html.pad-nav, html.pad-nav * { cursor: none !important; }
 html.pad-nav :focus-visible, html.pad-nav :focus { outline: 4px solid var(--gold-hi) !important; outline-offset: 3px; box-shadow: 0 0 0 7px #000; }
 html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-image-source: var(--px-plaque-hover); color: var(--gold-hi); }
+
+/* ---------- skill tree: node kinds (new skill / upgrade / passive) and the lean detail pane ----------
+   New skill = arcane gems set over the socket's corner rivets + an arcane "New skill" plate.
+   Upgrade   = an ember badge (top-left) carrying the upgraded skill's icon, an ember up-chevron on the top rim,
+               and an ember "Upgrade" plate naming the skill.
+   Passive   = the plain bronze socket and a bronze "Passive" plate. */
+.tnode .tgems { position: absolute; inset: 0; border-style: solid; border-width: 16px; border-image: var(--px-socket-gems) 8 / 16px stretch; image-rendering: pixelated; pointer-events: none; }
+.tnode .tupg { position: absolute; z-index: 1; left: -8px; top: -8px; width: 24px; height: 24px; display: grid; place-items: center; border-style: solid; border-width: 4px; border-image: var(--px-hud-plate-ember) 4 fill / 4px stretch; image-rendering: pixelated; pointer-events: none; }
+.tnode.n-upgrade::after { content: ''; position: absolute; z-index: 1; left: 50%; top: -8px; width: 18px; height: 14px; margin-left: -9px; background: var(--px-up) center / 18px 14px no-repeat; image-rendering: pixelated; pointer-events: none; }
+.tnode.k-locked .tgems, .tnode.k-sealed .tgems, .tnode.k-locked .tupg, .tnode.k-sealed .tupg, .tnode.k-locked::after, .tnode.k-sealed::after { filter: grayscale(1) brightness(0.6); }
+.kind-plate { align-self: flex-start; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-1); max-width: 100%; padding: 0 var(--sp-1); border-style: solid; border-width: 4px; border-image: var(--px-hud-plate) 4 fill / 4px stretch; image-rendering: pixelated;
+  font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; color: var(--bone-2); text-shadow: 2px 2px 0 #000; }
+.kind-plate b { display: inline-flex; align-items: center; gap: 4px; font-weight: 400; color: #fff; text-transform: none; }
+.kind-plate.grant { border-image-source: var(--px-hud-plate-arcane); color: var(--arcane-hi); }
+.kind-plate.upgrade { border-image-source: var(--px-hud-plate-ember); color: var(--ember-hi); }
+.kind-plate .up { flex: none; width: 18px; height: 14px; background: var(--px-up) center / 18px 14px no-repeat; image-rendering: pixelated; }
+.td-change { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-1) var(--sp-2); background: #070505; box-shadow: inset 0 0 0 2px #000, inset 2px 2px 0 2px #2c241e; }
+.td-change .lbl { font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; color: var(--bone-3); }
+.td-change .ln { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--sp-1); color: var(--bone); }
+.td-change .k { color: var(--bone-2); }
+.td-change .k::after { content: ':'; }
+.td-change .from, .td-change .to { display: inline-flex; align-items: center; gap: 4px; }
+.td-change .from { color: var(--bone-2); }
+.td-change .to { color: var(--gold-hi); }
+.td-change .arr { color: var(--ember-hi); }
+.td-change .meta { color: var(--bone-3); }
+.td-change .meta::before { content: '· '; }
+.td-reqs.inline { flex-direction: row; flex-wrap: wrap; column-gap: var(--sp-3); row-gap: var(--sp-1); }
