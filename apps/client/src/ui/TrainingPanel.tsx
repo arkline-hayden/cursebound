@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { BOSSES, CLASSES, ENEMY_BY_ID, PACK_TEMPLATES } from '@cursebound/content';
+import { BOSSES, CLASSES, ENEMY_BY_ID, PACK_TEMPLATES, SHRINES } from '@cursebound/content';
 import { netStore, type GameConnection } from '@/lib/net';
 import { useStore } from '@/lib/store';
 import { ClassEmblem } from './icons';
@@ -11,13 +11,23 @@ import { SkillTree } from './SkillTree';
 // Training grounds tool drawer (training rooms only; simulation training.ts validates every tool). A slim carved tab
 // on the left edge opens a compact pixel-art drawer: spawn any pack (ordinary / champion / rare), either boss, the foe
 // level that scales new spawns, clear the yard, switch foe AI off, reset cooldowns, heal, swap class, and open the
-// skill tree (free ranks and refunds while training). Keys: T toggles the drawer, K the skill tree.
+// skill tree (free ranks and refunds while training). Room events (shrines, altar, merchant, imp, coins) spawn ahead
+// of the hero for testing. Keys: T toggles the drawer, K the skill tree.
 
 const ORANGE = '#ff8a1e';
 const TIERS = [{ id: 0, name: 'Normal', color: 'var(--text-2)' }, { id: 1, name: 'Champion', color: '#6ab4ff' }, { id: 2, name: 'Rare', color: '#ffd23f' }] as const;
 const lab: CSSProperties = { fontFamily: 'var(--font-label)', fontSize: 'var(--fs-small)', lineHeight: 'var(--lh-small)', textTransform: 'uppercase', color: 'var(--text-3)' };
 const grid = (cols: number): CSSProperties => ({ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 4 });
 const tight: CSSProperties = { padding: '2px 6px', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' };
+
+/** Room event spawns (TRAIN op 'event'): the five shrines, the altar, the merchant, a treasure imp, a heap of coins. */
+const ROOM_EVENT_TOOLS = [
+  ...SHRINES.map((s) => ({ arg: `shrine_${s.id}`, name: s.name.replace(/^Shrine of /, ''), title: `${s.name}: ${s.short}`, color: s.color })),
+  { arg: 'altar', name: 'Altar', title: 'Cursed altar: trade health for power', color: '#ff6a5e' },
+  { arg: 'merchant', name: 'Merchant', title: 'Wandering merchant: wares for cursed coins', color: ORANGE },
+  { arg: 'runner', name: 'Imp', title: 'Treasure imp: catch it before it escapes', color: '#ffd23f' },
+  { arg: 'coins', name: '+30 coins', title: 'A heap of cursed coins', color: '#ffd23f' },
+];
 
 /** Short pack label: the lead foe's name ("Ghoul Hound" pack). */
 function packName(lead: string): string {
@@ -84,6 +94,12 @@ export function TrainingPanel({ net }: { net: GameConnection }) {
               <b style={{ fontFamily: 'var(--font-num)', fontSize: 'var(--fs-label)', minWidth: 32, textAlign: 'center' }} aria-live="polite">{level}</b>
               <button className="btn small" style={tight} aria-label="Raise foe level" disabled={level >= 99} onClick={() => net.train('level', String(Math.min(99, level + (level >= 10 ? 5 : 1))))}>+</button>
             </div>
+          </div>
+
+          {/* room events (simulation roomEvents.ts): every event spawns ahead of you */}
+          <span style={lab}>Room events</span>
+          <div style={grid(3)}>
+            {ROOM_EVENT_TOOLS.map((t) => <button key={t.arg} className="btn small" style={{ ...tight, color: t.color }} title={t.title} onClick={() => net.train('event', t.arg)}>{t.name}</button>)}
           </div>
 
           <span style={lab}>Tools</span>

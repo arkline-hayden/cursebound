@@ -28,6 +28,11 @@ const G = {
   broken: ['###......', '#.#......', '###......', '.........', '...h.h...', '.........', '......###', '......#.#', '......###'],
   up: ['....#....', '...###...', '..##h##..', '.###h###.', '...#h#...', '...#h#...', '...#h#...', '...###...', '.........'],
   down: ['.........', '...###...', '...#h#...', '...#h#...', '...#h#...', '.###h###.', '..##h##..', '...###...', '....#....'],
+  // room events: shrine blessings
+  flame: ['....h....', '...h#....', '...##h...', '..#h##...', '..##h##..', '.##hh##..', '.#hhhh#..', '.##hh##..', '..#####..'],
+  wing: ['........h', '......h##', '....h###.', '..h###...', 'h####h...', '..##h....', '.##h.....', '##.......', '#........'],
+  shield: ['#########', '#hhhhhhh#', '#hh###hh#', '#h#####h#', '#h#####h#', '.#h###h#.', '.##h#h##.', '..##h##..', '....#....'],
+  coin: ['..#####..', '.#hhhhh#.', '#hh###hd#', '#h#hhh#d#', '#h#h#h#d#', '#h#hhh#d#', '#hh###dd#', '.#ddddd#.', '..#####..'],
 } as const;
 
 export const STATUS_DEFS: Record<string, StatusDef> = {
@@ -50,6 +55,11 @@ export const STATUS_DEFS: Record<string, StatusDef> = {
   af_overclock: { label: 'Overclock', kind: 'buff', color: '#7fe8d4', glyph: [...G.cog] },
   d_perfect_form: { label: 'Perfect form', kind: 'buff', color: '#ffd36a', glyph: [...G.star] },
   rally: { label: 'Rallied', kind: 'buff', color: '#e8c66a', glyph: [...G.flag] },
+  // room events (simulation roomEvents.ts): shrine blessings
+  shrine_fury: { label: 'Fury', kind: 'buff', color: '#ff6a3a', glyph: [...G.flame] },
+  shrine_haste: { label: 'Haste', kind: 'buff', color: '#5ae0ff', glyph: [...G.wing] },
+  shrine_warding: { label: 'Warded', kind: 'buff', color: '#9fb4ff', glyph: [...G.shield] },
+  shrine_fortune: { label: 'Fortune', kind: 'buff', color: '#ffd23f', glyph: [...G.coin] },
 };
 
 const NEG_HINT = /(frozen|chill|slow|root|poison|blind|silence|chain|stun|snare|curse|burn|bleed|weak|vuln|fear|hex|doom|mark)/i;

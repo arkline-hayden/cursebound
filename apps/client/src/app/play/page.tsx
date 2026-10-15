@@ -26,6 +26,7 @@ import { TutorialHints } from '@/ui/TutorialHints';
 import { Minimap } from '@/ui/Minimap';
 import { CinematicOverlay } from '@/ui/CinematicOverlay';
 import { TrainingPanel } from '@/ui/TrainingPanel';
+import { RoomEventLayer } from '@/ui/RoomEvents';   // room events: altar pacts and the merchant's shop
 import type { AudioEngine } from '@/game/audio/AudioEngine';
 import { computeIntensity } from '@/game/audio/music';
 import { sharedAudio } from '@/game/audio/shared';
@@ -236,6 +237,7 @@ export default function Play() {
       <Announcer />
       <Toasts />
       {net && stage === 'RUN' && <GearLayer net={net} />}
+      {net && stage === 'RUN' && (ph === 'COMBAT' || ph === 'VOTING') && <RoomEventLayer net={net} />}
       {welcome && <span className="sr-only">Seat {welcome.slot + 1}</span>}
     </div>
   );

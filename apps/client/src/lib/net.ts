@@ -1,5 +1,5 @@
 import { contentHash, DODGE, RULES } from '@cursebound/content';
-import { BUILD_ID, PROTOCOL_VERSION, type ServerMessage, type TrainOp } from '@cursebound/protocol';
+import { BUILD_ID, PROTOCOL_VERSION, type EventOp, type ServerMessage, type TrainOp } from '@cursebound/protocol';
 import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type Snapshot, type SimEvent } from '@cursebound/simulation';
 import { wsTransport, type GameTransport } from './p2p/transport';
 import { roomWsUrl } from './runtime';
@@ -273,6 +273,9 @@ export class GameConnection {
     if (offer) this.send({ t: 'BLESS', offerId: offer.offerId, slot: cardSlot, requestId: crypto.randomUUID().slice(0, 32) });
   }
 
+  /** Room events (simulation roomEvents.ts): activate shrine `id`, take altar pact `choice`, buy merchant row `choice`. */
+  roomEvent(op: EventOp, id: number, choice?: number) { this.send({ t: 'EVENT', op, id, ...(choice !== undefined ? { choice } : {}), requestId: crypto.randomUUID().slice(0, 32) }); }
+
   /** Interpolated view of remote entities ~100 ms in the past. */
   interpolation(now: number, delayMs = 100): { a: Snapshot; b: Snapshot; t: number } | null {
     const target = now - delayMs;
@@ -307,6 +310,9 @@ function ackText(code: string): string {
     NO_BLESSING: 'You carry no Fate’s Blessing.', ALREADY_BLESSED: 'That card is already blessed.', NO_CURSE: 'That card carries no price to lift.',
     STALE_OFFER: 'That offer has passed.', NOT_TRAINING: 'Only the training grounds allow that.', YARD_FULL: 'The yard is full — clear some foes first.',
     BOSS_ACTIVE: 'A boss already stands in the yard.',
+    // room events (simulation roomEvents.ts)
+    TOO_FAR: 'Step closer first.', SPENT: 'Its power is spent.', SOLD_OUT: 'Sold out.', NO_FUNDS: 'Not enough cursed coins.',
+    PACK_FULL: 'Your pack holds no more blessings.', CANNOT_EQUIP: 'You cannot wear that.', DEAD: 'The fallen cannot trade.', NOT_FOUND: 'It is gone.',
   };
   return m[code] ?? `Action rejected (${code}).`;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BOUNTY_BY_ID, DERIVED_NODES, LEGENDARY_BY_ID, MECHANIC_BY_ID, NODE_BY_ID, STAT_BY_ID, cardById } from '@cursebound/content';
+import { BOUNTY_BY_ID, DERIVED_NODES, LEGENDARY_BY_ID, MECHANIC_BY_ID, NODE_BY_ID, PACT_BY_ID, STAT_BY_ID, WARE_BY_ID, cardById } from '@cursebound/content';
 import type { LedgerMechanic, LedgerStat } from '@cursebound/simulation';
 import { netStore, type GameConnection } from '@/lib/net';
 import { useStore } from '@/lib/store';
@@ -74,6 +74,7 @@ function StatRow({ s, tab, onTrace }: { s: LedgerStat; tab: number | 'party'; on
             <div key={p.slot} className="num">
               <b>P{p.slot + 1}</b>: base {exact(p.base)} → tree ×{fmt(p.tree, 4)} → mastery ×{fmt(p.mastery, 4)}{p.gear && p.gear !== '1' ? <> → gear ×{fmt(p.gear, 4)}</> : null} → Fate ×{fmt(p.fate, 4)} = <b>{fmt(p.result)}</b> <span className="faint">({exact(p.result)})</span>
               {p.gearSources && p.gearSources.length > 0 && <div className="faint" style={{ color: '#ff8a1e' }}>Gear: {p.gearSources.map((g) => `${LEGENDARY_BY_ID[g.item]?.name ?? g.item} (×${g.factor})`).join(', ')}</div>}
+              {p.pactSources && p.pactSources.length > 0 && <div className="faint" style={{ color: '#ff6a5e' }}>Pacts: {p.pactSources.map((g) => `${pactName(g.id)} (×${shortFactor(g.factor)})`).join(', ')}</div>}
               {p.treeSources.length > 0 && <div className="faint">Tree: {p.treeSources.map((t) => `${NODE_BY_ID[t.node]?.name ?? t.node} r${t.rank} (×${t.factor}/rank)`).join(', ')}</div>}
             </div>
           ))}
@@ -86,6 +87,12 @@ function StatRow({ s, tab, onTrace }: { s: LedgerStat; tab: number | 'party'; on
       )}
     </li>
   );
+}
+
+/** Room events: an altar pact or merchant boon by id (the relic pact names its legendary). */
+function pactName(id: string, item?: string) {
+  const base = PACT_BY_ID[id]?.name ?? WARE_BY_ID[id]?.name ?? id;
+  return item && LEGENDARY_BY_ID[item] ? `${base} (${LEGENDARY_BY_ID[item].name})` : base;
 }
 
 function shortFactor(f: string) {
@@ -186,6 +193,11 @@ export function Ledger({ net, onClose }: { net: GameConnection; onClose: () => v
             )}
             <section className="well" aria-labelledby="tl-h">
               <h3 id="tl-h" className="lg-h">Timeline ({view.timelineTotal + (view.mechanicTimeline?.length ?? 0)} effects)</h3>
+              {(view.pacts ?? []).length > 0 && (
+                <ul className="lg-timeline" aria-label="Altar pacts and merchant boons">
+                  {view.pacts!.map((pc, i) => <li key={`${pc.round}-${pc.slot}-${i}`}><span className="faint">R{pc.round}</span> {pc.name}: <b style={{ color: pc.src === 'altar' ? '#ff6a5e' : '#ffd36a' }}>{pc.src === 'altar' ? 'Altar pact' : 'Merchant'}</b> {pactName(pc.id, pc.item)} <span className="faint">· {pc.mods.map((m) => `${STAT_BY_ID[m.stat]?.name ?? m.stat} ×${shortFactor(m.factor)}`).join(', ')}</span></li>)}
+                </ul>
+              )}
               {(view.blessings ?? []).length > 0 && (
                 <ul className="lg-timeline" aria-label="Blessed cards">
                   {view.blessings!.map((b) => <li key={`${b.round}-${b.cardId}`}><span className="faint">after R{b.round}</span> {cardName(b.cardId)}: <b className="prism-text">Blessed</b> <span className="faint">· price lifted by {b.name}’s Fate’s Blessing</span></li>)}

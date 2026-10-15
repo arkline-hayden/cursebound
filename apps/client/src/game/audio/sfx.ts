@@ -82,7 +82,14 @@ export type SfxId =
   | 'move_click'
   | 'minimap_ping'
   | 'chest_open'
-  | 'potion_glug';
+  | 'potion_glug'
+  // room events (render/RoomEvents.ts)
+  | 'coin_pickup'
+  | 'shrine_activate'
+  | 'altar_pact'
+  | 'merchant_buy'
+  | 'imp_jingle'
+  | 'imp_portal';
 
 export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 
@@ -192,6 +199,12 @@ export const SFX_IDS: readonly SfxId[] = [
   'minimap_ping',
   'chest_open',
   'potion_glug',
+  'coin_pickup',
+  'shrine_activate',
+  'altar_pact',
+  'merchant_buy',
+  'imp_jingle',
+  'imp_portal',
 ];
 
 /** Cues that are never voice-stolen and always produce a caption. */
@@ -238,4 +251,8 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   stag_cry: '[stag shrieks]',
   bell_toll: '[bell tolls]',
   chest_open: '[chest creaks open]',
+  shrine_activate: '[shrine awakens]',
+  altar_pact: '[the altar drinks]',
+  imp_jingle: '[coins jingle]',
+  imp_portal: '[a rift tears open]',
 };
