@@ -21,3 +21,5 @@ export * from './cinematic';
 export * from './afflictions';
 export * from './caches';
 export * from './doors';
+export * from './bounty';
+export * from './bountyRules';

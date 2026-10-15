@@ -100,6 +100,8 @@ export interface PlayerState {
   dodgeTimer: number;              // seconds remaining in dodge travel
   dodgeCooldown: number;           // seconds until the next dodge charge returns (0 when full)
   dodgeCharges: number;            // dashes available (DODGE.charges max)
+  /** maximum dodge charges when a bounty changes it (bounty.ts, "Hobbled"); absent = DODGE.charges */
+  dodgeMax?: number;
   surgeTimer: number;              // post-dash speed surge remaining (seconds)
   dodgeDirX: number; dodgeDirY: number;
   iframes: number;
@@ -504,6 +506,8 @@ export interface SimState {
    * grand entrance): no player actions, no AI, no damage, no hazard / projectile / wave progress. Absent = never held.
    */
   cinematicUntilTick?: number;
+  /** Daily bounty modifier the run was created with (content bounties.ts, applied by bounty.ts). Absent = none. */
+  bounty?: string | null;
 }
 
 export interface PendingSpawn { kind: string; x: number; y: number; count: Big; summonerId: number | null; objective: boolean; groupId: number; /** population pack and idle state inherited by rare minions */ pack?: number; dormant?: boolean; /** minion scaling (boss reinforcements): unit health and damage multipliers */ hpMul?: string; dmgMul?: string }

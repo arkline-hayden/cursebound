@@ -1,4 +1,5 @@
-import { DODGE, RULES } from '@cursebound/content';
+import { RULES } from '@cursebound/content';
+import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { healPlayer } from './combat';
 import { registerGlobalHooks } from './hooks';
 import { nearestFloor } from './map';
@@ -92,7 +93,7 @@ export function stepPickups(state: SimState, ev: SimEvent[]) {
 
 /** Drop table on an enemy death (combat stream rolls). */
 export function rollDrops(state: SimState, e: EnemyState) {
-  if (e.boss) return;
+  if (e.boss || bountyRules(state).noPickups) return;   // "Barren Halls" bounty: nothing drops
   const tier = e.elite ?? 0;
   const roll = () => nextFloat(state.rng.combat);
   if (tier >= 2) {
@@ -119,7 +120,7 @@ registerGlobalHooks({
   onRoundStart(state) {
     state.pickups = [];
     for (const p of state.players) {
-      p.dodgeCharges = DODGE.charges; p.dodgeCooldown = 0; p.surgeTimer = 0; p.vx = 0; p.vy = 0;
+      p.dodgeCharges = dodgeMaxOf(p); p.dodgeCooldown = 0; p.surgeTimer = 0; p.vx = 0; p.vy = 0;
     }
   },
   onKill(state, _ev, e) {

@@ -16,6 +16,8 @@ import './pickups';   // potions and resource orbs (global hooks)
 import './boons';     // Fate mechanics: boons and banes (global hooks)
 import { settleLoot } from './gear';   // legendary gear: drops, pickup/swap, perks (global hooks; after pickups)
 import { STATE_SCHEMA, stateHash } from './serialize';
+import { applyBounty } from './bounty';
+import { bountyRules } from './bountyRules';
 import { B, ONE, derivePlayer } from './stats';
 import type { Command, Phase, PlayerInput, PlayerState, SimEvent, SimState, SkillRuntime } from './types';
 
@@ -38,6 +40,8 @@ export interface CreateRunParams {
   roster: RosterEntry[];
   tutorial?: boolean;
   deck?: string[];
+  /** daily bounty modifier id (content bounties.ts), applied at creation by bounty.ts; absent/null = none */
+  bounty?: string | null;
 }
 
 function newPlayer(e: RosterEntry): PlayerState {
@@ -106,6 +110,7 @@ export function createRun(params: CreateRunParams): SimState {
     reactions: [], pendingSpawns: [], bossPhaseEvents: [], pickups: [], loot: [], lootFound: [],
   };
   if (params.mode === 'coop') state.phaseDeadlineTick = null;
+  if (params.bounty) applyBounty(state, params.bounty);   // daily bounty modifier (bounty.ts); absent keeps old hashes
   return state;
 }
 
@@ -357,6 +362,7 @@ function enterRoundClear(state: SimState, ev: SimEvent[]) {
   if (state.rounds.length > 500) state.rounds.splice(0, state.rounds.length - 500);   // bounded history (K10); totals are exact in scoreText
   state.lastClear = { round: r, points: award.toString(), cleared: true };
   const points = isBossRound(r) ? RULES.pointsBoss : RULES.pointsOrdinary;
+  const healFactor = bountyRules(state).intermissionHealFactor ?? 1;   // "No Respite" bounty: 0
   for (const p of state.players) {
     p.skillPoints += points;
     p.ready = false;
@@ -364,8 +370,9 @@ function enterRoundClear(state: SimState, ev: SimEvent[]) {
       p.lifeState = 'alive';
       p.hp = p.maxHp.mul(B(RULES.clearReturnHealthFrac));
       p.selfReviveChannel = 0; p.downTimer = 0;
-    } else {
-      p.hp = Big.min(p.maxHp, p.hp.add(p.maxHp.mul(B(RULES.intermissionHealFrac))));
+    } else if (healFactor > 0) {
+      const heal = p.maxHp.mul(B(RULES.intermissionHealFrac));
+      p.hp = Big.min(p.maxHp, p.hp.add(healFactor === 1 ? heal : heal.mulNum(healFactor)));
     }
     p.downsThisRound = 0;
     p.guardTimer = 0; p.dodgeTimer = 0; p.buffs = [];
