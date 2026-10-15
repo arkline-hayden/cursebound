@@ -394,6 +394,21 @@ function slotFrame(t: Trim, deep: RGB = 0x090706) {
   return px;
 }
 
+/** Skill-granting socket overlay: gems set over the four corner rivets of slotFrame. 24px tile, 8px slice, no fill. */
+function socketGems(t: Trim) {
+  const s = 24, px = new Px(s, s);
+  for (const [x, y] of [[5, 5], [s - 5, 5], [5, s - 5], [s - 5, s - 5]]) diamondStud(px, x, y, 3.5, t);
+  return px;
+}
+
+/** Upgrade glyph: an ember up-chevron with a black outline. 9x7. */
+function upChevron() {
+  const rows = ['...#...', '..###..', '.#####.', '###.###', '##...##'];
+  const px = new Px(9, 7);
+  rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === '#') px.p(x + 1, y + 1, y < 2 ? P.em5 : y < 4 ? P.em4 : P.em2); }));
+  return px.outline(P.K, true);
+}
+
 /** Portrait frame (small, no fill). 20px tile, 6px slice. */
 function portraitFrame(t: Trim) {
   const s = 20, px = new Px(s, s);
@@ -1100,6 +1115,11 @@ export function buildSkinAssets(): Record<string, Px> {
   out['--px-keystone-lg'] = keystone(T.bronze, 44);
   out['--px-keystone-lg-ready'] = keystone(emberRim, 44);
   out['--px-keystone-lg-owned'] = keystone(hotGold, 44);
+  // skill-tree node kinds: new skill (arcane gems + plate), upgrade (ember plate + chevron), passive (bronze plate)
+  out['--px-socket-gems'] = socketGems(T.arcane);
+  out['--px-hud-plate-arcane'] = hudPlate(T.arcane);
+  out['--px-hud-plate-ember'] = hudPlate(T.ember);
+  out['--px-up'] = upChevron();
   out['--px-seal'] = sealCross();
   out['--px-lock'] = padlock();
   out['--px-tick'] = tick(true);

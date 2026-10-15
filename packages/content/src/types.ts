@@ -160,9 +160,15 @@ export interface NodeDef {
   excludes?: string[];
   modifiers: NodeModifier[];
   grantsSkill?: string;
+  /**
+   * Display tag for "upgrade" nodes: the skill (granted elsewhere, or the class basic/signature) this node modifies.
+   * Presentation only (the tree marks the socket and names the skill); the effect itself lives in modifiers/mechanics.
+   * The description must start with "Upgrades <skill name>:" (validate.ts).
+   */
+  upgrades?: string;
   starting?: boolean;        // free starting grant (Spark)
   mechanics: string[];       // mechanic tags implemented by the simulation
-  description: string;       // template; {rank} {value} placeholders
+  description: string;       // template; {rank} {value} placeholders. One sentence, ≤ ~90 chars (content.test.ts)
   icon: string;
 }
 
