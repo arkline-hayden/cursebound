@@ -1,9 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { CLASSES, CLASS_BY_ID } from '@cursebound/content';
+import { BOUNTY_BY_ID, CLASSES, CLASS_BY_ID } from '@cursebound/content';
 import { netStore, type GameConnection } from '@/lib/net';
 import { presenceStore } from '@/lib/p2p/presence';
+import { progressStore, refreshProgress } from '@/lib/progress';
+import { authStore } from '@/lib/auth';
+import { cachedProfile } from '@/lib/profile';
+import { useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { ActorPortrait, actorFor } from './ClassPortrait';
 import { ClassPicker } from './ClassPicker';
@@ -18,10 +22,13 @@ export function Lobby({ net }: { net: GameConnection }) {
   const room = useStore(netStore, (s) => s.room);
   const slot = useStore(netStore, (s) => s.slot);
   const online = useStore(presenceStore, (s) => s.conn === 'online');
+  const level = useStore(progressStore, (s) => s.progress?.level ?? null);   // locked classes (progression)
+  useEffect(() => { if (!progressStore.get().progress) void refreshProgress(authStore.get().account?.profileId ?? cachedProfile()?.id ?? null); }, []);
   if (!room) return null;
   const me = room.seats.find((s) => s.you);
   const solo = room.mode === 'solo';
-  const title = solo ? (room.challengeId === 'tutorial' ? 'First Descent' : room.challengeId ? 'The Daily Rite' : 'Descend') : 'The Party Gathers';
+  const title = solo ? (room.challengeId === 'tutorial' ? 'First Descent' : room.challengeId ? 'The Daily Rite' : room.bounty ? 'The Daily Bounty' : 'Descend') : 'The Party Gathers';
+  const bounty = room.bounty ? BOUNTY_BY_ID[room.bounty] : null;
   const ready = room.seats.filter((s) => s.ready).length;
   const myClass = me?.classId ?? CLASSES[0]?.id ?? 'vanguard';
   return (
@@ -36,6 +43,7 @@ export function Lobby({ net }: { net: GameConnection }) {
           <div className="lobby-meta">
             <span className="chip">{room.trust === 'lan' ? 'LAN · local records' : 'Local records'}</span>
             {room.challengeId && <span className="chip gold">{room.challengeId}</span>}
+            {bounty && <span className="chip warn" data-tip={bounty.description}>Bounty · {bounty.name}</span>}
           </div>
           {!solo && (
             <div className="lobby-code">
@@ -50,7 +58,7 @@ export function Lobby({ net }: { net: GameConnection }) {
         <div className="sheet-body lobby-body">
           <section className="lobby-vessel" aria-labelledby="lobby-cls">
             <span className="engraved" id="lobby-cls">{me?.ready ? 'Vessel locked — undo Ready to change' : 'Choose your vessel'}</span>
-            <ClassPicker value={myClass} onChange={(id) => net.lobby({ classId: id })} disabled={!!me?.ready} labelledBy="lobby-cls" idPrefix="lobby-vessel" />
+            <ClassPicker value={myClass} onChange={(id) => net.lobby({ classId: id })} disabled={!!me?.ready} labelledBy="lobby-cls" idPrefix="lobby-vessel" level={level} />
           </section>
 
           <section className="lobby-party" aria-labelledby="lobby-party-h">

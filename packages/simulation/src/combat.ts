@@ -1,6 +1,7 @@
 import { Big, sampleBinomial } from '@cursebound/numeric';
 import { AFFLICTION_RULES, BOSS_BY_ID, ENEMY_BY_ID, RULES, TICK_SEC, type DamageType } from '@cursebound/content';
 import { nextFloat } from './rng';
+import { bountyRules } from './bountyRules';
 import { B, ONE, fateFactor, playerDerived } from './stats';
 import type { Cohort, EnemyState, PlayerState, SimEvent, SimState } from './types';
 import { hooks, type HitMod } from './hooks';
@@ -412,7 +413,7 @@ export function downOrKill(state: SimState, ev: SimEvent[], p: PlayerState, amou
     p.lifeState = 'downed';
     p.downsThisRound++;
     p.stats.downs++;
-    p.downTimer = RULES.downedSec;
+    p.downTimer = RULES.downedSec * (bountyRules(state).downedSecFactor ?? 1);   // "Swift Death" bounty: halved
     p.reviveProgress = 0;
     recordRecap(state, p, amount, o, false);
     ev.push({ t: 'downed', slot: p.slot });

@@ -2,6 +2,7 @@ import { Big } from '@cursebound/numeric';
 import { CLASS_BY_ID, DODGE, RULES, SKILL_BY_ID, TICK_SEC, type SkillDef } from '@cursebound/content';
 import { addStagger, cohortRadius, healPlayer, hitEnemy, shieldPlayer } from './combat';
 import { breakChain } from './afflictions';
+import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { hooks } from './hooks';
 import { dir8, inCone, inLine, isWallAt, moveCircle, norm, q, rayDistance } from './geometry';
 import { nearestFloor } from './map';
@@ -100,8 +101,8 @@ export function dodgeSpeedFor(speed: number, classId: string): number {
 }
 
 /** Shared dodge charge recharge (authority and prediction). `dt` is already scaled by the recovery rate. */
-export function rechargeDodge(p: { dodgeCharges: number; dodgeCooldown: number }, dt: number) {
-  const max = DODGE.charges;
+export function rechargeDodge(p: { dodgeCharges: number; dodgeCooldown: number; dodgeMax?: number }, dt: number) {
+  const max = dodgeMaxOf(p);   // DODGE.charges unless a bounty lowered it
   if (!(p.dodgeCharges >= 0)) p.dodgeCharges = max;            // checkpoints from before dodge charges
   if (p.dodgeCharges >= max) { p.dodgeCharges = max; p.dodgeCooldown = 0; return; }
   p.dodgeCooldown -= dt;
@@ -116,7 +117,7 @@ export function rechargeDodge(p: { dodgeCharges: number; dodgeCooldown: number }
  * starts a dash along the move input (or the aim when standing still). Pressing again mid-dash chains a new dash.
  */
 export function tryStartDodge(
-  p: { dodgeTimer: number; dodgeDirX: number; dodgeDirY: number; dodgeCharges: number; dodgeCooldown: number; surgeTimer: number; guardTimer: number },
+  p: { dodgeTimer: number; dodgeDirX: number; dodgeDirY: number; dodgeCharges: number; dodgeCooldown: number; dodgeMax?: number; surgeTimer: number; guardTimer: number },
   edge: boolean, moveX: number, moveY: number, aimX: number, aimY: number,
 ): boolean {
   if (!edge || p.guardTimer > 0 || !(p.dodgeCharges > 0)) return false;
@@ -124,7 +125,7 @@ export function tryStartDodge(
   if (dx === 0 && dy === 0) { [dx, dy] = norm(aimX, aimY); if (dx === 0 && dy === 0) dx = 1; }
   p.dodgeDirX = dx; p.dodgeDirY = dy;
   p.dodgeTimer = DODGE.durationSec;
-  if (p.dodgeCharges >= DODGE.charges) p.dodgeCooldown = DODGE.cooldownSec;   // recharge clock starts when leaving full
+  if (p.dodgeCharges >= dodgeMaxOf(p)) p.dodgeCooldown = DODGE.cooldownSec;   // recharge clock starts when leaving full
   p.dodgeCharges--;
   p.surgeTimer = 0;
   return true;
@@ -144,6 +145,8 @@ export interface MoveBody {
   x: number; y: number; vx: number; vy: number;
   dodgeTimer: number; dodgeDirX: number; dodgeDirY: number; dodgeCharges: number; dodgeCooldown: number;
   surgeTimer: number; guardTimer: number;
+  /** maximum dodge charges (snapshot dcm); absent = DODGE.charges */
+  dodgeMax?: number;
   /** afflictions (snapshot lk / teth / tk): ticks of movement lock left, chain anchor + radius, chain ticks left */
   lock?: number;
   teth?: [number, number, number] | null;
@@ -652,7 +655,7 @@ export function stepPlayer(state: SimState, ev: SimEvent[], p: PlayerState, inpu
       if ((a.x - p.x) ** 2 + (a.y - p.y) ** 2 > RULES.reviveRange ** 2) continue;
       a.reviverSlot = p.slot;
       a.reviveProgress += DT * pd.reviveSpeed;
-      if (a.reviveProgress >= RULES.reviveChannelSec) {
+      if (a.reviveProgress >= RULES.reviveChannelSec * (bountyRules(state).reviveChannelFactor ?? 1)) {   // "Swift Death" bounty: slower
         revivePlayer(state, ev, a, p.slot);
         p.stats.revives++;
         if ((p.ranks['v_unbroken_rhythm'] ?? 0) > 0) p.dodgeCooldown = 0;

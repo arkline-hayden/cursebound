@@ -4,8 +4,8 @@ import { formatBig, Big } from '@cursebound/numeric';
 import type { Snapshot, SnapEnemy, SnapPlayer, SimEvent } from '@cursebound/simulation';
 import { buildArt, ensureActor } from '../art/generate';
 import { ACTOR_IDS, ACTOR_META, animFor, type ActorId, type ActorState, HERO_ACTOR_IDS } from '../art/actors';
-import { SKILL_FX, HAZARD_FX, HAZARD_LIGHT, PROJECTILE_FX } from '../render/fx';
-import type { FxCtx } from '../render/fx/registry';
+import { SKILL_FX, HAZARD_FX, HAZARD_LIGHT, PROJECTILE_FX, KILL_FX } from '../render/fx';
+import type { FxCtx, ProjectileLook } from '../render/fx/registry';
 import { iso, isoPoly } from '../render/iso';
 import { TELEGRAPH_PALETTES } from '../art/palette';
 import type { AudioEngine, SfxId } from '../audio/AudioEngine';
@@ -60,6 +60,10 @@ const CAM_LIFT = 22;
 /** Kill-streak milestones and their colours (escalating). */
 const STREAKS: [number, number][] = [[5, 0xffd890], [10, 0xffa040], [15, 0xff6a3a], [25, 0xff3a5a], [40, 0xd06aff], [60, 0xffffff]];
 const ELITE_HAZARD_LIGHT: Record<string, number> = { moltenBlast: 0xff7a2a, frostOrb: 0x8fd8ff, plague: 0x6ab03a, thunder: 0xc8e8ff };
+/** Typed hits tint the foe briefly after the white hit flash: shock, poison, frost, scorch, starlight. */
+const ELEM_TINT: Record<string, number> = { storm: 0xc4ecff, decay: 0xc4f08a, frost: 0xd0f4ff, ember: 0xffbe8a, astral: 0xe8c4ff };
+/** Death burst colours per killing damage type (main, hot core). */
+const DEATH_FX: Record<string, [number, number]> = { ember: [0xff7a2a, 0xffe0a0], frost: [0x8fe0ff, 0xffffff], storm: [0x9fd8ff, 0xffffff], decay: [0x8fd14f, 0xe0ffb0], astral: [0xb07aff, 0xf0e0ff] };
 
 interface Launch { t0: number; dur: number; dx: number; dy: number; dist: number; h: number; spin: number; landed: boolean }
 
@@ -108,7 +112,7 @@ export class CombatScene extends Phaser.Scene {
   /** in-world door vote (render/Doors.ts) */
   doorsR: DoorRenderer | null = null;
   private actors = new Map<string, ActorView>();
-  private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number }>();
+  private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number; color: number; look?: ProjectileLook; born: number }>();
   private hazardG!: Phaser.GameObjects.Graphics;
   private teleG!: Phaser.GameObjects.Graphics;
   private fxG!: Phaser.GameObjects.Graphics;
@@ -161,8 +165,12 @@ export class CombatScene extends Phaser.Scene {
   private hoverFx: Phaser.FX.Glow | null = null;
   private hoverSig = '';
   private frameCount = 0;
-  /** last player hit on each enemy (screen direction, crit, one-shot) for corpse launches and gibs */
-  private lastHit = new Map<number, { ux: number; uy: number; crit: boolean; big: boolean; at: number }>();
+  /** last player hit on each enemy (screen direction, crit, one-shot, damage type) for corpse launches, gibs and death bursts */
+  private lastHit = new Map<number, { ux: number; uy: number; crit: boolean; big: boolean; at: number; dtype?: string }>();
+  /** brief elemental tint on a foe after a typed hit (storm shock, decay poison, frost, ember, astral) */
+  private elemTint = new Map<number, { c: number; until: number }>();
+  /** one FxCtx reused for every hazard drawn this frame (no per-hazard allocation in the hot path) */
+  private hazardCtx: FxCtx | null = null;
   private lastDeath = { x: 0, y: 0 };
   private flourishRound = -1;
   private lastDashAt = 0;
@@ -313,7 +321,16 @@ export class CombatScene extends Phaser.Scene {
       bolt: (x0, y0, x1, y1, color) => this.bolt(x0, y0, x1, y1, color),
       mine, reduced: this.settings().reducedEffects, particles: particleBudget(), now: this.time.now,
       actorSprite: (slot) => this.actors.get(`p${slot}`)?.sprite,
+      rank: (slot, node) => netStore.get().phase?.players.find((p) => p.slot === slot)?.ranks[node] ?? 0,
+      cls: (slot) => netStore.get().phase?.players.find((p) => p.slot === slot)?.classId,
     };
+  }
+
+  /** The shared hazard FxCtx, refreshed (clock, settings, budget) rather than rebuilt for every hazard every frame. */
+  private hazardFxCtx(): FxCtx {
+    const c = this.hazardCtx ??= this.fxCtx(false);
+    c.now = this.time.now; c.reduced = this.settings().reducedEffects; c.particles = particleBudget();
+    return c;
   }
 
   /** Hero sprite for a class (falls back to the Vanguard rig until a class has art). */
@@ -382,6 +399,14 @@ export class CombatScene extends Phaser.Scene {
     this.audio.play(id, { pan, priority, dist });
   }
 
+  /** Live elemental hit tint for an enemy id (0 when none or expired; expired entries are dropped). */
+  private elemTintOf(id: number): number {
+    const t = this.elemTint.get(id);
+    if (!t) return 0;
+    if (this.time.now > t.until) { this.elemTint.delete(id); return 0; }
+    return t.c;
+  }
+
   private viewFor(kind: 'enemy' | 'player', id: number): ActorView | undefined {
     if (kind === 'player') return this.actors.get(`p${id}`);
     for (const [k, v] of this.actors) if (k.startsWith(`e${id}:`)) return v;
@@ -420,7 +445,7 @@ export class CombatScene extends Phaser.Scene {
         if (e.targetKind === 'enemy') {
           const v = this.viewFor('enemy', e.target);
           if (v) { v.recoilX = u.x * (e.crit ? 8 : 4); v.recoilY = u.y * (e.crit ? 6 : 3); v.squash = e.crit ? 1 : 0.6; }
-          if (e.sx !== undefined) this.lastHit.set(e.target, { ux: u.x, uy: u.y, crit: e.crit, big: !!e.kill && (v?.lastHp ?? 0) >= 0.85, at: this.time.now });
+          if (e.sx !== undefined) this.lastHit.set(e.target, { ux: u.x, uy: u.y, crit: e.crit, big: !!e.kill && (v?.lastHp ?? 0) >= 0.85, at: this.time.now, dtype: e.dtype });
           const big = e.crit || e.kill;
           const label = `${amount}${e.count ? ` ×${formatBig(Big.fromCompact(e.count))}` : ''}${e.crit ? '!' : ''}`;
           if (e.crit) J.number(x, y - 8, label, '#ffe27a', 'crit');
@@ -428,9 +453,21 @@ export class CombatScene extends Phaser.Scene {
           const kind = v?.kind ?? 'pursuer';
           if (e.dtype === 'physical' || e.dtype === 'storm') J.sparksAt(x, y - 14, e.crit ? 14 : 5, e.dtype === 'storm' ? 0x9fd8ff : 0xffd890);
           if (e.dtype === 'ember') J.embersAt(x, y - 14, e.crit ? 10 : 4);
+          // elemental secondaries: shattering frost, crackling shock, poison bubbles, astral stars (tier-scaled)
+          else if (e.dtype === 'frost') J.bits('ice', x, y - 14, e.crit ? 8 : 3, 0xbfeaff);
+          else if (e.dtype === 'decay') J.bits('bubble', x, y - 12, e.crit ? 5 : 2, 0xa8e070);
+          else if (e.dtype === 'astral') J.bits('star', x, y - 14, e.crit ? 6 : 2, 0xd7a8ff);
+          if (e.dtype === 'storm') J.bits('zap', x, y - 14, e.crit ? 5 : 2, 0xbfe8ff);
+          const et = ELEM_TINT[e.dtype];
+          if (et) this.elemTint.set(e.target, { c: et, until: this.time.now + 220 });
           J.bleed(kind, x, y - 14, e.crit ? 12 : 5, u.x, u.y);
           J.impact(x, y - 14, e.crit ? 0xffdc8a : 0xffffff, e.crit ? 1.6 : 0.8);
-          if (e.crit) this.dungeon.flashLight(x, y - 14, 90, 0xffdc8a, 1.4, 90);
+          if (e.crit) {
+            // crit pop: a hot star snaps open behind the big number
+            J.starburst(x, y - 14, 0xffe27a, 1.3, 190);
+            J.orb(x, y - 14, 0xffb040, 0.6, 170);
+            this.dungeon.flashLight(x, y - 14, 90, 0xffdc8a, 1.4, 90);
+          }
           if (e.src === me) {
             if (big) J.hitStop(e.crit ? 55 : 35);
             else if (e.dtype === 'physical' && this.time.now - this.lastMeleeStop > 140) {
@@ -486,6 +523,15 @@ export class CombatScene extends Phaser.Scene {
       }
       case 'death': this.onDeath(e, me, snap); break;
       case 'spawn': { const { x, y } = this.P(e.x, e.y); J.dust(x, y, 6, 0x2a1e2a); J.ring(x, y, 24, 0x6a3a9a, 260); break; }
+      case 'summon_blink': {
+        // a summon lost its route and returned to its owner (sim follow.ts leash): the spirit dissolves where it was
+        // stuck and reforms at the owner's side
+        const tint = e.kind.startsWith('w_') ? 0x9affc8 : e.kind.startsWith('hx_') ? 0xd7a8ff : 0xd8e8ff;
+        const f = this.P(e.fx, e.fy), t = this.P(e.x, e.y);
+        J.embersAt(f.x, f.y - 12, 8, tint); J.ring(f.x, f.y, 18, tint, 220);
+        J.ring(t.x, t.y, 24, tint, 280); J.embersAt(t.x, t.y - 12, 6, tint); J.dust(t.x, t.y, 3, 0x2a3a2a);
+        break;
+      }
       case 'elite': {
         if (e.fx === 'spawn') this.pendingBanners.push({ id: e.id, tier: e.tier ?? 1, until: this.time.now + 700 });
         const mp = this.mePos(snap);
@@ -520,17 +566,16 @@ export class CombatScene extends Phaser.Scene {
             const s = this.add.sprite(x + u.x * 26, y + u.y * 26, 'fx:slash').setRotation(ang).setDepth(4660).setScale(strong ? 0.9 : 0.6, strong ? 0.7 : 0.45).setBlendMode(Phaser.BlendModes.ADD);
             s.play('fx:slash'); s.once('animationcomplete', () => s.destroy());
           }
-          if (e.slot === me && strong) J.shake(0.003, 70);
         } else if (e.skill === 'v_earthbreaker') {
           J.ring(x, y + 14, iso.rx(2.6), 0xffd890, 320); J.ring(x, y + 14, iso.rx(1.8), 0xffffff, 200);
           J.dust(x, y + 14, 14, 0x6a5a48); J.sparksAt(x, y + 10, 18);
           this.dungeon.flashLight(x, y, 220, 0xffc070, 2.4, 260);
-          J.shake(0.012, 220); if (e.slot === me) J.hitStop(70);
+          if (e.slot === me) J.hitStop(70);
         } else if (e.skill === 'a_astral_nova') {
           J.ring(x, y + 14, iso.rx(3), 0xd7a8ff, 360); J.ring(x, y + 14, iso.rx(2), 0xffffff, 220);
           J.embersAt(x, y, 20, 0xd7a8ff);
           this.dungeon.flashLight(x, y, 260, 0xb07aff, 2.6, 320);
-          J.shake(0.01, 200); if (e.slot === me) J.hitStop(60);
+          if (e.slot === me) J.hitStop(60);
         } else if (e.skill === 'v_rally_cry') { J.ring(x, y + 14, iso.rx(4), 0xffd23f, 500); this.dungeon.flashLight(x, y, 200, 0xffd23f, 1.6, 500); }
         else if (e.skill === 'a_arc_bolt') {
           // arc bolt carries its target point in dx/dy
@@ -546,7 +591,9 @@ export class CombatScene extends Phaser.Scene {
         // every moving skill snaps the local prediction; only the Arcanist rift ('rift' / no style) draws purple rings
         if (e.slot === me) { this.renderSelf.x = e.x; this.renderSelf.y = e.y; this.net.pred.x = e.x; this.net.pred.y = e.y; }
         const f = this.P(e.fx, e.fy), t = this.P(e.x, e.y);
-        if (!e.style || e.style === 'rift') {
+        const riftKit = !e.style || e.style === 'rift' ? SKILL_FX['teleport:rift'] : undefined;
+        if (riftKit) riftKit(this.fxCtx(e.slot === me), { slot: e.slot, skill: 'teleport:rift', x: e.x, y: e.y, dx: e.fx, dy: e.fy });
+        else if (!e.style || e.style === 'rift') {
           J.ring(f.x, f.y, 26, 0xb07aff, 200); J.ring(t.x, t.y, 32, 0xd7a8ff, 260);
           J.embersAt(t.x, t.y - 14, 12, 0xd7a8ff);
         } else {
@@ -621,6 +668,29 @@ export class CombatScene extends Phaser.Scene {
       }
     }
     J.impact(x, y - 12, 0xffffff, boss ? 3 : elite ? 2.2 : 1.4);
+    this.elemTint.delete(e.id);
+    // typed deaths burst in their element: ember flares and scorches, frost shatters, storm crackles, decay bursts in
+    // spores and slime, astral scatters stars (physical keeps the gore above)
+    const dfx = recent && lh!.dtype ? DEATH_FX[lh!.dtype] : undefined;
+    if (dfx) {
+      const big = gib || elite > 0 || boss;
+      const [col, hot] = dfx;
+      J.starburst(x, y - 12, hot, big ? 1.6 : 1, 180);
+      J.orb(x, y - 12, col, big ? 1.1 : 0.7, 240);
+      switch (lh!.dtype) {
+        case 'ember': J.embersAt(x, y - 12, big ? 18 : 9, col); J.dust(x, y - 6, big ? 5 : 2, 0x2a1a10); this.dungeon.addDecal('scorch', x, y + 4, 0x1a1008, big ? 1.4 : 0.8); break;
+        case 'frost': J.bits('ice', x, y - 14, big ? 16 : 8, 0xd8f6ff); J.bits('star', x, y - 14, big ? 5 : 2, 0xffffff); break;
+        case 'storm': J.bits('zap', x, y - 14, big ? 10 : 5, col); J.sparksAt(x, y - 14, big ? 14 : 7, col); break;
+        case 'decay': J.bits('bubble', x, y - 10, big ? 10 : 5, col); J.bits('skull', x, y - 18, big ? 2 : 1, 0xd8f0b0); this.dungeon.addDecal('slime', x, y + 6, 0x3a5a1a, big ? 1.3 : 0.8); break;
+        case 'astral': J.bits('star', x, y - 14, big ? 12 : 6, col); J.bits('rune', x, y - 14, big ? 4 : 2, hot); break;
+      }
+    }
+    // the killer's class flourish (render/fx/<class>.ts registerKillFx), on top of the shared burst
+    if (e.by !== undefined && e.by >= 0) {
+      const ctx = this.fxCtx(e.by === me);
+      const k = KILL_FX[ctx.cls(e.by) ?? ''];
+      if (k) k(ctx, { slot: e.by, kind: e.kind, x: e.x, y: e.y, dtype: recent ? lh!.dtype : undefined, crit: recent && lh!.crit, big: gib, elite, boss });
+    }
     this.dungeon.flashLight(x, y - 10, boss ? 300 : elite ? 200 : 130, elite ? (ELITE_COLOR[elite]?.main ?? gore.color) : gore.color, boss ? 3 : elite ? 2.4 : 1.6, boss ? 600 : elite ? 420 : 220);
     if (elite) {
       const col = ELITE_COLOR[elite]?.main ?? 0xffffff;
@@ -1216,6 +1286,7 @@ export class CombatScene extends Phaser.Scene {
     const flashing = e.flash && this.settings().flashes;
     if (flashing) v.sprite.setTintFill(0xffffff);
     else if (e.st === 'windup') v.sprite.setTint((Math.floor(this.time.now / 70) % 2) ? 0xff9a8a : 0xffffff);   // readable windup blink
+    else if (this.elemTintOf(e.i)) v.sprite.setTint(this.elemTintOf(e.i));   // shock / poison / frost / scorch / starlight after a typed hit
     else if (e.fz) v.sprite.setTint(0x9fe8ff);                 // frozen solid
     else if (e.ch) v.sprite.setTint(0xc4ecff);                 // chilled
     else if (e.burn) v.sprite.setTint(0xffc8a0);
@@ -1306,10 +1377,13 @@ export class CombatScene extends Phaser.Scene {
       const key = look?.key ?? (p.k === 'spark' ? 'fx:spark' : p.k === 'wave' ? 'fx:wave' : p.k === 'orb' ? 'fx:orb' : p.k === 'lob' ? 'fx:lob' : 'fx:shard');
       const color = look?.color ?? (p.k === 'spark' ? 0xff9a3a : p.k === 'wave' ? 0xffd890 : p.k === 'orb' ? 0xb07aff : p.k === 'lob' ? 0x9ae04a : 0xe8e0d0);
       if (!entry) {
-        const spr = this.add.sprite(0, 0, key).setBlendMode(p.o === 0 ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL);
+        // player shots default to additive; a kit can force a solid sprite (arrows, axes) with additive: false
+        const add = look?.additive ?? p.o === 0;
+        const spr = this.add.sprite(0, 0, key).setBlendMode(add ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL);
+        if (look?.tint !== undefined) spr.setTint(look.tint);
         if (this.anims.exists(key)) spr.play(key);
         const glow = gfx().softGlow && this.textures.exists('light:soft') ? this.add.image(0, 0, 'light:soft').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setAlpha(0.35).setScale(p.o === 0 ? 0.18 : 0.14).setDepth(4590) : undefined;
-        entry = { s: spr, glow, last: 0 };
+        entry = { s: spr, glow, last: 0, color, look, born: now };
         this.projectiles.set(p.i, entry);
       }
       let x = p.x + p.vx * Math.min(age, 0.1), y = p.y + p.vy * Math.min(age, 0.1);
@@ -1318,12 +1392,20 @@ export class CombatScene extends Phaser.Scene {
       const q = this.P(x, y);
       const sx = Math.round(q.x), sy = Math.round(q.y - 14 - lift);
       const d = iso.dir(p.vx, p.vy);
-      entry.s.setPosition(sx, sy).setRotation(Math.atan2(d.y, d.x)).setDepth(iso.depth(x, y) + 5).setScale(p.w ? 1.3 : 1);
+      const rot = look?.spin ? ((now - entry.born) / 1000) * look.spin * (Math.PI / 180) : Math.atan2(d.y, d.x);
+      entry.s.setPosition(sx, sy).setRotation(rot).setDepth(iso.depth(x, y) + 5).setScale((p.w ? 1.3 : 1) * (look?.scale ?? 1));
       entry.glow?.setPosition(sx, sy);
-      if (now - entry.last > 45 && !this.juice.low) { entry.last = now; this.juice.embersAt(sx, sy, 1, color); }
+      const trail = look?.trail ?? 'ember';
+      if (trail !== 'none' && now - entry.last > (look?.trailMs ?? 45) && !this.juice.low) {
+        entry.last = now;
+        if (trail === 'ember') this.juice.embersAt(sx, sy, 1, color);
+        else this.juice.bits(trail, sx, sy, 1, color, { angle: (Math.atan2(-d.y, -d.x) * 180) / Math.PI, spread: 50, speed: 0.5 });
+      }
     }
     for (const [id, e] of this.projectiles) if (!seen.has(id)) {
-      this.juice.impact(e.s.x, e.s.y, 0xffffff, 0.6);
+      // where a shot ends: a flash in its own colour, plus the kit's burst when it has one
+      this.juice.impact(e.s.x, e.s.y, e.color, 0.7);
+      if (e.look?.end) e.look.end(this.fxCtx(false), e.s.x, e.s.y);
       e.s.destroy(); e.glow?.destroy(); this.projectiles.delete(id);
     }
   }
@@ -1366,7 +1448,7 @@ export class CombatScene extends Phaser.Scene {
         if (col) this.dungeon.flashLight(x, y, 170, col, 1.6, Math.max(300, (h.u - h.b) * 16));
       }
       const kit = HAZARD_FX[h.k];
-      if (kit) { kit(this.fxCtx(false), g, h, s.tick); continue; }
+      if (kit) { kit(this.hazardFxCtx(), g, h, s.tick); continue; }
       if (this.elites.drawHazard(g, h, s.tick, this.time.now, !fxOn)) continue;
       switch (h.k) {
         case 'fireline': {

@@ -3,6 +3,7 @@ import {
   type Account, type AccountCredentials, type AccountStats, type AccountStore, type FriendEntry, type FriendState, type SavedBuild,
   type SavedBuildInput, type SessionInfo,
 } from '@cursebound/accounts';
+import { randomBytes } from 'node:crypto';
 import type { Row, Sql } from './sql';
 
 // Postgres implementation of the shared AccountStore plus the cloud-only run summaries and boards. Semantics match
@@ -88,6 +89,17 @@ export interface CloudBoardRow {
 }
 
 export const RUN_TRUST = 'client-reported';
+
+/** XP to credit the submitter for a run (progression): base XP, and the bounty id when it may double it. */
+export interface RunCredit { baseXp: number; bountyId: string | null }
+export interface CloudXpAward { xp: number; baseXp: number; bounty: boolean; xpBefore: number; existing: boolean }
+export interface CloudBounty { id: string; modifierId: string; createdAt: number; expiresAt: number }
+
+const BOUNTY_LOCK_KEY = 727_274_002;
+
+function toBounty(r: Row): CloudBounty {
+  return { id: s(r.id), modifierId: s(r.modifier_id), createdAt: n(r.created_at), expiresAt: n(r.expires_at) };
+}
 
 interface Cursor { d: number; s: string; dep: number; at: number; ca: number; pk: number }
 
@@ -459,9 +471,77 @@ export class PgAccountStore implements AccountStore {
    * Record a client-reported run. Idempotent on (host account, run id); a later report of the same run (same id,
    * board and score) from another participant only claims that participant's own slot.
    */
-  async submitRun(submitterId: string, x: RunSubmission): Promise<{ existing: boolean; rank: number | null }> {
+  async submitRun(submitterId: string, x: RunSubmission, credit?: RunCredit): Promise<{ existing: boolean; rank: number | null; award: CloudXpAward | null }> {
     assertStoreId(submitterId, 'accountId');
     return this.sql.tx(async (q) => {
+      // progression: the submitter's own XP for this run, once per (account, run), in the same transaction
+      const award = credit ? await this.creditRun(q, submitterId, x.runId, credit) : null;
+      const r = await this.recordRun(q, submitterId, x);
+      return { ...r, award };
+    });
+  }
+
+  /**
+   * Credit an account's XP for a run (idempotent on account + run). A bounty id doubles the award when this is the
+   * account's first completion of that bounty (bounty_completions); the route has already checked the bounty is valid.
+   */
+  private async creditRun(q: Sql, accountId: string, runId: string, c: RunCredit): Promise<CloudXpAward> {
+    const prior = (await q.query('SELECT xp, base_xp, bounty, xp_before FROM xp_awards WHERE account_id = $1 AND run_id = $2', [accountId, runId])).rows[0];
+    if (prior) return { xp: n(prior.xp), baseXp: n(prior.base_xp), bounty: !!prior.bounty, xpBefore: n(prior.xp_before), existing: true };
+    const acc = (await q.query('SELECT xp FROM accounts WHERE id = $1 FOR UPDATE', [accountId])).rows[0];
+    if (!acc) throw new AccountStoreError('NOT_FOUND', 'account not found');
+    let bounty = false;
+    if (c.bountyId) {
+      bounty = (await q.query('INSERT INTO bounty_completions(bounty_id, account_id, run_id, completed_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING', [c.bountyId, accountId, runId, Date.now()])).rowCount === 1;
+    }
+    const xp = bounty ? c.baseXp * 2 : c.baseXp;
+    const xpBefore = n(acc.xp);
+    await q.query('INSERT INTO xp_awards(account_id, run_id, xp, base_xp, bounty, xp_before, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [accountId, runId, xp, c.baseXp, bounty, xpBefore, Date.now()]);
+    await q.query('UPDATE accounts SET xp = xp + $1 WHERE id = $2', [xp, accountId]);
+    return { xp, baseXp: c.baseXp, bounty, xpBefore, existing: false };
+  }
+
+  /** An account's total XP (progression). */
+  async accountXp(accountId: string): Promise<number> {
+    assertStoreId(accountId, 'accountId');
+    const r = (await this.sql.query('SELECT xp FROM accounts WHERE id = $1', [accountId])).rows[0];
+    if (!r) throw new AccountStoreError('NOT_FOUND', 'account not found');
+    return n(r.xp);
+  }
+
+  // ---------------------------------------------------------------- daily bounty
+  /**
+   * The current daily bounty; when there is none or the latest is at least `periodMs` old, inserts a new one with the
+   * first of `candidates` that differs from the previous modifier. A transaction-scoped advisory lock serializes every
+   * check (the polled job and lazy reads, on any instance), so two checks can never both roll.
+   */
+  async ensureBounty(o: { now: number; periodMs: number; candidates: string[] }): Promise<{ bounty: CloudBounty; rolled: boolean }> {
+    return this.sql.tx(async (q) => {
+      await q.query('SELECT pg_advisory_xact_lock($1)', [BOUNTY_LOCK_KEY]);
+      const last = (await q.query('SELECT id, modifier_id, created_at, expires_at FROM daily_bounties ORDER BY created_at DESC, id DESC LIMIT 1')).rows[0];
+      if (last && o.now - n(last.created_at) < o.periodMs) return { bounty: toBounty(last), rolled: false };
+      const prev = last ? s(last.modifier_id) : null;
+      const modifierId = o.candidates.find((c) => c !== prev);
+      if (!modifierId) throw new AccountStoreError('INVALID_INPUT', 'no candidate differs from the previous bounty');
+      const b: CloudBounty = { id: `bty_${o.now.toString(36)}_${randomBytes(4).toString('hex')}`, modifierId, createdAt: o.now, expiresAt: o.now + o.periodMs };
+      await q.query('INSERT INTO daily_bounties(id, modifier_id, created_at, expires_at) VALUES ($1, $2, $3, $4)', [b.id, b.modifierId, b.createdAt, b.expiresAt]);
+      return { bounty: b, rolled: true };
+    });
+  }
+
+  async getBounty(id: string): Promise<CloudBounty | null> {
+    if (!ID_RE.test(id)) return null;
+    const r = (await this.sql.query('SELECT id, modifier_id, created_at, expires_at FROM daily_bounties WHERE id = $1', [id])).rows[0];
+    return r ? toBounty(r) : null;
+  }
+
+  async bountyCompleted(bountyId: string, accountId: string): Promise<boolean> {
+    return (await this.sql.query('SELECT 1 FROM bounty_completions WHERE bounty_id = $1 AND account_id = $2', [bountyId, accountId])).rows.length > 0;
+  }
+
+  /** submitRun's original body: insert or join the run summary and rank it. */
+  private async recordRun(q: Sql, submitterId: string, x: RunSubmission): Promise<{ existing: boolean; rank: number | null }> {
+    {
       const mySlot = x.participants.findIndex((p) => p.accountId === submitterId);
       let row = (await q.query(
         'SELECT pk, practice, score_digits, score_text, depth, active_ticks, created_at FROM runs WHERE run_id = $1 AND board_key = $2 AND score_text = $3 ORDER BY pk LIMIT 1 FOR UPDATE',
@@ -496,7 +576,7 @@ export class PgAccountStore implements AccountStore {
         [x.boardKey, n(row.score_digits), s(row.score_text), n(row.depth), n(row.active_ticks), n(row.created_at), n(row.pk)],
       );
       return { existing, rank: n(before.rows[0]!.c) + 1 };
-    });
+    }
   }
 
   /** The stored summary and slot of a run the account took part in (for /builds/from-run by run id). */

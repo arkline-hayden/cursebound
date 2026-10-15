@@ -6,10 +6,11 @@ import { botCommands, botInput, createRun, killEnemy, step, type SimEvent, type 
 
 export const CLASS_IDS = CLASSES.map((c) => c.id);
 
-export function newRun(classes: string[], seed: string): SimState {
+/** A seeded bot run; `bounty` applies a daily bounty modifier (content bounties.ts). */
+export function newRun(classes: string[], seed: string, bounty: string | null = null): SimState {
   return createRun({
     runId: 'bal_' + seed.replace(/[^A-Za-z0-9]/g, '').slice(0, 24), seed, mode: classes.length > 1 ? 'coop' : 'solo', trust: 'local', contentHash: contentHash(),
-    roster: classes.map((c, i) => ({ slot: i, profileId: 'p' + i, name: 'P' + i, classId: c })),
+    roster: classes.map((c, i) => ({ slot: i, profileId: 'p' + i, name: 'P' + i, classId: c })), bounty,
   });
 }
 
