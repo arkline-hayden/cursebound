@@ -1271,3 +1271,10 @@ textarea.input:focus-visible { outline: 2px dashed var(--ember-hi); outline-offs
 .spectral-halo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); z-index: -1; pointer-events: none; image-rendering: pixelated; }
 .title-root .menu-tagline { color: #bfeef8; text-shadow: 2px 2px 0 #0c1028, 0 0 0 transparent; }
 .title-root .press-start { color: #e6fbff; text-shadow: 4px 4px 0 #0c1028, 6px 6px 0 #2a3f86; }
+
+/* ---------- spectate bar (fallen for the round: watch a standing teammate) ---------- */
+.spectate-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--sp-1) var(--sp-2); margin-bottom: var(--sp-2); }
+.spectate-label { font-family: var(--font-label); font-size: var(--fs-small); line-height: var(--lh-small); text-transform: uppercase; color: var(--bad); text-shadow: var(--shadow-hard); }
+.spectate-row { display: flex; align-items: center; gap: var(--sp-2); }
+.spectate-who { display: inline-flex; align-items: center; gap: var(--sp-1); min-width: 180px; justify-content: center; }
+.spectate-who b { font-family: var(--font-gothic); font-weight: normal; font-size: var(--fs-goth-sm); color: var(--gold-hi); text-shadow: var(--shadow-hard); }

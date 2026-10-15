@@ -11,6 +11,7 @@ import { ActorPortrait, actorFor } from './ClassPortrait';
 import { Orb } from './Orb';
 import { orbLabelColor, orbPalette } from './orbArt';
 import { GearBar } from './GearBar';
+import { SpectateBar } from './Spectate';
 import { StatusIcon, sortStatuses, statusDef } from './icons/statusIcons';
 import { useCinematic } from './cinematic';
 
@@ -229,7 +230,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
 
       <div className="hud-center" aria-hidden="true">
         {me.life === 'downed' && <div className="hud-msg downed">{me.self > 0 ? `Rising… ${me.self.toFixed(1)}s` : `Downed — ${me.down.toFixed(1)}s`}</div>}
-        {me.life === 'dead' && <div className="hud-msg dead">Fallen until the round is won</div>}
+        {me.life === 'dead' && <SpectateBar />}
         <ClassMeter kv={me.kv} />
         {/* the equipped-gear row (GearBar) stacks here, above the action bar */}
         <GearBar />

@@ -29,6 +29,8 @@ import { cinematicHeld, movesIn, netStore, type GameConnection } from '@/lib/net
 import { settingsStore } from '@/lib/settings';
 import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 import { gfx, particleBudget, reportSlowFrames } from '../gfx';
+import { spectateStore } from '@/ui/Spectate';
+import { spectateTarget } from '../spectate';
 
 // Combat presentation (PRD §15, §16, §18): renders authoritative snapshots in a lit isometric dungeon, predicts the
 // local avatar, interpolates remote entities, draws shape-coded telegraphs that survive reduced effects, and layers
@@ -748,6 +750,8 @@ export class CombatScene extends Phaser.Scene {
     const { a, b, t } = ip;
     const me = netStore.get().slot;
     const seen = new Set<string>();
+    /** where each hero is drawn this frame (the spectate camera follows a teammate's) */
+    const drawnAt = new Map<number, { x: number; y: number }>();
     for (const pb of b.players) {
       const pa = a.players.find((x) => x.s === pb.s) ?? pb;
       let x = pa.x + (pb.x - pa.x) * t, y = pa.y + (pb.y - pa.y) * t;
@@ -772,8 +776,13 @@ export class CombatScene extends Phaser.Scene {
       }
       const key = `p${pb.s}`;
       seen.add(key);
+      drawnAt.set(pb.s, { x, y });
       this.drawPlayer(key, pb.s === me ? latest.players[me] : pb, x, y, pb.s === me, delta);
     }
+    // fallen for the round: the camera follows the teammate chosen in the spectate bar (ui/Spectate.tsx)
+    const watched = spectateTarget(latest.players, me, spectateStore.get().slot);
+    const wp = watched === null ? undefined : drawnAt.get(watched);
+    if (wp) this.camTarget = { x: wp.x, y: wp.y };
     for (const eb of b.enemies) {
       const ea = a.enemies.find((x) => x.i === eb.i && x.g === eb.g) ?? eb;
       const x = ea.x + (eb.x - ea.x) * t, y = ea.y + (eb.y - ea.y) * t;

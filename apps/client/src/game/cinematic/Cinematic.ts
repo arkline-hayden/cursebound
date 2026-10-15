@@ -501,7 +501,8 @@ export class CinematicDirector {
         J.ring(fq.x, fq.y, iso.rx(1.6), glow, 520);
         J.embersAt(oq.x, oq.y - 30, 18, glow);
         this.flash(oq.x, oq.y - 30, 280, glow, 3, 500);
-        // (the door renderer, render/Doors.ts, plays the door_open sound itself)
+        // (the door renderer, render/Doors.ts, plays the door_open grind itself); the rift tears open behind it
+        this.host.sfx('portal_open', inside.x, inside.y, 2);
       },
     });
     // the 'portal' cue's accent (0.9 s) lands as the first hero dissolves into the light

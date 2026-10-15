@@ -27,6 +27,7 @@ import { Minimap } from '@/ui/Minimap';
 import { CinematicOverlay } from '@/ui/CinematicOverlay';
 import type { AudioEngine } from '@/game/audio/AudioEngine';
 import { computeIntensity } from '@/game/audio/music';
+import { sharedAudio } from '@/game/audio/shared';
 
 const GameCanvas = dynamic(() => import('@/game/GameCanvas'), { ssr: false });
 
@@ -78,23 +79,12 @@ export default function Play() {
     });
   }, [room, hosting, phase?.round, phase?.map?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // audio engine: created lazily, unlocked by the first explicit gesture (browser autoplay policy)
+  // audio: the app-wide engine (game/audio/shared.ts), so the title song carries into the lobby and fades into the
+  // loadout song; it unlocks on the first gesture. Leaving the game stops the dungeon music, not the engine.
   useEffect(() => {
-    let disposed = false;
-    const unlock = async () => {
-      if (audioRef.current) return;
-      try {
-        const { AudioEngine } = await import('@/game/audio/AudioEngine');
-        if (disposed) return;
-        const eng = new AudioEngine((text) => { if (settingsStore.get().s.captions) netStore.get() && window.dispatchEvent(new CustomEvent('cursebound:caption', { detail: text })); });
-        await eng.unlock();
-        audioRef.current = eng;
-        setAudio(eng);
-      } catch { /* audio is optional */ }
-    };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => { disposed = true; window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); audioRef.current?.dispose(); };
+    let live = true;
+    void sharedAudio().then((eng) => { if (live && eng) { audioRef.current = eng; setAudio(eng); } });
+    return () => { live = false; const eng = audioRef.current; eng?.setMusic(null); eng?.setBoss(null); eng?.setSong(null); };
   }, []);
   useEffect(() => { audio?.setVolumes(settings.volumes); }, [audio, settings.volumes]);
   // music (AUDIO): theme + boss + track per phase; the in-world door walk and intermissions keep the floor's song calm
@@ -103,6 +93,16 @@ export default function Play() {
     if (phase?.map?.theme) audio.setTheme(phase.map.theme);
     audio.setBoss(phase?.bossId ?? null);
     const ph = phase?.phase;
+    // recorded theme songs: the lobby keeps the title song; loadout, skill picks and the door walk share the loadout
+    // song; boss rounds play the boss song; the end of a run plays the results song; ordinary combat stays synthesized
+    const bossRound = !!phase && (!!phase.bossId || phase.round % 5 === 0);
+    audio.setSong(
+      !room || room.stage === 'LOBBY' || !phase ? 'title'
+        : ph === 'LOADOUT_LOCK' || ph === 'ROUND_CLEAR' || ph === 'SKILL_ALLOCATION' || ph === 'FATE_OFFER' || ph === 'VOTING' || ph === 'FATE_COMMIT' || ph === 'SAFE_CHECKPOINT' ? 'loadout'
+        : (ph === 'COMBAT' || ph === 'ROUND_SETUP') && bossRound ? 'boss'
+        : ph === 'PARTY_WIPE' || ph === 'RETIRE_REQUEST' || ph === 'RESULTS' || ph === 'FINALIZE' ? 'results'
+        : null,
+    );
     if (!room || room.stage === 'LOBBY' || !phase || ph === 'LOADOUT_LOCK') audio.setMusic('menu');
     else if (ph === 'COMBAT' || ph === 'ROUND_SETUP') audio.setMusic(phase.bossId || phase.round % 5 === 0 ? 'boss' : 'combat');
     else if (ph === 'ROUND_CLEAR' || ph === 'SKILL_ALLOCATION' || ph === 'FATE_OFFER' || ph === 'VOTING' || ph === 'FATE_COMMIT' || ph === 'SAFE_CHECKPOINT') audio.setMusic('explore');

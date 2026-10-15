@@ -65,6 +65,7 @@ export type SfxId =
   | 'door_hum'
   | 'door_open'
   | 'door_choose'
+  | 'portal_open'
   | 'portal_enter'
   // cutscenes (CINEMA)
   | 'cine_whoosh'
@@ -174,6 +175,7 @@ export const SFX_IDS: readonly SfxId[] = [
   'door_hum',
   'door_open',
   'door_choose',
+  'portal_open',
   'portal_enter',
   'cine_whoosh',
   'title_boom',
@@ -221,6 +223,7 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   silenced: '[silenced]',
   door_appear: '[doors rise]',
   door_open: '[door groans open]',
+  portal_open: '[a portal tears open]',
   door_choose: '[door chosen]',
   portal_enter: '[portal swallows]',
   title_boom: '[deep boom]',

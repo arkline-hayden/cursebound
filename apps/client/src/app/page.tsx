@@ -18,6 +18,7 @@ import { ClassPicker } from '@/ui/ClassPicker';
 import { EmberField } from '@/ui/EmberField';
 import { FireTitle } from '@/ui/FireTitle';
 import { SpectralHalo } from '@/ui/SpectralHalo';
+import { sharedAudio } from '@/game/audio/shared';
 import { FriendsPanel, InviteToasts } from '@/ui/Friends';
 import { ClassEmblem } from '@/ui/icons';
 
@@ -107,6 +108,8 @@ export default function Home() {
     try { if (sessionStorage.getItem(STAGE_KEY)) setStage('menu'); } catch { /* ignore */ }
     try { const v = localStorage.getItem(VESSEL_KEY); if (v && CLASS_BY_ID[v]) setClassId(v); } catch { /* ignore */ }
     initSettings();
+    // the title theme (starts on the first key/click: "press any key" doubles as the browser's audio unlock)
+    void sharedAudio().then((eng) => { eng?.setMusic(null); eng?.setSong('title'); });
     // back on the title screen means out of any party this tab hosted; friends see us in the menu
     stopHostBridge();
     startPresence();

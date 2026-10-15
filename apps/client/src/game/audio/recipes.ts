@@ -364,12 +364,35 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
     case 'door_hum':
       for (const [f, a] of [[110, 0.05], [111, 0.04], [165, 0.025], [220.5, 0.015]] as [number, number][]) s.tone(o, t, { f, dur: 1.2, gain: a, attack: 0.4 });
       return s.noiseHit(o, t + 0.2, { dur: 1, type: 'highpass', f: 5000, gain: 0.01, attack: 0.4 });
-    case 'door_open':
-      s.tone(o, t, { type: 'sawtooth', f: 80, f2: 58, dur: 1.1, gain: 0.07, filter: 450, q: 10, glide: 1, attack: 0.15 });
-      s.noiseHit(o, t, { dur: 1.0, f: 300, f2: 700, q: 2.5, gain: 0.08, attack: 0.3, brown: true });
-      s.drum('taiko', o, t + 1.05, 0.8);
-      s.noiseHit(o, t + 1.0, { dur: 0.8, f: 400, f2: 2000, q: 1, gain: 0.06, attack: 0.2 });
-      return 1.9;
+    case 'door_open': {
+      // a heavy dungeon door: the iron latch clunks and its chain goes slack...
+      s.crunchHit(o, t, { dur: 0.08, type: 'lowpass', f: 1800, gain: 0.25, drive: 3 });
+      s.tone(o, t, { f: 90, f2: 48, dur: 0.18, gain: 0.35 });
+      for (let k = 0; k < 5; k++) s.click('chain', o, t + 0.05 + k * 0.05 + r() * 0.02, 0.6);
+      // ...the slab grinds over stone (a sweeping band of brown noise with the scrape stuttering through it)...
+      s.noiseHit(o, t + 0.15, { dur: 1.5, f: 180, f2: 520, q: 3, gain: 0.22, attack: 0.25, brown: true });
+      for (let k = 0; k < 14; k++) s.noiseHit(o, t + 0.2 + k * 0.095 + r() * 0.03, { dur: 0.07, f: 300 + r() * 300, q: 4, gain: 0.07 + r() * 0.04, brown: true });
+      // ...the hinges groan...
+      s.tone(o, t + 0.2, { type: 'sawtooth', f: 210, f2: 140, dur: 1.2, gain: 0.08, filter: 900, q: 14, glide: 1.1, attack: 0.1 });
+      s.tone(o, t + 0.25, { type: 'sawtooth', f: 85, f2: 60, dur: 1.3, gain: 0.1, filter: 400, q: 8, glide: 1.2, attack: 0.15 });
+      // ...and it bangs fully open while the magic behind it breathes out
+      s.drum('taiko', o, t + 1.7, 1);
+      s.tone(o, t + 1.7, { f: 55, f2: 32, dur: 0.6, gain: 0.45 });
+      s.noiseHit(o, t + 1.65, { dur: 1.0, f: 600, f2: 3000, q: 0.8, gain: 0.1, attack: 0.15 });
+      return 2.8;
+    }
+    case 'portal_open': {
+      // a rift tears open: a sub swell under two rising swirls, a shimmer climbing the key, a crack of release,
+      // then a low beating hum settles in
+      s.tone(o, t, { f: 40, f2: 70, dur: 1.4, gain: 0.35, attack: 0.6, glide: 1.3 });
+      s.noiseHit(o, t, { dur: 1.3, f: 250, f2: 3200, q: 2.5, gain: 0.16, attack: 0.9 });
+      s.noiseHit(o, t + 0.1, { dur: 1.2, f: 400, f2: 5200, q: 4, gain: 0.08, attack: 0.8 });
+      [0, 7, 12, 19, 24, 31].forEach((d, k) => s.tone(o, t + 0.2 + k * 0.12, { type: 'triangle', f: mtof(key + 24 + d), dur: 0.9, gain: 0.03, attack: 0.02 }));
+      s.crunchHit(o, t + 1.25, { dur: 0.2, type: 'lowpass', f: 1500, gain: 0.2, drive: 2 });
+      s.bigBell(o, t + 1.25, mtof(key - 12), 2.4, 0.08);
+      for (const [f, a] of [[mtof(key - 24), 0.08], [mtof(key - 24) * 1.005, 0.06], [mtof(key - 12), 0.03]] as [number, number][]) s.tone(o, t + 1.3, { f, dur: 1.6, gain: a, attack: 0.3 });
+      return 3.0;
+    }
     case 'door_choose':
       s.bigBell(o, t, mtof(key), 2.2, 0.12);
       [12, 19, 24].forEach((d, k) => s.bell(o, t + 0.08 + k * 0.08, mtof(key + 12 + d), 1.2, 0.05, 1.2));

@@ -1,6 +1,7 @@
 /**
- * CURSEBOUND audio: every sound is synthesized with WebAudio (oscillators, noise buffers, filters, envelopes).
- * No audio files. Safe to import during SSR: nothing touches `window` until unlock().
+ * CURSEBOUND audio: sound effects, ambience and the in-dungeon music are synthesized with WebAudio (oscillators,
+ * noise buffers, filters, envelopes). The four theme SONGS (title, loadout, boss, results) are recorded tracks streamed
+ * from /audio/*.mp3 (setSong). Safe to import during SSR: nothing touches `window` until unlock().
  *
  * Mixer:  music -> duck -> master        (songs + their post-fader reverb send)
  *         stingers -> master             (follow the music volume, never ducked)
@@ -11,6 +12,9 @@
  *
  * Music:     setMusic(track) + setTheme(theme) + setBoss(id): per-theme adaptive songs whose stems cross-fade by
  *            intensity (setIntensity, smoothed with hysteresis). See music.ts / MusicDirector.ts.
+ * Songs:     setSong('title' | 'loadout' | 'boss' | 'results' | null): a recorded track streamed through the music
+ *            duck stage (stingers still dip it) and the music fader; while one plays the synthesized music rests,
+ *            and songs cross-fade into each other and back into the synthesized music.
  * Stingers:  stinger(kind) plays a composed cue in the current key and ducks the music (stingers.ts).
  * Ambience:  one bed per theme (ambience.ts), cross-faded on theme change, softened as combat heats up.
  * SFX:       play(id, { pan, dist, priority, volume }); recipes.ts. Random pitch/filter per voice, distance
@@ -33,6 +37,20 @@ export type { SfxId, MixGroup, MusicTrack, AudioTheme, StingerKind } from './sfx
 export { computeIntensity } from './music';
 export { getAudio } from './bus';
 
+/** Recorded theme songs (apps/client/public/audio). */
+export type SongId = 'title' | 'loadout' | 'boss' | 'results';
+const SONG_URL: Record<SongId, string> = {
+  title: '/audio/song-title.mp3',
+  loadout: '/audio/song-loadout.mp3',
+  boss: '/audio/song-boss.mp3',
+  results: '/audio/song-results.mp3',
+};
+/** songs are mastered hot next to the synthesized score; trim so the music fader means the same for both */
+const SONG_TRIM = 0.62;
+const SONG_FADE = 1.6;
+
+interface SongVoice { el: HTMLAudioElement; src: MediaElementAudioSourceNode; gain: GainNode; stopTimer: ReturnType<typeof setTimeout> | null }
+
 const UI_SFX = new Set<SfxId>(['ui_click', 'ui_hover', 'ui_confirm', 'ui_error', 'vote_cast', 'vote_lock', 'fate_commit', 'level_up', 'move_click', 'minimap_ping']);
 
 const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
@@ -45,7 +63,7 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   legendary_drop: 9, legendary_equip: 7, potion_glug: 5, chest_open: 5, minimap_ping: 3,
   chain_throw: 3, chain_bind: 5, chain_break: 5, freeze_build: 3, freeze: 6, ice_shatter: 5, poison_spit: 2, poisoned: 4,
   blind_burst: 6, web_spit: 2, rooted: 5, silenced: 6,
-  door_appear: 6, door_hum: 2, door_open: 7, door_choose: 7, portal_enter: 8,
+  door_appear: 6, door_hum: 2, door_open: 7, door_choose: 7, portal_open: 8, portal_enter: 8,
   cine_whoosh: 7, title_boom: 9, round_start: 8, boss_rumble: 8, boss_emerge: 9, boss_roar: 9, stag_cry: 9, bell_toll: 8,
 };
 
@@ -84,6 +102,9 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private groups: Partial<Record<MixGroup, GainNode>> = {};
   private musicDuck: GainNode | null = null;
+  private songBus: GainNode | null = null;
+  private songs = new Map<SongId, SongVoice>();
+  private song: SongId | null = null;
   private ambLevel: GainNode | null = null;
   private ambDuck: GainNode | null = null;
   private stingerBus: GainNode | null = null;
@@ -154,6 +175,7 @@ export class AudioEngine {
       this.timer = setInterval(() => this.tick(), 40);
     }
     // music requested before the gesture starts now
+    this.refreshSongs();
     this.refreshMusic();
   }
 
@@ -185,6 +207,8 @@ export class AudioEngine {
     this.musicDuck = gain();
     this.groups.music!.connect(this.musicDuck);
     this.musicDuck.connect(master);
+    this.songBus = gain();
+    this.songBus.connect(this.musicDuck);
     this.groups.combat!.connect(master);
     this.groups.ui!.connect(master);
     this.ambLevel = gain();
@@ -235,6 +259,7 @@ export class AudioEngine {
     const sq = (x: number): number => x * x;
     set(this.master, sq(this.vol.master));
     set(this.groups.music, sq(this.vol.music * 0.55));
+    set(this.songBus, sq(this.vol.music * SONG_TRIM));
     set(this.musicRev, sq(this.vol.music * 0.55));
     set(this.stingerBus, sq(this.vol.music * 1.1));
     set(this.groups.combat, sq(this.vol.combat));
@@ -350,6 +375,53 @@ export class AudioEngine {
 
   // ------------------------------------------------------------------ music API
 
+  /** Current recorded song, if one is playing (or requested before unlock). */
+  get currentSong(): SongId | null {
+    return this.song;
+  }
+
+  /**
+   * Play a recorded theme song (looping), cross-fading from whatever plays now; null returns to the synthesized
+   * music. Requested before unlock(), it starts on unlock.
+   */
+  setSong(id: SongId | null): void {
+    if (id === this.song) return;
+    this.song = id;
+    this.refreshSongs();
+    this.refreshMusic();
+  }
+
+  private refreshSongs(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.songBus || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    for (const [id, v] of this.songs) {
+      if (id === this.song) continue;
+      // fade out, then pause and rewind so the song starts from the top next time
+      v.gain.gain.cancelScheduledValues(now);
+      v.gain.gain.setTargetAtTime(0, now, SONG_FADE / 4);
+      if (!v.stopTimer) v.stopTimer = setTimeout(() => { v.el.pause(); v.el.currentTime = 0; v.stopTimer = null; }, SONG_FADE * 1000 + 400);
+    }
+    if (!this.song) return;
+    let v = this.songs.get(this.song);
+    if (!v) {
+      const el = new Audio(SONG_URL[this.song]);
+      el.loop = true;
+      el.preload = 'auto';
+      const src = ctx.createMediaElementSource(el);
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      src.connect(gain);
+      gain.connect(this.songBus);
+      v = { el, src, gain, stopTimer: null };
+      this.songs.set(this.song, v);
+    }
+    if (v.stopTimer) { clearTimeout(v.stopTimer); v.stopTimer = null; }
+    v.gain.gain.cancelScheduledValues(now);
+    v.gain.gain.setTargetAtTime(1, now, SONG_FADE / 4);
+    if (v.el.paused) void v.el.play().catch(() => { /* blocked until a gesture; unlock() retries */ });
+  }
+
   /** Select the music track; 'combat' / 'explore' play the current theme's song, 'boss' the current boss's. */
   setMusic(track: MusicTrack | null): void {
     if (track === this.track) return;
@@ -428,7 +500,8 @@ export class AudioEngine {
     const ctx = this.ctx;
     if (!ctx || !this.director || !this.synth || !this.groups.ambience || !this.ambRev) return;
     const now = ctx.currentTime;
-    const spec = this.track === null ? null : this.keySpec();
+    // a recorded song replaces the synthesized score while it plays; the ambience bed keeps going
+    const spec = this.track === null || this.song ? null : this.keySpec();
     const prev = this.director.currentId;
     if (spec && spec.id !== prev && spec.minIntensity !== undefined) this.follower.reset(Math.max(this.follower.value, 0.5));
     this.director.play(spec, now, spec && prev && prev.startsWith('boss:') !== spec.id.startsWith('boss:') ? 1.8 : 2.5);
@@ -471,6 +544,9 @@ export class AudioEngine {
       this.director?.stopAll(ctx.currentTime);
       this.bed?.stop(ctx.currentTime, 0.2);
     }
+    for (const v of this.songs.values()) { if (v.stopTimer) clearTimeout(v.stopTimer); v.el.pause(); }
+    this.songs.clear();
+    this.songBus = null;
     this.director = null;
     this.bed = null;
     this.synth = null;
