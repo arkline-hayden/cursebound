@@ -34,7 +34,11 @@ export type ActorId =
   | 'gaoler'
   | 'rimewraith'
   | 'gloomshade'
-  | 'webweaver';
+  | 'webweaver'
+  // theme foes (content 1.5; draw/themeFoes.ts): sky island, dead moon, server room
+  | 'harpy' | 'galewisp' | 'stormhawk' | 'cloudgolem'
+  | 'mooncrawler' | 'moonleaper' | 'lunarsentry' | 'voidshambler'
+  | 'maintdrone' | 'firewall' | 'glitchwraith' | 'malware';
 
 export type ActorState = 'idle' | 'run' | 'attack' | 'cast' | 'dodge' | 'hit' | 'downed' | 'revive' | 'death' | 'windup' | 'stagger';
 
@@ -67,6 +71,10 @@ export const ACTOR_IDS: readonly ActorId[] = [
   'rimewraith',
   'gloomshade',
   'webweaver',
+  // theme foes (content 1.5)
+  'harpy', 'galewisp', 'stormhawk', 'cloudgolem',
+  'mooncrawler', 'moonleaper', 'lunarsentry', 'voidshambler',
+  'maintdrone', 'firewall', 'glitchwraith', 'malware',
 ];
 
 export interface StateSpec {
@@ -217,6 +225,19 @@ const SPECS: Record<ActorId, ActorSpec> = {
   rimewraith: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 9, dirs: ENEMY_DIRS, states: ENEMY_STATES },
   gloomshade: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 8, dirs: ENEMY_DIRS, states: ENEMY_STATES },
   webweaver: { frameW: 48, frameH: 48, originX: 0.5, originY: 41 / 48, shadowRadius: 14, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  // theme foes (content 1.5): the standard foe rig and frame set; heavies take the Gaoler's slower gait
+  harpy: { frameW: 48, frameH: 48, originX: 0.5, originY: 41 / 48, shadowRadius: 9, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  galewisp: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 8, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  stormhawk: { frameW: 48, frameH: 48, originX: 0.5, originY: 41 / 48, shadowRadius: 8, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  cloudgolem: { frameW: 72, frameH: 72, originX: 0.5, originY: 64 / 72, shadowRadius: 18, dirs: ENEMY_DIRS, states: GAOLER_STATES },
+  mooncrawler: { frameW: 40, frameH: 40, originX: 0.5, originY: 34 / 40, shadowRadius: 7, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  moonleaper: { frameW: 48, frameH: 48, originX: 0.5, originY: 41 / 48, shadowRadius: 10, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  lunarsentry: { frameW: 48, frameH: 48, originX: 0.5, originY: 41 / 48, shadowRadius: 10, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  voidshambler: { frameW: 56, frameH: 56, originX: 0.5, originY: 49 / 56, shadowRadius: 12, dirs: ENEMY_DIRS, states: GAOLER_STATES },
+  maintdrone: { frameW: 40, frameH: 40, originX: 0.5, originY: 34 / 40, shadowRadius: 7, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  firewall: { frameW: 56, frameH: 56, originX: 0.5, originY: 49 / 56, shadowRadius: 14, dirs: ENEMY_DIRS, states: GAOLER_STATES },
+  glitchwraith: { frameW: 48, frameH: 48, originX: 0.5, originY: 42 / 48, shadowRadius: 8, dirs: ENEMY_DIRS, states: ENEMY_STATES },
+  malware: { frameW: 40, frameH: 40, originX: 0.5, originY: 34 / 40, shadowRadius: 9, dirs: ENEMY_DIRS, states: ENEMY_STATES },
 };
 
 export const ACTOR_META: Record<

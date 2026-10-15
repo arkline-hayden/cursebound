@@ -44,7 +44,7 @@ const THEME_TINT: Record<string, { f0: string; f1: string; edge: string }> = {
 };
 const tintOf = (theme: string | undefined) => THEME_TINT[theme ?? ''] ?? THEME_TINT.catacombs;
 
-const ENEMY = { normal: '#ff4436', champion: '#5fb0ff', rare: '#b47aff', boss: '#d58cff' };
+const ENEMY = { normal: '#ff4436', champion: '#5fb0ff', rare: '#b47aff', boss: '#d58cff', /* named mini-boss (ThemeFoeFx) */ miniboss: '#ff9a3c' };
 
 const hexRgb = (hex: string): [number, number, number] => {
   const v = parseInt(hex.replace('#', ''), 16);
@@ -134,6 +134,8 @@ function rasterise(map: MapInfo, k: number): HTMLCanvasElement {
 
 /** Tiny pixel sprites: each character is a palette key, '.' transparent. */
 const SKULL = ['..ppppp..', '.pooooop.', 'po#####op', 'po#o#o#op', 'po#####op', '.po###op.', '.po#h#op.', '..poooo..', '...ppp...'];
+/** named mini-boss marker: a little crown */
+const CROWN = ['p..p..p', 'pp.p.pp', 'ppppppp', 'phpphpp', 'ppppppp'];
 const DOOR = ['.ooooo.', 'o#####o', 'o##h##o', 'o#ooo#o', 'o#o.o#o', 'o#o.o#o', 'ooooooo'];
 function sprite(g: CanvasRenderingContext2D, rows: string[], cx: number, bottom: number, pal: Record<string, string>, sc = 1) {
   const x = Math.round(cx) - Math.floor((rows[0].length * sc) / 2), y = Math.round(bottom) - rows.length * sc;
@@ -258,7 +260,7 @@ export function Minimap({ net, audio = null }: { net: GameConnection; audio?: Au
       if (sg.key !== mapKey(map)) { sg.key = mapKey(map); sg.ids.clear(); }
       if (!blinded && snap?.phase === 'COMBAT') {
         let fresh = false;
-        for (const e of snap.enemies) if ((e.boss || (e.el ?? 0) > 0) && e.st !== 'dying' && !sg.ids.has(e.i)) { sg.ids.add(e.i); fresh = true; }
+        for (const e of snap.enemies) if ((e.boss || (e.el ?? 0) > 0 || e.mb) && e.st !== 'dying' && !sg.ids.has(e.i)) { sg.ids.add(e.i); fresh = true; }
         const now = performance.now();
         if (fresh && now - sg.at > 4000) { sg.at = now; audioRef.current?.play('minimap_ping', { volume: 0.35, priority: 1 }); }
       }
@@ -339,6 +341,13 @@ export function Minimap({ net, audio = null }: { net: GameConnection; audio?: Au
             const q = S(e.x, e.y);
             g.globalAlpha = seenAt(e.x, e.y) ? 1 : 0.6;
             if (e.boss) sprite(g, SKULL, q.x, q.y + (big ? 9 : 4), { p: ENEMY.boss, o: '#000', '#': '#ebe0c8', h: '#ff3b2f' }, big ? 2 : 1);
+            else if (e.mb) {
+              // the round's named mini-boss: an orange crown with a black rim, always shown at full strength
+              g.globalAlpha = 1;
+              const sc = big ? 2 : 1;
+              g.fillStyle = '#000'; g.fillRect(Math.round(q.x) - 4 * sc, Math.round(q.y) - 3 * sc - 1, 9 * sc, 5 * sc + 2);
+              sprite(g, CROWN, q.x, q.y + 2 * sc, { p: ENEMY.miniboss, h: '#fff0a6' }, sc);
+            }
             else {
               const tier = e.el === 2 ? 'rare' : e.el === 1 ? 'champion' : 'normal';
               const n = approxCount(e.cnt);
@@ -451,6 +460,7 @@ export function Minimap({ net, audio = null }: { net: GameConnection; audio?: Au
               <li><i style={{ background: ENEMY.champion }} />Champion</li>
               <li><i style={{ background: ENEMY.rare }} />Rare</li>
               <li><i className="lg-boss" />Boss</li>
+              <li><i style={{ background: ENEMY.miniboss }} />Mini-boss</li>
               <li><i style={{ background: '#ff5a7a' }} />Potion</li>
               <li><i style={{ background: '#ff8a1e' }} />Loot</li>
               {voting && <li><i style={{ background: '#e8c66a' }} />Door</li>}

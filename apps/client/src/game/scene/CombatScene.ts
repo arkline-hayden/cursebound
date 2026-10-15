@@ -16,6 +16,7 @@ import { EliteFx, ELITE_COLOR } from '../render/EliteFx';
 import { PickupRenderer } from '../render/Pickups';
 import { Outlines } from '../render/Outlines';
 import { AfflictionFx, foeActor, heroTint } from '../render/Afflictions';
+import { MINIBOSS_COLOR, MINIBOSS_CSS, MINIBOSS_SCALE, ThemeFoeFx, miniBossMechNames, miniBossTint } from '../render/ThemeFoeFx';   // theme foes + named mini-bosses
 import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
@@ -108,6 +109,8 @@ export class CombatScene extends Phaser.Scene {
   pickupsR!: PickupRenderer;
   /** crisp 1px foe outlines (render/Outlines.ts) and hero afflictions / new foe attacks (render/Afflictions.ts) */
   outlines!: Outlines;
+  /** theme foe cues and named mini-boss presentation (render/ThemeFoeFx.ts) */
+  themeFx!: ThemeFoeFx;
   aff!: AfflictionFx;
   /** in-world door vote (render/Doors.ts) */
   doorsR: DoorRenderer | null = null;
@@ -202,6 +205,7 @@ export class CombatScene extends Phaser.Scene {
     this.elites = new EliteFx(this, this.juice, this.dungeon);
     this.outlines = new Outlines(this);
     this.aff = new AfflictionFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
+    this.themeFx = new ThemeFoeFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y), (text, tone) => this.banner(text, tone));
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.hazardG = this.add.graphics().setDepth(-80);
@@ -296,10 +300,11 @@ export class CombatScene extends Phaser.Scene {
         const e = best.e;
         const base = ENEMY_BY_ID[e.k]?.name ?? e.k;
         detail = {
-          name: eliteName(base, e.af), hp: e.hp,
+          name: e.mb ?? eliteName(base, e.af), hp: e.hp,
           hpText: e.ht !== undefined && e.mt !== undefined ? `${hpNum(e.ht)} / ${hpNum(e.mt)}` : null,
           count: e.cnt ? formatBig(Big.fromCompact(e.cnt)) : null, objective: !!e.obj,
-          elite: e.el ?? 0, affixes: affixNames(e.af),
+          // a named mini-boss shows with the gold plate and its signature mechanics in the affix line
+          elite: e.mb ? 2 : e.el ?? 0, affixes: e.mb ? miniBossMechNames(e.mm).split(' · ').filter(Boolean) : affixNames(e.af),
         };
       }
       window.dispatchEvent(new CustomEvent('cursebound:target', { detail }));
@@ -435,6 +440,7 @@ export class CombatScene extends Phaser.Scene {
   private handleEvent(e: SimEvent, me: number, snap: Snapshot | null) {
     const pal = this.palette();
     const J = this.juice;
+    if (this.themeFx.onEvent(e, me, snap)) return;   // theme foe cues, mini-boss announcements (render/ThemeFoeFx.ts)
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
     switch (e.t) {
       case 'hit': {
@@ -832,6 +838,7 @@ export class CombatScene extends Phaser.Scene {
     this.elites.begin(this.time.now);
     this.outlines.begin();
     this.aff.begin(this.time.now);
+    this.themeFx.begin();
     this.focus.length = 0;
     if (!ip || !latest) { this.drawFx(); return; }
     const { a, b, t } = ip;
@@ -882,6 +889,7 @@ export class CombatScene extends Phaser.Scene {
       this.drawEnemy(key, eb, x, y, delta);
     }
     this.outlines.end();
+    this.themeFx.end();
     {
       // blindness: darkness closes in around the local hero (other heroes show a dark cloud, Afflictions.drawPlayer)
       const lp = latest.players[me];
@@ -1270,7 +1278,7 @@ export class CombatScene extends Phaser.Scene {
     const v = this.view(key, actor, px, py, e.k);
     v.lastSeen = performance.now(); v.dying = false;
     v.elite = e.el ?? 0;
-    v.baseScale = EliteFx.scaleFor(e.el);
+    v.baseScale = e.mb ? MINIBOSS_SCALE : EliteFx.scaleFor(e.el);   // named mini-bosses stand bigger
     if (e.st !== 'dying') v.lastHp = e.hp;
     v.sprite.setData('lx', px).setData('ly', py);
     if (v.gibbed) { v.bar?.clear(); v.badge?.setVisible(false); v.shadow.setAlpha(0); return; }
@@ -1286,6 +1294,7 @@ export class CombatScene extends Phaser.Scene {
     else if (e.ch) v.sprite.setTint(0xc4ecff);                 // chilled
     else if (e.burn) v.sprite.setTint(0xffc8a0);
     else if (e.vuln) v.sprite.setTint(0xffb0d0);
+    else if (e.mb) v.sprite.setTint(miniBossTint(e.mb));     // a named mini-boss's colour variant
     else if (look.tint !== null) v.sprite.setTint(look.tint);
     else v.sprite.clearTint();
     // frozen foes stop animating; everything else plays at normal speed
@@ -1294,6 +1303,7 @@ export class CombatScene extends Phaser.Scene {
     const set = this.settings();
     void set;
     if (v.elite) this.elites.draw(v.sprite, e, x, y, this.time.now);
+    if (e.mb) this.themeFx.drawMiniBoss(v.sprite, e, x, y, this.time.now);   // crown, aura, embers
     const count = e.cnt ? Big.fromCompact(e.cnt) : Big.ONE;
     const extras = e.boss ? 0 : Math.min(4, Math.max(0, Math.floor(count.log10() >= 1 ? 4 : count.toNumber() - 1)));
     while (v.extras.length < extras) { const s = this.add.sprite(0, 0, `actor:${actor}`).setOrigin(ACTOR_META[actor].originX, ACTOR_META[actor].originY).setScale(0.8).setAlpha(0.9); this.dungeon.litObject(s); v.extras.push(s); }
@@ -1309,7 +1319,7 @@ export class CombatScene extends Phaser.Scene {
     });
     // always-on crisp outlines: faint red for every foe, purple-blue for champions, rares and bosses (render/Outlines.ts)
     if (e.st !== 'dying') {
-      const strong = !!v.elite || e.boss;
+      const strong = !!v.elite || e.boss || !!e.mb;
       this.outlines.sync(v.sprite, strong);
       for (const s of v.extras) this.outlines.sync(s, strong);
     }
@@ -1320,23 +1330,24 @@ export class CombatScene extends Phaser.Scene {
     } else v.badge?.setVisible(false);
     if (!v.bar) v.bar = this.add.graphics();
     v.bar.clear().setDepth(4500);
-    if (!e.boss && e.st !== 'dying' && (e.hp < 0.999 || v.elite)) {
+    if (!e.boss && e.st !== 'dying' && (e.hp < 0.999 || v.elite || e.mb)) {
       // elites always show a wider bar in their tier colour
-      const w = v.elite ? 34 : 24;
+      const big = !!v.elite || !!e.mb;   // elites and mini-bosses always show a wider bar
+      const w = e.mb ? 40 : v.elite ? 34 : 24;
       const bx = Math.round(px - w / 2), by = Math.round(py - Math.max(40, top + 2));
-      v.bar.fillStyle(0x070505, 1).fillRect(bx - 1, by - 1, w + 2, v.elite ? 5 : 4);
-      const col = v.elite ? (ELITE_COLOR[v.elite]?.main ?? 0xd6323c) : e.obj ? 0xd6323c : 0x8a5ad0;
-      v.bar.fillStyle(col, 1).fillRect(bx, by, Math.round(w * e.hp), v.elite ? 3 : 2);
-      if (v.elite) v.bar.fillStyle(0xffffff, 0.6).fillRect(bx, by, Math.round(w * e.hp), 1);
+      v.bar.fillStyle(0x070505, 1).fillRect(bx - 1, by - 1, w + 2, big ? 5 : 4);
+      const col = e.mb ? MINIBOSS_COLOR : v.elite ? (ELITE_COLOR[v.elite]?.main ?? 0xd6323c) : e.obj ? 0xd6323c : 0x8a5ad0;
+      v.bar.fillStyle(col, 1).fillRect(bx, by, Math.round(w * e.hp), big ? 3 : 2);
+      if (big) v.bar.fillStyle(0xffffff, 0.6).fillRect(bx, by, Math.round(w * e.hp), 1);
     }
     if (e.st !== 'dying' && !this.cine?.active) {
       // nameplate request (placed after the frame's hover is known, placeNames): bosses and elites always, others when
       // hovered, targeted or recently hurt
       const base = (e.boss ? BOSS_BY_ID[e.k]?.name : undefined) ?? ENEMY_BY_ID[e.k]?.name ?? e.k;
-      const prio = e.boss ? 3 : v.elite ? 2 : 0;
-      const color = e.boss ? '#ff6a5e' : v.elite === 2 ? '#ffd36a' : v.elite ? '#7cc0ff' : e.obj ? '#e8c66a' : '#ebe0c8';
-      const ny = e.boss ? py - Math.max(64, top + 6) : py - Math.max(40, top + 2) - 2;
-      this.nameReq.push({ key, text: v.elite ? eliteName(base, e.af) : base, color, x: px, y: ny, prio, hurt: e.hp < 0.999, hitAt: this.lastHit.get(e.i)?.at ?? -1e9, badge: e.cnt ? v.badge : undefined });
+      const prio = e.boss ? 3 : e.mb ? 2.5 : v.elite ? 2 : 0;
+      const color = e.boss ? '#ff6a5e' : e.mb ? MINIBOSS_CSS : v.elite === 2 ? '#ffd36a' : v.elite ? '#7cc0ff' : e.obj ? '#e8c66a' : '#ebe0c8';
+      const ny = e.boss ? py - Math.max(64, top + 6) : py - Math.max(40, top + 2) - 2 - (e.mb ? 9 : 0);   // a mini-boss plate clears its crown
+      this.nameReq.push({ key, text: e.mb ? e.mb : v.elite ? eliteName(base, e.af) : base, color, x: px, y: ny, prio, hurt: e.hp < 0.999, hitAt: this.lastHit.get(e.i)?.at ?? -1e9, badge: e.cnt ? v.badge : undefined });
     }
     if (e.sh && !(e.af ?? []).includes('shielding')) v.bar.lineStyle(2, 0x9fd8ff, 0.9).strokeEllipse(Math.round(px), Math.round(py - 14), iso.rx(e.r) * 2 + 12, iso.ry(e.r) * 2 + 20);
     if (e.boss && e.stag) { const r = 1.6 + (Math.floor(this.time.now / 100) % 2) * 0.15; v.bar.lineStyle(2, 0xffd23f, 1).strokeEllipse(Math.round(px), Math.round(py), iso.rx(r) * 2, iso.ry(r) * 2); }
