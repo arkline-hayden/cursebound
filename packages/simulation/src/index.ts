@@ -27,3 +27,6 @@ export * from './courtyard';
 export * from './follow';
 export * from './bounty';
 export * from './bountyRules';
+export * from './bossregistry';
+export { isVoidAt, pushHero, safeSpot } from './bosskit';
+export { voidBeamDir } from './bosses';

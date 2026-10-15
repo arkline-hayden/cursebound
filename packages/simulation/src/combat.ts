@@ -5,6 +5,7 @@ import { bountyRules } from './bountyRules';
 import { B, ONE, fateFactor, playerDerived } from './stats';
 import type { Cohort, EnemyState, PlayerState, SimEvent, SimState } from './types';
 import { hooks, type HitMod } from './hooks';
+import { bossImmune } from './bossregistry';
 
 // Damage pipeline (REQ COMBAT01, PRD §5.2, §12.1, §12.2). All quantities canonical Big.
 // Grouped logical hits ("packets") preserve kill timing per unit via exact cohort arithmetic; crits on k identical
@@ -140,6 +141,7 @@ export interface HitOpts {
 /** Player -> enemy damage. perHit is snapshotted damage before crit/vulnerability/mitigation; mult = logical hits. */
 export function hitEnemy(state: SimState, ev: SimEvent[], e: EnemyState, perHit: Big, mult: Big, o: HitOpts): CohortResult {
   if (e.state === 'dying' || e.cohort.count.isZero()) return { kills: ZERO, dealt: ZERO };
+  if (e.boss && bossImmune(state, e)) return { kills: ZERO, dealt: ZERO };   // out of reach (a boss aloft, bossregistry.ts)
   const p = state.players[o.srcSlot];
   const pd = p ? playerDerived(state, p) : null;
   let factor = mitigationFactor(e.armor);
@@ -230,6 +232,7 @@ export function addDot(state: SimState, e: EnemyState, src: number, type: Damage
 
 export function tickDots(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (!e.dots.length) return;
+  if (e.boss && bossImmune(state, e)) { e.dots = []; e.burning = false; return; }   // nothing burns a boss out of reach
   const mit = mitigationFactor(e.armor);
   const dt = B(TICK_SEC);
   let total = ZERO;
@@ -250,7 +253,7 @@ export function tickDots(state: SimState, ev: SimEvent[], e: EnemyState) {
 }
 
 export function addStagger(state: SimState, ev: SimEvent[], e: EnemyState, amount: number) {
-  if (!e.boss || e.staggerUntil > state.tick) return;
+  if (!e.boss || e.staggerUntil > state.tick || bossImmune(state, e)) return;
   e.stagger += amount;
   const def = BOSS_BY_ID[e.kind];
   if (e.stagger >= def.staggerMeter) {

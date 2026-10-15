@@ -209,6 +209,24 @@ export const LEGENDARIES: LegendaryDef[] = [
       description: 'Your first-branch active skill (hotbar slot 1) gains +1 charge and deals ×1.4 damage.' },
     'Every journey starts with the same step. Make it twice.'),
 
+  // ---------------- Theme boss signatures (BOSS_LOOT: the Gale Wyrm and the Crater Horror) ----------------
+  L('lg_galeheart_mantle', 'Galeheart Mantle', 'chest', '#bfe8ff', [['player.movementSpeed', '1.06'], ['player.maxHealth', '1.08']],
+    { id: 'dodge_ward', magnitude: '0.12', params: { iframes: 0.3 },
+      description: 'Dodging grants a shield of 12% maximum health and 0.3s of extra invulnerability.' },
+    'Cut from the wing of a drake that never once touched the ground.'),
+  L('lg_stormfeather_crown', 'Stormfeather Crown', 'helm', '#e8f4ff', [['player.stormDamage', '1.12']],
+    { id: 'crit_lightning', magnitude: '1.4', params: { icd: 0.35, radius: 1.6 },
+      description: 'Critical hits call down lightning: 140% of the hit as storm damage to the target and 70% to enemies within 1.6 units (at most every 0.35s).' },
+    'Every quill still remembers the storm it was plucked from.'),
+  L('lg_eye_of_the_dead_moon', 'Eye of the Dead Moon', 'amulet', '#9a7aff', [['player.astralDamage', '1.12']],
+    { id: 'gravity_well', magnitude: '1.2', params: { period: 7, radius: 5.5, pull: 1.6 },
+      description: 'Every 7s the void drags enemies within 5.5 units 1.6 units toward you and deals 120% basic astral damage.' },
+    'It is still looking. Now it looks wherever you look.'),
+  L('lg_carapace_of_the_brood_moon', 'Carapace of the Brood Moon', 'chest', '#8fa0b8', [['player.armor', '1.15'], ['player.maxHealth', '1.06']],
+    { id: 'thorns_nova', magnitude: '2.2', params: { icd: 0.9, radius: 2.6 },
+      description: 'Taking a hit releases a thorn nova: 220% basic physical damage to enemies within 2.6 units (at most every 0.9s).' },
+    'Grown in the dark under the crater. It does not like being touched.'),
+
   // ---------------- Class: Vanguard ----------------
   L('lg_aegis_of_the_unyielding', 'Aegis of the Unyielding', 'chest', '#e0a040', [['player.armor', '1.15'], ['player.shieldCapacity', '1.15']],
     { id: 'aegis_release', magnitude: '2.5', params: { radius: 3, knockback: 1.2 },
@@ -239,6 +257,13 @@ export const LEGENDARIES: LegendaryDef[] = [
 ];
 
 export const LEGENDARY_BY_ID: Record<string, LegendaryDef> = Object.fromEntries(LEGENDARIES.map((x) => [x.id, x]));
+
+/** Boss loot tables (simulation gear.ts rollLoot): a listed boss's guaranteed drop is one of its signature items the
+ *  party does not already hold (falling back to the shared pool once all are taken). Unlisted bosses use the pool. */
+export const BOSS_LOOT: Record<string, string[]> = {
+  skydrake: ['lg_galeheart_mantle', 'lg_stormfeather_crown'],
+  moonhorror: ['lg_eye_of_the_dead_moon', 'lg_carapace_of_the_brood_moon'],
+};
 
 /** Number of a perk param (content default when absent). */
 export function perkParam(def: LegendaryDef, key: string, fallback: number): number {

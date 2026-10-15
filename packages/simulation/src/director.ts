@@ -1,5 +1,5 @@
 import { Big } from '@cursebound/numeric';
-import { BIOMES, BOSS_BY_ID, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, RULES, THEME_PACKS, TICK_RATE, isBossRound, referenceSec } from '@cursebound/content';
+import { BIOMES, BOSS_ADDS, BOSS_BY_ID, ENEMY_BY_ID, PACK_BY_ID, PACK_TEMPLATES, RULES, THEME_BOSSES, THEME_PACKS, TICK_RATE, isBossRound, referenceSec } from '@cursebound/content';
 import { cohortRadius } from './combat';
 import { bossIntroTicks, holdCinematic, inCinematic } from './cinematic';
 import { dist2 } from './geometry';
@@ -76,7 +76,10 @@ export function setupRound(state: SimState, ev: SimEvent[]) {
   if (boss) {
     // alternate templates; later bosses apply remix modules (more adds per phase)
     const idx = Math.floor(r / RULES.bossEvery) - 1;
-    bossId = biome.bosses[(idx + nextInt(rng, 2)) % biome.bosses.length];
+    // theme bosses (content THEME_BOSSES) take their floor's boss rounds (mapgen.ts bossForRound makes the same call);
+    // the draw is always taken, so the rest of the round's stream never depends on the theme
+    const pick = nextInt(rng, 2);
+    bossId = THEME_BOSSES[state.map.theme] ?? biome.bosses[(idx + pick) % biome.bosses.length];
     const def = BOSS_BY_ID[bossId];
     const weight = def.phases.reduce((s, p) => s + p.weight, 0);
     groups.push({ id: 0, weight, archetype: bossId, wave: 0, spawned: false, defeated: false, countText: '1' });
@@ -208,6 +211,8 @@ export function bossReinforcements(state: SimState, ev: SimEvent[], boss: EnemyS
   if (!pool.length) pool = PACK_TEMPLATES.filter((t) => t.minRound <= 1).map((t) => [t.id, 1] as [string, number]);
   const n = bossReinforceUnits(state.n, r, wave);
   const kinds: string[] = [];
+  const roster = BOSS_ADDS[boss.kind];   // bosses with their own adds (the Gale Wyrm's harpies, the Crater Horror's brood)
+  if (roster?.length) while (kinds.length < n) kinds.push(roster[nextInt(rng, roster.length)]);
   while (kinds.length < n) {
     const t = PACK_BY_ID[pickWeighted(rng, pool)];
     kinds.push(t.lead);

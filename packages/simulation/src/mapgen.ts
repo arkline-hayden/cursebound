@@ -1,4 +1,4 @@
-import { BIOMES, DUNGEON_LAYOUTS, DUNGEON_THEMES, RULES } from '@cursebound/content';
+import { BIOMES, DUNGEON_LAYOUTS, DUNGEON_THEMES, RULES, THEME_BOSSES } from '@cursebound/content';
 import { arenaDesign, generateArena } from './arenas';
 import { FLOOR, WALL, carve, corridor, ellipse, fill, idx, rect, ri, solid, type Gen, type Grid, type RoomSpec } from './mapgrid';
 import { assignKinds, finalRooms, furnish, partitionRooms } from './rooms';
@@ -668,7 +668,8 @@ export function layoutFor(seed: string, round: number, boss: boolean): string {
  * (director.setupRound), read here on a private copy so the arena can be built for its boss without the map
  * stream depending on the encounter stream's position.
  */
-export function bossForRound(seed: string, round: number): string | null {
+export function bossForRound(seed: string, round: number, theme?: string | null): string | null {
+  if (theme && THEME_BOSSES[theme]) return THEME_BOSSES[theme];   // theme bosses own their floor's boss rounds
   const bosses = BIOMES[0].bosses;
   if (!bosses.length) return null;
   const rng = seedRng(seed, 'encounter', round);
@@ -690,7 +691,7 @@ export function generateDungeon(seed: string, round: number, boss: boolean, them
   const theme = isTheme(themeOverride) ? themeOverride : themeFor(seed, round);
   const layout = layoutFor(seed, round, boss);
   const rng = seedRng(seed, 'map', round);
-  const design = boss ? arenaDesign(bossForRound(seed, round), rng) : null;
+  const design = boss ? arenaDesign(bossForRound(seed, round, theme), rng) : null;
   for (let attempt = 0; attempt < 12; attempt++) {
     let gen: Gen;
     if (design) gen = generateArena(design, rng);

@@ -14,6 +14,7 @@ import './classes';
 import './elites';    // champion / rare monster affixes (global hooks)
 import './pickups';   // potions and resource orbs (global hooks)
 import './boons';     // Fate mechanics: boons and banes (global hooks)
+import './bosses';    // boss kits: the Gale Wyrm, the Crater Horror (bossregistry.ts)
 import { settleLoot } from './gear';   // legendary gear: drops, pickup/swap, perks (global hooks; after pickups)
 import { STATE_SCHEMA, stateHash } from './serialize';
 import { applyTraining, setupTraining, topUpTrainingPoints, trainingAiOff, trainingIdleEnemy, trainingTick } from './training';   // training grounds

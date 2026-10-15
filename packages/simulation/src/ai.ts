@@ -8,6 +8,7 @@ import { hooks } from './hooks';
 import { actMul, isFrozen, lureGoal, moveMul } from './cc';
 import { inCinematic } from './cinematic';
 import { bossReinforcements } from './director';
+import { bossImmune, bossKit } from './bossregistry';
 import { makeHazard } from './players';
 import { nextFloat, nextInt } from './rng';
 import { B, ONE, fateFactor, toFloatClamped } from './stats';
@@ -56,7 +57,7 @@ function freq(e: EnemyState): number {
 
 // ---------------- Perception & utility ----------------
 
-function chooseTarget(state: SimState, e: EnemyState): PlayerState | null {
+export function chooseTarget(state: SimState, e: EnemyState): PlayerState | null {
   const alive = alivePlayers(state);
   if (!alive.length) return null;
   // blackboard reservations: melee roles avoid stacking more than 3 attackers on one player
@@ -295,7 +296,7 @@ function goalFor(state: SimState, e: EnemyState, target: PlayerState): [number, 
   }
 }
 
-function moveToward(state: SimState, e: EnemyState, gx: number, gy: number) {
+export function moveToward(state: SimState, e: EnemyState, gx: number, gy: number) {
   const map = state.map!;
   let wx = gx, wy = gy;
   if (!lineOfSight(map, e.x, e.y, gx, gy)) {
@@ -706,6 +707,8 @@ function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
   RULES.bossReinforceAt.forEach((at, i) => { if (frac <= at) bossReinforcements(state, ev, e, i + 1); });
   if (e.staggerUntil > state.tick) { e.state = 'stagger'; e.attack = null; return; }
   if (e.state === 'stagger') e.state = 'idle';
+  const kit = bossKit(e);
+  if (kit) { kit.step(state, ev, e); return; }   // boss kits run their own modules (bosskit.ts, bosses/*)
   if (e.attack) { stepAttack(state, ev, e); return; }
   if ((e.cooldowns['_pause'] ?? 0) > 0) {
     const target = chooseTarget(state, e);
@@ -872,6 +875,7 @@ export function separateEnemies(state: SimState) {
   for (const p of state.players) {
     if (p.lifeState === 'dead') continue;
     for (const e of live) {
+      if (e.boss && bossImmune(state, e)) continue;   // a boss aloft (bosskit.ts) does not shoulder heroes aside
       const R = 0.3 + Math.min(e.radius, 1.2);
       const dx = p.x - e.x, dy = p.y - e.y;
       const d2 = dx * dx + dy * dy;

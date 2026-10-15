@@ -216,7 +216,9 @@ export interface EnemyAttackDef {
   id: string;
   name: string;
   /** 'burst' = a telegraphed circle at the target point that detonates on release (no lingering hazard). */
-  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst';
+  kind: 'melee' | 'projectile' | 'lob' | 'pool' | 'summon' | 'shield' | 'charge' | 'ring' | 'rootwall' | 'lightpool' | 'sweep' | 'slam' | 'burst'
+    /** boss kits (simulation/src/bosses/skydrake.ts, moonhorror.ts): Gale Wyrm and Crater Horror modules */
+    | 'dive' | 'gale' | 'feathers' | 'soar' | 'tentacle' | 'gravwell' | 'beam' | 'slowzone' | 'brood';
   /** Affliction applied to heroes this attack hits: seconds, optional magnitude (slow fraction / chain radius). */
   inflict?: { status: AfflictionId; sec: number; value?: number };
   /** Projectile / lob presentation kind (snapshot `k`); defaults to 'shard' / 'orb' / 'lob'. */

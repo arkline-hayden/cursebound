@@ -1,4 +1,5 @@
 import type { BiomeDef, BossDef, EnemyAttackDef, EnemyDef } from './types';
+import { MOON_HORROR, SKY_DRAKE, SKY_MOON_ADDS } from './bossesSkyMoon';
 
 // Ordinary archetypes + a summon (PRD §14.2) and two boss templates (§14.3). First tuning proposals.
 // Individually weak, numerous foes (Diablo-style packs, director.ts); four archetypes impede heroes directly with
@@ -136,6 +137,7 @@ export const ENEMIES: EnemyDef[] = [
     ],
     weaknesses: { ember: '1.3' },
   },
+  ...SKY_MOON_ADDS,   // the Gale Wyrm's harpies and wind elementals, the Crater Horror's brood (bossesSkyMoon.ts)
 ];
 
 export const ENEMY_BY_ID: Record<string, EnemyDef> = Object.fromEntries(ENEMIES.map((x) => [x.id, x]));
@@ -175,6 +177,8 @@ export const BOSSES: BossDef[] = [
       { id: 'slam', name: 'Bell Slam', kind: 'slam', damageType: 'physical', damageCoef: '1.8', windupSec: 1.25, releaseSec: 0.15, recoverySec: 2.5, cooldownSec: 0, range: 3.6, telegraph: { kind: 'circle', radius: 3.6 } },
     ],
   },
+  SKY_DRAKE,     // theme boss: sky (bossesSkyMoon.ts)
+  MOON_HORROR,   // theme boss: moon (bossesSkyMoon.ts)
 ];
 
 export const BOSS_BY_ID: Record<string, BossDef> = Object.fromEntries(BOSSES.map((x) => [x.id, x]));
@@ -267,12 +271,30 @@ export const ARENA_DESIGNS: { id: string; name: string }[] = [
   { id: 'ritual', name: 'Ghost-fire ritual circle' },
   { id: 'belltower', name: 'Bell tower over the void' },
   { id: 'colosseum', name: 'Sunken colosseum' },
+  { id: 'skyring', name: 'Floating ring of rock' },
+  { id: 'crater', name: 'Cratered lunar basin' },
 ];
 
 /** Which arena designs a boss may fight in (unknown bosses draw from every design). */
 export const BOSS_ARENAS: Record<string, string[]> = {
   prismstag: ['nave', 'ritual'],
   bellroot: ['belltower', 'colosseum'],
+  skydrake: ['skyring'],
+  moonhorror: ['crater'],
+};
+
+/** Theme bosses: a boss round on one of these themes always fights that theme's boss (simulation mapgen.ts
+ *  bossForRound, which director.ts setupRound uses); every other theme alternates the biome bosses. */
+export const THEME_BOSSES: Record<string, string> = {
+  sky: 'skydrake',
+  moon: 'moonhorror',
+};
+
+/** Boss reinforcement rosters (simulation director.ts bossReinforcements): a boss listed here calls its own adds at
+ *  2/3 and 1/3 health instead of the floor theme's packs. */
+export const BOSS_ADDS: Record<string, string[]> = {
+  skydrake: ['galeharpy', 'galewisp'],
+  moonhorror: ['craterspawn'],
 };
 
 // ---------------- Packs (director.ts population) ----------------

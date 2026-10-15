@@ -1,6 +1,7 @@
 import { ARENA_DESIGNS, BOSS_ARENAS } from '@cursebound/content';
 import { FLOOR, WALL, block, carve, ellipse, idx, inner, rect, ri, solid, straight, type Gen, type Grid, type RoomSpec } from './mapgrid';
 import { nextFloat, nextInt, type RngState } from './rng';
+import { SKY_MOON_ARENAS } from './arenasSkyMoon';
 
 // Boss lairs (map generation, boss floors): every boss fights in a hand-designed arena that clearly differs from the
 // ordinary floors, procedurally varied per run (proportions, pillar rings, chapels, rim breaks, mirrored details).
@@ -12,6 +13,8 @@ import { nextFloat, nextInt, type RngState } from './rng';
 //   ritual     ghost-fire ritual circle: a round chamber ringed by obelisks, four shrine alcoves
 //   belltower  bell-tower floor: an octagonal platform floating in a bottomless shaft, reached over a bridge
 //   colosseum  sunken colosseum: an elliptical sand floor, gated pens, a central dais and four spina posts
+//   skyring    floating ring of rock (the Gale Wyrm, arenasSkyMoon.ts)
+//   crater     cratered lunar basin (the Crater Horror, arenasSkyMoon.ts)
 
 type ArenaFn = (rng: RngState) => Gen;
 
@@ -151,7 +154,7 @@ function colosseum(rng: RngState): Gen {
   return { g, rooms: [ante.room, arena], start: ante.start, boss: idx(g, cx, cy), arena: 'colosseum' };
 }
 
-const ARENAS: Record<string, ArenaFn> = { nave, ritual, belltower, colosseum };
+const ARENAS: Record<string, ArenaFn> = { nave, ritual, belltower, colosseum, ...SKY_MOON_ARENAS };
 
 /** The arena design for a boss (its own designs; any design for a boss without one), drawn from the map stream. */
 export function arenaDesign(bossId: string | null, rng: RngState): string {

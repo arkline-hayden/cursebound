@@ -1,6 +1,6 @@
 import { Big } from '@cursebound/numeric';
 import {
-  BOSS_BY_ID, CLASS_BY_ID, ENEMY_BY_ID, FATES_BLESSING, GEAR_SLOTS, LEGENDARIES, LEGENDARY_BY_ID, LOOT_RULES, NODE_BY_ID, RULES, SKILL_BY_ID, TICK_SEC,
+  BOSS_BY_ID, BOSS_LOOT, CLASS_BY_ID, ENEMY_BY_ID, FATES_BLESSING, GEAR_SLOTS, LEGENDARIES, LEGENDARY_BY_ID, LOOT_RULES, NODE_BY_ID, RULES, SKILL_BY_ID, TICK_SEC,
   perkParam, type DamageType, type GearSlot, type LegendaryDef,
 } from '@cursebound/content';
 import { isBlessingItem, settleBlessing, stepBlessingLoot } from './blessing';
@@ -187,6 +187,18 @@ export function chooseLegendary(state: SimState): string | null {
   return ids[nextInt(lootRng(state), ids.length)];
 }
 
+/** A boss's own loot table (content BOSS_LOOT): one of its signature items the party does not hold yet, drawn from the
+ *  loot stream; undefined (the shared pool) for bosses without a table or once every signature item is taken. */
+export function bossSignature(state: SimState, bossId: string): string | undefined {
+  const table = BOSS_LOOT[bossId];
+  if (!table?.length) return undefined;
+  const taken = new Set<string>();
+  for (const p of state.players) for (const s of GEAR_SLOTS) { const id = p.gear?.[s]; if (id) taken.add(id); }
+  for (const it of state.loot ?? []) taken.add(it.itemId);
+  const pool = table.filter((id) => LEGENDARY_BY_ID[id] && !taken.has(id));
+  return pool.length ? pool[nextInt(lootRng(state), pool.length)] : undefined;
+}
+
 /** Place a legendary on the ground near (x, y). */
 export function dropLegendary(state: SimState, ev: SimEvent[], x: number, y: number, source: LootRecord['source'], itemId?: string): GroundLoot | null {
   const id = itemId ?? chooseLegendary(state);
@@ -212,7 +224,7 @@ export function dropLegendary(state: SimState, ev: SimEvent[], x: number, y: num
 export function rollLoot(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (state.phase !== 'COMBAT') return;
   if (e.boss) {
-    for (let i = 0; i < LOOT_RULES.bossDrops; i++) dropLegendary(state, ev, e.x, e.y, 'boss');
+    for (let i = 0; i < LOOT_RULES.bossDrops; i++) dropLegendary(state, ev, e.x, e.y, 'boss', bossSignature(state, e.kind));
     return;
   }
   const roll = nextFloat(lootRng(state));
