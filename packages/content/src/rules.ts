@@ -61,9 +61,12 @@ export const RULES = {
   /** Boss reinforcements (director.ts bossReinforcements): crossing each health threshold summons one wave of the
    *  floor theme's foes, once per threshold. Wave = base + perHero x (N-1) + perRounds step, folded into cohorts. */
   bossReinforceAt: [2 / 3, 1 / 3] as number[],
-  bossReinforceBase: 3,
+  bossReinforceBase: 2,
   bossReinforcePerHero: 1,
   bossReinforceRoundStep: 10,
+  /** reinforcements are minions: numerous but individually weaker than the floor's packs */
+  bossReinforceHealth: '0.6',
+  bossReinforceDamage: '0.7',
   /** seconds the summoning telegraph (client banner, rune circles) runs before the wave arrives */
   bossReinforceWarnSec: 1.2,
   /** Global enemy ground-speed multiplier (applied at spawn, before Fate enemy.movementSpeed). Kit tests assume 1. */

@@ -160,6 +160,12 @@ export function spawnWave(state: SimState, ev: SimEvent[], wave: number) {
 }
 
 export function flushPendingSpawns(state: SimState, ev: SimEvent[]) {
+  // boss reinforcement waves arrive when their summoning circles release
+  const enc = state.encounter;
+  if (enc?.reinforce?.length && !inCinematic(state)) {
+    for (const w of enc.reinforce) if (w.tick <= state.tick) state.pendingSpawns.push(...w.spawns);
+    enc.reinforce = enc.reinforce.filter((w) => w.tick > state.tick);
+  }
   if (!state.pendingSpawns.length || inCinematic(state)) return;
   const list: PendingSpawn[] = state.pendingSpawns;
   state.pendingSpawns = [];
@@ -167,26 +173,59 @@ export function flushPendingSpawns(state: SimState, ev: SimEvent[]) {
     const e = createEnemy(state, s.kind, s.x, s.y, s.count, { objective: s.objective, groupId: s.groupId, summonerId: s.summonerId });
     if (s.pack !== undefined) e.pack = s.pack;
     if (s.dormant) e.dormant = true;   // a rare's minions idle with their pack
+    if (s.hpMul) e.cohort.unitHp = e.cohort.unitHp.mul(B(s.hpMul));
+    if (s.dmgMul) e.damage = e.damage.mul(B(s.dmgMul));
     state.enemies.push(e);
     ev.push({ t: 'spawn', id: e.id, kind: e.kind, x: s.x, y: s.y });
   }
 }
 
-/** Boss adds at phase transitions: authored, finite, non-objective, linked to the boss. */
-export function bossPhaseAdds(state: SimState, phase: number) {
-  const enc = state.encounter!;
-  if (enc.phaseAddsSpawned.includes(phase) || enc.bossEntityId === null) return;
-  enc.phaseAddsSpawned.push(phase);
-  const bossE = state.enemies.find((e) => e.id === enc.bossEntityId);
-  if (!bossE) return;
+/** Units in boss reinforcement wave `wave` (1 = at 2/3 health, 2 = at 1/3): base + per extra hero + per round step,
+ *  one more on the second wave. Each unit is a cohort of encounter.spawnQuantity (Fate). */
+export function bossReinforceUnits(partySize: number, round: number, wave: number): number {
+  return RULES.bossReinforceBase + RULES.bossReinforcePerHero * (partySize - 1) + Math.floor(round / RULES.bossReinforceRoundStep) + (wave - 1);
+}
+
+/**
+ * Boss reinforcements (RULES.bossReinforceAt): when the boss's health crosses a threshold (2/3, then 1/3), it calls
+ * one wave of the floor theme's foes, exactly once per threshold (encounter.phaseAddsSpawned holds the waves called;
+ * a single blow through both thresholds calls both). Composition comes from the theme's pack templates (the same
+ * tables as the population director), sized by party and round. The wave is telegraphed: a 'boss_adds' event (client
+ * banner + sound) and a summoning circle (Telegraph) at every arrival point; the foes appear when the circles release,
+ * RULES.bossReinforceWarnSec later (encounter.reinforce, flushed by flushPendingSpawns). Arrival points ring the boss,
+ * away from the heroes. Deterministic: its own seeded stream per round and wave. Non-objective, linked to the boss.
+ */
+export function bossReinforcements(state: SimState, ev: SimEvent[], boss: EnemyState, wave: number) {
+  const enc = state.encounter;
+  if (!enc || !state.map || enc.phaseAddsSpawned.includes(wave)) return;
+  enc.phaseAddsSpawned.push(wave);
+  const rng = seedRng(state.seed, 'boss-reinforce', enc.round, wave);
   const M = fateFactor(state, 'encounter.spawnQuantity');
-  const remix = Math.floor(enc.round / 15);
-  const kind = bossE.kind === 'prismstag' ? 'pursuer' : 'mite';
-  const n = 2 + remix;
-  for (let i = 0; i < n; i++) {
-    const s = state.map!.enemySpawns[(i + phase) % state.map!.enemySpawns.length];
-    state.pendingSpawns.push({ kind, x: s.x, y: s.y, count: M.floorInt() > 0n ? Big.from(M.floorInt()) : ONE, summonerId: bossE.id, objective: false, groupId: -1 });
+  const r = state.round;
+  const weights = THEME_PACKS[state.map.theme] ?? Object.fromEntries(PACK_TEMPLATES.map((t) => [t.id, 1]));
+  let pool = Object.entries(weights).filter(([id]) => (PACK_BY_ID[id]?.minRound ?? 99) <= r);
+  if (!pool.length) pool = PACK_TEMPLATES.filter((t) => t.minRound <= 1).map((t) => [t.id, 1] as [string, number]);
+  const n = bossReinforceUnits(state.n, r, wave);
+  const kinds: string[] = [];
+  while (kinds.length < n) {
+    const t = PACK_BY_ID[pickWeighted(rng, pool)];
+    kinds.push(t.lead);
+    for (let k = 0; k < 2 && kinds.length < n; k++) kinds.push(t.fodder[nextInt(rng, t.fodder.length)]);
   }
+  // arrival points: a ring around the boss, rotated by the stream, nudged off heroes
+  const R = 5.5 + Math.min(1.5, boss.radius);
+  const a0 = (nextInt(rng, 360) / 360) * Math.PI * 2;
+  const arrive = state.tick + Math.max(1, Math.round(RULES.bossReinforceWarnSec * TICK_RATE));
+  const spawns: PendingSpawn[] = [];
+  kinds.forEach((kind, i) => {
+    const ang = a0 + (i / n) * Math.PI * 2;
+    let [x, y] = nearestFloor(state.map!, boss.x + Math.cos(ang) * R, boss.y + Math.sin(ang) * R);
+    if (state.players.some((p) => p.lifeState !== 'dead' && dist2(p.x, p.y, x, y) < 9)) [x, y] = nearestFloor(state.map!, boss.x + Math.cos(ang) * (R + 2.5), boss.y + Math.sin(ang) * (R + 2.5));
+    spawns.push({ kind, x, y, count: cohortCount(rng, 1, M), summonerId: boss.id, objective: false, groupId: -1, hpMul: RULES.bossReinforceHealth, dmgMul: RULES.bossReinforceDamage });
+    state.telegraphs.push({ id: state.nextId++, ownerId: boss.id, shape: { kind: 'circle', radius: 0.9 }, x, y, dx: 0, dy: 0, startTick: state.tick, releaseTick: arrive, attack: 'reinforce' });
+  });
+  (enc.reinforce ??= []).push({ tick: arrive, spawns });
+  ev.push({ t: 'boss_adds', id: boss.id, wave, n, x: boss.x, y: boss.y });
 }
 
 // ---------------- Population (Diablo-style packs) ----------------

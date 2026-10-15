@@ -7,6 +7,7 @@ import { findPath, nearestFloor, tileCenter } from './map';
 import { hooks } from './hooks';
 import { actMul, isFrozen, lureGoal, moveMul } from './cc';
 import { inCinematic } from './cinematic';
+import { bossReinforcements } from './director';
 import { makeHazard } from './players';
 import { nextFloat, nextInt } from './rng';
 import { B, ONE, fateFactor, toFloatClamped } from './stats';
@@ -568,6 +569,8 @@ function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
     ev.push({ t: 'boss_phase', id: e.id, phase });
     state.bossPhaseEvents.push(phase);
   }
+  // reinforcements: one wave per health threshold crossed (2/3, 1/3), each exactly once
+  RULES.bossReinforceAt.forEach((at, i) => { if (frac <= at) bossReinforcements(state, ev, e, i + 1); });
   if (e.staggerUntil > state.tick) { e.state = 'stagger'; e.attack = null; return; }
   if (e.state === 'stagger') e.state = 'idle';
   if (e.attack) { stepAttack(state, ev, e); return; }

@@ -144,33 +144,35 @@ export const BOSSES: BossDef[] = [
   {
     id: 'prismstag', name: 'The Hollow Stag', title: 'Crowned in Cold Ghost-fire',
     description: 'Charges down lanes, sweeps with burning bone antlers and scatters splitting ghost-fire pools whose bursts blind. Charging into a wall leaves it staggered.',
-    refUnitHealth: 1500, bossFactor: 8, baseDamage: 70, armor: 40, radius: 1.1, moveSpeed: 2.6, tags: ['boss'],
+    // 1.2 retune (~20% easier): health 1500 -> 1350, damage 70 -> 60, slower wind-ups and cadence
+    refUnitHealth: 1350, bossFactor: 8, baseDamage: 60, armor: 40, radius: 1.1, moveSpeed: 2.6, tags: ['boss'],
     vulnerableMultiplier: '1.5', staggerMeter: 600,
     phases: [
-      { healthFrac: 1.0, weight: 1, patterns: [['charge', 'sweep'], ['lightpools', 'sweep']], cadence: '1' },
-      { healthFrac: 0.66, weight: 1, patterns: [['charge', 'charge', 'sweep'], ['lightpools', 'charge']], cadence: '0.9' },
-      { healthFrac: 0.33, weight: 1, patterns: [['lightpools', 'charge', 'sweep'], ['charge', 'lightpools', 'charge']], cadence: '0.75' },
+      { healthFrac: 1.0, weight: 1, patterns: [['charge', 'sweep'], ['lightpools', 'sweep']], cadence: '1.15' },
+      { healthFrac: 2 / 3, weight: 1, patterns: [['charge', 'charge', 'sweep'], ['lightpools', 'charge']], cadence: '1.05' },
+      { healthFrac: 1 / 3, weight: 1, patterns: [['lightpools', 'charge', 'sweep'], ['charge', 'lightpools', 'charge']], cadence: '0.9' },
     ],
     attacks: [
-      { id: 'charge', name: 'Lane Charge', kind: 'charge', damageType: 'physical', damageCoef: '1.6', windupSec: 0.9, releaseSec: 0.75, recoverySec: 1.0, cooldownSec: 0, range: 12, telegraph: { kind: 'line', length: 12, width: 1.7 } },
-      { id: 'sweep', name: 'Antler Sweep', kind: 'sweep', damageType: 'physical', damageCoef: '1.3', windupSec: 0.7, releaseSec: 0.15, recoverySec: 0.8, cooldownSec: 0, range: 3.3, telegraph: { kind: 'cone', range: 3.3, arcDeg: 160 } },
-      { id: 'lightpools', name: 'Splitting Ghost-fire', kind: 'lightpool', damageType: 'astral', damageCoef: '1.2', inflict: { status: 'blinded', sec: 2 }, windupSec: 0.8, releaseSec: 0.1, recoverySec: 0.9, cooldownSec: 0, range: 10, projectileCount: 3, duration: 1.2, telegraph: { kind: 'circle', radius: 1.3 } },
+      { id: 'charge', name: 'Lane Charge', kind: 'charge', damageType: 'physical', damageCoef: '1.6', windupSec: 1.05, releaseSec: 0.75, recoverySec: 1.0, cooldownSec: 0, range: 12, telegraph: { kind: 'line', length: 12, width: 1.7 } },
+      { id: 'sweep', name: 'Antler Sweep', kind: 'sweep', damageType: 'physical', damageCoef: '1.3', windupSec: 0.8, releaseSec: 0.15, recoverySec: 0.8, cooldownSec: 0, range: 3.3, telegraph: { kind: 'cone', range: 3.3, arcDeg: 160 } },
+      { id: 'lightpools', name: 'Splitting Ghost-fire', kind: 'lightpool', damageType: 'astral', damageCoef: '0.95', inflict: { status: 'blinded', sec: 2 }, windupSec: 0.95, releaseSec: 0.1, recoverySec: 0.9, cooldownSec: 0, range: 10, projectileCount: 3, duration: 1.2, telegraph: { kind: 'circle', radius: 1.3 } },
     ],
   },
   {
     id: 'bellroot', name: 'The Bell Golem', title: 'Toller of the Drowned Dead',
     description: 'Toll pulses roll outward, chain lashes rake the arena and chain whoever they catch, and its slam cracks the bell open to expose a molten core.',
-    refUnitHealth: 2000, bossFactor: 8, baseDamage: 60, armor: 60, radius: 1.6, moveSpeed: 0.8, tags: ['boss', 'regen'],
+    // 1.2 retune (~20% easier): health 2000 -> 1700, damage 60 -> 48, slower wind-ups and cadence
+    refUnitHealth: 1700, bossFactor: 8, baseDamage: 48, armor: 60, radius: 1.6, moveSpeed: 0.8, tags: ['boss', 'regen'],
     vulnerableMultiplier: '2', staggerMeter: 800,
     phases: [
-      { healthFrac: 1.0, weight: 1, patterns: [['ring', 'rootwall'], ['slam']], cadence: '1' },
-      { healthFrac: 0.66, weight: 1, patterns: [['ring', 'ring', 'rootwall'], ['rootwall', 'slam']], cadence: '0.85' },
-      { healthFrac: 0.33, weight: 1, patterns: [['ring', 'rootwall', 'ring'], ['slam', 'ring']], cadence: '0.7' },
+      { healthFrac: 1.0, weight: 1, patterns: [['ring', 'rootwall'], ['slam']], cadence: '1.15' },
+      { healthFrac: 2 / 3, weight: 1, patterns: [['ring', 'ring', 'rootwall'], ['rootwall', 'slam']], cadence: '1' },
+      { healthFrac: 1 / 3, weight: 1, patterns: [['ring', 'rootwall', 'ring'], ['slam', 'ring']], cadence: '0.85' },
     ],
     attacks: [
-      { id: 'ring', name: 'Toll Pulse', kind: 'ring', damageType: 'astral', damageCoef: '1.2', windupSec: 0.9, releaseSec: 2.2, recoverySec: 0.6, cooldownSec: 0, range: 12, projectileSpeed: 5, telegraph: { kind: 'ring', inner: 1.6, outer: 2.4 } },
-      { id: 'rootwall', name: 'Chain Lash', kind: 'rootwall', damageType: 'physical', damageCoef: '1.0', inflict: { status: 'chained', sec: 2, value: 2.2 }, windupSec: 0.9, releaseSec: 0.1, recoverySec: 0.8, cooldownSec: 0, range: 10, projectileCount: 3, duration: 3, telegraph: { kind: 'line', length: 10, width: 0.9 } },
-      { id: 'slam', name: 'Bell Slam', kind: 'slam', damageType: 'physical', damageCoef: '1.8', windupSec: 1.1, releaseSec: 0.15, recoverySec: 2.5, cooldownSec: 0, range: 3.6, telegraph: { kind: 'circle', radius: 3.6 } },
+      { id: 'ring', name: 'Toll Pulse', kind: 'ring', damageType: 'astral', damageCoef: '0.95', windupSec: 1.05, releaseSec: 2.2, recoverySec: 0.6, cooldownSec: 0, range: 12, projectileSpeed: 5, telegraph: { kind: 'ring', inner: 1.6, outer: 2.4 } },
+      { id: 'rootwall', name: 'Chain Lash', kind: 'rootwall', damageType: 'physical', damageCoef: '1.0', inflict: { status: 'chained', sec: 2, value: 2.2 }, windupSec: 1.05, releaseSec: 0.1, recoverySec: 0.8, cooldownSec: 0, range: 10, projectileCount: 3, duration: 3, telegraph: { kind: 'line', length: 10, width: 0.9 } },
+      { id: 'slam', name: 'Bell Slam', kind: 'slam', damageType: 'physical', damageCoef: '1.8', windupSec: 1.25, releaseSec: 0.15, recoverySec: 2.5, cooldownSec: 0, range: 3.6, telegraph: { kind: 'circle', radius: 3.6 } },
     ],
   },
 ];

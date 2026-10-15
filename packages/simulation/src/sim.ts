@@ -3,7 +3,7 @@ import {
   BRANCH_TIER_POINTS, CARD_BY_ID, CLASS_BY_ID, DODGE, cardById, cardMechanics, cardStatEffects, NODE_BY_ID, RULES, SKILL_BY_ID, TICK_RATE, TICK_SEC, TUTORIAL_CARD, defaultDeck, isBossRound,
 } from '@cursebound/content';
 import { separateEnemies, stepEnemy, stepEnemyHazard, stepEnemyProjectile } from './ai';
-import { bossPhaseAdds, createEnemy, flushPendingSpawns, setupRound, spawnWave } from './director';
+import { createEnemy, flushPendingSpawns, setupRound, spawnWave } from './director';
 import { addScore, applyCard, castVote, drawOffer, partialAward, refreshMaxHp, resolveVotes, roundAward, voteCounts, voteShouldResolve } from './fate';
 import { processReactions, stepPlayer, stepPlayerHazard, stepPlayerProjectile } from './players';
 import { seedRng } from './rng';
@@ -297,7 +297,6 @@ function combatTick(state: SimState, ev: SimEvent[], inputs: (PlayerInput | null
   // deaths -> progression
   if (state.bossPhaseEvents.length) {
     for (const ph of state.bossPhaseEvents) {
-      bossPhaseAdds(state, ph);
       enc.completedWeight = Math.max(enc.completedWeight, ph);   // finishing phase i credits its fixed weight once
       ev.push({ t: 'objective', groupId: 0, weight: 1, completed: enc.completedWeight, total: enc.objectiveTotal });
       ev.push({ t: 'domain', type: 'objective_completed', payload: { round: state.round, completedWeight: enc.completedWeight, total: enc.objectiveTotal, bossPhase: ph } });

@@ -371,7 +371,10 @@ export interface EncounterState {
   activeTicks: number;
   budget: string;              // logical budget for disclosure
   pressure: Big;               // M_r at round start
+  /** boss reinforcement waves already called (1 = at 2/3 health, 2 = at 1/3; director.ts bossReinforcements) */
   phaseAddsSpawned: number[];
+  /** boss reinforcement waves telegraphed and on their way: they spawn at `tick` */
+  reinforce?: { tick: number; spawns: PendingSpawn[] }[];
   /** number of population + reinforcement packs this round (HUD) */
   packCount?: number;
 }
@@ -499,7 +502,7 @@ export interface SimState {
   cinematicUntilTick?: number;
 }
 
-export interface PendingSpawn { kind: string; x: number; y: number; count: Big; summonerId: number | null; objective: boolean; groupId: number; /** population pack and idle state inherited by rare minions */ pack?: number; dormant?: boolean }
+export interface PendingSpawn { kind: string; x: number; y: number; count: Big; summonerId: number | null; objective: boolean; groupId: number; /** population pack and idle state inherited by rare minions */ pack?: number; dormant?: boolean; /** minion scaling (boss reinforcements): unit health and damage multipliers */ hpMul?: string; dmgMul?: string }
 
 export interface Reaction { kind: 'inferno'; slot: number; x: number; y: number; amount: Big; tick: number; generation: number }
 
@@ -546,6 +549,9 @@ export type SimEvent =
   | { t: 'dead'; slot: number }
   | { t: 'teleport'; slot: number; fx: number; fy: number; x: number; y: number; /** presentation style: absent or 'rift' = Arcanist rings; others resolve SKILL_FX['teleport:<style>'] */ style?: string }
   | { t: 'boss_phase'; id: number; phase: number }
+  /** a boss calls reinforcement wave `wave` (1 at 2/3 health, 2 at 1/3): `n` foes arrive in RULES.bossReinforceWarnSec at
+   *  the summoning circles (telegraphs, attack 'reinforce') */
+  | { t: 'boss_adds'; id: number; wave: number; n: number; x: number; y: number }
   | { t: 'stagger'; id: number }
   | { t: 'wave'; wave: number }
   | { t: 'objective'; groupId: number; weight: number; completed: number; total: number }

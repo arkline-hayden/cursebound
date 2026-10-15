@@ -571,6 +571,7 @@ export class CombatScene extends Phaser.Scene {
         J.shake(0.02, 450); J.flash(0xffffff, 120);
         this.banner(`Phase ${e.phase + 1}`, 'danger');
         break;
+      case 'boss_adds': this.sfx('wave_spawn', undefined, 4); this.banner('Reinforcements!', 'danger'); break;   // summoning circles are the telegraphs
       case 'stagger': this.banner('Staggered!', 'good'); J.hitStop(90); break;
     }
   }
