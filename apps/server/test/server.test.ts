@@ -79,7 +79,7 @@ describe('server integration', () => {
     // A16: forged fields are ignored; unknown message types are rejected
     c.send({ t: 'INPUT', seq: 1, tick: 0, mx: 0, my: 0, ax: 1, ay: 0, b: 0, hp: '1e999', score: '999' });
     c.send({ t: 'SET_SCORE', score: '1e99' });
-    await tickle();
+    await until(() => c.msgs.some((m) => m.t === 'ERROR' && m.code === 'INVALID_INPUT'));
     expect(c.msgs.some((m) => m.t === 'ERROR' && m.code === 'INVALID_INPUT')).toBe(true);
     const pump = async (n: number, play = true) => {
       for (let i = 0; i < n; i++) {
@@ -121,11 +121,12 @@ describe('server integration', () => {
     expect(a.state.phase).toBe('VOTING');
     // A15: refresh during vote -> new socket with the same seat token gets the offer and vote state again
     c.close();
-    await tickle(); await pump(2, false);
+    // the socket close reaches the authority asynchronously (slower under load / on CI)
+    await until(() => { a.tick(); return a.paused; });
     expect(a.paused).toBe(true);   // solo local authority paused for client loss
     const c2 = new Client(room.roomId, room.seatToken);
     await c2.open();
-    await tickle(); await tickle();
+    await until(() => { a.tick(); return !a.paused; });
     expect(a.paused).toBe(false);
     expect(c2.last('OFFER')?.offerId).toBe(offer.offerId);
     expect(c2.last('VOTE_STATE')?.offerId).toBe(offer.offerId);

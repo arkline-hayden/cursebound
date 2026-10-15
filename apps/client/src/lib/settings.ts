@@ -65,6 +65,8 @@ export interface Settings {
   pad: Record<Action, number[]>;
   devOverlay: boolean;
   tutorialDone: boolean;
+  /** controller vibration on hits, downs and boss slams (lib/gamepad.ts) */
+  rumble: boolean;
   /** graphics quality tier in use (game/gfx.ts). With graphicsAuto it follows this device's first-run capability
    *  probe (game/gfxProfile.ts), which the frame-rate watchdog may lower; both stay device-local when profiles sync */
   graphics: GfxTier;
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pad: { moveUp: [12], moveDown: [13], moveLeft: [14], moveRight: [15], attack: [7], forceAttack: [], skill1: [2], skill2: [3], skill3: [1], signature: [5], dodge: [0, 4], ledger: [8], pause: [9], interact: [6], inventory: [], minimap: [] },
   devOverlay: false,
   tutorialDone: false,
+  rumble: true,
   graphics: 'high',
   graphicsAuto: true,
 };

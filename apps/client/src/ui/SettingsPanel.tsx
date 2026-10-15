@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { ACTIONS, CONTROL_SCHEMES, DEFAULT_SETTINGS, PAD_LABELS, SCHEME_KEYS, TEXT_SIZES, actionLabel, bindKey, keyLabel, setControlScheme, setGraphics, settingsStore, textSizeTier, updateSettings, type Action, type PaletteId, type Settings } from '@/lib/settings';
+import { padGlyph, padStore } from '@/lib/gamepad';
+import { ACTIONS, CONTROL_SCHEMES, DEFAULT_SETTINGS, SCHEME_KEYS, TEXT_SIZES, actionLabel, bindKey, keyLabel, setControlScheme, setGraphics, settingsStore, textSizeTier, updateSettings, type Action, type PaletteId, type Settings } from '@/lib/settings';
 import { useStore } from '@/lib/store';
 import { GFX_LABELS, GFX_TIERS, slowHint, stepDown, type GfxTier } from '@/game/gfx';
 
@@ -48,6 +49,7 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
   const [tab, setTabState] = useState<TabId>('graphics');
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [capture, setCapture] = useState<{ action: Action; kind: 'key' | 'pad'; index: number } | null>(null);
+  const pad = useStore(padStore, (x) => x);
   const [bindNote, setBindNote] = useState<string | null>(null);
   // device-local slow-frame report (localStorage, so read after mount to keep hydration stable)
   const [slow, setSlow] = useState<GfxTier | null>(null);
@@ -131,7 +133,7 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
           {s.keys[a.id][i] ? keyLabel(s.keys[a.id][i]) : '—'}
         </button>
       ))}</span></td>
-      <td><button className="btn small" onClick={() => setCapture({ action: a.id, kind: 'pad', index: 0 })} aria-label={`${actionLabel(a.id, s.controlScheme)} gamepad: ${s.pad[a.id][0] !== undefined ? PAD_LABELS[s.pad[a.id][0]] ?? `B${s.pad[a.id][0]}` : 'unbound'}. Activate to rebind.`}>{s.pad[a.id][0] !== undefined ? PAD_LABELS[s.pad[a.id][0]] ?? `B${s.pad[a.id][0]}` : '—'}</button></td>
+      <td><button className="btn small" onClick={() => setCapture({ action: a.id, kind: 'pad', index: 0 })} aria-label={`${actionLabel(a.id, s.controlScheme)} gamepad: ${s.pad[a.id][0] !== undefined ? padGlyph(s.pad[a.id][0], pad.family) : 'unbound'}. Activate to rebind.`}>{s.pad[a.id][0] !== undefined ? padGlyph(s.pad[a.id][0], pad.family) : '—'}</button></td>
     </tr>
   );
   const bindTable = (rows: (typeof ACTIONS)[number][]) => (
@@ -185,6 +187,11 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
         {s.controlScheme === 'click' && !s.keys.attack.some((k) => k.startsWith('Mouse')) && <p role="alert" className="chip warn" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>Move / attack has no mouse button, so clicks will not walk. Bind Left click to it.</p>}
         {bindNote && !capture && <p role="status" className="chip" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>{bindNote}</p>}
         {capture && <p role="status" className="chip warn" style={{ alignSelf: 'flex-start', margin: '8px 0' }}>Press a {capture.kind === 'key' ? 'key or mouse button' : 'gamepad button'} for “{actionLabel(capture.action, s.controlScheme)}”…</p>}
+        <div className="set-row">
+          <span>Controller<span className="hint-text">{pad.connected ? `${pad.name || 'Controller'} · ${pad.family === 'playstation' ? 'PlayStation' : pad.family === 'xbox' ? 'Xbox' : 'standard'} layout. The D-pad or left stick moves through menus, ${padGlyph(0, pad.family)} selects, ${padGlyph(1, pad.family)} goes back, ${padGlyph(4, pad.family)} / ${padGlyph(5, pad.family)} switch tabs.` : 'None connected. Plug in or pair an Xbox, PlayStation or other standard controller and press a button.'}</span></span>
+          <span className={`chip ${pad.connected ? 'good' : ''}`}>{pad.connected ? 'Connected' : 'Not found'}</span>
+        </div>
+        <Toggle k="rumble" label="Controller rumble" hint="Vibrates on hits you take, going down and boss slams (controllers that support it)." />
         <div className="bind-grid">{bindTable(ACTIONS.slice(0, half))}{bindTable(ACTIONS.slice(half))}</div>
         <button className="btn small ghost" style={{ alignSelf: 'flex-start', marginTop: 12 }} onClick={() => { setBindNote(null); updateSettings({ keys: SCHEME_KEYS[s.controlScheme], pad: DEFAULT_SETTINGS.pad }); }}>Reset controls</button>
       </>

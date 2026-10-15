@@ -8,6 +8,7 @@ import '@fontsource/jersey-20';
 import '@fontsource/cinzel/900.css';
 import './globals.css';
 import { SkinInstaller } from '@/ui/SkinInstaller';
+import { GamepadRoot } from '@/ui/GamepadRoot';
 import { UpdateToast } from '@/ui/UpdateToast';
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <SkinInstaller />
+        <GamepadRoot />
         <a className="skip-link" href="#main">Skip to content</a>
         {children}
         <UpdateToast />

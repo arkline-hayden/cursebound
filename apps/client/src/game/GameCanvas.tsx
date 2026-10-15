@@ -112,7 +112,8 @@ export default function GameCanvas({ net, audio }: { net: GameConnection; audio:
     };
   }, [net, audio, tier]);
   return (
-    <div className="game-canvas" ref={ref}>
+    // data-gameplay: while nothing is open over the game, the controller drives the hero, not the menus (lib/gamepad.ts)
+    <div className="game-canvas" ref={ref} data-gameplay="true">
       {error && <div className="frame blood" role="alert" style={{ position: 'absolute', maxWidth: 520 }}>{error}</div>}
     </div>
   );

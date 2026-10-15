@@ -30,6 +30,7 @@ import { settingsStore } from '@/lib/settings';
 import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 import { gfx, particleBudget, reportSlowFrames } from '../gfx';
 import { spectateStore } from '@/ui/Spectate';
+import { rumble } from '@/lib/gamepad';
 import { spectateTarget } from '../spectate';
 
 // Combat presentation (PRD §15, §16, §18): renders authoritative snapshots in a lit isometric dungeon, predicts the
@@ -436,6 +437,7 @@ export class CombatScene extends Phaser.Scene {
           if (v) { v.recoilX = u.x * 6; v.recoilY = u.y * 4; v.squash = 1; }
           if (e.target === me) {
             this.sfx('hit_player', e.x, 2, e.y);
+            rumble(frac > 0.2 ? 'heavy' : 'hit');
             J.hitStop(40 + Math.round(frac * 120));
             J.shake(0.004 + frac * 0.02, 120 + frac * 200);
             J.flash(0xa01a1a, 80);
@@ -555,14 +557,14 @@ export class CombatScene extends Phaser.Scene {
           if (en?.boss) this.sfx('boss_telegraph', en.x, 3, en.y);
           else if (en) this.sfx('telegraph_warn', en.x, 0, en.y);
         } else if (en) {
-          if (en.boss) { this.sfx(e.attack === 'charge' ? 'boss_charge' : e.attack === 'ring' ? 'boss_ring' : 'hit_player', en.x, 2, en.y); this.juice.shake(0.008, 180); }
+          if (en.boss) { this.sfx(e.attack === 'charge' ? 'boss_charge' : e.attack === 'ring' ? 'boss_ring' : 'hit_player', en.x, 2, en.y); this.juice.shake(0.008, 180); rumble('slam'); }
           else if (['shard', 'orb', 'fan', 'lob'].includes(e.attack)) this.sfx('enemy_shoot', en.x, 0, en.y);
           else this.sfx('enemy_bite', en.x, 0, en.y);
           if (e.attack === 'slam' || e.attack === 'lightpool_burst') { const q = this.P(en.x, en.y); J.ring(q.x, q.y, iso.rx(3.6), 0xff8a3a, 300); J.dust(q.x, q.y, 12); }
         }
         break;
       }
-      case 'downed': this.sfx('player_downed', undefined, 5); if (e.slot === me) { J.hitStop(160); J.shake(0.02, 300); } break;
+      case 'downed': this.sfx('player_downed', undefined, 5); if (e.slot === me) { J.hitStop(160); J.shake(0.02, 300); rumble('downed'); } break;
       case 'revived': { this.sfx('player_revived', undefined, 3); const p = snap?.players[e.slot]; if (p) { const q = this.P(p.x, p.y); J.ring(q.x, q.y, 36, 0xffd890, 400); J.embersAt(q.x, q.y - 14, 16, 0xffd890); } break; }
       case 'boss_phase':
         this.sfx('boss_phase', undefined, 4);

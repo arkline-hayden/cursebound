@@ -1278,3 +1278,8 @@ textarea.input:focus-visible { outline: 2px dashed var(--ember-hi); outline-offs
 .spectate-row { display: flex; align-items: center; gap: var(--sp-2); }
 .spectate-who { display: inline-flex; align-items: center; gap: var(--sp-1); min-width: 180px; justify-content: center; }
 .spectate-who b { font-family: var(--font-gothic); font-weight: normal; font-size: var(--fs-goth-sm); color: var(--gold-hi); text-shadow: var(--shadow-hard); }
+
+/* ---------- controller: a bold pixel focus ring while navigating with a pad; the mouse cursor hides ---------- */
+html.pad-nav, html.pad-nav * { cursor: none !important; }
+html.pad-nav :focus-visible, html.pad-nav :focus { outline: 4px solid var(--gold-hi) !important; outline-offset: 3px; box-shadow: 0 0 0 7px #000; }
+html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-image-source: var(--px-plaque-hover); color: var(--gold-hi); }

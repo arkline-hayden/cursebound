@@ -272,7 +272,7 @@ export default function Home() {
         </header>
 
         {stage === 'title' ? (
-          <button className="press-start" onClick={() => { setStage('menu'); try { sessionStorage.setItem(STAGE_KEY, '1'); } catch { /* ignore */ } }}>
+          <button className="press-start" data-pad-any onClick={() => { setStage('menu'); try { sessionStorage.setItem(STAGE_KEY, '1'); } catch { /* ignore */ } }}>
             Press any key
           </button>
         ) : (

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { BOSS_BY_ID, CARD_BY_ID, CLASS_BY_ID, SKILL_BY_ID } from '@cursebound/content';
 import { netStore, type GameConnection } from '@/lib/net';
-import { settingsStore, keyCap, keyLabel } from '@/lib/settings';
+import { settingsStore, keyCap, keyLabel, type Action } from '@/lib/settings';
+import { padGlyph, padStore } from '@/lib/gamepad';
 import { useStore } from '@/lib/store';
 import { score, whole, wholeNum } from '@/lib/format';
 import { NodeIcon, CardIcon } from './icons';
@@ -110,6 +111,11 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
   const slot = useStore(netStore, (s) => s.slot);
   const phase = useStore(netStore, (s) => s.phase);
   const keys = useStore(settingsStore, (s) => s.s.keys);
+  const padBinds = useStore(settingsStore, (s) => s.s.pad);
+  const padMode = useStore(padStore, (s) => s.usingPad);
+  const padFam = useStore(padStore, (s) => s.family);
+  /** the prompt for an action: its controller button while a pad is in use, else its key */
+  const cap = (a: Action, fallback: string) => (padMode ? padGlyph(padBinds[a]?.[0], padFam) : keyCap(keys[a]?.[0] ?? fallback));
   const cine = useCinematic();
   if (!snap || !phase) return null;
   const me = snap.players[slot];
@@ -124,6 +130,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
   const enc = snap.enc;
   const boss = enc?.boss && enc.bossId ? BOSS_BY_ID[enc.bossId] : null;
   const slotKeys = [keys.skill1[0], keys.skill2[0], keys.skill3[0], keys.signature[0]];
+  const slotActions: Action[] = ['skill1', 'skill2', 'skill3', 'signature'];
   const t = enc ? enc.activeTicks / 60 : 0;
   const ref = enc ? enc.referenceTicks / 60 : 0;
   const statusText = `Round ${snap.round}. Health ${whole(me.hpT)} of ${whole(me.mhpT)}${me.life !== 'alive' ? `, ${me.life}` : ''}. ${enc ? `Objectives ${enc.done} of ${enc.total}.` : ''} ${boss ? `${boss.name} at ${Math.round(enc!.bossHp * 100)} percent, phase ${enc!.bossPhase + 1}.` : ''}`;
@@ -202,13 +209,13 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
           <span className="val">{score(snap.scoreText)}</span>
         </div>
         <button className="ledger-btn" onClick={onLedger} aria-label={`Open Fate Ledger. ${phase.fate.length} cards bound.`}>
-          <span className="lhead"><span>Fate Ledger · {phase.fate.length}</span><span className="kbd">{keyCap(keys.ledger[0] ?? 'Tab')}</span></span>
+          <span className="lhead"><span>Fate Ledger · {phase.fate.length}</span><span className="kbd">{cap('ledger', 'Tab')}</span></span>
           <span className="lcards">
             {phase.fate.slice(-5).map((c, i) => <span key={i} data-tip={CARD_BY_ID[c.cardId]?.name}><CardIcon cardId={c.cardId} size={32} /></span>)}
             {phase.fate.length === 0 && <span className="none">None bound</span>}
           </span>
         </button>
-        <button className="btn small" onClick={onPause}>Menu <span className="kbd">{keyCap(keys.pause[0] ?? 'Escape')}</span></button>
+        <button className="btn small" onClick={onPause}>Menu <span className="kbd">{cap('pause', 'Escape')}</span></button>
       </div>
 
       {/* bottom: life orb, action bar, resource orb */}
@@ -247,7 +254,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
                 {id && frac > 0 && <span className="cdtext">{Math.ceil(frac * (SKILL_BY_ID[id]?.cooldownSec ?? 0))}</span>}
                 {id && !ready && frac === 0 && <div className="nores" />}
                 {max > 1 && <span className="charges">{ch}</span>}
-                <span className="kbd key" title={keyLabel(slotKeys[i] ?? '')}>{keyCap(slotKeys[i])}</span>
+                <span className="kbd key" title={keyLabel(slotKeys[i] ?? '')}>{cap(slotActions[i]!, slotKeys[i] ?? '')}</span>
               </div>
             );
           })}
@@ -261,7 +268,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
                 ))}
               </span>
             )}
-            <span className="kbd key">{keyCap(keys.dodge[0])}</span>
+            <span className="kbd key">{cap('dodge', 'Space')}</span>
           </div>
         </div>
       </div>
