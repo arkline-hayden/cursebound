@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { DODGE, BOSS_BY_ID, ENEMY_BY_ID, affixNames, eliteName, CLASS_BY_ID } from '@cursebound/content';
+import { DODGE, BOSSES, BOSS_BY_ID, ENEMY_BY_ID, affixNames, eliteName, CLASS_BY_ID } from '@cursebound/content';
 import { formatBig, Big } from '@cursebound/numeric';
 import type { Snapshot, SnapEnemy, SnapPlayer, SimEvent } from '@cursebound/simulation';
 import { buildArt, ensureActor } from '../art/generate';
@@ -17,6 +17,7 @@ import { PickupRenderer } from '../render/Pickups';
 import { Outlines } from '../render/Outlines';
 import { AfflictionFx, foeActor, heroTint } from '../render/Afflictions';
 import { DoorRenderer } from '../render/Doors';
+import { ThemeBossFx } from '../render/BossFx';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
 import type { StingerKind } from '../audio/sfx';
@@ -54,7 +55,7 @@ function hpNum(compact: string): string {
   return formatBig(b);
 }
 
-const BOSS_KINDS = new Set(['prismstag', 'bellroot']);
+const BOSS_KINDS = new Set(BOSSES.map((b) => b.id));
 /** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
 const CAM_LIFT = 22;
 /** Kill-streak milestones and their colours (escalating). */
@@ -111,6 +112,8 @@ export class CombatScene extends Phaser.Scene {
   aff!: AfflictionFx;
   /** in-world door vote (render/Doors.ts) */
   doorsR: DoorRenderer | null = null;
+  /** theme bosses: the Gale Wyrm aloft, kit cues, the Crater Horror's darkness (render/BossFx.ts) */
+  bossFx!: ThemeBossFx;
   private actors = new Map<string, ActorView>();
   private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number; color: number; look?: ProjectileLook; born: number }>();
   private hazardG!: Phaser.GameObjects.Graphics;
@@ -204,6 +207,7 @@ export class CombatScene extends Phaser.Scene {
     this.aff = new AfflictionFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
+    this.bossFx = new ThemeBossFx(this, this.juice, this.dungeon, () => this.hazardFxCtx(), (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.hazardG = this.add.graphics().setDepth(-80);
     this.teleG = this.add.graphics().setDepth(-70);
     this.fxG = this.add.graphics().setDepth(4700);
@@ -435,6 +439,7 @@ export class CombatScene extends Phaser.Scene {
   private handleEvent(e: SimEvent, me: number, snap: Snapshot | null) {
     const pal = this.palette();
     const J = this.juice;
+    this.bossFx.onEvent(e, me, snap);   // theme boss kit cues (reads, never consumes)
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
     switch (e.t) {
       case 'hit': {
@@ -832,6 +837,7 @@ export class CombatScene extends Phaser.Scene {
     this.elites.begin(this.time.now);
     this.outlines.begin();
     this.aff.begin(this.time.now);
+    this.bossFx.begin(this.net.map);
     this.focus.length = 0;
     if (!ip || !latest) { this.drawFx(); return; }
     const { a, b, t } = ip;
@@ -921,6 +927,7 @@ export class CombatScene extends Phaser.Scene {
     this.cine?.update(delta, latest, this.focus);
     this.dungeon.update(this.time.now, this.focus);
     this.cine?.applyLights();
+    this.bossFx.update(latest, delta);   // the Crater Horror's darkness (after the cutscene lights)
     const cam = this.cameras.main;
     const cc = this.cine?.camera();   // a cutscene drives the camera (integer zoom only)
     if (cc) {
@@ -1275,9 +1282,11 @@ export class CombatScene extends Phaser.Scene {
     v.sprite.setData('lx', px).setData('ly', py);
     if (v.gibbed) { v.bar?.clear(); v.badge?.setVisible(false); v.shadow.setAlpha(0); return; }
     const st: ActorState = e.st === 'dying' ? 'death' : e.st === 'windup' ? 'windup' : e.st === 'attack' || e.st === 'recovery' ? 'attack' : e.st === 'stagger' || e.stag ? 'stagger' : e.st === 'move' ? 'run' : 'idle';
-    this.play(v, st, this.dirOf(e.fx, e.fy));
+    const bl = e.boss ? this.bossFx.enemyLook(e, delta) : null;   // a flying boss aloft (render/BossFx.ts)
+    this.play(v, bl?.state ?? st, this.dirOf(e.fx, e.fy));
     v.sprite.setDepth(depth).setAlpha(1);
     this.applyRecoil(v, px, py, delta);
+    if (bl) { v.sprite.y -= Math.round(bl.lift); v.sprite.setDepth(depth + bl.lift * 2); }
     const flashing = e.flash && this.settings().flashes;
     if (flashing) v.sprite.setTintFill(0xffffff);
     else if (e.st === 'windup') v.sprite.setTint((Math.floor(this.time.now / 70) % 2) ? 0xff9a8a : 0xffffff);   // readable windup blink
@@ -1290,7 +1299,7 @@ export class CombatScene extends Phaser.Scene {
     else v.sprite.clearTint();
     // frozen foes stop animating; everything else plays at normal speed
     if (e.fz) v.sprite.anims.pause(); else if (v.sprite.anims.isPaused) v.sprite.anims.resume();
-    v.shadow.setAlpha(1).setScale(v.baseScale);
+    v.shadow.setAlpha(1).setScale(v.baseScale * (bl?.shadow ?? 1));
     const set = this.settings();
     void set;
     if (v.elite) this.elites.draw(v.sprite, e, x, y, this.time.now);

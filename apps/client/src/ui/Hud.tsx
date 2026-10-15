@@ -144,7 +144,7 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
       <div className="hud-top" aria-hidden="true">
         <div className="hud-round">
           <div className="hud-wing left">
-            {training && !enc?.boss ? <span>Training</span> : enc ? (enc.boss ? <span>Phase <b>{enc.bossPhase + 1}</b>/3</span>
+            {training && !enc?.boss ? <span>Training</span> : enc ? (enc.boss ? <span>Phase <b>{enc.bossPhase + 1}</b>/{boss?.phases.length ?? 3}</span>
               : enc.packsLeft !== undefined ? <span>Packs <b>{enc.packsLeft}</b> left</span>
               : <span>Wave <b>{enc.wave + 1}</b>/{enc.waves} · <b>{enc.done}</b>/{enc.total}</span>) : <span>Gathering</span>}
           </div>
@@ -170,10 +170,11 @@ export function Hud({ net, onLedger, onPause }: { net: GameConnection; onLedger:
               <i style={{ width: `${enc.bossHp * 100}%` }} />
               <span className="mark" style={{ left: '66%' }} />
               <span className="mark" style={{ left: '33%' }} />
+              {boss.phases.filter((p) => p.healthFrac < 1 && Math.abs(p.healthFrac - 2 / 3) > 0.02 && Math.abs(p.healthFrac - 1 / 3) > 0.02).map((p) => <span key={p.healthFrac} className="mark" style={{ left: `${Math.round(p.healthFrac * 100)}%` }} />)}
             </div>
             <div className="bmeta">
               <span>{whole(enc.bossHpT)}</span>
-              <span className="phase-pips">{[0, 1, 2].map((p) => <i key={p} className={p <= enc.bossPhase ? 'on' : ''} />)}</span>
+              <span className="phase-pips">{boss.phases.map((_, p) => <i key={p} className={p <= enc.bossPhase ? 'on' : ''} />)}</span>
             </div>
           </div>
         ) : <TargetPlate />}

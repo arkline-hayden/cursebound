@@ -81,6 +81,8 @@ export function playStinger(s: Synth, kind: StingerKind, o: AudioNode, t: number
       s.noiseHit(o, t, { dur: 1.6, f: 600, f2: 300, q: 0.8, gain: 0.08, attack: 0.1 });
       if (k.boss === 'prismstag') for (const f of [1750, 1860, 2480]) s.tone(o, h, { f, f2: f * 0.8, dur: 1.4, gain: 0.02, attack: 0.08, glide: 1.4 });
       else if (k.boss === 'bellroot') s.bigBell(o, h, 65, 3.5, 0.14);
+      else if (k.boss === 'skydrake') s.noiseHit(o, h, { dur: 1.8, f: 400, f2: 2400, q: 0.7, gain: 0.07, attack: 0.3 });   // a gust
+      else if (k.boss === 'moonhorror') for (const f of [41, 41.6]) s.tone(o, h, { f, dur: 2.4, gain: 0.12, attack: 0.3 });   // a sub beat
       return;
     }
     case 'round_clear': {

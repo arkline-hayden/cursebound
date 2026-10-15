@@ -65,6 +65,11 @@ const ACTOR_SOURCE: Record<ActorId, string> = {
   rimewraith: 'apps/client/src/game/art/draw/creatures.ts',
   gloomshade: 'apps/client/src/game/art/draw/creatures.ts',
   webweaver: 'apps/client/src/game/art/draw/creatures.ts',
+  skydrake: 'apps/client/src/game/art/draw/skyMoonBosses.ts',
+  moonhorror: 'apps/client/src/game/art/draw/skyMoonBosses.ts',
+  galeharpy: 'apps/client/src/game/art/draw/skyMoonCreatures.ts',
+  galewisp: 'apps/client/src/game/art/draw/skyMoonCreatures.ts',
+  craterspawn: 'apps/client/src/game/art/draw/skyMoonCreatures.ts',
 };
 
 /** Display names in the Sunken Catacombs theme (ids are stable). */
@@ -95,6 +100,11 @@ export const ACTOR_DISPLAY_NAME: Record<ActorId, string> = {
   rimewraith: 'Rime Wraith',
   gloomshade: 'Gloom Shade',
   webweaver: 'Web Weaver',
+  skydrake: 'The Gale Wyrm',
+  moonhorror: 'The Crater Horror',
+  galeharpy: 'Gale Harpy',
+  galewisp: 'Wind Elemental',
+  craterspawn: 'Crater Spawn',
 };
 
 const ACTOR_ROLE: Record<ActorId, string> = {
@@ -124,6 +134,11 @@ const ACTOR_ROLE: Record<ActorId, string> = {
   rimewraith: 'enemy',
   gloomshade: 'enemy',
   webweaver: 'enemy',
+  skydrake: 'boss',
+  moonhorror: 'boss',
+  galeharpy: 'enemy',
+  galewisp: 'enemy',
+  craterspawn: 'enemy',
 };
 
 function buildManifest(): AssetEntry[] {
@@ -263,6 +278,11 @@ const REQUIRED_STATES: Record<ActorId, string[]> = {
   rimewraith: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
   gloomshade: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
   webweaver: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  skydrake: ['idle', 'run', 'windup', 'attack', 'stagger', 'death'],
+  moonhorror: ['idle', 'windup', 'attack', 'stagger', 'death'],
+  galeharpy: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  galewisp: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
+  craterspawn: ['idle', 'run', 'windup', 'attack', 'hit', 'death'],
 };
 
 /** Minimum frame counts from the art contract. */
@@ -273,11 +293,13 @@ const MIN_FRAMES: Record<string, Record<string, number>> = {
   mite: { idle: 2, run: 4, windup: 2, attack: 2, hit: 1, death: 4 },
   prismstag: { idle: 4, run: 6, windup: 4, attack: 6, stagger: 3, death: 8 },
   bellroot: { idle: 4, windup: 4, attack: 6, stagger: 3, death: 8 },
+  skydrake: { idle: 4, run: 4, windup: 4, attack: 5, stagger: 3, death: 8 },
+  moonhorror: { idle: 4, windup: 4, attack: 6, stagger: 3, death: 8 },
 };
 
 function frameClass(id: ActorId): string {
   if (isHeroActor(id)) return 'hero';
-  if (id === 'mite' || id === 'prismstag' || id === 'bellroot') return id;
+  if (id === 'mite' || id === 'prismstag' || id === 'bellroot' || id === 'skydrake' || id === 'moonhorror') return id;
   if (id === 'spiritwolf' || id === 'spiritbear' || id === 'spiritelk') return 'companion';
   return 'enemy';
 }

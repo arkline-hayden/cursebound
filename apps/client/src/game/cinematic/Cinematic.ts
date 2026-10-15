@@ -13,6 +13,7 @@ import { cinematicEnd, cinematicRebroadcast, cinematicStart, type CinematicKind 
 import { cineOverlay } from './overlay';
 import { Puppet, dirOf } from './puppet';
 import { BOSS_CINE, bossEpithet, bossName, cardLine, fatesLine, hexCss, themeGlow, themeName } from './text';
+import { THEME_BOSS_INTROS, THEME_INTRO_LIFT } from './themeBossIntros';
 import { E, Timeline, lerp, type Ease, type TimelineCtx } from './timeline';
 
 // Cutscene director. Every scene is driven by authoritative sim events / phases, so all co-op clients play the same
@@ -647,6 +648,7 @@ export class CinematicDirector {
     const J = this.host.juice;
     const info = BOSS_CINE[kind] ?? { epithet: '', glow: 0xff5a5a, css: '#ff8a7a', dust: 0x5a4a40 };
     const stag = kind === 'prismstag', bell = kind === 'bellroot';
+    const themeIntro = THEME_BOSS_INTROS[kind];   // the Gale Wyrm, the Crater Horror (themeBossIntros.ts)
     const spot = { x, y };
     const sq = iso.p(x, y);
     const heroes = (snap?.players ?? []).filter((p) => p.life === 'alive');
@@ -654,7 +656,7 @@ export class CinematicDirector {
     let fx = party.x - x, fy = party.y - y;
     const fl = Math.hypot(fx, fy) || 1; fx /= fl; fy /= fl;
     const actor = (ACTOR_IDS as readonly string[]).includes(kind) ? (kind as ActorId) : null;
-    const lift = bell ? 64 : stag ? 46 : 40;
+    const lift = bell ? 64 : stag ? 46 : THEME_INTRO_LIFT[kind] ?? 40;
     const reduced = this.settings().reducedEffects;
     const motion = !this.settings().reducedMotion;
 
@@ -793,6 +795,18 @@ export class CinematicDirector {
           if (motion) this.zoom = 2;
         }
       }));
+    } else if (themeIntro) {
+      themeIntro({
+        tl: sc.tl, J, pup, x, y, sq, fx, fy, T, REVEAL, ROAR, reduced, motion, info,
+        image: (key, ix, iy, depth) => this.image(sc, key, ix, iy, depth),
+        sprite: (key, ix, iy, depth) => this.sprite(sc, key, ix, iy, depth),
+        light: (lx, ly, r, c, k) => this.light(sc, lx, ly, r, c, k),
+        flash: (fx2, fy2, r, c, k, ms) => this.flash(fx2, fy2, r, c, k, ms),
+        sfx: (ctx, id, w, priority) => this.sfx(ctx, id, w, priority),
+        debrisAt: (dx, dy, n, tint) => this.debrisAt(dx, dy, n, tint),
+        zoom: (z) => { this.zoom = z; },
+        graphics: (depth) => { const g = this.host.scene.add.graphics().setDepth(depth); sc.objs.push(g); return g; },
+      });
     } else {
       // any other boss: rises out of a flare of its colour
       const lamp = this.light(sc, sq.x, sq.y - 30, 260, info.glow, 0);

@@ -75,7 +75,8 @@ const TENTACLES: KitModule = {
     for (const [x, y] of spotsAround(state, e, want, K.lead, K.spacing, 1.8, 4.5)) {
       addTelegraph(state, e, a.id, a.telegraph, x, y, 0, 0, release);
       state.hazards.push(makeHazard(state, {
-        kind: 'tentacle', owner: 'enemy', ownerId: e.id, x, y, radius: R, armTick: release, untilTick: release + ticksFor(e, a.duration ?? 4.5),
+        // inner: the burst tick, replicated for the client (the tentacle rises as the telegraph closes)
+        kind: 'tentacle', owner: 'enemy', ownerId: e.id, x, y, radius: R, inner: release, armTick: release, untilTick: release + ticksFor(e, a.duration ?? 4.5),
         interval: every, nextTick: release + every, damage: dmg, dtype: a.damageType, vars: {},
       }));
     }

@@ -19,6 +19,11 @@ export const GORE: Record<string, { color: number; decal: 'blood' | 'ichor' | 's
   mite: { color: 0x9a3a2a, decal: 'blood', shards: 0x8a6a5a },
   prismstag: { color: 0x8fd8ff, decal: 'ichor', shards: 0xe8e8f0 },
   bellroot: { color: 0xf0a030, decal: 'ichor', shards: 0xa07040 },
+  skydrake: { color: 0x7ab4dc, decal: 'ichor', shards: 0xd2f2ff },
+  moonhorror: { color: 0x8e4a86, decal: 'slime', shards: 0x786c92 },
+  galeharpy: { color: 0x8a1c2c, decal: 'blood', shards: 0xe0eaf6 },
+  galewisp: { color: 0x9ac8e8, decal: 'ichor', shards: 0xdaf2ff },
+  craterspawn: { color: 0x8e4a86, decal: 'slime', shards: 0x4e4060 },
   player: { color: 0xa01a1a, decal: 'blood', shards: 0xa01a1a },
 };
 

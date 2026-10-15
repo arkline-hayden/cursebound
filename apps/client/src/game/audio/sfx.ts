@@ -82,7 +82,17 @@ export type SfxId =
   | 'move_click'
   | 'minimap_ping'
   | 'chest_open'
-  | 'potion_glug';
+  | 'potion_glug'
+  // theme bosses (audio/bossRecipes.ts): the Gale Wyrm, the Crater Horror
+  | 'drake_screech'
+  | 'drake_gale'
+  | 'drake_dive'
+  | 'thunder_feather'
+  | 'skyfall'
+  | 'horror_moan'
+  | 'tentacle_burst'
+  | 'gravity_well'
+  | 'void_beam';
 
 export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 
@@ -192,6 +202,15 @@ export const SFX_IDS: readonly SfxId[] = [
   'minimap_ping',
   'chest_open',
   'potion_glug',
+  'drake_screech',
+  'drake_gale',
+  'drake_dive',
+  'thunder_feather',
+  'skyfall',
+  'horror_moan',
+  'tentacle_burst',
+  'gravity_well',
+  'void_beam',
 ];
 
 /** Cues that are never voice-stolen and always produce a caption. */
@@ -238,4 +257,13 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   stag_cry: '[stag shrieks]',
   bell_toll: '[bell tolls]',
   chest_open: '[chest creaks open]',
+  drake_screech: '[wyrm screeches]',
+  drake_gale: '[gale howls]',
+  drake_dive: '[wyrm dives]',
+  thunder_feather: '[lightning strikes]',
+  skyfall: '[blown off the island]',
+  horror_moan: '[the crater moans]',
+  tentacle_burst: '[tentacles burst out]',
+  gravity_well: '[gravity drags]',
+  void_beam: '[void beam hums]',
 };

@@ -11,4 +11,5 @@ import './cryomancer';
 import './ranger';
 import './templar';
 import './berserker';
+import './themebosses';   // theme bosses: the Gale Wyrm, the Crater Horror (hazards, adds' shots, the long fall)
 export { SKILL_FX, HAZARD_FX, HAZARD_LIGHT, PROJECTILE_FX, KILL_FX } from './registry';

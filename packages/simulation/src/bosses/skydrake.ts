@@ -70,7 +70,8 @@ function featherVolley(state: SimState, e: EnemyState, base: number) {
   for (const [x, y] of spots) {
     addTelegraph(state, e, 'stormfeather', a.telegraph, x, y, 0, 0, release);
     state.hazards.push(makeHazard(state, {
-      kind: 'stormfeather', owner: 'enemy', ownerId: e.id, x, y, radius: R, armTick: release, untilTick: release + 1, interval: 1, damage: dmg, dtype: a.damageType,
+      // inner: the strike tick, replicated for the client (the feather lands as the telegraph closes)
+      kind: 'stormfeather', owner: 'enemy', ownerId: e.id, x, y, radius: R, inner: release, armTick: release, untilTick: release + 1, interval: 1, damage: dmg, dtype: a.damageType,
     }));
   }
 }
@@ -96,12 +97,13 @@ const DIVE: KitModule = {
     e.x = at.ox + (at.tx - at.ox) * k; e.y = at.oy + (at.ty - at.oy) * k;
     v.alt = K.diveAlt;
     const seg = Math.hypot(e.x - fromX, e.y - fromY);
+    const half = (a.telegraph.kind === 'line' ? a.telegraph.width / 2 : e.radius) + 0.3;   // the marked lane (+ a hero's radius)
     for (const p of alive(state)) {
       if (at.hitSlots.includes(p.slot)) continue;
       const vx = p.x - fromX, vy = p.y - fromY;
       const along = vx * at.dx + vy * at.dy;
       if (along < -e.radius || along > seg + e.radius) continue;
-      if (Math.abs(-vx * at.dy + vy * at.dx) > e.radius + 0.3) continue;
+      if (Math.abs(-vx * at.dy + vy * at.dx) > half) continue;
       at.hitSlots.push(p.slot);
       hitHero(state, ev, e, p, a);
     }
