@@ -164,6 +164,8 @@ export class AudioEngine {
   private vol: Volumes = { master: 0.8, music: 0.6, combat: 0.8, ui: 0.7, ambience: 0.5 };
   private track: MusicTrack | null = null;
   private themeId: AudioTheme = 'catacombs';
+  /** on the training grounds (theme 'courtyard': catacombs music and footsteps, its own ambience loop when recorded) */
+  private courtyard = false;
   private bossId: string | null = null;
   private raw = 0;
   private readonly follower = new IntensityFollower();
@@ -352,9 +354,10 @@ export class AudioEngine {
    * Play a recorded sound by its file name (a per-skill cast, an enemy voice, a boss death…) when that file exists;
    * otherwise play `fallback` (the shared cue, synthesized or recorded), or nothing. Same mixing as play().
    */
-  playFile(key: string, fallback: SfxId | null, opts: { pan?: number; priority?: number; volume?: number; dist?: number } = {}): void {
-    // the stand-in cue only lends its mix group and priority; a pure file (no fallback) mixes as combat
-    if (SampleBank.has(key)) { this.play(fallback ?? 'hit_enemy', { ...opts, file: key }); return; }
+  playFile(key: string, fallback: SfxId | null, opts: { pan?: number; priority?: number; volume?: number; dist?: number; ui?: boolean } = {}): void {
+    // the stand-in cue only lends its mix group and priority; a pure file (no fallback) mixes as combat, or as
+    // interface with `ui` (menu screens: skill tree, results)
+    if (SampleBank.has(key)) { this.play(fallback ?? (opts.ui ? 'ui_confirm' : 'hit_enemy'), { ...opts, file: key }); return; }
     if (fallback) this.play(fallback, opts);
   }
 
@@ -366,7 +369,7 @@ export class AudioEngine {
     if (!ctx || ctx.state !== 'running' || !s) return;
     // a recorded take when the cue has one (footsteps pick the floor's surface set); recipe-less cues stay silent without
     const key = opts.file ?? (id === 'footstep' ? `footstep_${FLOOR_FOR_THEME[this.themeId] ?? 'stone'}` : id);
-    const take = this.samples.pick(key, s.rand);
+    const take = this.samples.pick(key, () => s.rand());
     // a named file still decoding: skip rather than play the stand-in cue
     if (!take && (FILE_ONLY.has(id) || opts.file)) return;
     const now = ctx.currentTime;
@@ -529,11 +532,14 @@ export class AudioEngine {
     this.refreshMusic();
   }
 
-  /** Set the dungeon theme (DUNGEON_THEMES id). Unknown ids fall back to catacombs. */
+  /** Set the dungeon theme (DUNGEON_THEMES id). Unknown ids fall back to catacombs (the training grounds' 'courtyard'
+   *  too, except for its own recorded ambience loop, amb_courtyard, once that exists). */
   setTheme(theme: string | null | undefined): void {
     const id = (AUDIO_THEMES as readonly string[]).includes(theme ?? '') ? (theme as AudioTheme) : 'catacombs';
-    if (id === this.themeId) return;
+    const court = theme === 'courtyard';
+    if (id === this.themeId && court === this.courtyard) return;
     this.themeId = id;
+    this.courtyard = court;
     this.refreshMusic();
   }
 
@@ -566,7 +572,7 @@ export class AudioEngine {
     const [db, hold, rel] = STINGER_DUCK[kind];
     this.duck(db, hold, rel);
     const spec = this.keySpec();
-    const take = this.samples.pick(`stinger_${kind}`, s.rand);
+    const take = this.samples.pick(`stinger_${kind}`, () => s.rand());
     if (take) {
       // recorded stinger
       const src = ctx.createBufferSource();
@@ -632,11 +638,19 @@ export class AudioEngine {
       return;
     }
     const bedId: BedId = this.themeId;
-    const take = this.samples.pick(`amb_${bedId}`, this.synth.rand);
+    const want = this.bedFile();
+    const synth = this.synth;
+    const take = this.samples.pick(want.key, () => synth.rand());
     const wantFile = !!take;
-    if (this.bed?.id === bedId && (this.bed instanceof FileBed) === wantFile) return;
+    if (this.bed?.id === (take ? want.id : bedId) && (this.bed instanceof FileBed) === wantFile) return;
     this.bed?.stop(now);
-    this.bed = take ? new FileBed(ctx, this.groups.ambience, bedId, take, now) : new AmbienceBed(this.synth, this.groups.ambience, this.ambRev, bedId, now);
+    this.bed = take ? new FileBed(ctx, this.groups.ambience, want.id, take, now) : new AmbienceBed(this.synth, this.groups.ambience, this.ambRev, bedId, now);
+  }
+
+  /** The recorded loop the bed should play: the training grounds' own once decoded, else the floor theme's. */
+  private bedFile(): { key: string; id: BedId | 'courtyard' } {
+    if (this.courtyard && this.samples.ready('amb_courtyard')) return { key: 'amb_courtyard', id: 'courtyard' };
+    return { key: `amb_${this.themeId}`, id: this.themeId };
   }
 
   private tick(): void {
@@ -654,8 +668,8 @@ export class AudioEngine {
       this.director.tick(now, ahead);
     }
     this.bed?.tick(now, ahead);
-    // the recorded loop finished decoding after the synthesized bed started: swap to it
-    if (this.bed && !(this.bed instanceof FileBed) && this.samples.ready(`amb_${this.bed.id}`)) this.refreshBed(now);
+    // the recorded loop finished decoding after the synthesized bed (or the theme's loop, in the training grounds) started: swap to it
+    if (this.bed && (this.bed instanceof FileBed ? this.bed.id !== this.bedFile().id : this.samples.ready(this.bedFile().key))) this.refreshBed(now);
     // ambience steps back as the fight heats up
     const amb = 1 - 0.45 * I;
     if (this.ambLevel && Math.abs(amb - this.ambSet) > 0.02) {
@@ -691,7 +705,7 @@ export class AudioEngine {
 class FileBed {
   private readonly src: AudioBufferSourceNode;
   private readonly gain: GainNode;
-  constructor(ctx: AudioContext, dest: AudioNode, readonly id: BedId, take: Take, t: number) {
+  constructor(ctx: AudioContext, dest: AudioNode, readonly id: BedId | 'courtyard', take: Take, t: number) {
     this.src = ctx.createBufferSource();
     this.src.buffer = take.buf;
     this.src.loop = true;

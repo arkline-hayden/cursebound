@@ -109,6 +109,8 @@ registerHazardFx({
 }, { firewall: 0xff7a1e });
 
 type Sfx = (id: SfxId, x?: number, y?: number, priority?: number) => void;
+/** a recorded file (audio/fileCues) when it exists, else the shared `fallback` cue (or nothing) */
+type FileSfx = (key: string, fallback: SfxId | null, x?: number, y?: number, priority?: number) => void;
 
 interface Per { lastFx: number }
 
@@ -118,7 +120,7 @@ export class ThemeFoeFx {
   private per = new Map<number, Per>();
   private seen = new Set<number>();
 
-  constructor(private scene: Phaser.Scene, private juice: Juice, private sfx: Sfx, private banner: (text: string, tone: 'danger' | 'good' | 'info') => void) {
+  constructor(private scene: Phaser.Scene, private juice: Juice, private sfx: Sfx, private banner: (text: string, tone: 'danger' | 'good' | 'info') => void, private sfxFile: FileSfx) {
     buildTextures(scene);
     this.ground = scene.add.graphics().setDepth(-65);
   }
@@ -177,13 +179,13 @@ export class ThemeFoeFx {
       switch (e.op) {
         case 'awake':
           this.banner(`${e.name} awakens!`, 'danger');
-          this.sfx('boss_roar', e.x, e.y, 4);
+          this.sfxFile('miniboss_awaken', 'boss_roar', e.x, e.y, 4);
           J.ring(q.x, q.y, 40, MINIBOSS_COLOR, 420); J.embersAt(q.x, q.y - 18, 18, MINIBOSS_COLOR);
           break;
         case 'slain': {
           const pts = e.pts && e.pts !== '0' ? `  +${e.pts}` : '';
           this.banner(`${e.name} slain!${pts}`, 'good');
-          this.sfx('chest_open', e.x, e.y, 4);
+          this.sfxFile('miniboss_death', 'chest_open', e.x, e.y, 4);   // the take ends in the loot chime
           J.ring(q.x, q.y, 48, 0xffe08a, 480); J.ring(q.x, q.y, 30, MINIBOSS_COLOR, 360); J.embersAt(q.x, q.y - 16, 28, 0xffd23f);
           break;
         }
@@ -200,11 +202,12 @@ export class ThemeFoeFx {
           J.ring(q.x, q.y, 34, 0xb07aff, 320);
           break;
         case 'enrage':
+          this.sfxFile('miniboss_enrage', null, e.x, e.y, 3);   // was silent: the roar plays once its file exists
           J.number(q.x, q.y - 56, 'ENRAGED', '#ff5a3a', 'md');
           J.ring(q.x, q.y, 36, 0xff3a2a, 360); J.embersAt(q.x, q.y - 20, 16, 0xff3a2a);
           break;
         case 'shield':
-          this.sfx('shield', e.x, e.y, 2);
+          this.sfxFile('miniboss_shield', 'shield', e.x, e.y, 2);
           J.number(q.x, q.y - 56, 'WARDED', '#9fd8ff', 'md');
           J.ring(q.x, q.y, 34, 0x9fd8ff, 360);
           break;

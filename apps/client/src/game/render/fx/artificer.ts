@@ -3,6 +3,8 @@ import type { SfxId } from '../../audio/AudioEngine';
 import { iso } from '../iso';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx, type SnapHazard } from './registry';
 import { castFlash, chestAt, heroGhosts, killPop, upgradeScale, type Pal } from './spectacle';
+import { fileSfx, skillLayer, skillSfx } from './kit3';
+import { SKILL_FILE } from '../../audio/fileCues';
 
 // Artificer presentation (cosmetic only). Brass, teal arc-light, orange blasts, white steam and gear bits. Turrets,
 // the drone, grenades, bomblets, mortar shells and mines are pixel sprites (art/fx/artificer.ts) that live while their
@@ -41,6 +43,18 @@ function sfx(ctx: FxCtx, id: SfxId, x: number, y: number, minGapMs: number, prio
 }
 
 const has = (ctx: FxCtx, key: string) => ctx.scene.textures.exists(key);
+
+/** True when this skill's own recorded file exists (it then covers the whole cast: throw, burst, landing). */
+const ownFile = (ctx: FxCtx, skill: string | null | undefined) => !!skill && !!SKILL_FILE[skill] && ctx.hasFile(SKILL_FILE[skill]!);
+
+/** A bomb/shell explosion: nothing when the skill's own file covers the boom, else the shared explosion file, else `id`. */
+function boom(ctx: FxCtx, skill: string | null, id: SfxId, x: number, y: number, minGapMs: number, priority: number) {
+  if (ownFile(ctx, skill)) return;
+  fileSfx(ctx, 'skill_artificer_explosion', id, x, y, minGapMs, priority);
+}
+
+/** The grenade skill each player last threw (heavy shells, style 5, do not say which variant they were). */
+const lastThrow = new Map<number, string>();
 
 // ---------------- one-shot sprites ----------------
 
@@ -237,7 +251,8 @@ function blastFx(ctx: FxCtx, e: CastFx) {
     J.bits('mote', p.x, p.y - 10, 10, STEAM, { speed: 1.4 });
     J.dust(p.x, p.y - 4, 6, 0xd0dcdc);
     ctx.dungeon.flashLight(p.x, p.y - 8, Math.max(130, rpx * 2.2), 0xd8f0f0, 2, 260);
-    sfx(ctx, 'steam_vent', e.x, e.y, 70, ctx.mine ? 2 : 1);
+    // the vent of Overclock / Rocket Jump's launch: both recorded casts include it
+    if (!(ownFile(ctx, 'af_overclock') && ownFile(ctx, 'af_rocket_jump'))) sfx(ctx, 'steam_vent', e.x, e.y, 70, ctx.mine ? 2 : 1);
     return;
   }
   const scale = heavy ? 2.4 : style === 1 || style === 8 ? Math.min(1.1, 0.6 + R * 0.25) : Math.min(2.2, Math.max(1, rpx / 36));
@@ -258,8 +273,19 @@ function blastFx(ctx: FxCtx, e: CastFx) {
   if (heavy) { J.pop(0xff7a2a, 0.16, 200); if (ctx.mine) J.hitStop(80); }
   else if (big && ctx.mine && style !== 2) J.hitStop(30);
   // grenades, shells and landings get the full explosion; bomblets and chain reactions a smaller flame whoomp
-  if (style !== 8 && (big || R >= 1.6)) sfx(ctx, 'blast_fire', e.x, e.y, 70, big ? 2 : 1);
-  else sfx(ctx, 'impact_fire', e.x, e.y, 70, 1);
+  const id: SfxId = style !== 8 && (big || R >= 1.6) ? 'blast_fire' : 'impact_fire';
+  const pri = id === 'blast_fire' && big ? 2 : 1;
+  if (style === 8) sfx(ctx, id, e.x, e.y, 70, pri);                               // Chain Reaction (no file of its own)
+  else if (style === 7) skillLayer(ctx, 'af_rocket_jump', id, e.x, e.y, 70, pri);  // the landing is in the recorded jump
+  else if (style === 2 || style === 3) boom(ctx, null, id, e.x, e.y, 70, pri);     // mortar shells, turret self-destruct
+  else if (mineAt(e.x, e.y)) boom(ctx, null, id, e.x, e.y, 70, pri);              // a proximity mine, long after its throw
+  else boom(ctx, style === 1 ? 'af_cluster_charge' : style === 6 ? 'af_firebomb' : style === 5 ? lastThrow.get(e.slot) ?? null : 'af_grenade', id, e.x, e.y, 70, pri);
+}
+
+/** A proximity mine view sitting at a world point (its detonation is not covered by the throw's recorded file). */
+function mineAt(x: number, y: number) {
+  for (const v of views.values()) if (v.kind === 'af_mine' && (v.x - x) ** 2 + (v.y - y) ** 2 < 0.36) return true;
+  return false;
 }
 
 function deployFx(ctx: FxCtx, e: CastFx, pal: Pal, kind: string) {
@@ -292,7 +318,7 @@ function deployFx(ctx: FxCtx, e: CastFx, pal: Pal, kind: string) {
     }
   }
   if (ctx.rank(e.slot, 'af_fortress_protocol') > 0) cog(ctx, p.x, p.y, ctx.rx(3.5), 900, TEAL);
-  sfx(ctx, 'mech_deploy', e.x, e.y, 60, ctx.mine ? 2 : 1);
+  skillSfx(ctx, kind, 'mech_deploy', e.x, e.y, 60, ctx.mine ? 2 : 1);
 }
 
 function overclockFx(ctx: FxCtx, e: CastFx, boiler: boolean) {
@@ -314,8 +340,8 @@ function overclockFx(ctx: FxCtx, e: CastFx, boiler: boolean) {
   ctx.dungeon.flashLight(p.x, p.y - 16, 200, TEAL, 2.2, 400);
   if (ctx.mine) J.number(p.x, p.y - 34, 'OVERCLOCK', '#5ae8d4', 'sm');
   // the engine spinning up (Overclock's own vent arrives as a steam af_fx_blast; the boiler vents here)
-  sfx(ctx, 'mech_deploy', e.x, e.y, 80, 2);
-  if (boiler) sfx(ctx, 'steam_vent', e.x, e.y, 80, 1);
+  skillSfx(ctx, e.skill, 'mech_deploy', e.x, e.y, 80, 2);
+  if (boiler) skillLayer(ctx, e.skill, 'steam_vent', e.x, e.y, 80, 1);
 }
 
 registerSkillFx({
@@ -329,7 +355,7 @@ registerSkillFx({
     J.sparksAt(mx, my, 2, BRASS_HOT);
     if (Math.random() < 0.3) J.bits('gear', c.x, c.y, 1, BRASS_DK, { angle: (Math.atan2(u.y, -u.x) * 180) / Math.PI - 60, spread: 30, speed: 0.6 });
     ctx.dungeon.flashLight(mx, my, 60, BRASS, 0.9, 70);
-    sfx(ctx, 'gun_shot', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    skillSfx(ctx, e.skill, 'gun_shot', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
 
   // ---- Turrets ----
@@ -345,7 +371,7 @@ registerSkillFx({
     const k = upgradeScale(ctx, e.slot, ['af_calibrated'], 1.75);
     ctx.juice.orb(mx, my, TEAL, 0.22 * k, 90);
     ctx.juice.sparksAt(mx, my, 2, ctx.rank(e.slot, 'af_marking_rounds') > 0 ? 0xff6a4a : TEAL);
-    sfx(ctx, 'gun_shot', e.x, e.y, 140, 0);
+    fileSfx(ctx, 'skill_artificer_turret_shot', 'gun_shot', e.x, e.y, 140, 0);
   },
   af_fx_flame: (ctx, e) => {
     const J = ctx.juice;
@@ -359,7 +385,10 @@ registerSkillFx({
     J.embersAt(q.x, q.y - 10, 3, FIRE);
     if (Math.random() < 0.3) J.dust(q.x, q.y - 12, 1, SMOKE);
     ctx.dungeon.flashLight((nx + q.x) / 2, (ny + q.y) / 2, 100, FIRE, 1.3, 160);
-    sfx(ctx, 'skill_fireline', e.x, e.y, 450, 0);
+    // the recorded flame turret is the roaring jet itself: once per take, not per burst
+    const jet = SKILL_FILE.af_flame_turret!;
+    if (ctx.hasFile(jet)) fileSfx(ctx, jet, null, e.x, e.y, 1400, 0);
+    else sfx(ctx, 'skill_fireline', e.x, e.y, 450, 0);
   },
   // tesla chain links and drone zaps (frequent): bolt + a crisp spark
   af_fx_zap: (ctx, e) => {
@@ -371,7 +400,9 @@ registerSkillFx({
     const coil = turretNear(e.x, e.y, 'af_tesla_coil');
     if (coil) { const p = ctx.P(coil.x, coil.y); ctx.juice.orb(p.x, p.y - 34, ARC, 0.5, 140); }
     ctx.dungeon.flashLight(t.x, t.y, 80, ARC, 1.4, 120);
-    sfx(ctx, 'skill_arc', e.dx, e.dy, 120, 0);
+    // a zap leaving a drone is Drone Zap (its own file, 2 takes, frequent); coil arcs and chain hops keep the shared cue
+    if (!coil && turretNear(e.x, e.y, 'af_drone')) skillSfx(ctx, 'af_drone_zap', 'skill_arc', e.dx, e.dy, 160, 0);
+    else sfx(ctx, 'skill_arc', e.dx, e.dy, 120, 0);
   },
 
   // ---- Ordnance ----
@@ -390,7 +421,7 @@ registerSkillFx({
         J.sparksAt(p.x, p.y - 26, 3, FIRE_HOT);
         puff(ctx, p.x + (Math.random() - 0.5) * 8, p.y - 28, 0.9, 0, -20);
         ctx.dungeon.flashLight(p.x, p.y - 24, 110, FIRE, 1.4, 90);
-        if (i === 4) ctx.sfx('gun_shot', e.x, e.y, 1);   // second thump of the volley (unthrottled: ctx.now is stale here)
+        if (i === 4) skillLayer(ctx, e.skill, 'gun_shot', e.x, e.y, 0, 1);   // second thump of the volley (no gap: ctx.now is stale here)
       });
     }
     J.dust(p.x, p.y, 8, 0x5a4a38);
@@ -399,7 +430,7 @@ registerSkillFx({
     cog(ctx, t.x, t.y, ctx.rx(3.6), 1500, 0xffa060);
     J.shockwave(t.x, t.y, ctx.rx(3.6), 0xff5a2a, 700);
     J.pop(FIRE, 0.08, 160);
-    sfx(ctx, 'gun_shot', e.x, e.y, 80, 2);
+    skillSfx(ctx, e.skill, 'gun_shot', e.x, e.y, 80, 2);
   },
 
   // ---- Clockwork ----
@@ -415,7 +446,7 @@ registerSkillFx({
     J.dust(p.x, p.y, 10, 0xd0dcdc);
     heroGhosts(ctx, e.slot, e.dx - e.x, e.dy - e.y, FIRE, 4, 10);
     ctx.dungeon.addDecal('scorch', p.x, p.y + 2, 0x1a1008, 0.9);
-    sfx(ctx, 'cast_fire', e.x, e.y, 80, 2);   // rocket ignition (the launch vent is a steam af_fx_blast)
+    skillSfx(ctx, e.skill, 'cast_fire', e.x, e.y, 80, 2);   // rocket ignition (the launch vent is a steam af_fx_blast)
   },
 });
 
@@ -424,7 +455,10 @@ function throwFx(ctx: FxCtx, e: CastFx) {
   const c = chestAt(ctx, e.x, e.y, 18);
   ctx.juice.slash(c.x + u.x * 6, c.y + u.y * 4, Math.atan2(u.y, u.x) - 0.6, BRASS, 0.6, { thin: true, ms: 140 });
   ctx.juice.sparksAt(c.x + u.x * 10, c.y - 4, 2, FIRE_HOT);
-  sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
+  lastThrow.set(e.slot, e.skill);
+  // the skill's own file covers the throw; without it, the shared throw take (else the whoosh)
+  if (ownFile(ctx, e.skill)) skillSfx(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
+  else fileSfx(ctx, 'skill_artificer_grenade_throw', 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
 }
 
 /** Styled teleport ('rocket', Rocket Jump landing): x,y = destination, dx,dy = origin. */

@@ -2,7 +2,8 @@ import * as Phaser from 'phaser';
 import type { SfxId } from '../../audio/AudioEngine';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx } from './registry';
 import { castFlash, chestAt, heroGhosts, impactBurst, screenAngle, trailBits, type Pal } from './spectacle';
-import { arcTrail } from './kit3';
+import { arcTrail, fileSfx, skillLayer, skillSfx } from './kit3';
+import { SKILL_FILE } from '../../audio/fileCues';
 
 // Vanguard presentation (cosmetic only): steel shockwaves, shield glints, gold rally light, red for executes and
 // provokes. Branch identity: Bulwark = steel blue + white glints, Cleaver = forged red + amber earth, Rally = banner
@@ -157,7 +158,7 @@ registerSkillFx({
     J.slash(c.x + u.x * 4, c.y + u.y * 2, ang, 0xfff0c8, 1.5 * big, { flip, ms: 170 });
     J.slash(c.x + u.x * 6, c.y + u.y * 3, ang, 0xffffff, 1.3 * big, { thin: true, flip, ms: 130 });
     J.sparksAt(c.x + u.x * 40, c.y + u.y * 20, 3, GOLD);
-    sfx(ctx, 'swing', e.x, e.y, 50, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'swing', e.x, e.y, 50, ctx.mine ? 2 : 1);
   },
 
   // Earthbreaker (signature, r2.6; also the Warlord's Leap landing): a molten crater, triple wave, stone spurs, rubble.
@@ -180,7 +181,7 @@ registerSkillFx({
     if (ctx.rank(e.slot, 'v_aftershock') > 0) J.glyph(p.x, p.y, ctx.rx(R), AMBER, 520);   // the crack that will erupt
     ctx.dungeon.flashLight(p.x, p.y - 10, 300, AMBER, 2.8, 380);
     if (ctx.mine) J.hitStop(leap ? 110 : 80);
-    sfx(ctx, 'signature_slam', e.x, e.y, 80, ctx.mine ? 3 : 2);
+    skillSfx(ctx, e.skill, 'signature_slam', e.x, e.y, 80, ctx.mine ? 3 : 2);
   },
 
   // Guard Stance: the shield pops up with a glint, the guard arc lights on the ground, steel light.
@@ -190,7 +191,7 @@ registerSkillFx({
     const p = ctx.P(e.x, e.y);
     ctx.juice.ring(p.x, p.y, 22, STEEL, 240);
     ctx.dungeon.flashLight(sx, sy, 130, STEEL, 1.8, 260);
-    sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
 
   // Sweeping Strike: the true 150deg wedge flares red, two heavy arcs, sparks along the edge; Deep Cut bleeds, Fracture cracks.
@@ -214,7 +215,7 @@ registerSkillFx({
     }
     J.starburst(c.x + u.x * 40, c.y + u.y * 20, RED_HOT, 0.8, 150);
     ctx.dungeon.flashLight(c.x + u.x * 30, c.y + u.y * 15, 140, RED, 1.8, 200);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
 
   // Rally Cry (aura r4): a gold war-glyph, a banner-gold wave at the true radius, a light column, rising motes.
@@ -231,7 +232,7 @@ registerSkillFx({
     if (ctx.rank(e.slot, 'v_standard_bearer') > 0) J.ring(p.x, p.y, ctx.rx(2.2), STEEL, 460);
     if (ctx.rank(e.slot, 'v_valor') > 0) J.bits('mote', p.x, p.y - 10, 8, 0xb8ffb0);
     ctx.dungeon.flashLight(p.x, p.y - 20, 240, BANNER, 2.2, 520);
-    sfx(ctx, 'skill_rally', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'skill_rally', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
 
   // ---- evolutions ----
@@ -256,9 +257,9 @@ registerSkillFx({
       J.sparksAt(ex + u.x * 12, ey - 14, 8, STEEL_HOT);
       J.dust(ex, ey, 5, EARTH);
       ctx.dungeon.flashLight(ex, ey - 12, 140, STEEL, 2, 200);
-      sfx(ctx, 'shield_bash', e.x + e.dx * 5, e.y + e.dy * 5, 60, ctx.mine ? 2 : 1);   // the slam where it stops (fixed delay)
+      skillLayer(ctx, e.skill, 'shield_bash', e.x + e.dx * 5, e.y + e.dy * 5, 60, ctx.mine ? 2 : 1);   // the slam where it stops (fixed delay)
     });
-    sfx(ctx, 'dodge', e.x, e.y, 60, ctx.mine ? 2 : 1);   // the rush
+    skillSfx(ctx, e.skill, 'dodge', e.x, e.y, 60, ctx.mine ? 2 : 1);   // the rush (the recorded take is rush and bash)
   },
 
   // Retaliate: the shield braces and a ring at the true blast radius (3) charges up over the brace.
@@ -283,7 +284,7 @@ registerSkillFx({
         onComplete: () => g.destroy(),
       });
     }
-    sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   // Retaliate detonation (r in dx): everything absorbed comes back as a gold-white blast with shield-shard glints.
   v_retaliate_blast: (ctx, e) => {
@@ -327,7 +328,7 @@ registerSkillFx({
       });
     }
     ctx.dungeon.flashLight(p.x, p.y - 10, 160, GOLD, 1.8, 360);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
 
   // Executioner's Chop: the true 80deg/2.6 wedge flashes red and a heavy overhead blade lands with a crack in the stone.
@@ -347,8 +348,8 @@ registerSkillFx({
     ctx.dungeon.addDecal('scorch', hit.x, hit.y + 2, 0x2a1810, 0.7);
     ctx.dungeon.flashLight(hit.x, hit.y - 10, 150, RED, 2, 220);
     if (ctx.mine) J.hitStop(40);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'slam_heavy', e.x + e.dx * 1.7, e.y + e.dy * 1.7, 60, 1);   // the blade cracking the stone
+    skillSfx(ctx, e.skill, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillLayer(ctx, e.skill, 'slam_heavy', e.x + e.dx * 1.7, e.y + e.dy * 1.7, 60, 1);   // the blade cracking the stone
   },
   // An execution (on the executed enemy): a guillotine of red light, crossing white cuts, a blood burst.
   v_execute: (ctx, e) => {
@@ -385,10 +386,10 @@ registerSkillFx({
       J.bits('mote', q.x, q.y - 20, 10, BANNER);
       rubble(ctx, q.x, q.y, 6);
       ctx.dungeon.flashLight(q.x, q.y - 20, 240, BANNER, 2.2, 460);
-      sfx(ctx, 'slam_heavy', e.dx, e.dy, 120, 1);
-      sfx(ctx, 'skill_rally', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // planted: the rally goes up
+      skillLayer(ctx, e.skill, 'slam_heavy', e.dx, e.dy, 120, 1);
+      skillLayer(ctx, e.skill, 'skill_rally', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // planted: the rally goes up
     });
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);   // the recorded take: thrown, planted, horn
   },
 
   // Thunderous Shout (r5): the big one. A war-glyph, three staggered waves at the true radius, a visible roar, thunder.
@@ -425,8 +426,8 @@ registerSkillFx({
     J.pop(BANNER, 0.15, 220);
     ctx.dungeon.flashLight(p.x, p.y - 10, 320, BANNER, 3, 460);
     if (ctx.mine) J.hitStop(80);
-    sfx(ctx, 'skill_rally', e.x, e.y, 60, 3);
-    sfx(ctx, 'zap_strike', e.x, e.y, 200, 1);   // the thunder
+    skillSfx(ctx, e.skill, 'skill_rally', e.x, e.y, 60, 3);
+    skillLayer(ctx, e.skill, 'zap_strike', e.x, e.y, 200, 1);   // the thunder
   },
 
   // Warlord's Leap (x,y -> landing dx,dy, 0.4s airborne): take-off burst, a gold arc, a landing ring at the true r2.6
@@ -655,6 +656,7 @@ registerProjectileFx({
   // Sundering Wave: a ground shockwave crescent with glints in its wake; it breaks into rubble where it ends.
   wave: {
     key: 'fx:vanguard:wave', color: AMBER, scale: 1.1, additive: true, trail: 'star', trailMs: 40,
+    spawn: (ctx, p) => fileSfx(ctx, SKILL_FILE.v_sundering_wave!, null, p.x, p.y, 90),   // no cast event of its own: one per volley
     end: (ctx, sx, sy) => {
       ctx.juice.shockwave(sx, sy + 14, 26, AMBER, 240);
       ctx.juice.starburst(sx, sy, GOLD_HOT, 0.7, 140);

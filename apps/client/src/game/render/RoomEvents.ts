@@ -3,6 +3,7 @@ import { LEGENDARY_BY_ID, MERCHANT, PACT_BY_ID, ROOM_EVENT_RULES, RUNNER_KIND, S
 import type { SimEvent, SnapEnemy, SnapRoomEvent, Snapshot } from '@cursebound/simulation';
 import { ensureRoomEventArt } from '../art/roomEventArt';
 import type { SfxId } from '../audio/AudioEngine';
+import { SHRINE_FILE } from '../audio/fileCues';
 import { gfx } from '../gfx';
 import type { DungeonRenderer } from './DungeonRenderer';
 import type { Juice } from './Juice';
@@ -24,6 +25,8 @@ import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 // (window 'cursebound:banner') and sounds. Never shakes the camera.
 
 export type RoomSfx = (id: SfxId, x?: number, y?: number, priority?: number) => void;
+/** a recorded file (audio/fileCues) when it exists, else the shared `fallback` cue (or nothing) */
+export type RoomFileSfx = (key: string, fallback: SfxId | null, x?: number, y?: number, priority?: number) => void;
 
 /** 'cursebound:roomevent' window event: open the altar / merchant panel for event `id`. */
 export interface RoomEventOpen { kind: 'altar' | 'merchant'; id: number }
@@ -76,8 +79,11 @@ export class RoomEventRenderer {
   /** clicked out of reach: walk there and use it on arrival (event id, ms deadline) */
   private pending: { id: number; until: number } | null = null;
   private lastCoinSfx = 0;
+  private lastSpill = 0;
+  /** merchant id -> when it last greeted the local hero walking up */
+  private greeted = new Map<number, number>();
 
-  constructor(private scene: Phaser.Scene, private juice: Juice, private dungeon: DungeonRenderer, private net: GameConnection, private sfx: RoomSfx) {
+  constructor(private scene: Phaser.Scene, private juice: Juice, private dungeon: DungeonRenderer, private net: GameConnection, private sfx: RoomSfx, private sfxFile: RoomFileSfx) {
     ensureRoomEventArt(scene);
     this.prompt = scene.add.text(0, 0, '', { fontFamily: FONT_WORLD, fontSize: `${WORLD_TEXT_PX.label}px`, color: '#ffe8b0', stroke: '#070505', strokeThickness: 3, resolution: 1 })
       .setOrigin(0.5, 1).setDepth(4850).setVisible(false);
@@ -188,6 +194,8 @@ export class RoomEventRenderer {
       }
     }
     const n = this.near;
+    // walking up to the merchant: a soft chuckle, at most once per 20 s per merchant
+    if (n?.k === 'merchant' && now - (this.greeted.get(n.i) ?? -1e9) > 20000) { this.greeted.set(n.i, now); this.sfxFile('merchant_greet', null, n.x, n.y, 2); }
     if (n) {
       const q = iso.p(n.x, n.y);
       const key = keyCap(settingsStore.get().s.keys.interact?.[0] ?? 'KeyG');
@@ -271,7 +279,7 @@ export class RoomEventRenderer {
           J.ring(pq.x, pq.y, 22, col, 360);
         }
         this.banner(def?.name ?? 'Shrine', `${def?.short ?? ''}${who && !mine ? ` · ${who}` : ''}`, 'good');
-        this.sfx('shrine_activate', e.x, e.y, 3);
+        this.sfxFile(SHRINE_FILE[e.k ?? ''] ?? 'shrine_activate', 'shrine_activate', e.x, e.y, 3);   // each shrine type its own take
         return true;
       }
       case 'altar': {
@@ -300,7 +308,7 @@ export class RoomEventRenderer {
         J.dust(q.x, q.y, 6, 0x4a3a30);
         J.ring(q.x, q.y, 26, 0xffc060, 360);
         this.banner(MERCHANT.name, 'Wares for cursed coins — walk up and trade', 'info');
-        this.sfx('merchant_buy', e.x, e.y, 1);
+        this.sfxFile('merchant_greet', 'merchant_buy', e.x, e.y, 1);
         return true;
       case 'runner':
         J.ring(q.x, q.y, 30, GOLD, 420);
@@ -370,6 +378,8 @@ export class RoomEventRenderer {
         if (this.scene.anims.exists('rev:coin')) spr.play({ key: 'rev:coin', repeat: -1, startFrame: pk.i % 4 });
         v = { spr, shadow: this.scene.add.ellipse(0, 0, 12, 4, 0x000000, 0.45).setDepth(-58), x: pk.x, y: pk.y, seen: now, value: pk.t, lastGlint: now };
         this.coins.set(pk.i, v);
+        // the heap spilling out (a pack's worth of coins at once is one spill)
+        if (now - this.lastSpill > 250) { this.lastSpill = now; this.sfxFile('coin_drop', null, pk.x, pk.y, 1); }
       }
       v.value = pk.t;
       const k = Math.min(1, delta / 55);

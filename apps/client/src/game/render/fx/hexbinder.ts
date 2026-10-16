@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { iso } from '../iso';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx, type SnapHazard } from './registry';
-import { groundCircle, groundQuad, sfx } from './kit3';
+import { fileSfx, groundCircle, groundQuad, sfx, skillLayer, skillSfx } from './kit3';
 import { castFlash, chestAt, hitSpark, impactBurst, killPop, screenAngle, upgradeScale, type Pal } from './spectacle';
 
 // Hexbinder presentation (cosmetic only): sickly green rot, violet hexes, crimson blood and pale spirit mint.
@@ -222,7 +222,7 @@ registerSkillFx({
     J.bits('rune', hx, hy, multi ? 3 : 1, HEX, { angle: (Math.atan2(u.y, u.x) * 180) / Math.PI, spread: 50, speed: 0.6 });
     J.embersAt(hx, hy, 2, SICK);
     ctx.dungeon.flashLight(hx, hy, 70, SICK, 0.9, 80);
-    sfx(ctx, 'attack_spark', e.x, e.y, 60, ctx.mine ? 2 : 1);   // basics stay a short zip (ear fatigue); casts carry the element
+    skillSfx(ctx, e.skill, 'attack_spark', e.x, e.y, 60, ctx.mine ? 2 : 1);   // basics stay a short zip (ear fatigue); casts carry the element
   },
 
   // ---- signature: Grave Tide ----
@@ -242,8 +242,8 @@ registerSkillFx({
     ctx.dungeon.flashLight(p.x, p.y, 280, SICK, 2.8, 460);
     J.pop(SICK, 0.14, 200);
     if (ctx.mine) J.hitStop(55);
-    sfx(ctx, 'blast_decay', e.x, e.y, 80, 3);   // the tide's wet roar
-    sfx(ctx, 'cast_decay', e.x, e.y, 80, 1);
+    skillSfx(ctx, e.skill, 'blast_decay', e.x, e.y, 80, 3);   // the tide's wet roar
+    skillLayer(ctx, e.skill, 'cast_decay', e.x, e.y, 80, 1);
   },
 
   // ---- Pestilence ----
@@ -264,9 +264,9 @@ registerSkillFx({
       J.dust(q.x, q.y, 10, 0x3a5a1a);
       ctx.dungeon.addDecal('slime', q.x, q.y + 2, ROT, R * 0.7);
       ctx.dungeon.flashLight(q.x, q.y - 10, ctx.rx(R) * 2.2, SICK, 2, 300);
-      sfx(ctx, 'blast_decay', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // the flask bursting
+      skillLayer(ctx, e.skill, 'blast_decay', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // the flask bursting
     });
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    skillSfx(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   h_blightbloom: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y, 16);
@@ -280,9 +280,9 @@ registerSkillFx({
       J.bits('thorn', q.x, q.y - 4, 5, HEX);
       J.dust(q.x, q.y, 6, 0x2a3a1a);
       ctx.dungeon.flashLight(q.x, q.y - 12, 150, SICK, 1.8, 300);
-      sfx(ctx, 'summon_rise', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // the bloom sprouting
+      skillLayer(ctx, e.skill, 'summon_rise', e.dx, e.dy, 60, ctx.mine ? 2 : 1);   // the bloom sprouting
     });
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    skillSfx(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   h_blightbloom_burst: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -301,7 +301,7 @@ registerSkillFx({
     ctx.juice.bits('mote', p.x, p.y, 16, 0x2a3418, { angle: deg, spread: 40, speed: 1.6 });
     ctx.juice.bits('mote', p.x, p.y, 8, SICK, { angle: deg, spread: 30, speed: 1.3 });
     ctx.juice.orb(p.x, p.y, ROT, 0.6, 180);
-    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);   // its beating detuned drone reads as the swarm
+    skillSfx(ctx, e.skill, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);   // its beating detuned drone reads as the swarm
   },
   // rot leaping corpse -> neighbour (also Black Death's spread every second): cheap
   h_contagion: (ctx, e) => {
@@ -341,7 +341,7 @@ registerSkillFx({
     const q = chestAt(ctx, e.dx, e.dy);
     ctx.juice.starburst(q.x, q.y, BLOOD_HOT, 1, 160);
     ctx.juice.bleed('player', q.x, q.y, 10);
-    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   h_hemorrhage: (ctx, e) => {
     const J = ctx.juice;
@@ -356,8 +356,8 @@ registerSkillFx({
     ctx.dungeon.flashLight(p.x, p.y - 10, 220, BLOOD, 2.4, 320);
     J.pop(BLOOD, 0.1, 160);
     if (ctx.mine) J.hitStop(45);
-    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'blast_decay', e.x, e.y, 80, 1);   // the tendrils ripping in
+    skillSfx(ctx, e.skill, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillLayer(ctx, e.skill, 'blast_decay', e.x, e.y, 80, 1);   // the tendrils ripping in
   },
   // one tendril per victim (target x,y -> caster dx,dy)
   h_hemorrhage_t: (ctx, e) => {
@@ -377,8 +377,8 @@ registerSkillFx({
     J.bleed('player', c.x + u.x * 10, c.y + u.y * 6, 10, u.x, u.y);
     J.bits('mote', c.x, c.y, 6, BLOOD, { angle: (ang * 180) / Math.PI, spread: 30, speed: 1.6 });
     if (ctx.rank(e.slot, 'h_crimson_covenant') > 0) J.sparksAt(c.x, c.y, 6, 0xffd070);
-    sfx(ctx, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, 1);   // the lance hurled
+    skillSfx(ctx, e.skill, 'cast_decay', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillLayer(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, 1);   // the lance hurled
   },
   h_exsanguinate: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -409,16 +409,16 @@ registerSkillFx({
   },
 
   // ---- Wraithcall ----
-  h_summon_wraith: (ctx, e) => { rise(ctx, e, SPIRITP, 1.2); sfx(ctx, 'summon_rise', e.x, e.y, 60, ctx.mine ? 2 : 1); },
+  h_summon_wraith: (ctx, e) => { rise(ctx, e, SPIRITP, 1.2); skillSfx(ctx, e.skill, 'summon_rise', e.x, e.y, 60, ctx.mine ? 2 : 1); },
   h_banshee: (ctx, e) => {
     rise(ctx, e, BANSHEEP, 1.8);
     const p = ctx.P(e.x, e.y);
     ctx.juice.shockwave(p.x, p.y, ctx.rx(3), LILAC, 420, 80);
     ctx.juice.pop(LILAC, 0.08, 160);
-    sfx(ctx, 'summon_rise', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'beast_howl', e.x, e.y, 200, 1);   // her wail
+    skillSfx(ctx, e.skill, 'summon_rise', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillLayer(ctx, e.skill, 'beast_howl', e.x, e.y, 200, 1);   // her wail
   },
-  h_grave_legion: (ctx, e) => { rise(ctx, e, { main: BONE, hot: SICK_HOT, deep: 0x3a3020, bits: 'skull' }, 0.9); sfx(ctx, 'summon_rise', e.x, e.y, 120, ctx.mine ? 2 : 1); },
+  h_grave_legion: (ctx, e) => { rise(ctx, e, { main: BONE, hot: SICK_HOT, deep: 0x3a3020, bits: 'skull' }, 0.9); skillSfx(ctx, e.skill, 'summon_rise', e.x, e.y, 120, ctx.mine ? 2 : 1); },
   // Legion of the Damned raises one per kill: keep it light
   h_lesser_wraith: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -455,8 +455,9 @@ registerSkillFx({
     shot(ctx, 'fx:hexbinder:bell', p.x, p.y - 40, { add: false, depth: 4662, scale: 1.2 });
     ctx.juice.beam(p.x, p.y, 110, 10, SPIRIT, 320);
     ctx.juice.bits('skull', p.x, p.y - 16, 5, SPIRIT_HOT, { angle: -90, spread: 140, speed: 1.2 });
-    sfx(ctx, 'blast_decay', e.x, e.y, 160, 2);
-    sfx(ctx, 'bell_toll', e.x, e.y, 1500, 1);   // the long toll at most every 1.5s (lesser wraiths fade often)
+    // the recorded bell covers the whole knell, so the shared impact layer only plays without it
+    if (!ctx.hasFile('skill_hexbinder_death_knell')) sfx(ctx, 'blast_decay', e.x, e.y, 160, 2);
+    fileSfx(ctx, 'skill_hexbinder_death_knell', 'bell_toll', e.x, e.y, 1500, 1);   // the long toll at most every 1.5s (lesser wraiths fade often)
   },
 });
 

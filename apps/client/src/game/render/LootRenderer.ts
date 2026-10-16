@@ -163,12 +163,14 @@ export class LootRenderer {
     return key;
   }
 
-  private sfx(id: SfxId, x: number, y: number, priority = 1) {
+  /** `file`: a recorded file (audio/fileCues) played instead of `id` when it exists */
+  private sfx(id: SfxId, x: number, y: number, priority = 1, file?: string) {
     const a = this.scene.audio;
     if (!a) return;
     const cam = this.scene.cameras.main;
     const pan = Math.max(-1, Math.min(1, (iso.x(x, y) - cam.midPoint.x) / (this.scene.scale.width / 2)));
-    a.play(id, { pan, priority });
+    if (file) a.playFile(file, id, { pan, priority });
+    else a.play(id, { pan, priority });
   }
 
   private make(id: number, itemId: string, x: number, y: number): LootView {
@@ -248,7 +250,7 @@ export class LootRenderer {
     const pl = snap?.players[e.slot];
     const mine = e.slot === me;
     const at = e.op === 'pickup' && pl ? iso.p(pl.x, pl.y) : iso.p(e.x, e.y);
-    this.sfx('fate_blessing', e.x, e.y, mine ? 8 : 4);
+    this.sfx('fate_blessing', e.x, e.y, mine ? 8 : 4, e.op === 'apply' ? 'blessing_apply' : undefined);   // lifting a card's curse has its own take
     const rings = e.op === 'apply' ? 5 : 3;
     for (let k = 0; k < rings; k++) J.ring(at.x, at.y, iso.rx(0.6 + k * 0.55), prismColor(now, k / rings), 360 + k * 110);
     this.sparks.burst(at.x, at.y - (e.op === 'apply' ? 40 : 16), e.op === 'apply' ? 70 : 34, e.op === 'apply' ? 30 : 16, e.op === 'apply' ? 80 : 50);

@@ -17,6 +17,7 @@ import { ItemIcon } from './itemIcons';
 import { FATES_BLESSING, LEGENDARY_BY_ID } from '@cursebound/content';
 import type { RunBreakdown } from '@cursebound/simulation';
 import { Breakdown } from './Breakdown';
+import { sharedAudio } from '@/game/audio/shared';
 import { TutorialDone } from './TutorialDone';
 
 // RESULTS (PRD §16.1, §13): collective score, clear depth, end reason, builds, Fate timeline, score breakdown
@@ -28,8 +29,18 @@ const END_LABEL: Record<string, string> = {
   wipe: 'Party wipe', retired: 'Retired', aborted_infrastructure: 'Aborted — infrastructure failure (not a defeat)', invalidated: 'Invalidated run',
 };
 
+/** the class-unlock award last voiced (module scope: XpLine remounts when the cloud award replaces the local one) */
+let lastUnlockSound = '';
+
 /** XP gained, the bounty doubling, the new XP bar, level-ups and class unlocks (progression). */
 function XpLine({ award }: { award: XpAward }) {
+  // a class unlocked: chains break (once per award, though the local award may be replaced by the cloud's)
+  const unlockKey = award.unlocked.length ? `${award.unlocked.join(',')}@${award.levelAfter}` : '';
+  useEffect(() => {
+    if (!unlockKey || unlockKey === lastUnlockSound) return;
+    lastUnlockSound = unlockKey;
+    void sharedAudio().then((a) => a?.playFile('class_unlock', null, { priority: 7, ui: true }));
+  }, [unlockKey]);
   const into = award.xpAfter - totalXpForLevel(award.levelAfter);
   const pct = Math.max(0, Math.min(100, (into / xpToNext(award.levelAfter)) * 100));
   return (

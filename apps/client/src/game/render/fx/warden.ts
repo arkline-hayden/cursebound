@@ -1,7 +1,9 @@
 import * as Phaser from 'phaser';
 import type { SfxId } from '../../audio/AudioEngine';
+import { SKILL_FILE } from '../../audio/fileCues';
 import { ACTOR_IDS, ACTOR_META, animFor, type ActorId, type ActorState } from '../../art/actors';
 import { iso, isoPoly } from '../iso';
+import { fileSfx, skillLayer, skillSfx } from './kit3';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx, type SnapHazard } from './registry';
 import { castFlash, chestAt, heroGhosts, impactBurst, killPop, type Pal } from './spectacle';
 
@@ -350,6 +352,7 @@ function drawBeast(ctx: FxCtx, g: Phaser.GameObjects.Graphics, h: SnapHazard, ti
     v.pulse = h.w;
     const u = ctx.U(h.dx || 1, h.dy);
     ctx.juice.claw(p.x + u.x * 12, p.y - 10 + u.y * 6, Math.atan2(u.y, u.x) + Math.PI / 2, h.out ? 0xd8ffa0 : SPIRIT, dire ? 0.8 : 0.6, 170);
+    fileSfx(ctx, SKILL_FILE.w_wolf_bite, null, h.x, h.y, 90, 1);   // snarl + snap; one key shared by all wolves, >= 90 ms apart
   }
   // ground mark (readable spirit footprint) and shadow
   ell(ctx, g, v.x, v.y, (bear ? 0.95 : dire ? 0.5 : 0.38) * (leaping ? 0.7 : 1), 0x000000, 0.35);
@@ -749,7 +752,7 @@ registerSkillFx({
     const tx = c.x + u.x * reach, ty = c.y + u.y * reach;
     J.sparksAt(tx, ty, 2, THORN);
     if (Math.random() < 0.5) J.bits('leaf', tx, ty, 1, LEAF, { angle: ang * DEG, spread: 60 });
-    sfx(ctx, 'swing', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'swing', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   w_bear_maul: (ctx, e) => {
     const J = ctx.juice;
@@ -780,8 +783,8 @@ registerSkillFx({
     J.dust(p.x, p.y, 14, 0x3a4a30);
     ctx.dungeon.flashLight(p.x, p.y - 12, 340, SPIRIT, 2.6, 560);
     if (ctx.mine) { J.pop(SPIRIT, 0.14, 220); J.hitStop(50); }
-    sfx(ctx, 'beast_howl', e.x, e.y, 0, 3);   // the call
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 2);   // the stampede's thunder
+    skillSfx(ctx, e.skill, 'beast_howl', e.x, e.y, 0, 3);   // the call
+    skillLayer(ctx, e.skill, 'slam_heavy', e.x, e.y, 0, 2);   // the stampede's thunder
   },
   w_entangle: (ctx, e) => {
     const J = ctx.juice;
@@ -792,8 +795,8 @@ registerSkillFx({
     impactBurst(ctx, e.x, e.y, R, GROVEP, 2, { dust: 8 });
     spikeRing(ctx, e.x, e.y, R * 0.55, 7, 'fx:warden:rootspike');
     J.bits('leaf', p.x, p.y - 10, 10, LEAF);
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the seed
-    sfx(ctx, 'slam_heavy', e.x, e.y, 120, 1);   // roots ripping up
+    skillSfx(ctx, e.skill, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the seed
+    skillLayer(ctx, e.skill, 'slam_heavy', e.x, e.y, 120, 1);   // roots ripping up
   },
   w_verdant_totem: (ctx, e) => {
     const J = ctx.juice;
@@ -805,8 +808,8 @@ registerSkillFx({
     spikeRing(ctx, e.x, e.y, R * 0.55, 6, 'fx:warden:rootspike');
     J.glyph(p.x, p.y, ctx.rx(ctx.rank(e.slot, 'w_forest_heart') ? 6 : 4), HEAL, 900);
     J.bits('leaf', p.x, p.y - 30, 10, BLOOM, { angle: -90, spread: 140 });
-    sfx(ctx, 'summon_rise', e.x, e.y, 0, 2);   // the living totem rising
-    sfx(ctx, 'heal', e.x, e.y, 0, 1);
+    skillSfx(ctx, e.skill, 'summon_rise', e.x, e.y, 0, 2);   // the living totem rising
+    skillLayer(ctx, e.skill, 'heal', e.x, e.y, 0, 1);
   },
   w_worldroot: (ctx, e) => {
     const J = ctx.juice;
@@ -818,7 +821,7 @@ registerSkillFx({
     J.bits('leaf', p.x, p.y - 8, 8, LEAF, { angle: Math.atan2(u.y, u.x) * DEG, spread: 40, speed: 1.8 });
     ctx.dungeon.flashLight(p.x, p.y - 10, 200, 0x6bd84a, 2, 400);
     if (ctx.mine) J.hitStop(35);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);
   },
   w_call_pack: (ctx, e) => {
     const J = ctx.juice;
@@ -830,8 +833,8 @@ registerSkillFx({
     spiritRise(ctx, p.x, p.y - 40, 'fx:warden:wolfspirit', 1.2, 640);
     J.bits('mote', p.x, p.y - 18, 14, SPIRIT, { angle: -90, spread: 160 });
     ctx.dungeon.flashLight(p.x, p.y - 16, 230, SPIRIT, 1.9, 420);
-    sfx(ctx, 'beast_howl', e.x, e.y, 0, ctx.mine ? 2 : 1);
-    sfx(ctx, 'summon_rise', e.x, e.y, 0, 1);   // the wolf spirits rising
+    skillSfx(ctx, e.skill, 'beast_howl', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    skillLayer(ctx, e.skill, 'summon_rise', e.x, e.y, 0, 1);   // the wolf spirits rising
   },
   w_ursine_call: (ctx, e) => {
     const J = ctx.juice;
@@ -853,8 +856,8 @@ registerSkillFx({
       J.bits('mote', p.x, p.y - 16, 16, SPIRIT, { speed: 2 });
       J.bits('leaf', p.x, p.y - 10, 8, LEAF);
     });
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 3);
-    sfx(ctx, 'beast_roar', e.x, e.y, 0, 2);   // the Ursa
+    skillSfx(ctx, e.skill, 'slam_heavy', e.x, e.y, 0, 3);
+    skillLayer(ctx, e.skill, 'beast_roar', e.x, e.y, 0, 2);   // the Ursa
   },
   w_alpha_pounce: (ctx, e) => {
     const J = ctx.juice;
@@ -866,7 +869,7 @@ registerSkillFx({
     J.shockwave(p.x, p.y, ctx.rx(0.8), SPIRIT, 260);
     heroGhosts(ctx, e.slot, e.dx, e.dy, SPIRIT, 4, 9);
     J.bitsAlong('mote', c.x, c.y, c.x + u.x * far, c.y + u.y * far, 6, SPIRIT);
-    sfx(ctx, 'dodge', e.x, e.y, 0, 2);
+    skillSfx(ctx, e.skill, 'dodge', e.x, e.y, 0, 2);   // the file covers the leap and the landing
   },
   w_alpha_land: (ctx, e) => {
     const J = ctx.juice;
@@ -877,8 +880,8 @@ registerSkillFx({
     spiritRise(ctx, p.x, p.y - 34, 'fx:warden:wolfspirit', 1, 480);
     spikeRing(ctx, e.x, e.y, 1.3, 5, 'fx:warden:rootspike', undefined, 0.8);
     if (ctx.mine) J.hitStop(60);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 3 : 1);
-    sfx(ctx, 'beast_howl', e.x, e.y, 0, 1);   // the pack called
+    skillLayer(ctx, 'w_alpha_pounce', 'slam_heavy', e.x, e.y, 0, ctx.mine ? 3 : 1);
+    skillLayer(ctx, 'w_alpha_pounce', 'beast_howl', e.x, e.y, 0, 1);   // the pack called
   },
   w_wolf_pounce: (ctx, e) => {
     const J = ctx.juice;
@@ -905,14 +908,14 @@ registerSkillFx({
   w_thornburst: (ctx, e) => {
     thornNova(ctx, e, 2.8);
     if (ctx.mine) ctx.juice.hitStop(30);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);   // thorns erupting
-    sfx(ctx, 'blast_decay', e.x, e.y, 0, 1);   // the venom
+    skillSfx(ctx, e.skill, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);   // thorns erupting
+    skillLayer(ctx, e.skill, 'blast_decay', e.x, e.y, 0, 1);   // the venom
   },
   w_bramble_wall: (ctx, e) => {
     thornNova(ctx, e, 2.8);
     if (ctx.mine) ctx.juice.hitStop(35);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the nova and the wall bursting up
-    sfx(ctx, 'blast_decay', e.x, e.y, 0, 1);
+    skillSfx(ctx, e.skill, 'slam_heavy', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the nova and the wall bursting up
+    skillLayer(ctx, e.skill, 'blast_decay', e.x, e.y, 0, 1);
   },
   w_thorn_pod: (ctx, e) => {
     const p = ctx.P(e.x, e.y);
@@ -920,7 +923,7 @@ registerSkillFx({
     lob(ctx, h.x, h.y, p.x, p.y - 6, VENOM, 'thorn', 260);
     ctx.juice.ring(p.x, p.y, 18, VENOM, 240);
     ctx.juice.dust(p.x, p.y, 3, 0x3a4a20);
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);
+    skillLayer(ctx, 'w_thorn_pod', 'throw_whoosh', e.x, e.y, 0, ctx.mine ? 2 : 1);   // the lob (the pod's file plays at the burst)
   },
   w_pod_burst: (ctx, e) => {
     const J = ctx.juice;
@@ -938,7 +941,7 @@ registerSkillFx({
     J.bits('bubble', p.x, p.y - 10, 12, VENOM);
     J.embersAt(p.x, p.y - 10, 10, VENOM);
     if (ctx.mine) { J.pop(VENOM, 0.1, 160); J.hitStop(40); }
-    sfx(ctx, 'blast_decay', e.x, e.y, 0, 2);
+    skillSfx(ctx, 'w_thorn_pod', 'blast_decay', e.x, e.y, 0, 2);   // Ironthorn Pod's file: swelling then bursting
   },
   w_thorn_lash: (ctx, e) => {
     const heart = ctx.rank(e.slot, 'w_heart_of_thorns') > 0;

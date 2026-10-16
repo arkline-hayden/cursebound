@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import type { SfxId } from '../../audio/AudioEngine';
+import { SKILL_FILE } from '../../audio/fileCues';
 import { isoPoly } from '../iso';
 import type { FxCtx } from './registry';
 
@@ -12,6 +13,36 @@ export function sfx(ctx: FxCtx, id: SfxId, x: number, y: number, minGapMs = 40, 
   if (ctx.now - t < minGapMs) return;
   lastSfx.set(id, ctx.now);
   ctx.sfx(id, x, y, priority);
+}
+
+/**
+ * A skill's own recorded cast (audio/fileCues SKILL_FILE) when its file exists, else the shared cue `id` (throttled per
+ * file or cue). Use it for the skill's main sound; every other shared cue the same skill layers goes through
+ * skillLayer, so a skill never plays both its file and the shared cues it replaces.
+ */
+export function skillSfx(ctx: FxCtx, skill: string, id: SfxId, x: number, y: number, minGapMs = 40, priority = 1) {
+  const file = SKILL_FILE[skill];
+  if (!file || !ctx.hasFile(file)) { sfx(ctx, id, x, y, minGapMs, priority); return; }
+  const t = lastSfx.get(file) ?? -1e9;
+  if (ctx.now - t < minGapMs) return;
+  lastSfx.set(file, ctx.now);
+  ctx.sfxFile(file, id, x, y, priority);
+}
+
+/** A secondary shared cue of a skill (impact, whoosh, landing): silent once the skill has its own file, which covers the whole cast. */
+export function skillLayer(ctx: FxCtx, skill: string, id: SfxId, x: number, y: number, minGapMs = 40, priority = 1) {
+  const file = SKILL_FILE[skill];
+  if (file && ctx.hasFile(file)) return;
+  sfx(ctx, id, x, y, minGapMs, priority);
+}
+
+/** A named recorded file (turret_shot, explosion…) when it exists, else the shared cue `id`; throttled per key. */
+export function fileSfx(ctx: FxCtx, file: string, id: SfxId | null, x: number, y: number, minGapMs = 40, priority = 1) {
+  const key = ctx.hasFile(file) || !id ? file : id;
+  const t = lastSfx.get(key) ?? -1e9;
+  if (ctx.now - t < minGapMs) return;
+  lastSfx.set(key, ctx.now);
+  ctx.sfxFile(file, id, x, y, priority);
 }
 
 /** Chest-height screen point of a world point. */
