@@ -10,6 +10,9 @@ import { pathToFileURL } from 'node:url';
 import { PUB, folderFor, here, installPicks, readPicks, root, setDir, writePicks } from './picks.mjs';
 
 const REROLLS = path.join(here, 'rerolls.json');
+// when you last picked a take of each sound: a set generated after that is badged NEW
+const REVIEWED = path.join(here, 'reviewed.json');
+const readReviewed = () => (fs.existsSync(REVIEWED) ? JSON.parse(fs.readFileSync(REVIEWED, 'utf8')) : {});
 const PORT = Number(process.env.AUDIO_REVIEW_PORT ?? 4321);
 const soundsUrl = pathToFileURL(path.join(here, 'sounds.mjs')).href;
 const sounds = async () => import(`${soundsUrl}?t=${Date.now()}`);   // fresh each time: list edits show without a restart
@@ -19,6 +22,7 @@ const ver = (p) => Math.round(fs.statSync(p).mtimeMs);
 async function state() {
   const { SECTIONS, STYLE } = await sounds();
   const picks = readPicks();
+  const reviewed = readReviewed();
   return {
     rerolls: readRerolls(),
     sections: SECTIONS.map((s) => ({ key: s.key, title: s.title, blurb: s.blurb, items: s.items.map((i) => {
@@ -31,6 +35,7 @@ async function state() {
         file: i.file, when: i.when, base: i.prompt, prompt: `${i.prompt}, ${STYLE[i.kind]}`, tier: i.tier, seconds: i.seconds, loop: i.loop, tool: i.tool, variants: i.variants,
         takes: takes.map((n) => ({ n, url: `/take/${i.file}/${n}.mp3?v=${ver(path.join(dir, `${n}.mp3`))}` })),
         picked: picks[i.file] ?? [],
+        fresh: takes.length > 0 && ver(path.join(dir, `${takes[0]}.mp3`)) > (reviewed[i.file] ?? 0),
         game: takes.length ? [] : game.map((f) => ({ name: f, url: `/game/${folderFor(i)}/${f}?v=${ver(path.join(gdir, f))}` })),
       };
     }) })),
@@ -56,6 +61,9 @@ http.createServer(async (req, res) => {
       const picks = readPicks();
       picks[file] = takes.map(Number).filter((n) => n > 0);
       writePicks(picks);
+      const reviewed = readReviewed();
+      reviewed[file] = Date.now();
+      fs.writeFileSync(REVIEWED, JSON.stringify(reviewed, null, 1));
       const names = installPicks(i, picks[file]);
       await import(`${pathToFileURL(path.join(root, 'scripts/audio-manifest.mjs')).href}?t=${Date.now()}`);
       return json(res, { ok: true, names });

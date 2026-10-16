@@ -39,6 +39,8 @@ section > p { margin: 0 0 8px; color: var(--ink-3); font-size: 13.5px; }
 .card[data-t="2"] { border-left-color: var(--teal); }
 .card[data-t="3"] { border-left-color: var(--violet); }
 .card.reroll { background: #2a1512; border-color: var(--ember); }
+.card.fresh { box-shadow: 0 0 0 2px var(--good); }
+.chip.new { color: #0f1a0b; background: var(--good); border-color: var(--good); font-weight: 700; }
 .card.missing { opacity: .5; }
 .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .name { font: 600 14px var(--mono); color: var(--gold); overflow-wrap: anywhere; }
@@ -64,7 +66,7 @@ input.note { flex: 1 1 160px; min-width: 0; font-size: 13px; padding: 5px 8px; }
   <p class="lede">Each sound has four takes. Click <b>▶</b> to listen and <b>Use</b> to put a take in the game (gold = in the game now). Sounds marked "pick N" use several takes as variations, so toggle the ones to keep. If none are right, hit <b>Regenerate set</b> and add a note like "deeper" or "more crunch"; it's folded into the prompt. Then tell me "regenerate them".</p>
   <div class="bar">
     <div class="seg" id="tiers" role="group" aria-label="Tier"><button data-v="all" aria-pressed="true">All</button><button data-v="1" aria-pressed="false">Tier 1</button><button data-v="2" aria-pressed="false">Tier 2</button><button data-v="3" aria-pressed="false">Tier 3</button></div>
-    <div class="seg" id="views" role="group" aria-label="Show"><button data-v="ready" aria-pressed="true">Made</button><button data-v="all" aria-pressed="false">Everything</button><button data-v="marked" aria-pressed="false">Regenerating</button></div>
+    <div class="seg" id="views" role="group" aria-label="Show"><button data-v="ready" aria-pressed="true">Made</button><button data-v="all" aria-pressed="false">Everything</button><button data-v="fresh" aria-pressed="false">New</button><button data-v="marked" aria-pressed="false">Regenerating</button></div>
     <input id="q" type="search" placeholder="Search sounds" aria-label="Search sounds">
     <span class="count" id="count"></span><span class="saved" id="saved" aria-live="polite"></span>
   </div>
@@ -82,7 +84,7 @@ async function load() { S = await (await fetch('/api/state')).json(); rerolls = 
 let saveT = null;
 function saveRerolls() { clearTimeout(saveT); saveT = setTimeout(async () => { await fetch('/api/rerolls', { method: 'POST', body: JSON.stringify(rerolls) }); flash('saved'); }, 250); }
 async function pick(file, takes) {
-  const i = byFile()[file]; i.picked = takes; render();
+  const i = byFile()[file]; i.picked = takes; i.fresh = false; render();
   const r = await (await fetch('/api/pick', { method: 'POST', body: JSON.stringify({ file, takes }) })).json();
   flash(r.ok ? 'in game' : 'failed');
 }
@@ -92,6 +94,7 @@ function visible(i) {
   const made = i.takes.length || i.game.length;
   if (view === 'ready' && !made) return false;
   if (view === 'marked' && !rerolls[i.file]) return false;
+  if (view === 'fresh' && !i.fresh) return false;
   if (query) { const h = (i.file + ' ' + i.when + ' ' + i.base).toLowerCase(); if (!query.split(/\s+/).every((w) => h.includes(w))) return false; }
   return true;
 }
@@ -108,8 +111,8 @@ function card(i) {
   } else if (i.game.length) {
     takes = `<div class="row">${i.game.map((g) => `<button class="btn play" data-url="${g.url}">▶ ${esc(g.name)}</button>`).join('')}<span class="hint">your file</span></div>`;
   } else takes = '<span class="hint">Not made yet</span>';
-  return `<div class="card${r ? ' reroll' : ''}${!i.takes.length && !i.game.length ? ' missing' : ''}" data-t="${i.tier}" data-f="${i.file}">
-    <div class="row"><span class="name">${esc(i.file)}</span><span class="chip">tier ${i.tier}</span><span class="chip">${i.tool === 'music' ? 'music' : i.seconds + 's'}</span>${i.loop ? '<span class="chip">loop</span>' : ''}${multi ? `<span class="chip">pick ${i.variants}</span>` : ''}</div>
+  return `<div class="card${i.fresh ? ' fresh' : ''}${r ? ' reroll' : ''}${!i.takes.length && !i.game.length ? ' missing' : ''}" data-t="${i.tier}" data-f="${i.file}">
+    <div class="row"><span class="name">${esc(i.file)}</span>${i.fresh ? '<span class="chip new">NEW</span>' : ''}<span class="chip">tier ${i.tier}</span><span class="chip">${i.tool === 'music' ? 'music' : i.seconds + 's'}</span>${i.loop ? '<span class="chip">loop</span>' : ''}${multi ? `<span class="chip">pick ${i.variants}</span>` : ''}</div>
     <div class="when">${esc(i.when)}</div>
     <p class="prompt">${esc(i.base)}</p>
     ${takes}
@@ -130,7 +133,8 @@ function render() {
   }
   document.getElementById('list').innerHTML = html || '<p class="hint">Nothing here yet. Switch to "Everything" to see sounds that are not made yet.</p>';
   document.getElementById('nav').innerHTML = nav;
-  document.getElementById('count').textContent = `${made}/${total} made · ${Object.keys(rerolls).length} to regenerate · showing ${shown}`;
+  const fresh = S.sections.reduce((n, s) => n + s.items.filter((i) => i.fresh).length, 0);
+  document.getElementById('count').textContent = `${made}/${total} made · ${fresh} new · ${Object.keys(rerolls).length} to regenerate · showing ${shown}`;
   for (const b of document.querySelectorAll('#tiers button')) b.setAttribute('aria-pressed', String(b.dataset.v === tier));
   for (const b of document.querySelectorAll('#views button')) b.setAttribute('aria-pressed', String(b.dataset.v === view));
 }
