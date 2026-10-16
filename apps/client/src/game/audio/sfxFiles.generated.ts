@@ -91,7 +91,7 @@ export const SFX_FILES: Record<string, readonly string[]> = {
   ice_shatter: ['sfx/ice_shatter_01.mp3', 'sfx/ice_shatter_02.mp3', 'sfx/ice_shatter_03.mp3', 'sfx/ice_shatter_04.mp3'],
   imp_jingle: ['sfx/imp_jingle_01.mp3', 'sfx/imp_jingle_02.mp3'],
   imp_portal: ['sfx/imp_portal.mp3'],
-  impact_astral: ['sfx/impact_astral_01.mp3', 'sfx/impact_astral_02.mp3', 'sfx/impact_astral_03.mp3'],
+  impact_astral: ['sfx/impact_astral_01.mp3', 'sfx/impact_astral_02.mp3', 'sfx/impact_astral_03.mp3', 'sfx/impact_astral_04.mp3'],
   impact_decay: ['sfx/impact_decay_01.mp3', 'sfx/impact_decay_02.mp3', 'sfx/impact_decay_03.mp3', 'sfx/impact_decay_04.mp3'],
   impact_fire: ['sfx/impact_fire_01.mp3', 'sfx/impact_fire_02.mp3', 'sfx/impact_fire_03.mp3', 'sfx/impact_fire_04.mp3'],
   impact_frost: ['sfx/impact_frost_01.mp3', 'sfx/impact_frost_02.mp3', 'sfx/impact_frost_03.mp3', 'sfx/impact_frost_04.mp3'],
