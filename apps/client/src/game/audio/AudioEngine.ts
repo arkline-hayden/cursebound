@@ -369,7 +369,7 @@ export class AudioEngine {
     if (!ctx || ctx.state !== 'running' || !s) return;
     // a recorded take when the cue has one (footsteps pick the floor's surface set); recipe-less cues stay silent without
     const key = opts.file ?? (id === 'footstep' ? `footstep_${FLOOR_FOR_THEME[this.themeId] ?? 'stone'}` : id);
-    const take = this.samples.pick(key, s.rand);
+    const take = this.samples.pick(key, () => s.rand());
     // a named file still decoding: skip rather than play the stand-in cue
     if (!take && (FILE_ONLY.has(id) || opts.file)) return;
     const now = ctx.currentTime;
@@ -572,7 +572,7 @@ export class AudioEngine {
     const [db, hold, rel] = STINGER_DUCK[kind];
     this.duck(db, hold, rel);
     const spec = this.keySpec();
-    const take = this.samples.pick(`stinger_${kind}`, s.rand);
+    const take = this.samples.pick(`stinger_${kind}`, () => s.rand());
     if (take) {
       // recorded stinger
       const src = ctx.createBufferSource();
@@ -639,7 +639,8 @@ export class AudioEngine {
     }
     const bedId: BedId = this.themeId;
     const want = this.bedFile();
-    const take = this.samples.pick(want.key, this.synth.rand);
+    const synth = this.synth;
+    const take = this.samples.pick(want.key, () => synth.rand());
     const wantFile = !!take;
     if (this.bed?.id === (take ? want.id : bedId) && (this.bed instanceof FileBed) === wantFile) return;
     this.bed?.stop(now);
