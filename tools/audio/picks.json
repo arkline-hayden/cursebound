@@ -1410,10 +1410,10 @@
   1
  ],
  "party_leave": [
-  1
+  2
  ],
  "invite_received": [
-  1
+  2
  ],
  "countdown_tick": [
   1
@@ -1428,7 +1428,7 @@
   1
  ],
  "new_record": [
-  1
+  3
  ],
  "bounty_complete": [
   1
@@ -1437,32 +1437,34 @@
   1
  ],
  "ledger_open": [
-  1
+  2
  ],
  "revive_channel": [
-  1
+  2
  ],
  "knockback": [
   1,
-  2
+  2,
+  3
  ],
  "skill_warden_summon_blink": [
   1
  ],
  "slowed": [
-  1
+  2
  ],
  "stunned": [
-  1
+  2
  ],
  "core_voice": [
   1
  ],
  "item_drop": [
-  1
+  2
  ],
  "training_dummy": [
   1,
-  2
+  2,
+  4
  ]
 }
