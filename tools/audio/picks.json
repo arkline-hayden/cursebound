@@ -1,7 +1,6 @@
 {
  "vessel_shift": [
-  1,
-  2
+  1
  ],
  "vessel_locked": [
   3
@@ -10,10 +9,10 @@
   2
  ],
  "vessel_pick_vanguard": [
-  1
+  2
  ],
  "vessel_pick_arcanist": [
-  1
+  2
  ],
  "vessel_pick_duelist": [
   4
@@ -25,7 +24,7 @@
   2
  ],
  "vessel_pick_templar": [
-  1
+  2
  ],
  "vessel_pick_berserker": [
   3
@@ -136,7 +135,7 @@
   3
  ],
  "heartbeat": [
-  1
+  3
  ],
  "combo": [
   1
@@ -244,7 +243,7 @@
   1
  ],
  "blast_frost": [
-  1
+  4
  ],
  "cast_storm": [
   4
@@ -285,10 +284,10 @@
   2
  ],
  "blade_flurry": [
-  1
+  4
  ],
  "shield_bash": [
-  1
+  3
  ],
  "summon_rise": [
   4
@@ -376,7 +375,7 @@
   1
  ],
  "silenced": [
-  1
+  3
  ],
  "enemy_shoot": [
   1,
@@ -440,7 +439,7 @@
   2
  ],
  "core_deploy": [
-  1
+  2
  ],
  "colossus_raise": [
   1
@@ -449,7 +448,7 @@
   1
  ],
  "colossus_stomp": [
-  1
+  3
  ],
  "colossus_vent": [
   1

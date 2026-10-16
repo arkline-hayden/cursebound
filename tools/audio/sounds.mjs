@@ -100,7 +100,7 @@ e('impact_fire', 'Fire damage hit', 'a fiery impact, a whoomp of flame with crac
 e('impact_frost', 'Frost damage hit', 'an icy impact, a glassy crack and a tinkle of frost', 0.6, { v: 3 });
 e('impact_storm', 'Lightning damage hit', 'an electric impact, a sharp zap snap with buzzing sparks', 0.6, { v: 3 });
 e('impact_decay', 'Poison / decay damage hit', 'a wet sickly impact, a squelching splat with a gurgle', 0.6, { v: 3 });
-e('impact_astral', 'Holy / astral damage hit', 'a loud radiant impact, a bright crystalline crack with a punchy thump and a shimmering ring', 0.6, { v: 3 });
+e('impact_astral', 'Holy / astral damage hit', 'a radiant magic impact with a long bright glittering shimmer, sparkling chimes ringing out after a soft punchy hit, twinkling starlight tail', 1, { v: 3 });
 e('hit_enemy', 'Generic hit on an enemy (fallback)', 'a meaty hit on a monster, a fleshy thud', 0.4, { v: 4 });
 e('crit', 'Critical hit (layered on top)', 'a big critical hit, a sharp metallic ka-ching crack with a bass punch', 0.7, { v: 2 });
 e('kill', 'Enemy killed by physical damage', 'a monster killed, a crunchy bone-breaking burst', 0.6, { v: 3 });
@@ -273,7 +273,7 @@ e('zap_strike', 'Generic lightning strike', 'a lightning bolt striking, a split-
 e('cast_decay', 'Generic poison / curse cast', 'a dark curse cast, a gurgling whisper and sickly tones', 0.6);
 e('blast_decay', 'Generic rot burst', 'a burst of rot, a wet pop and a splattering spray', 0.8);
 e('cast_holy', 'Generic holy cast', 'a holy spell, a soft choir-like swell and a bell', 0.8);
-e('smite', 'Generic holy strike', 'a powerful holy strike with lots of oomph, a deep booming impact, a crack of light and big ringing bells', 1.2);
+e('smite', 'Generic holy strike', 'a holy smite: a sharp bright crack of lightning-like light, then two loud church bells ringing out clearly, over a deep booming impact', 1.6);
 e('cast_astral', 'Generic astral cast', 'starlight magic, an ascending glittering shimmer', 0.6);
 e('bow_shot', 'Generic bow shot', 'a bow twang and an arrow whoosh', 0.5, { v: 2 });
 e('gun_shot', 'Generic mechanical shot', 'a mechanical bolt gun firing, a clack and twang', 0.5, { v: 2 });

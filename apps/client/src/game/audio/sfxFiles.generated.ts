@@ -182,7 +182,7 @@ export const SFX_FILES: Record<string, readonly string[]> = {
   vessel_pick_vanguard: ['sfx/vessel_pick_vanguard.mp3'],
   vessel_pick_warden: ['sfx/vessel_pick_warden.mp3'],
   vessel_roar: ['sfx/vessel_roar.mp3'],
-  vessel_shift: ['sfx/vessel_shift_01.mp3', 'sfx/vessel_shift_02.mp3'],
+  vessel_shift: ['sfx/vessel_shift_01.mp3'],
   void_beam: ['sfx/void_beam.mp3'],
   vote_cast: ['sfx/vote_cast.mp3'],
   vote_lock: ['sfx/vote_lock.mp3'],

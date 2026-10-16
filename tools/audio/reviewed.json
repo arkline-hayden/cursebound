@@ -154,5 +154,18 @@
  "stinger_boss_roar": 1792169719244,
  "stinger_round_clear": 1792169719244,
  "stinger_legendary": 1792169719244,
- "stinger_party_wipe": 1792169719244
+ "stinger_party_wipe": 1792169719244,
+ "vessel_shift": 1792169766328,
+ "vessel_pick_vanguard": 1792169772577,
+ "vessel_pick_arcanist": 1792169777754,
+ "vessel_pick_templar": 1792169788762,
+ "heartbeat": 1792169793660,
+ "blast_frost": 1792169855057,
+ "blade_flurry": 1792169873934,
+ "shield_bash": 1792169880319,
+ "skill_rally": 1792169894082,
+ "silenced": 1792169898009,
+ "core_deploy": 1792169907634,
+ "colossus_stomp": 1792169911794,
+ "round_start": 1792169926989
 }
