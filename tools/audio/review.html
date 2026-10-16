@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cursebound Sound Review</title>
+<style>
+/* Torchlit review desk: sticky filter bar, one card per sound, take buttons that play, a re-roll toggle with a note. */
+:root {
+  --bg: #100c0b; --panel: #1a1413; --panel-2: #241b18; --line: #3a2c26; --ink: #ecdcc3; --ink-2: #b8a58c; --ink-3: #85735f;
+  --gold: #e0a84a; --ember: #d4572f; --teal: #5fb3a6; --violet: #a68ad8; --good: #7cc46a; --bad: #e0604a;
+  --display: 'Courier New', ui-monospace, monospace; --body: 'Segoe UI', system-ui, sans-serif; --mono: Consolas, ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--body); padding: 0 max(16px, env(safe-area-inset-left)) 80px; }
+.wrap { max-width: 1200px; margin: 0 auto; }
+h1 { font: 700 30px var(--display); color: var(--gold); margin: 26px 0 4px; letter-spacing: 1px; text-shadow: 2px 2px 0 #000; }
+.lede { color: var(--ink-2); margin: 0 0 14px; max-width: 80ch; }
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); }
+.seg button, .btn { font: 600 13px var(--body); background: var(--panel); color: var(--ink-2); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; }
+.seg button { border: 0; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--ink); box-shadow: inset 0 -2px 0 var(--gold); }
+.btn:hover, .seg button:hover { color: var(--ink); }
+.btn.hot { background: #3a1712; color: #ffb39f; border-color: var(--ember); }
+input[type="search"], input.note { font: 14px var(--body); background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 6px 9px; }
+input[type="search"] { flex: 1 1 220px; min-width: 0; }
+.count { font: 13px var(--mono); color: var(--ink-2); margin-left: auto; }
+nav { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; }
+nav a { flex: none; font-size: 12.5px; color: var(--ink-2); text-decoration: none; border: 1px solid var(--line); padding: 3px 8px; background: var(--panel); white-space: nowrap; }
+section h2 { font: 700 20px var(--display); margin: 26px 0 2px; color: var(--ink); }
+section > p { margin: 0 0 8px; color: var(--ink-3); font-size: 13.5px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 8px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.card[data-t="1"] { border-left-color: var(--ember); }
+.card[data-t="2"] { border-left-color: var(--teal); }
+.card[data-t="3"] { border-left-color: var(--violet); }
+.card.reroll { background: #2a1512; border-color: var(--ember); }
+.card.missing { opacity: .55; }
+.name { font: 600 14px var(--mono); color: var(--gold); overflow-wrap: anywhere; }
+.when { font-size: 14px; }
+.prompt { font-size: 12.5px; color: var(--ink-3); margin: 0; overflow-wrap: anywhere; }
+.takes { display: flex; flex-wrap: wrap; gap: 6px; }
+.take { font: 600 12.5px var(--mono); background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); padding: 5px 9px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.take:disabled { color: var(--ink-3); cursor: default; }
+.take.playing { border-color: var(--good); color: var(--good); }
+.take.marked { border-color: var(--ember); color: #ffb39f; }
+.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+input.note { flex: 1 1 160px; min-width: 0; font-size: 13px; padding: 5px 8px; }
+.chip { font: 11.5px var(--mono); padding: 1px 6px; border: 1px solid var(--line); color: var(--ink-3); }
+.hint { font-size: 12px; color: var(--ink-3); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.saved { font: 12px var(--mono); color: var(--good); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cursebound Sound Review</h1>
+  <p class="lede">Click a take to hear it. Mark anything you don't like with <b>Re-roll</b>, and optionally add a note like "deeper", "less high-pitched" or "more crunch" that I'll fold into the prompt. Shift-click a take to re-roll only that variation. Your marks save automatically; then tell me "re-roll them".</p>
+  <div class="bar">
+    <div class="seg" id="tiers" role="group" aria-label="Tier">
+      <button data-v="all" aria-pressed="true">All</button><button data-v="1" aria-pressed="false">Tier 1</button><button data-v="2" aria-pressed="false">Tier 2</button><button data-v="3" aria-pressed="false">Tier 3</button>
+    </div>
+    <div class="seg" id="views" role="group" aria-label="Show">
+      <button data-v="ready" aria-pressed="true">Made</button><button data-v="all" aria-pressed="false">Everything</button><button data-v="marked" aria-pressed="false">Marked</button>
+    </div>
+    <input id="q" type="search" placeholder="Search sounds" aria-label="Search sounds">
+    <button class="btn" id="playall" title="Plays every made take in view, one after another">Play all in view</button>
+    <span class="count" id="count"></span><span class="saved" id="saved" aria-live="polite"></span>
+  </div>
+  <nav id="nav"></nav>
+  <main id="list"><p class="hint">Loading…</p></main>
+</div>
+<script>
+let S = null, rerolls = {}, tier = 'all', view = 'ready', query = '';
+let audio = null, playingBtn = null, queue = [];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function load() { S = await (await fetch('/api/state')).json(); rerolls = S.rerolls || {}; render(); }
+let saveT = null;
+function save() {
+  clearTimeout(saveT);
+  saveT = setTimeout(async () => {
+    await fetch('/api/rerolls', { method: 'POST', body: JSON.stringify(rerolls) });
+    const el = document.getElementById('saved'); el.textContent = 'saved'; setTimeout(() => (el.textContent = ''), 1200);
+  }, 250);
+}
+
+function visible(i) {
+  if (tier !== 'all' && String(i.tier) !== tier) return false;
+  const made = i.takes.some((t) => t.url);
+  if (view === 'ready' && !made) return false;
+  if (view === 'marked' && !rerolls[i.file]) return false;
+  if (query) { const h = (i.file + ' ' + i.when + ' ' + i.base).toLowerCase(); if (!query.split(/\s+/).every((w) => h.includes(w))) return false; }
+  return true;
+}
+
+function render() {
+  let html = '', nav = '', shown = 0, made = 0, total = 0, marked = Object.keys(rerolls).length;
+  for (const s of S.sections) for (const i of s.items) { total++; if (i.takes.every((t) => t.url)) made++; }
+  for (const s of S.sections) {
+    const items = s.items.filter(visible);
+    if (!items.length) continue;
+    shown += items.length;
+    nav += `<a href="#${s.key}">${esc(s.title.replace(/^Class: /, ''))} (${items.length})</a>`;
+    html += `<section id="${s.key}"><h2>${esc(s.title)}</h2><p>${esc(s.blurb)}</p><div class="grid">`;
+    for (const i of items) {
+      const r = rerolls[i.file];
+      const missing = !i.takes.some((t) => t.url);
+      html += `<div class="card${r ? ' reroll' : ''}${missing ? ' missing' : ''}" data-t="${i.tier}" data-f="${i.file}">
+        <div class="row"><span class="name">${esc(i.file)}</span><span class="chip">tier ${i.tier}</span><span class="chip">${i.tool === 'music' ? 'music' : i.seconds + 's'}</span>${i.loop ? '<span class="chip">loop</span>' : ''}</div>
+        <div class="when">${esc(i.when)}</div>
+        <p class="prompt">${esc(i.base)}</p>
+        <div class="takes">${i.takes.map((t, n) => `<button class="take${r && (!r.takes?.length || r.takes.includes(t.name)) ? ' marked' : ''}" data-url="${t.url || ''}" data-take="${t.name}" ${t.url ? '' : 'disabled'} title="${t.url ? 'Play (shift-click: re-roll just this take)' : 'Not made yet'}">▶ ${i.takes.length > 1 ? 'take ' + (n + 1) : 'play'}</button>`).join('')}</div>
+        <div class="row"><button class="btn${r ? ' hot' : ''}" data-act="reroll">${r ? 'Marked for re-roll' : 'Re-roll'}</button>
+        ${r ? `<input class="note" data-act="note" placeholder="What should change? (optional)" value="${esc(r.note || '')}">` : ''}</div>
+      </div>`;
+    }
+    html += '</div></section>';
+  }
+  document.getElementById('list').innerHTML = html || '<p class="hint">Nothing here yet. Switch to "Everything" to see sounds that are not made yet.</p>';
+  document.getElementById('nav').innerHTML = nav;
+  document.getElementById('count').textContent = `${made}/${total} made · ${marked} marked · showing ${shown}`;
+  for (const b of document.querySelectorAll('#tiers button')) b.setAttribute('aria-pressed', String(b.dataset.v === tier));
+  for (const b of document.querySelectorAll('#views button')) b.setAttribute('aria-pressed', String(b.dataset.v === view));
+}
+
+function play(btn, then) {
+  if (audio) { audio.pause(); audio = null; }
+  if (playingBtn) playingBtn.classList.remove('playing');
+  if (!btn || !btn.dataset.url) { playingBtn = null; return; }
+  playingBtn = btn; btn.classList.add('playing');
+  audio = new Audio(btn.dataset.url);
+  audio.onended = () => { btn.classList.remove('playing'); playingBtn = null; if (then) then(); };
+  audio.play().catch(() => {});
+}
+
+document.getElementById('list').addEventListener('click', (e) => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const f = card.dataset.f;
+  const take = e.target.closest('.take');
+  if (take) {
+    if (e.shiftKey) {
+      // re-roll just this take
+      const r = rerolls[f] || { takes: [], note: '' };
+      r.takes = r.takes || [];
+      r.takes = r.takes.includes(take.dataset.take) ? r.takes.filter((t) => t !== take.dataset.take) : [...r.takes, take.dataset.take];
+      if (!r.takes.length) delete rerolls[f]; else rerolls[f] = r;
+      save(); render(); return;
+    }
+    queue = []; play(take); return;
+  }
+  if (e.target.closest('[data-act="reroll"]')) {
+    if (rerolls[f]) delete rerolls[f]; else rerolls[f] = { takes: [], note: '' };
+    save(); render();
+    if (rerolls[f]) document.querySelector(`.card[data-f="${f}"] input.note`)?.focus();
+  }
+});
+document.getElementById('list').addEventListener('input', (e) => {
+  const n = e.target.closest('input.note'); if (!n) return;
+  const f = n.closest('.card').dataset.f; if (rerolls[f]) { rerolls[f].note = n.value; save(); }
+});
+document.getElementById('playall').addEventListener('click', () => {
+  queue = [...document.querySelectorAll('.take:not(:disabled)')];
+  const next = () => { const b = queue.shift(); if (b) { b.scrollIntoView({ block: 'center', behavior: 'smooth' }); play(b, () => setTimeout(next, 250)); } };
+  next();
+});
+for (const b of document.querySelectorAll('#tiers button')) b.onclick = () => { tier = b.dataset.v; render(); };
+for (const b of document.querySelectorAll('#views button')) b.onclick = () => { view = b.dataset.v; render(); };
+document.getElementById('q').addEventListener('input', (e) => { query = e.target.value.trim().toLowerCase(); render(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { queue = []; play(null); } });
+// pick up new files while the page is open (after a generation run)
+setInterval(async () => { const prev = JSON.stringify(S?.sections); const next = await (await fetch('/api/state')).json(); if (JSON.stringify(next.sections) !== prev) { S = next; render(); } }, 5000);
+load();
+</script>
+</body>
+</html>
