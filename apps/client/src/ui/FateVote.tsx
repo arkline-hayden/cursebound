@@ -1,15 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FAMILIES, MECHANIC_BY_ID, RARITIES, STAT_BY_ID, cardById, cardRarity, mechanicText, type CardDef, type CardEffect, type MechanicEffect } from '@cursebound/content';
+import { CLASS_BY_ID, DUNGEON_THEMES, FAMILIES, MECHANIC_BY_ID, RARITIES, STAT_BY_ID, cardById, cardRarity, mechanicText, type CardDef, type CardEffect, type MechanicEffect } from '@cursebound/content';
 import { B, formatMechanicValue, type CardForecast, type FValue, type MechanicForecast } from '@cursebound/simulation';
 import { deadlineSeconds, netStore, type GameConnection } from '@/lib/net';
+import { settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
 import { changeLabel, fmt, pct, score, seconds } from '@/lib/format';
+import { particleBudget } from '@/game/gfx';
+import { FateCards, fateCardStyles as fcs, type FateCardModel } from './FateCards';
 import { CardIcon, ClassEmblem } from './icons';
+import { useReducedMotion } from './motion';
 
-// Card faces, keyword chips and the Forecast detail are shared with the in-world door vote (DoorPanel.tsx), which
-// replaced this full-screen vote in the main flow; FateVote stays as a fallback / reference screen.
+// Card faces, keyword chips and the Forecast detail are shared with the door vote (DoorPanel.tsx), which replaced
+// this full-screen vote in the main flow; FateVote stays as a fallback / reference screen and shows the same themed
+// card spread (FateCards.tsx).
 // FATE_OFFER / VOTING (REQ VOTE01, LEDGER01, PRD §4.2, §10.2, §16.1): three cards that read at a glance — rarity
 // frame (silver / gold / prismatic crimson), a GIFT and a PRICE section with big numbers and keyword chips, the
 // per-card Forecast one key away (F). Warnings never disable a selection control. Keys: 1 2 3 choose, Enter seals,
@@ -95,17 +100,6 @@ export function CardFace({ card, fc, index, children }: { card: CardDef; fc?: Ca
       {children}
     </>
   );
-}
-
-function ariaFor(card: CardDef, i: number, fc: CardForecast): string {
-  const parts = [`Card ${i + 1}: ${card.name}, ${RARITIES[cardRarity(card)].name}.`, 'Gift:'];
-  for (const m of fc.mechanics.filter((x) => x.side === 'gift')) parts.push(`${m.name}: ${m.short}.`);
-  if (card.positive) parts.push(`${signed(card.positive.percent)} ${STAT_BY_ID[card.positive.stat]?.name}.`);
-  parts.push('Price:');
-  for (const m of fc.mechanics.filter((x) => x.side === 'price')) parts.push(`${m.name}: ${m.short}.`);
-  if (card.negative) parts.push(`${signed(card.negative.percent)} ${STAT_BY_ID[card.negative.stat]?.name}.`);
-  parts.push(fc.consequence);
-  return parts.join(' ');
 }
 
 // ---------------- forecast drawer ----------------
@@ -203,15 +197,16 @@ export function FateVote({ net, onLedger }: { net: GameConnection; onLedger: () 
   const commit = useStore(netStore, (s) => s.commit);
   const slot = useStore(netStore, (s) => s.slot);
   const serverTick = useStore(netStore, (s) => s.serverTick);
+  const flashes = useStore(settingsStore, (s) => s.s.flashes);
+  const reducedFx = useStore(settingsStore, (s) => s.s.reducedEffects);
+  const reduced = useReducedMotion();
   const [detail, setDetail] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const lockRef = useRef<HTMLButtonElement | null>(null);
   const [, setNow] = useState(0);
   useEffect(() => { const t = setInterval(() => setNow((x) => x + 1), 250); return () => clearInterval(t); }, []);
   useEffect(() => { setSelected(myVote.cardSlot); }, [myVote.cardSlot, offer?.offerId]);
   useEffect(() => { setDetail(null); }, [offer?.offerId]);
-  useEffect(() => { if (offer && !myVote.locked) setTimeout(() => cardRefs.current[0]?.focus(), 450); }, [offer?.offerId]); // eslint-disable-line react-hooks/exhaustive-deps
   const castSelect = (i: number) => { setSelected(i); if (!myVote.locked) net.vote(i, false); };
   const lock = () => { if (selected !== null && !myVote.locked) net.vote(selected, true); };
   useEffect(() => {
@@ -221,11 +216,11 @@ export function FateVote({ net, onLedger }: { net: GameConnection; onLedger: () 
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       if (['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].includes(e.code)) {
         const i = Number(e.code.slice(-1)) - 1;
-        castSelect(i); cardRefs.current[i]?.focus();
+        castSelect(i); (document.querySelector(`[data-fate-card="${i}"]`) as HTMLElement | null)?.focus();
         if (detail !== null) setDetail(i);
       } else if (e.code === 'Escape' && detail !== null) setDetail(null);
       else if (e.code === 'KeyF' && selected !== null) setDetail(detail === null ? selected : null);
-      else if ((e.code === 'Enter' || e.code === 'NumpadEnter') && selected !== null && !(e.target as HTMLElement)?.closest?.('.fate-card, button, summary')) { e.preventDefault(); lock(); }
+      else if ((e.code === 'Enter' || e.code === 'NumpadEnter') && selected !== null && !(e.target as HTMLElement)?.closest?.('[data-fate-card], button, summary')) { e.preventDefault(); lock(); }
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -256,64 +251,52 @@ export function FateVote({ net, onLedger }: { net: GameConnection; onLedger: () 
   const secs = deadlineSeconds(offer.deadlineTick, serverTick);
   const voters = votes?.votes ?? [];
   const nameOfSlot = (s: number) => phase.players[s]?.name ?? `P${s + 1}`;
-  const onKey = (e: React.KeyboardEvent, i: number) => {
-    if (e.key === 'ArrowRight') { e.preventDefault(); cardRefs.current[(i + 1) % 3]?.focus(); }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); cardRefs.current[(i + 2) % 3]?.focus(); }
-    if (e.key === 'Enter' && selected === i) { e.preventDefault(); lock(); }
-  };
   const lockedCount = voters.filter((v) => v.locked).length;
   const selCard = selected !== null ? cardDef(offer.cardIds[selected]) : undefined;
   const detailCard = detail !== null ? cardDef(offer.cardIds[detail]) : undefined;
+  // the same themed card spread as the door vote (FateCards): each card wears the dungeon behind its door
+  const models: FateCardModel[] = offer.cardIds.map((id, i): FateCardModel | null => {
+    const card = cardDef(id);
+    if (!card) return null;
+    const theme = offer.themes?.[i] ?? phase.map?.theme ?? 'catacombs';
+    return {
+      i, card, fc: fc.cards[i], theme, themeName: DUNGEON_THEMES.find((t) => t.id === theme)?.name ?? theme, boss: !!fc.nextIsBoss, blessed: false, hold: 0,
+      voters: phase.players.length > 1 ? voters.filter((v) => v.cardSlot === i).map((v) => ({ slot: v.slot, name: nameOfSlot(v.slot), accent: CLASS_BY_ID[phase.players[v.slot]?.classId ?? '']?.accent ?? '#e8c66a', locked: v.locked, standing: false, me: v.slot === slot })) : [],
+    };
+  }).filter((m): m is FateCardModel => !!m);
+  const header = (
+    <>
+      <h2 className={fcs.title}>Choose your Fate</h2>
+      <div className={fcs.sub}>
+        <span>after round {offer.round} · takes hold in round {fc.nextRound}{fc.nextIsBoss ? ' (boss)' : ''}</span>
+        {phase.players.length > 1 && <span className={fcs.tally}>{lockedCount}/{phase.players.filter((p) => p.connected).length} sealed</span>}
+        {secs !== null ? <span className="chip warn" role="timer" aria-label={`${Math.ceil(secs)} seconds left to vote`}>{Math.ceil(secs)}s</span> : <span className="chip">no timer</span>}
+        <span className="chip gold">score {score(phase.scoreText)}</span>
+        <button className="btn small" onClick={onLedger}>Ledger</button>
+      </div>
+    </>
+  );
+  const footer = (
+    <>
+      <div className={fcs.actions}>
+        <button className="btn" aria-expanded={detail !== null} disabled={selected === null} onClick={() => selected !== null && setDetail(detail === null ? selected : null)}>
+          Forecast <span className="kbd">F</span>
+        </button>
+        <button ref={lockRef} className="btn primary big" data-sfx="vote_lock" disabled={selected === null || myVote.locked || myVote.pending} onClick={lock}>
+          {myVote.locked ? 'Fate sealed ✦' : selCard ? `Seal ${selCard.name}` : 'Choose a card'}
+        </button>
+      </div>
+      <div className={fcs.status} role="status" aria-live="polite">
+        {myVote.locked ? 'Your vote is locked and accepted by the authority.' : myVote.pending ? 'Sending vote…' : 'Every card stays selectable, however dangerous.'}
+        <span> · 1 2 3 choose · Enter seals · F forecast</span>
+      </div>
+    </>
+  );
   return (
-    <div className="fate-screen">
-      <div className="fate-head">
-        <h2 className="fate-title">Choose your Fate</h2>
-        <div className="fate-sub">
-          <span>after round {offer.round} · takes hold in round {fc.nextRound}{fc.nextIsBoss ? ' (boss)' : ''}</span>
-          {secs !== null ? <span className="chip warn" role="timer" aria-label={`${Math.ceil(secs)} seconds left to vote`}>{Math.ceil(secs)}s</span> : <span className="chip">no timer</span>}
-          <span className="chip gold">score {score(phase.scoreText)}</span>
-          <button className="btn small" onClick={onLedger}>Ledger</button>
-        </div>
-      </div>
-
-      <div className="fate-row" role="radiogroup" aria-label="Fate Cards">
-        {offer.cardIds.map((id, i) => {
-          const card = cardDef(id);
-          const c = fc.cards[i];
-          if (!card || !c) return null;
-          const rarity = cardRarity(card);
-          const who = voters.filter((v) => v.cardSlot === i);
-          return (
-            <div key={id + i} className={`fate-slot r-${rarity}`} style={{ ['--fam' as string]: FAMILIES[card.family]?.color ?? '#e8b64a', ['--rar' as string]: RARITIES[rarity].color, animation: `cardIn 0.5s steps(8) ${i * 0.12}s both` }}>
-              <button ref={(el) => { cardRefs.current[i] = el; }} role="radio" aria-checked={selected === i} className={`fate-card r-${rarity}`}
-                onKeyDown={(e) => onKey(e, i)} onClick={() => castSelect(i)} aria-label={ariaFor(card, i, c)}>
-                <CardFace card={card} fc={c} index={i}>
-                  <span className="fate-seals">
-                    {who.map((v) => <span key={v.slot} className={`seal ${v.locked ? 'locked' : ''}`}>{nameOfSlot(v.slot)}{v.locked ? ' ✦' : ''}</span>)}
-                  </span>
-                </CardFace>
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="fate-actions">
-        <div className="fate-buttons">
-          <button className="btn" aria-expanded={detail !== null} disabled={selected === null} onClick={() => selected !== null && setDetail(detail === null ? selected : null)}>
-            Forecast <span className="kbd">F</span>
-          </button>
-          <button ref={lockRef} className="btn primary big fate-seal" disabled={selected === null || myVote.locked || myVote.pending} onClick={lock}>
-            {myVote.locked ? 'Fate sealed ✦' : selCard ? `Seal ${selCard.name}` : 'Choose a card'}
-          </button>
-        </div>
-        <div className="fate-status" role="status" aria-live="polite">
-          {myVote.locked ? 'Your vote is locked and accepted by the authority.' : myVote.pending ? 'Sending vote…' : 'Every card stays selectable, however dangerous.'}
-          {phase.players.length > 1 && <span> · {lockedCount}/{phase.players.filter((p) => p.connected).length} sealed · ties use a seeded draw</span>}
-          <span className="faint"> · 1 2 3 choose · Enter seals · F forecast</span>
-        </div>
-      </div>
-
+    <>
+      <FateCards cards={models} dealKey={offer.offerId} entrance="deal" selected={selected} sealed={myVote.locked ? myVote.cardSlot : null} ceremony={null}
+        header={header} footer={footer} onSelect={castSelect} onChoose={(i) => { if (!myVote.locked) { setSelected(i); net.vote(i, true); } }}
+        reduced={reduced} flashes={flashes} density={reducedFx ? 0 : particleBudget()} />
       {detail !== null && detailCard && fc.cards[detail] && (
         <aside className="frame fate-drawer" role="dialog" aria-modal="false" aria-label={`Forecast for ${detailCard.name}`}>
           <div className="fd-top">
@@ -329,6 +312,6 @@ export function FateVote({ net, onLedger }: { net: GameConnection; onLedger: () 
         </aside>
       )}
       <span className="sr-only">Your seat {slot + 1}</span>
-    </div>
+    </>
   );
 }

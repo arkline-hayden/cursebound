@@ -785,3 +785,27 @@ export function ensureDoorArt(scene: Phaser.Scene, theme: string): void {
 export function doorArtTheme(theme: string): string {
   return STYLES[theme] ? theme : 'catacombs';
 }
+
+/** Frames in a door portrait loop: lcm of the portal (6) and glow (4) cycles. */
+export const DOOR_PORTRAIT_FRAMES = 12;
+
+/**
+ * Flat, front-on frames of a theme's door for UI art (the Fate cards' destination window, ui/fateArt.ts): the animated
+ * portal behind the lit frame with the leaves thrown wide open, emissive details on top. DOOR_PORTRAIT_FRAMES RGBA
+ * buffers of DOOR_GEOM.FW x DOOR_GEOM.FH. Pure (no DOM), so it also runs in Node previews.
+ */
+export function buildDoorPortrait(theme: string): { w: number; h: number; frames: Uint8ClampedArray[] } {
+  const t = doorArtTheme(theme);
+  const frame = paintFrame(t);
+  const leaves = paintLeaves(t, DOOR_FRAMES.leaves - 1);
+  const frames: Uint8ClampedArray[] = [];
+  for (let f = 0; f < DOOR_PORTRAIT_FRAMES; f++) {
+    const b = new PixelBuffer(FW, FH);
+    frame.drawTo(b, 0, 0);
+    paintPortal(t, f % DOOR_FRAMES.portal).drawTo(b, 0, 0);
+    leaves.drawTo(b, 0, 0);
+    paintGlow(t, f % DOOR_FRAMES.glow).drawTo(b, 0, 0);
+    frames.push(b.toRGBA());
+  }
+  return { w: FW, h: FH, frames };
+}
