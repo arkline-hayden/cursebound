@@ -29,6 +29,7 @@ import { MusicDirector } from './MusicDirector';
 import { BOSS_SONGS, GENERIC_BOSS_SONG, IntensityFollower, MENU_SONG, THEME_SONGS, type SongSpec } from './music';
 import { FLOOR_FOR_THEME, pitchSpread, synthSfx, type SfxEnv } from './recipes';
 import { SampleBank, type Take } from './samples';
+import { MUSIC_FILES } from './sfxFiles.generated';
 import { AUDIO_THEMES, CRITICAL_SFX, SFX_CAPTIONS, STINGER_TIMING, type AudioTheme, type MixGroup, type MusicTrack, type SfxId, type StingerKind } from './sfx';
 import { STINGER_DUCK, playStinger } from './stingers';
 import { Synth, makeImpulse } from './synth';
@@ -46,6 +47,8 @@ const SONG_URL: Record<SongId, string> = {
   boss: '/audio/song-boss.mp3',
   results: '/audio/song-results.mp3',
 };
+/** Boss id -> its recorded track's short name (public/audio/song-boss-<name>.mp3). */
+const BOSS_SONG: Record<string, string> = { prismstag: 'stag', bellroot: 'golem', corruptcore: 'core', ironcolossus: 'colossus', skydrake: 'wyrm', moonhorror: 'horror' };
 /** songs are mastered hot next to the synthesized score; trim so the music fader means the same for both */
 const SONG_TRIM = 0.62;
 const SONG_FADE = 1.6;
@@ -150,7 +153,8 @@ export class AudioEngine {
   private groups: Partial<Record<MixGroup, GainNode>> = {};
   private musicDuck: GainNode | null = null;
   private songBus: GainNode | null = null;
-  private songs = new Map<SongId, SongVoice>();
+  /** recorded tracks by file stem ('song-title', 'song-floor-forge', 'song-boss-core'…) */
+  private songs = new Map<string, SongVoice>();
   private song: SongId | null = null;
   private ambLevel: GainNode | null = null;
   private ambDuck: GainNode | null = null;
@@ -530,21 +534,44 @@ export class AudioEngine {
     this.refreshMusic();
   }
 
+  /**
+   * The recorded track to play now (a file stem under /audio/), or null for the synthesized score: the page's
+   * requested song (title, loadout, results; the boss song upgrades to that boss's own track when it exists), else in
+   * a run the floor theme's track (song-floor-<theme>, song-training in the Training Grounds) when its file exists.
+   */
+  private activeSong(): string | null {
+    if (this.song === 'boss') {
+      const own = this.bossId && BOSS_SONG[this.bossId] ? `song-boss-${BOSS_SONG[this.bossId]}` : null;
+      return own && MUSIC_FILES.includes(own) ? own : 'song-boss';
+    }
+    if (this.song) return `song-${this.song}`;
+    if (this.track === 'boss') {
+      const own = this.bossId && BOSS_SONG[this.bossId] ? `song-boss-${BOSS_SONG[this.bossId]}` : null;
+      if (own && MUSIC_FILES.includes(own)) return own;
+    }
+    if (this.track === 'combat' || this.track === 'explore') {
+      const floor = this.courtyard ? 'song-training' : `song-floor-${this.themeId}`;
+      if (MUSIC_FILES.includes(floor)) return floor;
+    }
+    return null;
+  }
+
   private refreshSongs(): void {
     const ctx = this.ctx;
     if (!ctx || !this.songBus || ctx.state !== 'running') return;
     const now = ctx.currentTime;
+    const want = this.activeSong();
     for (const [id, v] of this.songs) {
-      if (id === this.song) continue;
+      if (id === want) continue;
       // fade out, then pause and rewind so the song starts from the top next time
       v.gain.gain.cancelScheduledValues(now);
       v.gain.gain.setTargetAtTime(0, now, SONG_FADE / 4);
       if (!v.stopTimer) v.stopTimer = setTimeout(() => { v.el.pause(); v.el.currentTime = 0; v.stopTimer = null; }, SONG_FADE * 1000 + 400);
     }
-    if (!this.song) return;
-    let v = this.songs.get(this.song);
+    if (!want) return;
+    let v = this.songs.get(want);
     if (!v) {
-      const el = new Audio(SONG_URL[this.song]);
+      const el = new Audio(`/audio/${want}.mp3`);
       el.loop = true;
       el.preload = 'auto';
       const src = ctx.createMediaElementSource(el);
@@ -553,7 +580,7 @@ export class AudioEngine {
       src.connect(gain);
       gain.connect(this.songBus);
       v = { el, src, gain, stopTimer: null };
-      this.songs.set(this.song, v);
+      this.songs.set(want, v);
     }
     if (v.stopTimer) { clearTimeout(v.stopTimer); v.stopTimer = null; }
     v.gain.gain.cancelScheduledValues(now);
@@ -652,11 +679,12 @@ export class AudioEngine {
   }
 
   private refreshMusic(): void {
+    this.refreshSongs();
     const ctx = this.ctx;
     if (!ctx || !this.director || !this.synth || !this.groups.ambience || !this.ambRev) return;
     const now = ctx.currentTime;
     // a recorded song replaces the synthesized score while it plays; the ambience bed keeps going
-    const spec = this.track === null || this.song ? null : this.keySpec();
+    const spec = this.track === null || this.activeSong() ? null : this.keySpec();
     const prev = this.director.currentId;
     if (spec && spec.id !== prev && spec.minIntensity !== undefined) this.follower.reset(Math.max(this.follower.value, 0.5));
     this.director.play(spec, now, spec && prev && prev.startsWith('boss:') !== spec.id.startsWith('boss:') ? 1.8 : 2.5);

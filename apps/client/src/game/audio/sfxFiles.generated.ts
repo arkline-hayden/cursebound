@@ -449,3 +449,6 @@ export const SFX_FILES: Record<string, readonly string[]> = {
   xp_tick: ['sfx/xp_tick.mp3'],
   zap_strike: ['sfx/zap_strike.mp3'],
 };
+
+/** Recorded music tracks present under /audio/ (file stems: song-title, song-floor-forge, song-boss-core…). */
+export const MUSIC_FILES: readonly string[] = ['song-boss', 'song-loadout', 'song-results', 'song-title'];
