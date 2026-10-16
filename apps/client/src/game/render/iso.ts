@@ -34,6 +34,22 @@ export const iso = {
     const l = Math.hypot(wx, wy) || 1;
     return { x: (wx / l) * m, y: (wy / l) * m };
   },
+  /**
+   * 8-way facing (0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE on screen; animFor's index) for a world direction.
+   * Sprites are posed on the ground plane and foreshortened 2:1 exactly like the floor (art/draw/rig.ts), so the
+   * direction is binned there, in equal 45° sectors: undoing the 2:1 squash of iso.dir leaves (dx - dy, dx + dy).
+   * Binning the squashed screen vector instead gave east / west 79° of heading and north / south only 23°, so a
+   * hero walking a few degrees off a world axis (a screen diagonal: every corridor) showed the wrong sprite.
+   */
+  facing8: (dx: number, dy: number) => {
+    const x = dx - dy, y = dx + dy;
+    if (Math.abs(x) < 1e-9 && Math.abs(y) < 1e-9) return 2;
+    const T = 0.41421356, ax = Math.abs(x), ay = Math.abs(y);   // tan(22.5°)
+    if (ay <= ax * T) return x > 0 ? 0 : 4;
+    if (ax <= ay * T) return y > 0 ? 2 : 6;
+    if (x > 0) return y > 0 ? 1 : 7;
+    return y > 0 ? 3 : 5;
+  },
   /** depth for an object standing at world (x, y) */
   depth: (x: number, y: number) => (x + y) * 10,
   /** half-axes of the screen ellipse for a world circle of radius r */

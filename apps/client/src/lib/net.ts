@@ -84,6 +84,9 @@ export class GameConnection {
     surgeTimer: 0, guardTimer: 0, speed: 4, rr: 1, prevDodge: false, dashAt: 0,
     /** afflictions (snapshot lk / teth / tk): movement-lock ticks, chain anchor + radius, chain ticks (same limits as the authority) */
     lock: 0, teth: null as [number, number, number] | null, tethT: 0,
+    /** the aim the authority holds once it has our inputs (it keeps the last non-zero aim input, stepPlayer): the
+     *  local hero faces this, not the snapshot's aim, which trails our predicted body by the input round trip */
+    ax: 1, ay: 0,
   };
   /** dodge bit of the last input the authority acknowledged (edge detection for replay) */
   private ackDodge = false;
@@ -213,8 +216,12 @@ export class GameConnection {
       const b = this.pred;
       b.x = me.x; b.y = me.y; b.vx = me.vx; b.vy = me.vy;
       b.dodgeTimer = me.dt; b.dodgeDirX = me.ddx; b.dodgeDirY = me.ddy;
-      b.dodgeCharges = me.dc ?? DODGE.charges; b.dodgeMax = me.dcm ?? DODGE.charges; b.dodgeCooldown = me.dcd;   // dcm: a bounty may lower the max b.surgeTimer = me.sg ?? 0; b.guardTimer = me.guard ? 1 : 0;
+      b.dodgeCharges = me.dc ?? DODGE.charges; b.dodgeMax = me.dcm ?? DODGE.charges; b.dodgeCooldown = me.dcd;   // dcm: a bounty may lower the max
+      // the post-dash surge and the guard slow scale ground speed: replay from the authority's, never from our own
+      // (a surge kept on our clock was spent again by every replay and ended early, so the hero lagged the authority)
+      b.surgeTimer = me.sg ?? 0; b.guardTimer = me.guard ? 1 : 0;
       b.speed = me.spd; b.rr = me.rr ?? 1;
+      if (!b.valid) { b.ax = me.ax; b.ay = me.ay; }   // a fresh prediction (new round) starts from the authority's aim
       b.lock = me.lk ?? 0; b.teth = me.teth ?? null; b.tethT = me.tk ?? 0;   // frozen / rooted / chained (afflictions.ts)
       let prev = this.ackDodge;
       if (me.life === 'alive' && movesIn(snap.phase) && !cinematicHeld(snap)) {
@@ -246,9 +253,11 @@ export class GameConnection {
     this.send(input);
     const me = snap.players[st.slot];
     const dodge = (buttons & 32) !== 0;
-    // the authority keeps the previous aim when the aim input is ~zero; mirror that for standing dashes
+    // the authority keeps the previous aim when the aim input is ~zero; mirror that for standing dashes (our last
+    // non-zero aim, which the authority will hold by then, not the snapshot's, which may not have seen it yet)
     const hasAim = Math.hypot(input.ax, input.ay) > 1e-4;
-    const pax = hasAim ? input.ax : (me?.ax ?? 1), pay = hasAim ? input.ay : (me?.ay ?? 0);
+    if (hasAim) { this.pred.ax = input.ax; this.pred.ay = input.ay; }
+    const pax = this.pred.ax, pay = this.pred.ay;
     this.pending.push({ seq, mx: input.mx, my: input.my, ax: pax, ay: pay, dodge });
     if (this.pending.length > 120) this.pending.shift();
     const edge = dodge && !this.pred.prevDodge;

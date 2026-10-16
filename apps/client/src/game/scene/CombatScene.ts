@@ -27,7 +27,7 @@ import { BOSS_DEATH_FILE, CueGate, FoeWatch, SKILL_FILE, foeVoice } from '../aud
 import { DamageNumbers, NUMBER_COLOR } from '../render/DamageNumbers';
 import { DeathFx, deathStyle } from '../render/DeathFx';
 import { InputController, type Sample } from '@/lib/input';
-import { ClickMove, type DriveOut } from '../input/ClickMove';
+import { ClickMove, InputTicks, type DriveFrame } from '../input/ClickMove';
 import { basicReach, pickEnemy, pickGround, type GroundThing } from '../input/targeting';
 import { ClickFx } from '../render/ClickFx';
 import { GuideMark } from '../render/GuideMark';
@@ -150,7 +150,8 @@ export class CombatScene extends Phaser.Scene {
   private hazardSprites = new Map<number, Phaser.GameObjects.Sprite[]>();
   private hazardLit = new Set<number>();
   private bolts: { pts: { x: number; y: number }[]; until: number; color: number }[] = [];
-  private inputAcc = 0;
+  /** rendered frames to 60 Hz input ticks (real clock, stalls not replayed, one controller decision per tick) */
+  private inputTicks = new InputTicks();
   private frameTimes: number[] = [];
   /** frame-rate watchdog: seconds of slow frames (decays when fast), last sample, and whether a report waits for a
    *  safe moment (never mid-fight, mid-boss or mid-cutscene); one report per scene */
@@ -427,17 +428,8 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
-  /** 8-way facing on screen for a world-space direction */
-  private dirOf(wx: number, wy: number): number {
-    const v = iso.dir(wx, wy);
-    const x = v.x, y = v.y;
-    if (Math.abs(x) < 1e-6 && Math.abs(y) < 1e-6) return 2;
-    const T = 0.41421356, ax = Math.abs(x), ay = Math.abs(y);
-    if (ay <= ax * T) return x > 0 ? 0 : 4;
-    if (ax <= ay * T) return y > 0 ? 2 : 6;
-    if (x > 0) return y > 0 ? 1 : 7;
-    return y > 0 ? 3 : 5;
-  }
+  /** 8-way facing on screen for a world-space direction (binned on the ground plane, iso.facing8) */
+  private dirOf(wx: number, wy: number): number { return iso.facing8(wx, wy); }
 
   private sfx(id: SfxId, x?: number, priority = 1, y = x) {
     if (!this.audio) return;
@@ -1009,7 +1001,7 @@ export class CombatScene extends Phaser.Scene {
         this.releaseNames();
       }
     }
-    this.sendInputs(delta, latest);
+    this.sendInputs(latest);
     this.watchFrames(realNow, avgFrame, latest);
     this.loot?.update(latest, this.net.events);   // reads (does not consume) the event queue
     this.cine?.ingest(this.net.events, latest);   // cutscene triggers (reads, does not consume)
@@ -1035,9 +1027,11 @@ export class CombatScene extends Phaser.Scene {
     for (const pb of b.players) {
       const pa = a.players.find((x) => x.s === pb.s) ?? pb;
       let x = pa.x + (pb.x - pa.x) * t, y = pa.y + (pb.y - pa.y) * t;
+      let predicted = false;
       if (pb.s === me) {
         const lp = latest.players[me];
         if (this.net.pred.valid && lp.life === 'alive' && movesIn(latest.phase)) {   // COMBAT and the door vote
+          predicted = true;
           const tx = this.net.pred.x, ty = this.net.pred.y;
           if (!this.renderSelf.init || Math.hypot(tx - this.renderSelf.x, ty - this.renderSelf.y) > 1.5) { this.renderSelf.x = tx; this.renderSelf.y = ty; this.renderSelf.init = true; }
           else {
@@ -1057,7 +1051,7 @@ export class CombatScene extends Phaser.Scene {
       const key = `p${pb.s}`;
       seen.add(key);
       drawnAt.set(pb.s, { x, y });
-      this.drawPlayer(key, pb.s === me ? latest.players[me] : pb, x, y, pb.s === me, delta);
+      this.drawPlayer(key, pb.s === me ? latest.players[me] : pb, x, y, pb.s === me, delta, predicted);
     }
     // fallen for the round: the camera follows the teammate chosen in the spectate bar (ui/Spectate.tsx)
     const watched = spectateTarget(latest.players, me, spectateStore.get().slot);
@@ -1242,7 +1236,7 @@ export class CombatScene extends Phaser.Scene {
     this.pendingBanners = keep;
   }
 
-  private sendInputs(delta: number, latest: Snapshot | null) {
+  private sendInputs(latest: Snapshot | null) {
     const s = this.input2.sample();
     if (this.roomFx && latest) {
       // room events: Interact near a shrine / altar / merchant, or a click on one (render/RoomEvents.ts)
@@ -1251,24 +1245,37 @@ export class CombatScene extends Phaser.Scene {
       // a click that used / walks to an event is not also a ground click (the ground under a tall sprite lies behind it)
       if (this.roomFx.input((s.pressed & 64) !== 0, click, this.renderSelf.init ? this.renderSelf : null)) { s.primaryEdge = false; s.primary = false; }
     }
-    this.inputAcc += delta;
-    if (this.inputAcc > 100) this.inputAcc = 100;
-    const out = this.driveInput(s, latest);
-    while (this.inputAcc >= 1000 / 60) {
-      this.inputAcc -= 1000 / 60;
+    // the controller decides once per frame and again for every input tick the frame carries, each from the body
+    // the prediction has reached (sendInput predicts the tick it sends); a stall's ticks are not sent late
+    // (InputTicks: the authority already held our last input through them)
+    this.inputTicks.run(performance.now(), this.clickMove, this.driveFrame(s, latest), (out) => {
       this.net.sendInput(out.mx, out.my, out.ax, out.ay, out.buttons);
+      return this.selfPos(latest);
+    });
+    const now = performance.now();
+    for (const m of this.clickMove.fx.splice(0)) {
+      this.clickFx?.mark(m.x, m.y, m.kind);
+      // a soft tick on a fresh ground click (not on UI move-to requests or re-paths while held)
+      if (m.kind === 'move' && !m.ui && now - this.lastClickSfx > 150) { this.lastClickSfx = now; this.sfx('move_click', undefined, 0); }
     }
   }
 
+  /** The local hero's body as the controller steers it: the prediction while it runs, else the snapshot. */
+  private selfPos(latest: Snapshot | null): { x: number; y: number } | null {
+    const lp = latest?.players[netStore.get().slot];
+    if (!lp) return null;
+    return this.net.pred.valid && lp.life === 'alive' ? { x: this.net.pred.x, y: this.net.pred.y } : { x: lp.x, y: lp.y };
+  }
+
   /**
-   * One frame of intention (world move vector, aim offset, buttons) from the sampled input: click-to-move, the WASD
-   * scheme and the gamepad all run through ClickMove (game/input/ClickMove.ts). Also picks what the cursor is over
-   * (foe by sprite bounds, pickup / loot / door), sets the pixel cursor and drops click markers.
+   * One frame of controller input from the sampled devices: click-to-move, the WASD scheme and the gamepad all run
+   * through ClickMove (game/input/ClickMove.ts). Also picks what the cursor is over (foe by sprite bounds, pickup /
+   * loot / door) and sets the pixel cursor.
    */
-  private driveInput(s: Sample, latest: Snapshot | null): DriveOut {
+  private driveFrame(s: Sample, latest: Snapshot | null): DriveFrame {
     const set = this.settings();
     const lp = latest?.players[netStore.get().slot];
-    const self = lp ? (this.net.pred.valid && lp.life === 'alive' ? { x: this.net.pred.x, y: this.net.pred.y } : { x: lp.x, y: lp.y }) : null;
+    const self = this.selfPos(latest);
     const cam = this.cameras.main;
     const k = this.game.canvas.clientWidth / this.W || 1;
     const sp = { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY };
@@ -1292,21 +1299,6 @@ export class CombatScene extends Phaser.Scene {
       : hd ? { kind: 'door' as const, x: hd.x, y: hd.y, r: 1.2, index: this.doorHover! }
       : pickGround(cursor, sp, (x, y) => iso.p(x, y), latest.pickups ?? [], latest.lt ?? [], doors);
     this.clickHover = { enemy: hoverEnemy, ground: hoverGround, combat };
-    const out = this.clickMove.update({
-      now: performance.now(), scheme: set.controlScheme === 'wasd' ? 'wasd' : 'click', phase: latest?.phase ?? '', blocked: s.blocked || !latest || cinematicHeld(latest),
-      life: lp?.life ?? null, self, buffs: lp?.buffs ?? [], tether: (lp as { teth?: [number, number, number] } | undefined)?.teth ?? null,
-      skills: lp?.cd.map((c) => c[0]) ?? [], map: this.net.map, enemies, reach: basicReach(lp?.c),
-      cursor, hoverEnemy, hoverGround, primary: s.primary, primaryEdge: s.primaryEdge, force: s.force,
-      buttons: s.buttons, pressed: s.pressed, keyMove: iso.dirToWorld(s.mx, s.my),
-      padAim: s.stickAim ? iso.dirToWorld(s.stickAim.x, s.stickAim.y) : null, usingPad: s.usingPad,
-      assist: { autoAttack: set.autoAttack, aimAssist: set.aimAssist },
-    });
-    const now = performance.now();
-    for (const m of this.clickMove.fx.splice(0)) {
-      this.clickFx?.mark(m.x, m.y, m.kind);
-      // a soft tick on a fresh ground click (not on UI move-to requests or re-paths while held)
-      if (m.kind === 'move' && !m.ui && now - this.lastClickSfx > 150) { this.lastClickSfx = now; this.sfx('move_click', undefined, 0); }
-    }
     // pixel cursor (re-asserted if another renderer reset it); the browser re-serialises the value, so compare to that
     const kind: GameCursor | '' = !over ? '' : hoverEnemy ? 'attack' : hoverGround ? 'grab' : 'default';
     const style = this.game.canvas.style;
@@ -1315,7 +1307,16 @@ export class CombatScene extends Phaser.Scene {
       style.cursor = kind ? gameCursor(kind) : '';
       this.cursorCss = style.cursor;
     }
-    return out;
+    return {
+      now: performance.now(), scheme: set.controlScheme === 'wasd' ? 'wasd' : 'click', phase: latest?.phase ?? '', blocked: s.blocked || !latest || cinematicHeld(latest),
+      life: lp?.life ?? null, self, buffs: lp?.buffs ?? [], tether: (lp as { teth?: [number, number, number] } | undefined)?.teth ?? null,
+      skills: lp?.cd.map((c) => c[0]) ?? [], map: this.net.map, enemies, reach: basicReach(lp?.c),
+      cursor, pointer: s.usingPad ? null : { x: this.input2.pointer.x / k, y: this.input2.pointer.y / k },
+      hoverEnemy, hoverGround, primary: s.primary, primaryEdge: s.primaryEdge, force: s.force,
+      buttons: s.buttons, pressed: s.pressed, keyMove: iso.dirToWorld(s.mx, s.my),
+      padAim: s.stickAim ? iso.dirToWorld(s.stickAim.x, s.stickAim.y) : null, usingPad: s.usingPad,
+      assist: { autoAttack: set.autoAttack, aimAssist: set.aimAssist },
+    };
   }
 
   /** Ground feedback for click-to-move: click markers, the hovered foe / item, the locked attack target. */
@@ -1362,7 +1363,8 @@ export class CombatScene extends Phaser.Scene {
     v.shadow.setPosition(Math.round(x), Math.round(y));
   }
 
-  private drawPlayer(key: string, p: SnapPlayer, x: number, y: number, isMe: boolean, delta: number) {
+  /** `predicted`: the local hero drawn at its predicted body (alive, in a phase heroes move in) */
+  private drawPlayer(key: string, p: SnapPlayer, x: number, y: number, isMe: boolean, delta: number, predicted = false) {
     const actor = this.heroActor(p.c);
     const { x: px, y: py } = this.P(x, y);
     const depth = iso.depth(x, y);
@@ -1376,11 +1378,16 @@ export class CombatScene extends Phaser.Scene {
     let lantern = this.lanterns.get(p.s);
     if (!lantern && this.lights && this.dungeon.lighting) { lantern = this.lights.addLight(px, py - 16, isMe ? 260 : 190, isMe ? 0xffd8a0 : 0xffc890, isMe ? 1.25 : 0.9); this.lanterns.set(p.s, lantern); }
     if (lantern) { lantern.x = px; lantern.y = py - 16; lantern.intensity = (p.life === 'alive' ? (isMe ? 1.25 : 0.9) : 0.4) * (0.95 + Math.random() * 0.08); }
-    // the local hero dashes on prediction (instant), remote heroes on the snapshot
-    const dashing = isMe && this.net.pred.valid && p.life === 'alive' ? this.net.pred.dodgeTimer > 0 : p.anim === 'dodge';
-    const anim = dashing ? 'dodge' : p.anim;
+    // The local hero dashes, runs and faces on its prediction, like its position: the snapshot's anim, velocity and
+    // aim trail the predicted body by the input round trip, so every turn showed the new heading with the old facing
+    // and every start / stop slid in the wrong pose. Remote heroes use the snapshot. A dash faces along the dash.
+    const pr = this.net.pred;
+    const dashing = predicted ? pr.dodgeTimer > 0 : p.anim === 'dodge';
+    const locomotion = p.anim === 'run' || p.anim === 'idle' || p.anim === 'dodge';
+    const anim = dashing ? 'dodge' : predicted && locomotion ? (Math.abs(pr.vx) + Math.abs(pr.vy) > 0.05 ? 'run' : 'idle') : p.anim;
+    const aimX = predicted ? pr.ax : p.ax, aimY = predicted ? pr.ay : p.ay;
     const st: ActorState = anim === 'death' ? 'death' : anim === 'downed' ? 'downed' : anim as ActorState;
-    this.play(v, st, this.dirOf(p.ax, p.ay));
+    this.play(v, st, dashing ? this.dirOf(predicted ? pr.dodgeDirX : p.ddx, predicted ? pr.dodgeDirY : p.ddy) : this.dirOf(aimX, aimY));
     const now = this.time.now;
     if (dashing && now - v.lastAfterimage > 28) { v.lastAfterimage = now; this.juice.afterimage(v.sprite, 0x8fd8ff, 0.5, 240); }
     const surging = isMe ? this.net.pred.surgeTimer > 0 : (p.sg ?? 0) > 0;
@@ -1411,7 +1418,7 @@ export class CombatScene extends Phaser.Scene {
     }
     { const tint = heroTint(p); if (tint !== null) v.sprite.setTint(tint); else v.sprite.clearTint(); }   // frozen / poisoned / chilled heroes
     this.aff.drawPlayer(p, x, y, v.sprite, isMe);
-    const u = iso.unit(p.ax, p.ay);
+    const u = iso.unit(aimX, aimY);
     if (p.guard) {
       if (!v.shield) { v.shield = this.add.sprite(0, 0, 'fx:shield').setBlendMode(Phaser.BlendModes.ADD); if (this.anims.exists('fx:shield')) v.shield.play('fx:shield'); }
       v.shield.setVisible(true).setPosition(px + u.x * 12, py - 16 + u.y * 8).setDepth(depth + 1).setAlpha(0.8);

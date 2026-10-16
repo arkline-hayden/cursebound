@@ -11,16 +11,9 @@ import { iso } from '../render/iso';
 
 export interface PathPoint { x: number; y: number }
 
-/** 8-way screen facing for a world-space direction (same mapping as CombatScene.dirOf). */
+/** 8-way screen facing for a world-space direction (the live scene's mapping, iso.facing8). */
 export function dirOf(wx: number, wy: number): number {
-  const v = iso.dir(wx, wy);
-  const x = v.x, y = v.y;
-  if (Math.abs(x) < 1e-6 && Math.abs(y) < 1e-6) return 2;
-  const T = 0.41421356, ax = Math.abs(x), ay = Math.abs(y);
-  if (ay <= ax * T) return x > 0 ? 0 : 4;
-  if (ax <= ay * T) return y > 0 ? 2 : 6;
-  if (x > 0) return y > 0 ? 1 : 7;
-  return y > 0 ? 3 : 5;
+  return iso.facing8(wx, wy);
 }
 
 export class Puppet {

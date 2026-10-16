@@ -187,7 +187,7 @@ describe('attack-move decisions', () => {
 function frame(over: Partial<DriveFrame>): DriveFrame {
   return {
     now: 0, scheme: 'click', phase: 'COMBAT', blocked: false, life: 'alive', self: { x: 2.5, y: 2.5 }, buffs: [], tether: null,
-    skills: ['', '', '', ''], map: null, enemies: [], reach: { ranged: false, range: 1.75 }, cursor: null, hoverEnemy: null, hoverGround: null,
+    skills: ['', '', '', ''], map: null, enemies: [], reach: { ranged: false, range: 1.75 }, cursor: null, pointer: null, hoverEnemy: null, hoverGround: null,
     primary: false, primaryEdge: false, force: false, buttons: 0, pressed: 0, keyMove: { x: 0, y: 0 }, padAim: null, usingPad: false,
     assist: { autoAttack: false, aimAssist: false }, ...over,
   };

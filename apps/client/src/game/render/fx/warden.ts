@@ -47,17 +47,8 @@ function sfx(ctx: FxCtx, id: SfxId, x: number, y: number, minGapMs = 0, priority
   ctx.sfx(id, x, y, priority);
 }
 
-/** 8-way screen facing for a world direction (matches CombatScene). */
-function dir8(wx: number, wy: number): number {
-  const v = iso.dir(wx, wy);
-  const x = v.x, y = v.y;
-  if (Math.abs(x) < 1e-6 && Math.abs(y) < 1e-6) return 2;
-  const T = 0.41421356, ax = Math.abs(x), ay = Math.abs(y);
-  if (ay <= ax * T) return x > 0 ? 0 : 4;
-  if (ax <= ay * T) return y > 0 ? 2 : 6;
-  if (x > 0) return y > 0 ? 1 : 7;
-  return y > 0 ? 3 : 5;
-}
+/** 8-way screen facing for a world direction (matches CombatScene: iso.facing8). */
+const dir8 = (wx: number, wy: number): number => iso.facing8(wx, wy);
 
 const hasActor = (id: string): id is ActorId => (ACTOR_IDS as readonly string[]).includes(id);
 /** Dedicated spirit sprites when present; a tinted Ghoul Hound stands in otherwise. */
