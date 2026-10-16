@@ -53,7 +53,7 @@ const BOSS_SONG: Record<string, string> = { prismstag: 'stag', bellroot: 'golem'
 const SONG_TRIM = 0.62;
 const SONG_FADE = 1.6;
 /** per-cue level trims on top of the levelled takes (footsteps sit under the fight) */
-const CUE_TRIM: Partial<Record<SfxId, number>> = { footstep: 0.5 };
+const CUE_TRIM: Partial<Record<SfxId, number>> = { footstep: 0.25 };
 
 interface SongVoice { el: HTMLAudioElement; src: MediaElementAudioSourceNode; gain: GainNode; stopTimer: ReturnType<typeof setTimeout> | null }
 
