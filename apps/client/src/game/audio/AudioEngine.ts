@@ -606,7 +606,13 @@ export class AudioEngine {
   private refreshBed(now: number): void {
     const ctx = this.ctx;
     if (!ctx || !this.synth || !this.groups.ambience || !this.ambRev) return;
-    const bedId: BedId = this.track === 'menu' ? 'menu' : this.themeId;
+    // no ambience outside a run: the title screen and menus are music only
+    if (this.track === null || this.track === 'menu') {
+      this.bed?.stop(now, 1.5);
+      this.bed = null;
+      return;
+    }
+    const bedId: BedId = this.themeId;
     const take = this.samples.pick(`amb_${bedId}`, this.synth.rand);
     const wantFile = !!take;
     if (this.bed?.id === bedId && (this.bed instanceof FileBed) === wantFile) return;
