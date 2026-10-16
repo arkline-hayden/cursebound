@@ -13,7 +13,7 @@ export interface Take {
   gain: number;
 }
 
-const BASE = '/audio/sfx/';
+const BASE = '/audio/';
 /** target RMS of a take's audible part (about -18 dBFS); the engine's per-cue volumes and mix groups sit on top */
 const TARGET_RMS = 0.125;
 /** a take's peak never goes past this after levelling */

@@ -1,0 +1,595 @@
+{
+ "vessel_shift": [
+  1,
+  2
+ ],
+ "vessel_locked": [
+  1
+ ],
+ "vessel_roar": [
+  1
+ ],
+ "vessel_pick_vanguard": [
+  1
+ ],
+ "vessel_pick_arcanist": [
+  1
+ ],
+ "vessel_pick_duelist": [
+  1
+ ],
+ "vessel_pick_hexbinder": [
+  1
+ ],
+ "vessel_pick_artificer": [
+  1
+ ],
+ "vessel_pick_templar": [
+  1
+ ],
+ "vessel_pick_berserker": [
+  1
+ ],
+ "vessel_pick_cryomancer": [
+  1
+ ],
+ "vessel_pick_ranger": [
+  1
+ ],
+ "vessel_pick_warden": [
+  1
+ ],
+ "level_up": [
+  1
+ ],
+ "footstep_stone": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_wet": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_bone": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_carpet": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_moss": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_grass": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_grate": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_snow": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "footstep_dust": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "dodge": [
+  1,
+  2,
+  3
+ ],
+ "swing": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "attack_melee": [
+  1,
+  2,
+  3
+ ],
+ "hit_player": [
+  1,
+  2,
+  3
+ ],
+ "heal": [
+  1
+ ],
+ "shield": [
+  1
+ ],
+ "potion_glug": [
+  1
+ ],
+ "player_downed": [
+  1
+ ],
+ "player_revived": [
+  1
+ ],
+ "heartbeat": [
+  1
+ ],
+ "combo": [
+  1,
+  2,
+  3
+ ],
+ "impact_light": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "impact_heavy": [
+  1,
+  2,
+  3
+ ],
+ "impact_fire": [
+  1,
+  2,
+  3
+ ],
+ "impact_frost": [
+  1,
+  2,
+  3
+ ],
+ "impact_storm": [
+  1,
+  2,
+  3
+ ],
+ "impact_decay": [
+  1,
+  2,
+  3
+ ],
+ "impact_astral": [
+  1,
+  2,
+  3
+ ],
+ "hit_enemy": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "crit": [
+  1,
+  2
+ ],
+ "kill": [
+  1,
+  2,
+  3
+ ],
+ "kill_burn": [
+  1,
+  2
+ ],
+ "kill_shatter": [
+  1,
+  2
+ ],
+ "kill_zap": [
+  1,
+  2
+ ],
+ "kill_squelch": [
+  1,
+  2
+ ],
+ "kill_chime": [
+  1,
+  2
+ ],
+ "enemy_death": [
+  1,
+  2,
+  3
+ ],
+ "cast_fire": [
+  1
+ ],
+ "blast_fire": [
+  1
+ ],
+ "cast_frost": [
+  1
+ ],
+ "blast_frost": [
+  1
+ ],
+ "cast_storm": [
+  1
+ ],
+ "zap_strike": [
+  1
+ ],
+ "cast_decay": [
+  1
+ ],
+ "blast_decay": [
+  1
+ ],
+ "cast_holy": [
+  1
+ ],
+ "smite": [
+  1
+ ],
+ "cast_astral": [
+  1
+ ],
+ "bow_shot": [
+  1,
+  2
+ ],
+ "gun_shot": [
+  1,
+  2
+ ],
+ "throw_whoosh": [
+  1
+ ],
+ "slam_heavy": [
+  1
+ ],
+ "blade_flurry": [
+  1
+ ],
+ "shield_bash": [
+  1
+ ],
+ "summon_rise": [
+  1
+ ],
+ "beast_howl": [
+  1
+ ],
+ "beast_roar": [
+  1
+ ],
+ "mech_deploy": [
+  1
+ ],
+ "steam_vent": [
+  1
+ ],
+ "trap_snap": [
+  1
+ ],
+ "skill_guard": [
+  1
+ ],
+ "skill_sweep": [
+  1
+ ],
+ "skill_rally": [
+  1
+ ],
+ "skill_fireline": [
+  1
+ ],
+ "blink": [
+  1
+ ],
+ "skill_arc": [
+  1
+ ],
+ "skill_phase": [
+  1
+ ],
+ "signature_slam": [
+  1
+ ],
+ "signature_nova": [
+  1
+ ],
+ "attack_spark": [
+  1,
+  2
+ ],
+ "chain_throw": [
+  1
+ ],
+ "chain_bind": [
+  1
+ ],
+ "chain_break": [
+  1
+ ],
+ "freeze_build": [
+  1
+ ],
+ "freeze": [
+  1
+ ],
+ "ice_shatter": [
+  1,
+  2
+ ],
+ "poison_spit": [
+  1
+ ],
+ "poisoned": [
+  1
+ ],
+ "blind_burst": [
+  1
+ ],
+ "web_spit": [
+  1
+ ],
+ "rooted": [
+  1
+ ],
+ "silenced": [
+  1
+ ],
+ "enemy_shoot": [
+  1,
+  2,
+  3
+ ],
+ "enemy_bite": [
+  1,
+  2,
+  3
+ ],
+ "telegraph_warn": [
+  1
+ ],
+ "wave_spawn": [
+  1
+ ],
+ "boss_telegraph": [
+  1
+ ],
+ "boss_charge": [
+  1
+ ],
+ "boss_phase": [
+  1
+ ],
+ "boss_rumble": [
+  1
+ ],
+ "boss_emerge": [
+  1
+ ],
+ "boss_roar": [
+  1
+ ],
+ "stag_cry": [
+  1
+ ],
+ "bell_toll": [
+  1
+ ],
+ "boss_ring": [
+  1
+ ],
+ "core_charge": [
+  1
+ ],
+ "core_laser": [
+  1
+ ],
+ "core_firewall": [
+  1
+ ],
+ "core_glitch": [
+  1
+ ],
+ "core_purge_alarm": [
+  1
+ ],
+ "core_purge": [
+  1
+ ],
+ "core_deploy": [
+  1
+ ],
+ "colossus_raise": [
+  1
+ ],
+ "colossus_hammer": [
+  1
+ ],
+ "colossus_stomp": [
+  1
+ ],
+ "colossus_vent": [
+  1
+ ],
+ "lava_vent": [
+  1
+ ],
+ "lava_erupt": [
+  1
+ ],
+ "drake_screech": [
+  1
+ ],
+ "drake_gale": [
+  1
+ ],
+ "drake_dive": [
+  1
+ ],
+ "thunder_feather": [
+  1,
+  2
+ ],
+ "skyfall": [
+  1
+ ],
+ "horror_moan": [
+  1
+ ],
+ "tentacle_burst": [
+  1,
+  2
+ ],
+ "gravity_well": [
+  1
+ ],
+ "void_beam": [
+  1
+ ],
+ "legendary_drop": [
+  1
+ ],
+ "chest_open": [
+  1
+ ],
+ "legendary_equip": [
+  1
+ ],
+ "coin_pickup": [
+  1,
+  2,
+  3
+ ],
+ "fate_blessing": [
+  1
+ ],
+ "shrine_activate": [
+  1
+ ],
+ "altar_pact": [
+  1
+ ],
+ "merchant_buy": [
+  1
+ ],
+ "imp_jingle": [
+  1,
+  2
+ ],
+ "imp_portal": [
+  1
+ ],
+ "round_start": [
+  1
+ ],
+ "round_clear": [
+  1
+ ],
+ "door_appear": [
+  1
+ ],
+ "door_hum": [
+  1
+ ],
+ "door_choose": [
+  1
+ ],
+ "door_open": [
+  1
+ ],
+ "portal_open": [
+  1
+ ],
+ "portal_enter": [
+  1
+ ],
+ "vote_cast": [
+  1
+ ],
+ "vote_lock": [
+  1
+ ],
+ "fate_commit": [
+  1
+ ],
+ "cine_whoosh": [
+  1
+ ],
+ "amb_menu": [
+  1
+ ],
+ "amb_catacombs": [
+  1
+ ],
+ "amb_flooded": [
+  1
+ ],
+ "amb_ossuary": [
+  1
+ ],
+ "amb_sanctum": [
+  1
+ ],
+ "amb_fungal": [
+  1
+ ],
+ "amb_forge": [
+  1
+ ],
+ "amb_frost": [
+  1
+ ],
+ "amb_sky": [
+  1
+ ],
+ "amb_moon": [
+  1
+ ],
+ "amb_server": [
+  1
+ ],
+ "stinger_door_open": [
+  1
+ ],
+ "stinger_portal": [
+  1
+ ],
+ "stinger_round_start": [
+  1
+ ],
+ "stinger_boss_reveal": [
+  1
+ ],
+ "stinger_boss_roar": [
+  1
+ ],
+ "stinger_round_clear": [
+  1
+ ],
+ "stinger_legendary": [
+  1
+ ],
+ "stinger_party_wipe": [
+  1
+ ]
+}

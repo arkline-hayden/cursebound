@@ -1,58 +1,69 @@
 #!/usr/bin/env node
-// Sound review page: lists every sound in tools/audio/sounds.mjs, plays its takes straight from
-// apps/client/public/audio, and saves re-roll marks (+ notes that steer the prompt) to tools/audio/rerolls.json,
-// which `node tools/audio/generate.mjs --rerolls` consumes.   node tools/audio/review-server.mjs  ->  http://localhost:4321
+// Sound review page (http://localhost:4321): every sound in tools/audio/sounds.mjs with its set of generated takes
+// (tools/audio/candidates/<sound>/1-4.mp3). Pick the take the game should use (or several, for sounds with
+// variations); a pick is copied into the game at once. Mark a set to regenerate (+ a note that steers the prompt):
+// tools/audio/rerolls.json, consumed by `node tools/audio/generate.mjs --rerolls`.
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
+import { PUB, folderFor, here, installPicks, readPicks, root, setDir, writePicks } from './picks.mjs';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, '../..');
-const PUB = path.join(root, 'apps/client/public/audio');
 const REROLLS = path.join(here, 'rerolls.json');
 const PORT = Number(process.env.AUDIO_REVIEW_PORT ?? 4321);
 const soundsUrl = pathToFileURL(path.join(here, 'sounds.mjs')).href;
-
-const folderFor = (i) => (i.tool === 'music' ? 'music' : i.kind === 'amb' ? 'amb' : i.kind === 'sting' ? 'stingers' : 'sfx');
-const namesFor = (i) => (i.variants > 1 ? Array.from({ length: i.variants }, (_, n) => `${i.file}_${String(n + 1).padStart(2, '0')}.mp3`) : [`${i.file}.mp3`]);
+const sounds = async () => import(`${soundsUrl}?t=${Date.now()}`);   // fresh each time: list edits show without a restart
+const readRerolls = () => (fs.existsSync(REROLLS) ? JSON.parse(fs.readFileSync(REROLLS, 'utf8')) : {});
+const ver = (p) => Math.round(fs.statSync(p).mtimeMs);
 
 async function state() {
-  // re-import each time so edits to the sound list show up without a restart
-  const { SECTIONS, STYLE } = await import(`${soundsUrl}?t=${Date.now()}`);
-  const rerolls = fs.existsSync(REROLLS) ? JSON.parse(fs.readFileSync(REROLLS, 'utf8')) : {};
+  const { SECTIONS, STYLE } = await sounds();
+  const picks = readPicks();
   return {
-    rerolls,
+    rerolls: readRerolls(),
     sections: SECTIONS.map((s) => ({ key: s.key, title: s.title, blurb: s.blurb, items: s.items.map((i) => {
-      const folder = folderFor(i);
+      const dir = setDir(i.file);
+      const takes = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^\d+\.mp3$/.test(f)).map((f) => Number(f.slice(0, -4))).sort((a, b) => a - b) : [];
+      // files already in the game without a set (made by hand)
+      const gdir = path.join(PUB, folderFor(i));
+      const game = fs.existsSync(gdir) ? fs.readdirSync(gdir).filter((f) => f === `${i.file}.mp3` || new RegExp(`^${i.file}_\\d{2}\\.mp3$`).test(f)).sort() : [];
       return {
-        file: i.file, when: i.when, prompt: `${i.prompt}, ${STYLE[i.kind]}`, base: i.prompt, tier: i.tier, seconds: i.seconds, loop: i.loop, tool: i.tool,
-        takes: namesFor(i).map((n) => { const p = path.join(PUB, folder, n); const st = fs.existsSync(p) ? fs.statSync(p) : null; return { name: n, url: st ? `/audio/${folder}/${n}?v=${Math.round(st.mtimeMs)}` : null }; }),
+        file: i.file, when: i.when, base: i.prompt, prompt: `${i.prompt}, ${STYLE[i.kind]}`, tier: i.tier, seconds: i.seconds, loop: i.loop, tool: i.tool, variants: i.variants,
+        takes: takes.map((n) => ({ n, url: `/take/${i.file}/${n}.mp3?v=${ver(path.join(dir, `${n}.mp3`))}` })),
+        picked: picks[i.file] ?? [],
+        game: takes.length ? [] : game.map((f) => ({ name: f, url: `/game/${folderFor(i)}/${f}?v=${ver(path.join(gdir, f))}` })),
       };
     }) })),
   };
 }
 
-const page = fs.readFileSync(path.join(here, 'review.html'), 'utf8');
+const body = async (req) => { let b = ''; for await (const c of req) b += c; return JSON.parse(b || '{}'); };
+const json = (res, data) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
+const audio = (res, p) => { if (!fs.existsSync(p)) { res.writeHead(404); res.end(); return; } res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-cache' }); fs.createReadStream(p).pipe(res); };
+
 http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://localhost:${PORT}`);
-    if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page); return; }
-    if (req.method === 'GET' && url.pathname === '/api/state') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(await state())); return; }
-    if (req.method === 'POST' && url.pathname === '/api/rerolls') {
-      let body = '';
-      for await (const c of req) body += c;
-      const data = JSON.parse(body || '{}');
-      fs.writeFileSync(REROLLS, JSON.stringify(data, null, 1));
-      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return;
+    if (req.method === 'GET' && url.pathname === '/') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(fs.readFileSync(path.join(here, 'review.html'), 'utf8')); return; }
+    if (req.method === 'GET' && url.pathname === '/api/state') return json(res, await state());
+    if (req.method === 'POST' && url.pathname === '/api/rerolls') { fs.writeFileSync(REROLLS, JSON.stringify(await body(req), null, 1)); return json(res, { ok: true }); }
+    if (req.method === 'POST' && url.pathname === '/api/pick') {
+      // { file, takes: [n, ...] }: install these takes into the game
+      const { file, takes } = await body(req);
+      const { SECTIONS } = await sounds();
+      const i = SECTIONS.flatMap((s) => s.items).find((x) => x.file === file);
+      if (!i || !Array.isArray(takes) || !takes.length) return json(res, { ok: false });
+      const picks = readPicks();
+      picks[file] = takes.map(Number).filter((n) => n > 0);
+      writePicks(picks);
+      const names = installPicks(i, picks[file]);
+      await import(`${pathToFileURL(path.join(root, 'scripts/audio-manifest.mjs')).href}?t=${Date.now()}`);
+      return json(res, { ok: true, names });
     }
-    const m = /^\/audio\/(sfx|amb|stingers|music)\/([a-z0-9_]+\.mp3)$/.exec(url.pathname);
-    if (req.method === 'GET' && m) {
-      const p = path.join(PUB, m[1], m[2]);
-      if (!fs.existsSync(p)) { res.writeHead(404); res.end(); return; }
-      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-cache' });
-      fs.createReadStream(p).pipe(res); return;
-    }
+    let m = /^\/take\/([a-z0-9_]+)\/(\d+\.mp3)$/.exec(url.pathname);
+    if (req.method === 'GET' && m) return audio(res, path.join(setDir(m[1]), m[2]));
+    m = /^\/game\/(sfx|amb|stingers|music)\/([a-z0-9_]+\.mp3)$/.exec(url.pathname);
+    if (req.method === 'GET' && m) return audio(res, path.join(PUB, m[1], m[2]));
     res.writeHead(404); res.end('not found');
   } catch (e) {
     res.writeHead(500); res.end(String(e));

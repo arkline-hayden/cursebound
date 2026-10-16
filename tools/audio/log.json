@@ -1,0 +1,1541 @@
+{
+ "vessel_shift": [
+  {
+   "prompt": "a soft airy whoosh with a faint stone scrape, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:13:49.181Z"
+  }
+ ],
+ "vessel_locked": [
+  {
+   "prompt": "a heavy iron padlock rattling against chains, a dull thunk, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:04.442Z"
+  }
+ ],
+ "vessel_roar": [
+  {
+   "prompt": "a portal erupting with a deep roar, swirling wind and a bright magical flare, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:06.049Z"
+  }
+ ],
+ "vessel_pick_vanguard": [
+  {
+   "prompt": "a shield slammed down on stone and a steel ring, heroic and heavy, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:07.359Z"
+  }
+ ],
+ "vessel_pick_arcanist": [
+  {
+   "prompt": "a crackle of arcane fire and a shimmering astral chime, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:08.664Z"
+  }
+ ],
+ "vessel_pick_duelist": [
+  {
+   "prompt": "two blades crossing with a sharp ring and a quick swish, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:09.954Z"
+  }
+ ],
+ "vessel_pick_hexbinder": [
+  {
+   "prompt": "a sinister whispering hiss and a sickly bubbling curse, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:11.208Z"
+  }
+ ],
+ "vessel_pick_artificer": [
+  {
+   "prompt": "clanking gears, a steam hiss and a tesla zap, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:13.011Z"
+  }
+ ],
+ "vessel_pick_templar": [
+  {
+   "prompt": "a holy bell strike with a radiant choir-like synth swell, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:14.275Z"
+  }
+ ],
+ "vessel_pick_berserker": [
+  {
+   "prompt": "a heavy axe thud into wood and a guttural roar-like rumble, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:15.796Z"
+  }
+ ],
+ "vessel_pick_cryomancer": [
+  {
+   "prompt": "crystalline ice forming with a cold glassy shimmer, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:17.142Z"
+  }
+ ],
+ "vessel_pick_ranger": [
+  {
+   "prompt": "a bowstring drawn taut and released with a wind whoosh, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:18.295Z"
+  }
+ ],
+ "vessel_pick_warden": [
+  {
+   "prompt": "rustling leaves, creaking roots and a distant spectral wolf howl, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:19.983Z"
+  }
+ ],
+ "level_up": [
+  {
+   "prompt": "a short triumphant fanfare jingle, bright rising square-wave arpeggio with a cymbal shimmer, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:21.061Z"
+  }
+ ],
+ "footstep_stone": [
+  {
+   "prompt": "a single armored boot footstep on stone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:22.139Z"
+  }
+ ],
+ "footstep_wet": [
+  {
+   "prompt": "a single footstep splashing in shallow water, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:23.611Z"
+  }
+ ],
+ "footstep_bone": [
+  {
+   "prompt": "a single footstep crunching on dry bones and gravel, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:24.893Z"
+  }
+ ],
+ "footstep_carpet": [
+  {
+   "prompt": "a single soft muffled footstep on a thick rug, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:26.092Z"
+  }
+ ],
+ "footstep_moss": [
+  {
+   "prompt": "a single soft squishy footstep on moss, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:27.207Z"
+  }
+ ],
+ "footstep_grass": [
+  {
+   "prompt": "a single footstep on short grass and soil, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:28.435Z"
+  }
+ ],
+ "footstep_grate": [
+  {
+   "prompt": "a single boot footstep on a metal grate with a light clang, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:30.280Z"
+  }
+ ],
+ "footstep_snow": [
+  {
+   "prompt": "a single footstep crunching in packed snow, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:31.422Z"
+  }
+ ],
+ "footstep_dust": [
+  {
+   "prompt": "a single soft dry footstep in fine powdery dust, muffled, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:32.672Z"
+  }
+ ],
+ "dodge": [
+  {
+   "prompt": "a quick dodge roll, cloth whoosh and a light scuff on the ground, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:33.894Z"
+  }
+ ],
+ "swing": [
+  {
+   "prompt": "a fast weapon swing whoosh through the air, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:34.989Z"
+  }
+ ],
+ "attack_melee": [
+  {
+   "prompt": "a sword strike connecting, a clean meaty slash, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:36.273Z"
+  }
+ ],
+ "hit_player": [
+  {
+   "prompt": "a heavy blow against armor, a dull metallic thump with a short crunch, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:37.539Z"
+  }
+ ],
+ "heal": [
+  {
+   "prompt": "a warm healing shimmer, soft rising chimes with a gentle glow, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:38.775Z"
+  }
+ ],
+ "shield": [
+  {
+   "prompt": "a magical barrier forming, a humming glassy shell with a bright edge, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:40.202Z"
+  }
+ ],
+ "potion_glug": [
+  {
+   "prompt": "drinking a potion, a cork pop and two quick gulps, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:41.436Z"
+  }
+ ],
+ "player_downed": [
+  {
+   "prompt": "a hero collapsing, armor clattering to the ground with a deep falling tone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:42.730Z"
+  }
+ ],
+ "player_revived": [
+  {
+   "prompt": "a revival, a rising holy chime and a deep breath of air, hopeful, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:44.156Z"
+  }
+ ],
+ "heartbeat": [
+  {
+   "prompt": "a single slow heavy heartbeat, a deep double thump, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:45.248Z"
+  }
+ ],
+ "combo": [
+  {
+   "prompt": "a quick rising blip, a punchy chiptune counter tick, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:46.702Z"
+  }
+ ],
+ "impact_light": [
+  {
+   "prompt": "a light quick impact, a sharp tick and a short fleshy slap, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:47.818Z"
+  }
+ ],
+ "impact_heavy": [
+  {
+   "prompt": "a heavy crushing impact, a hard crack over a deep bassy thump, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:48.995Z"
+  }
+ ],
+ "impact_fire": [
+  {
+   "prompt": "a fiery impact, a whoomp of flame with crackling embers, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:50.144Z"
+  }
+ ],
+ "impact_frost": [
+  {
+   "prompt": "an icy impact, a glassy crack and a tinkle of frost, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:52.024Z"
+  }
+ ],
+ "impact_storm": [
+  {
+   "prompt": "an electric impact, a sharp zap snap with buzzing sparks, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:53.632Z"
+  }
+ ],
+ "impact_decay": [
+  {
+   "prompt": "a wet sickly impact, a squelching splat with a gurgle, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:54.845Z"
+  }
+ ],
+ "impact_astral": [
+  {
+   "prompt": "a radiant impact, a bright crystalline ping with a soft thump, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:56.107Z"
+  }
+ ],
+ "hit_enemy": [
+  {
+   "prompt": "a meaty hit on a monster, a fleshy thud, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:57.306Z"
+  }
+ ],
+ "crit": [
+  {
+   "prompt": "a big critical hit, a sharp metallic ka-ching crack with a bass punch, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:58.493Z"
+  }
+ ],
+ "kill": [
+  {
+   "prompt": "a monster killed, a crunchy bone-breaking burst, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:14:59.753Z"
+  }
+ ],
+ "kill_burn": [
+  {
+   "prompt": "a creature burning to ash, a flare and a sizzling hiss with crackles, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:01.189Z"
+  }
+ ],
+ "kill_shatter": [
+  {
+   "prompt": "a frozen creature shattering, glass-like ice breaking and shards raining, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:02.485Z"
+  }
+ ],
+ "kill_zap": [
+  {
+   "prompt": "a creature electrocuted, a loud zap and crackle sputtering out, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:03.728Z"
+  }
+ ],
+ "kill_squelch": [
+  {
+   "prompt": "a creature melting into goo, a wet splat and popping bubbles, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:04.997Z"
+  }
+ ],
+ "kill_chime": [
+  {
+   "prompt": "a creature dissolving into light, a soft thump and a rising holy chime, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.9,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:06.271Z"
+  }
+ ],
+ "enemy_death": [
+  {
+   "prompt": "a monster dying, a gurgling collapse, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:07.523Z"
+  }
+ ],
+ "cast_fire": [
+  {
+   "prompt": "a fire spell igniting, a rising whoosh of flame with crackles, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:08.812Z"
+  }
+ ],
+ "blast_fire": [
+  {
+   "prompt": "a fiery explosion, a deep boom and a rolling fireball, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:10.092Z"
+  }
+ ],
+ "cast_frost": [
+  {
+   "prompt": "a frost spell forming, a crystalline icy shimmer, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:11.256Z"
+  }
+ ],
+ "blast_frost": [
+  {
+   "prompt": "an ice burst, a hard crack and a hiss of frost with shards, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.9,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:12.509Z"
+  }
+ ],
+ "cast_storm": [
+  {
+   "prompt": "a lightning spell charging, a rising electric whine and a snap, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:14.819Z"
+  }
+ ],
+ "zap_strike": [
+  {
+   "prompt": "a lightning bolt striking, a split-second crack and a short thunder roll, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:15.203Z"
+  }
+ ],
+ "cast_decay": [
+  {
+   "prompt": "a dark curse cast, a gurgling whisper and sickly tones, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:16.549Z"
+  }
+ ],
+ "blast_decay": [
+  {
+   "prompt": "a burst of rot, a wet pop and a splattering spray, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:18.262Z"
+  }
+ ],
+ "cast_holy": [
+  {
+   "prompt": "a holy spell, a soft choir-like swell and a bell, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:19.546Z"
+  }
+ ],
+ "smite": [
+  {
+   "prompt": "a holy strike, a thump, a crack of judgement and ringing bells, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:20.734Z"
+  }
+ ],
+ "cast_astral": [
+  {
+   "prompt": "starlight magic, an ascending glittering shimmer, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:22.083Z"
+  }
+ ],
+ "bow_shot": [
+  {
+   "prompt": "a bow twang and an arrow whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:24.107Z"
+  }
+ ],
+ "gun_shot": [
+  {
+   "prompt": "a mechanical bolt gun firing, a clack and twang, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:24.713Z"
+  }
+ ],
+ "throw_whoosh": [
+  {
+   "prompt": "an object thrown with a quick whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:25.845Z"
+  }
+ ],
+ "slam_heavy": [
+  {
+   "prompt": "a heavy ground slam, a deep thud with rubble, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:27.124Z"
+  }
+ ],
+ "blade_flurry": [
+  {
+   "prompt": "a quick flurry of blade slashes, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:28.978Z"
+  }
+ ],
+ "shield_bash": [
+  {
+   "prompt": "a heavy shield bash, a metallic thud, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:29.593Z"
+  }
+ ],
+ "summon_rise": [
+  {
+   "prompt": "something rising from the ground with a dark magical whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:30.783Z"
+  }
+ ],
+ "beast_howl": [
+  {
+   "prompt": "a wolf howl echoing, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:32.300Z"
+  }
+ ],
+ "beast_roar": [
+  {
+   "prompt": "a deep beast roar, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:33.632Z"
+  }
+ ],
+ "mech_deploy": [
+  {
+   "prompt": "machinery unfolding and locking in place, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:34.984Z"
+  }
+ ],
+ "steam_vent": [
+  {
+   "prompt": "a blast of steam venting, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:36.136Z"
+  }
+ ],
+ "trap_snap": [
+  {
+   "prompt": "a metal trap snapping shut, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:37.382Z"
+  }
+ ],
+ "skill_guard": [
+  {
+   "prompt": "a shield raised with a solid clank, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:40.069Z"
+  }
+ ],
+ "skill_sweep": [
+  {
+   "prompt": "a wide weapon sweep whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:41.798Z"
+  }
+ ],
+ "skill_rally": [
+  {
+   "prompt": "a short battle horn blast, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:43.588Z"
+  }
+ ],
+ "skill_fireline": [
+  {
+   "prompt": "a line of fire igniting along the ground, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:45.067Z"
+  }
+ ],
+ "blink": [
+  {
+   "prompt": "a quick magical blink, a pop with a reversed whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:45.311Z"
+  }
+ ],
+ "skill_arc": [
+  {
+   "prompt": "arcing lightning zaps, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:47.944Z"
+  }
+ ],
+ "skill_phase": [
+  {
+   "prompt": "a warping phase shift whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:48.763Z"
+  }
+ ],
+ "signature_slam": [
+  {
+   "prompt": "a massive ground slam with a deep boom, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:50.008Z"
+  }
+ ],
+ "signature_nova": [
+  {
+   "prompt": "a huge magical nova burst, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:51.214Z"
+  }
+ ],
+ "attack_spark": [
+  {
+   "prompt": "a small magic bolt firing, a zippy fizz, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:52.421Z"
+  }
+ ],
+ "chain_throw": [
+  {
+   "prompt": "a heavy chain whipping through the air, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:53.755Z"
+  }
+ ],
+ "chain_bind": [
+  {
+   "prompt": "heavy iron chains clanking tight around you, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:55.021Z"
+  }
+ ],
+ "chain_break": [
+  {
+   "prompt": "iron chains snapping apart with a sharp clank, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:56.154Z"
+  }
+ ],
+ "freeze_build": [
+  {
+   "prompt": "frost creeping, a cold crackling hiss building, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:57.332Z"
+  }
+ ],
+ "freeze": [
+  {
+   "prompt": "ice locking hard around a body, a sharp freezing crunch, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:58.564Z"
+  }
+ ],
+ "ice_shatter": [
+  {
+   "prompt": "ice shattering into glassy shards, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:15:59.806Z"
+  }
+ ],
+ "poison_spit": [
+  {
+   "prompt": "a creature spitting venom, a wet hiss, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:01.288Z"
+  }
+ ],
+ "poisoned": [
+  {
+   "prompt": "a sickly sizzling burn with a faint bubble, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:02.381Z"
+  }
+ ],
+ "blind_burst": [
+  {
+   "prompt": "a blinding flash, a bright whump and a high ringing tone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:03.649Z"
+  }
+ ],
+ "web_spit": [
+  {
+   "prompt": "a sticky web shot, a wet thwip, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:04.842Z"
+  }
+ ],
+ "rooted": [
+  {
+   "prompt": "sticky webbing or roots wrapping tight, stretching creaks, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:06.151Z"
+  }
+ ],
+ "silenced": [
+  {
+   "prompt": "a muffled magical snuff, a dull hushed thump, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:07.681Z"
+  }
+ ],
+ "enemy_shoot": [
+  {
+   "prompt": "a monster spitting a magical projectile, a dark whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:08.707Z"
+  }
+ ],
+ "enemy_bite": [
+  {
+   "prompt": "a monster lunging and biting, a snarl and a snap, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:09.925Z"
+  }
+ ],
+ "telegraph_warn": [
+  {
+   "prompt": "a sharp warning tone, an urgent rising buzz, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:11.228Z"
+  }
+ ],
+ "wave_spawn": [
+  {
+   "prompt": "enemies emerging, a dark rumble and a rising screech, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:12.465Z"
+  }
+ ],
+ "boss_telegraph": [
+  {
+   "prompt": "an urgent deep warning horn, a menacing rising tone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:13.602Z"
+  }
+ ],
+ "boss_charge": [
+  {
+   "prompt": "a massive creature charging, thundering footsteps and a rising roar, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:14.890Z"
+  }
+ ],
+ "boss_phase": [
+  {
+   "prompt": "a dramatic power surge, a deep boom and a rising dark swell, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:16.412Z"
+  }
+ ],
+ "boss_rumble": [
+  {
+   "prompt": "a deep ground rumble with falling dust and pebbles, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:17.567Z"
+  }
+ ],
+ "boss_emerge": [
+  {
+   "prompt": "something massive rising, stone grinding and a deep rumbling swell, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:19.231Z"
+  }
+ ],
+ "boss_roar": [
+  {
+   "prompt": "a huge monstrous roar with a reverb tail, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:20.531Z"
+  }
+ ],
+ "stag_cry": [
+  {
+   "prompt": "a haunting ghostly stag bellow, echoing and spectral, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:21.800Z"
+  }
+ ],
+ "bell_toll": [
+  {
+   "prompt": "a huge cracked iron bell tolling, deep and doom-laden, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:23.862Z"
+  }
+ ],
+ "boss_ring": [
+  {
+   "prompt": "a bell-clang shockwave, a metallic boom rippling outward, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:25.100Z"
+  }
+ ],
+ "core_charge": [
+  {
+   "prompt": "capacitors spinning up, a rising electronic whine with blips, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:26.383Z"
+  }
+ ],
+ "core_laser": [
+  {
+   "prompt": "sweeping laser beams firing, buzzing sci-fi zaps, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:28.604Z"
+  }
+ ],
+ "core_firewall": [
+  {
+   "prompt": "walls of digital fire roaring and closing in, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:16:30.975Z"
+  }
+ ],
+ "core_glitch": [
+  {
+   "prompt": "a harsh digital glitch stutter and a static burst, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:31.434Z"
+  }
+ ],
+ "core_purge_alarm": [
+  {
+   "prompt": "a blaring computer alarm, urgent repeating beeps, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:32.618Z"
+  }
+ ],
+ "core_purge": [
+  {
+   "prompt": "a massive electronic purge blast, a whooshing digital explosion, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:34.300Z"
+  }
+ ],
+ "core_deploy": [
+  {
+   "prompt": "mechanical hatches opening and drones whirring out, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:35.568Z"
+  }
+ ],
+ "colossus_raise": [
+  {
+   "prompt": "a massive iron hammer creaking upward, grinding metal and hissing steam, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:37.175Z"
+  }
+ ],
+ "colossus_hammer": [
+  {
+   "prompt": "a colossal hammer smashing the ground, a molten boom and shockwave, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:38.388Z"
+  }
+ ],
+ "colossus_stomp": [
+  {
+   "prompt": "a giant iron foot stomping, a heavy metallic thud with a hiss, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:39.766Z"
+  }
+ ],
+ "colossus_vent": [
+  {
+   "prompt": "a furnace venting scalding steam with a roaring hiss, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:42.052Z"
+  }
+ ],
+ "lava_vent": [
+  {
+   "prompt": "molten lava bubbling and gurgling, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:42.948Z"
+  }
+ ],
+ "lava_erupt": [
+  {
+   "prompt": "lava erupting violently with a fiery whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:44.077Z"
+  }
+ ],
+ "drake_screech": [
+  {
+   "prompt": "a dragon screech, piercing and wind-torn, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:45.592Z"
+  }
+ ],
+ "drake_gale": [
+  {
+   "prompt": "a howling gale of wind breath, powerful and sustained, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:16:48.692Z"
+  }
+ ],
+ "drake_dive": [
+  {
+   "prompt": "a dragon diving, a rushing whoosh of wind and beating wings, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:49.752Z"
+  }
+ ],
+ "thunder_feather": [
+  {
+   "prompt": "a lightning strike with a crackling thunderclap, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:50.888Z"
+  }
+ ],
+ "skyfall": [
+  {
+   "prompt": "falling through the sky with rushing wind, then a magical pull back, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:52.120Z"
+  }
+ ],
+ "horror_moan": [
+  {
+   "prompt": "a deep alien moan, otherworldly and dreadful, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:53.282Z"
+  }
+ ],
+ "tentacle_burst": [
+  {
+   "prompt": "tentacles bursting out of the ground, wet slithering and cracking rock, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:16:54.543Z"
+  }
+ ],
+ "gravity_well": [
+  {
+   "prompt": "a deep warping gravity pull, a low sucking drone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:16:57.212Z"
+  }
+ ],
+ "void_beam": [
+  {
+   "prompt": "a humming void beam, a deep resonant laser drone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:00.030Z"
+  }
+ ],
+ "legendary_drop": [
+  {
+   "prompt": "a legendary item dropping, a radiant shimmer swell and a heavy gleaming clink, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:01.607Z"
+  }
+ ],
+ "chest_open": [
+  {
+   "prompt": "an old chest creaking open with a burst of gold glints, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:05.033Z"
+  }
+ ],
+ "legendary_equip": [
+  {
+   "prompt": "armor buckling on with a powerful magical surge, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:05.052Z"
+  }
+ ],
+ "coin_pickup": [
+  {
+   "prompt": "gold coins picked up, a bright double chink, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:06.288Z"
+  }
+ ],
+ "fate_blessing": [
+  {
+   "prompt": "a prismatic magical shimmer, a rainbow of rising chimes, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:08.025Z"
+  }
+ ],
+ "shrine_activate": [
+  {
+   "prompt": "an ancient stone shrine awakening, a stone hum swelling into a radiant chord, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:09.086Z"
+  }
+ ],
+ "altar_pact": [
+  {
+   "prompt": "an ominous blood pact, a low drone, a heartbeat and a dark whisper, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:10.348Z"
+  }
+ ],
+ "merchant_buy": [
+  {
+   "prompt": "coins poured onto a counter and a pleased little chime, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:11.596Z"
+  }
+ ],
+ "imp_jingle": [
+  {
+   "prompt": "a sack of coins bouncing and jingling as something runs, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:12.751Z"
+  }
+ ],
+ "imp_portal": [
+  {
+   "prompt": "a rift tearing open with a rising warble and a sucking pop, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:14.201Z"
+  }
+ ],
+ "round_start": [
+  {
+   "prompt": "a war horn blast echoing through a dungeon, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:15.422Z"
+  }
+ ],
+ "round_clear": [
+  {
+   "prompt": "a victorious bright chime with a deep resolving drum, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:16.779Z"
+  }
+ ],
+ "door_appear": [
+  {
+   "prompt": "massive stone doors rising, grinding stone and a magical hum, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:17.997Z"
+  }
+ ],
+ "door_hum": [
+  {
+   "prompt": "a magical door humming with a low pulsing resonance, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:20.866Z"
+  }
+ ],
+ "door_choose": [
+  {
+   "prompt": "a heavy door choice, a deep boom and a magical swell, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:21.916Z"
+  }
+ ],
+ "door_open": [
+  {
+   "prompt": "a huge ancient door groaning open, creaking wood and iron, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:23.037Z"
+  }
+ ],
+ "portal_open": [
+  {
+   "prompt": "a magical portal tearing open, a swirling roar, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:24.284Z"
+  }
+ ],
+ "portal_enter": [
+  {
+   "prompt": "being swallowed by a portal, a whooshing rush and a deep thrum, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:25.624Z"
+  }
+ ],
+ "vote_cast": [
+  {
+   "prompt": "a wooden token placed on a table with a soft chime, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:26.746Z"
+  }
+ ],
+ "vote_lock": [
+  {
+   "prompt": "a heavy latch locking with a low bell ring, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:27.988Z"
+  }
+ ],
+ "fate_commit": [
+  {
+   "prompt": "an ominous seal stamping, a deep thud with a dark swell, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:29.254Z"
+  }
+ ],
+ "cine_whoosh": [
+  {
+   "prompt": "a big cinematic whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:17:31.364Z"
+  }
+ ],
+ "amb_menu": [
+  {
+   "prompt": "a vast dark dungeon hall, distant wind, faint fire crackle and deep drones, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:35.282Z"
+  }
+ ],
+ "amb_catacombs": [
+  {
+   "prompt": "ancient catacombs, dripping water, distant echoes and faint skittering, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:39.302Z"
+  }
+ ],
+ "amb_flooded": [
+  {
+   "prompt": "a flooded crypt, lapping water, constant drips and hollow echoes, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:43.306Z"
+  }
+ ],
+ "amb_ossuary": [
+  {
+   "prompt": "a bone-filled ossuary, cold wind, settling bones and distant whispers, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:47.547Z"
+  }
+ ],
+ "amb_sanctum": [
+  {
+   "prompt": "a ruined holy sanctum, wind through broken stained glass and faint candle flicker, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:51.616Z"
+  }
+ ],
+ "amb_fungal": [
+  {
+   "prompt": "a damp fungal cavern, bubbling, squelching and soft spore puffs, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:55.729Z"
+  }
+ ],
+ "amb_forge": [
+  {
+   "prompt": "an ancient forge, roaring furnaces, distant hammering and hissing steam, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:17:59.745Z"
+  }
+ ],
+ "amb_frost": [
+  {
+   "prompt": "a frozen cavern, howling icy wind and creaking ice, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:18:03.698Z"
+  }
+ ],
+ "amb_sky": [
+  {
+   "prompt": "a floating island high in the sky, strong wind gusts, flapping cloth and distant birds, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:18:07.862Z"
+  }
+ ],
+ "amb_moon": [
+  {
+   "prompt": "a desolate moon base, a deep sub-bass rumble, faint radio static and a lonely beacon beep, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:18:11.874Z"
+  }
+ ],
+ "amb_server": [
+  {
+   "prompt": "a cursed data center, humming servers, whirring fans and occasional glitchy chirps, seamless looping ambience for a retro 16-bit dark fantasy dungeon game, lo-fi, no music, no melody, no voices",
+   "seconds": 20,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T16:18:16.104Z"
+  }
+ ],
+ "stinger_door_open": [
+  {
+   "prompt": "a dark mysterious chord that blooms open, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 2.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:17.467Z"
+  }
+ ],
+ "stinger_portal": [
+  {
+   "prompt": "a rising swirling arpeggio that resolves into a big chord, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 3.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:19.549Z"
+  }
+ ],
+ "stinger_round_start": [
+  {
+   "prompt": "a bold heroic call to arms on brass-like square waves, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 2.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:21.088Z"
+  }
+ ],
+ "stinger_boss_reveal": [
+  {
+   "prompt": "a slow ominous build that crashes into a massive evil chord, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 5.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:22.580Z"
+  }
+ ],
+ "stinger_boss_roar": [
+  {
+   "prompt": "a sudden dramatic dark stab with a big drum hit, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 2.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:24.093Z"
+  }
+ ],
+ "stinger_round_clear": [
+  {
+   "prompt": "a triumphant short victory fanfare, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 3.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:26.006Z"
+  }
+ ],
+ "stinger_legendary": [
+  {
+   "prompt": "a shimmering magical treasure fanfare with sparkles, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 3,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:27.959Z"
+  }
+ ],
+ "stinger_party_wipe": [
+  {
+   "prompt": "a slow tragic descending dirge, heavy and final, short dark 80s chiptune and gothic synth music sting for a Diablo-like dungeon crawler, square and pulse waves with a dark organ edge",
+   "seconds": 6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:18:29.551Z"
+  }
+ ]
+}

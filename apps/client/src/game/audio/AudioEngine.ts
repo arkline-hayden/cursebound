@@ -28,7 +28,7 @@ import { getAudio, setCurrentAudio } from './bus';
 import { MusicDirector } from './MusicDirector';
 import { BOSS_SONGS, GENERIC_BOSS_SONG, IntensityFollower, MENU_SONG, THEME_SONGS, type SongSpec } from './music';
 import { FLOOR_FOR_THEME, pitchSpread, synthSfx, type SfxEnv } from './recipes';
-import { SampleBank } from './samples';
+import { SampleBank, type Take } from './samples';
 import { AUDIO_THEMES, CRITICAL_SFX, SFX_CAPTIONS, STINGER_TIMING, type AudioTheme, type MixGroup, type MusicTrack, type SfxId, type StingerKind } from './sfx';
 import { STINGER_DUCK, playStinger } from './stingers';
 import { Synth, makeImpulse } from './synth';
@@ -157,7 +157,7 @@ export class AudioEngine {
   private musicRev: GainNode | null = null;
   private ambRev: GainNode | null = null;
   private director: MusicDirector | null = null;
-  private bed: AmbienceBed | null = null;
+  private bed: AmbienceBed | FileBed | null = null;
   private voices: Voice[] = [];
   private vol: Volumes = { master: 0.8, music: 0.6, combat: 0.8, ui: 0.7, ambience: 0.5 };
   private track: MusicTrack | null = null;
@@ -547,7 +547,20 @@ export class AudioEngine {
     const [db, hold, rel] = STINGER_DUCK[kind];
     this.duck(db, hold, rel);
     const spec = this.keySpec();
-    playStinger(s, kind, this.stingerBus, now + 0.02, { root: spec.root, scale: spec.scale, boss: this.bossId });
+    const take = this.samples.pick(`stinger_${kind}`, s.rand);
+    if (take) {
+      // recorded stinger
+      const src = ctx.createBufferSource();
+      src.buffer = take.buf;
+      const g = ctx.createGain();
+      g.gain.value = take.gain;
+      src.connect(g);
+      g.connect(this.stingerBus);
+      src.start(now + 0.02, take.offset);
+      src.onended = () => { try { g.disconnect(); } catch { /* gone */ } };
+    } else {
+      playStinger(s, kind, this.stingerBus, now + 0.02, { root: spec.root, scale: spec.scale, boss: this.bossId });
+    }
     return timing;
   }
 
@@ -586,11 +599,19 @@ export class AudioEngine {
     const prev = this.director.currentId;
     if (spec && spec.id !== prev && spec.minIntensity !== undefined) this.follower.reset(Math.max(this.follower.value, 0.5));
     this.director.play(spec, now, spec && prev && prev.startsWith('boss:') !== spec.id.startsWith('boss:') ? 1.8 : 2.5);
+    this.refreshBed(now);
+  }
+
+  /** The ambience bed for the menu or the floor theme: its recorded loop when there is one, else the synthesized bed. */
+  private refreshBed(now: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.synth || !this.groups.ambience || !this.ambRev) return;
     const bedId: BedId = this.track === 'menu' ? 'menu' : this.themeId;
-    if (this.bed?.id !== bedId) {
-      this.bed?.stop(now);
-      this.bed = new AmbienceBed(this.synth, this.groups.ambience, this.ambRev, bedId, now);
-    }
+    const take = this.samples.pick(`amb_${bedId}`, this.synth.rand);
+    const wantFile = !!take;
+    if (this.bed?.id === bedId && (this.bed instanceof FileBed) === wantFile) return;
+    this.bed?.stop(now);
+    this.bed = take ? new FileBed(ctx, this.groups.ambience, bedId, take, now) : new AmbienceBed(this.synth, this.groups.ambience, this.ambRev, bedId, now);
   }
 
   private tick(): void {
@@ -608,6 +629,8 @@ export class AudioEngine {
       this.director.tick(now, ahead);
     }
     this.bed?.tick(now, ahead);
+    // the recorded loop finished decoding after the synthesized bed started: swap to it
+    if (this.bed && !(this.bed instanceof FileBed) && this.samples.ready(`amb_${this.bed.id}`)) this.refreshBed(now);
     // ambience steps back as the fight heats up
     const amb = 1 - 0.45 * I;
     if (this.ambLevel && Math.abs(amb - this.ambSet) > 0.02) {
@@ -636,5 +659,32 @@ export class AudioEngine {
     this.groups = {};
     if (ctx) void ctx.close().catch(() => undefined);
     if (getAudio() === this) setCurrentAudio(null);
+  }
+}
+
+/** A recorded ambience loop (public/audio/amb): the whole take loops seamlessly, faded in and out like the synth bed. */
+class FileBed {
+  private readonly src: AudioBufferSourceNode;
+  private readonly gain: GainNode;
+  constructor(ctx: AudioContext, dest: AudioNode, readonly id: BedId, take: Take, t: number) {
+    this.src = ctx.createBufferSource();
+    this.src.buffer = take.buf;
+    this.src.loop = true;
+    this.src.loopStart = take.offset;
+    this.src.loopEnd = take.buf.duration;
+    this.gain = ctx.createGain();
+    this.gain.gain.setValueAtTime(0, t);
+    this.gain.gain.linearRampToValueAtTime(take.gain, t + 2.5);
+    this.src.connect(this.gain);
+    this.gain.connect(dest);
+    this.src.start(t, take.offset);
+  }
+  tick(_now: number, _ahead: number): void { /* a loop needs no scheduling */ }
+  stop(t: number, fade = 3): void {
+    this.gain.gain.cancelScheduledValues(t);
+    this.gain.gain.setValueAtTime(this.gain.gain.value, t);
+    this.gain.gain.linearRampToValueAtTime(0, t + fade);
+    this.src.stop(t + fade + 0.1);
+    this.src.onended = () => { try { this.gain.disconnect(); } catch { /* gone */ } };
   }
 }
