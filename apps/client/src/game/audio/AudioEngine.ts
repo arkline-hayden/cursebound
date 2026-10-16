@@ -129,6 +129,8 @@ const CAPTION_THROTTLE_MS = 3000;
 
 interface Voice {
   id: SfxId;
+  /** recorded file name when played by playFile (merging and caps go by it) */
+  key?: string;
   priority: number;
   start: number;
   end: number;
@@ -341,15 +343,32 @@ export class AudioEngine {
    * Play a cue. pan -1..1 (screen x), dist = distance from the camera centre in half-screens (0 centre, ~1 screen
    * edge): quieter and duller with distance, culled far off-screen unless important.
    */
-  play(id: SfxId, opts: { pan?: number; priority?: number; volume?: number; dist?: number } = {}): void {
+  /** A recorded file exists for this key (tools/audio sound list name), decoded or not. */
+  hasFile(key: string): boolean {
+    return SampleBank.has(key);
+  }
+
+  /**
+   * Play a recorded sound by its file name (a per-skill cast, an enemy voice, a boss death…) when that file exists;
+   * otherwise play `fallback` (the shared cue, synthesized or recorded), or nothing. Same mixing as play().
+   */
+  playFile(key: string, fallback: SfxId | null, opts: { pan?: number; priority?: number; volume?: number; dist?: number } = {}): void {
+    // the stand-in cue only lends its mix group and priority; a pure file (no fallback) mixes as combat
+    if (SampleBank.has(key)) { this.play(fallback ?? 'hit_enemy', { ...opts, file: key }); return; }
+    if (fallback) this.play(fallback, opts);
+  }
+
+  play(id: SfxId, opts: { pan?: number; priority?: number; volume?: number; dist?: number; file?: string } = {}): void {
     const critical = CRITICAL_SFX.includes(id);
-    this.caption(id, critical);
+    if (!opts.file || opts.file === id) this.caption(id, critical);
     const ctx = this.ctx;
     const s = this.synth;
     if (!ctx || ctx.state !== 'running' || !s) return;
     // a recorded take when the cue has one (footsteps pick the floor's surface set); recipe-less cues stay silent without
-    const take = this.samples.pick(id === 'footstep' ? `footstep_${FLOOR_FOR_THEME[this.themeId] ?? 'stone'}` : id, s.rand);
-    if (!take && FILE_ONLY.has(id)) return;
+    const key = opts.file ?? (id === 'footstep' ? `footstep_${FLOOR_FOR_THEME[this.themeId] ?? 'stone'}` : id);
+    const take = this.samples.pick(key, s.rand);
+    // a named file still decoding: skip rather than play the stand-in cue
+    if (!take && (FILE_ONLY.has(id) || opts.file)) return;
     const now = ctx.currentTime;
     this.voices = this.voices.filter((v) => v.end > now);
     const priority = critical ? 99 : opts.priority ?? DEFAULT_PRIORITY[id] ?? 3;
@@ -358,13 +377,13 @@ export class AudioEngine {
       if (dist > 2.6 && priority < 6) return;
       // burst merge: the same cue within its repeat window (30 ms default; MERGE_SEC) becomes one louder voice
       const win = MERGE_SEC[id] ?? 0.03;
-      const recent = this.voices.find((v) => v.id === id && now - v.start < win);
+      const recent = this.voices.find((v) => (v.key ?? v.id) === (opts.file ?? id) && now - v.start < win);
       if (recent) {
         const g = recent.out.gain;
         g.setValueAtTime(Math.min(1.6, g.value * 1.12), now);
         return;
       }
-      const same = this.voices.filter((v) => v.id === id);
+      const same = this.voices.filter((v) => (v.key ?? v.id) === (opts.file ?? id));
       const cap = PER_ID_CAP[id] ?? 6;
       if (same.length >= cap) {
         const oldest = same.reduce((a, b) => (a.start <= b.start ? a : b));
@@ -427,7 +446,7 @@ export class AudioEngine {
     }
     const duck = SFX_DUCK[id];
     if (duck) this.duck(duck[0], duck[1], duck[2]);
-    this.voices.push({ id, priority, start: now, end: now + dur + 0.1, out });
+    this.voices.push({ id, key: opts.file, priority, start: now, end: now + dur + 0.1, out });
     setTimeout(() => {
       for (const n of chain) {
         try { n.disconnect(); } catch { /* already disconnected */ }
