@@ -52,6 +52,8 @@ const BOSS_SONG: Record<string, string> = { prismstag: 'stag', bellroot: 'golem'
 /** songs are mastered hot next to the synthesized score; trim so the music fader means the same for both */
 const SONG_TRIM = 0.62;
 const SONG_FADE = 1.6;
+/** per-cue level trims on top of the levelled takes (footsteps sit under the fight) */
+const CUE_TRIM: Partial<Record<SfxId, number>> = { footstep: 0.5 };
 
 interface SongVoice { el: HTMLAudioElement; src: MediaElementAudioSourceNode; gain: GainNode; stopTimer: ReturnType<typeof setTimeout> | null }
 
@@ -446,7 +448,7 @@ export class AudioEngine {
     if (!group) return;
     const out = ctx.createGain();
     const att = critical ? 1 : 1 / (1 + 0.9 * Math.max(0, dist - 0.35) ** 2);
-    out.gain.value = Math.min(1.5, Math.max(0, opts.volume ?? 1)) * att;
+    out.gain.value = Math.min(1.5, Math.max(0, opts.volume ?? 1)) * att * (CUE_TRIM[id] ?? 1);
     const chain: AudioNode[] = [out];
     if (dist > 0.6 && !critical) {
       const lp = ctx.createBiquadFilter();
