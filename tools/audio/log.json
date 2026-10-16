@@ -1850,6 +1850,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:02.744Z"
+  },
+  {
+   "prompt": "a crowd of soldiers roaring a battle cry together, many men yelling ahhhh as they charge into battle, with clashing shields, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:45.116Z"
   }
  ],
  "skill_vanguard_shield_charge": [
@@ -1859,6 +1866,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:04.319Z"
+  },
+  {
+   "prompt": "heavy armored footsteps running faster and faster, clanking plate armor, then a huge shield bash impact at the end, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:47.409Z"
   }
  ],
  "skill_vanguard_retaliate": [
@@ -2066,6 +2080,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:37.817Z"
+  },
+  {
+   "prompt": "a spinning blade flurry: three fast sword whooshes in quick succession, swish swish swish, spinning around, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:48.851Z"
   }
  ],
  "skill_duelist_shadowstep": [
@@ -2093,6 +2114,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:43.645Z"
+  },
+  {
+   "prompt": "an ominous rising hiss as a curse mark forms, dark whispering energy building for a second, then a sharp bloody detonation burst, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:50.804Z"
   }
  ],
  "skill_duelist_riposte": [
@@ -2102,6 +2130,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:45.418Z"
+  },
+  {
+   "prompt": "a sword parry clang immediately followed by a fast lunging counter stab, a quick swish and a piercing hit, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:52.322Z"
   }
  ],
  "skill_duelist_mirror_guard": [
@@ -2147,6 +2182,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:51.887Z"
+  },
+  {
+   "prompt": "three mortar launches thumping out boom boom boom, then whistling shells falling, then three explosions impact impact impact, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:54.686Z"
   }
  ],
  "skill_artificer_deploy_turret": [
@@ -2165,6 +2207,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:54.136Z"
+  },
+  {
+   "prompt": "a simple punchy thocky gunshot, short and snappy with a light pop, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:55.602Z"
   }
  ],
  "skill_artificer_flame_turret": [
@@ -2192,6 +2241,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:17:59.224Z"
+  },
+  {
+   "prompt": "a metal grenade bouncing twice on stone, then bursting into a loud hissing cloud of steam, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:57.408Z"
   }
  ],
  "skill_artificer_cluster_charge": [
@@ -2237,6 +2293,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:18:05.633Z"
+  },
+  {
+   "prompt": "a rocket blast launching upward with a roaring thrust, a short whoosh through the air, then a heavy thudding landing impact, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:40:58.865Z"
   }
  ],
  "skill_artificer_boiler_overdrive": [
@@ -2291,6 +2354,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:18:13.352Z"
+  },
+  {
+   "prompt": "a glass flask shattering, then a thick toxic gas cloud hissing and billowing out, bubbling and sizzling, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:00.686Z"
   }
  ],
  "skill_hexbinder_blightbloom": [
@@ -2471,6 +2541,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:18:45.300Z"
+  },
+  {
+   "prompt": "a powerful frost nova, a big booming icy explosion bursting outward, sharp cracking ice and shattering shards with deep bass, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:02.317Z"
   }
  ],
  "skill_cryomancer_glacial_spike": [
@@ -2516,6 +2593,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:18:51.900Z"
+  },
+  {
+   "prompt": "a volley of many arrows fired skyward with a chorus of bowstring twangs, then dozens of arrows raining down and thudding into the ground, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:04.041Z"
   }
  ],
  "skill_ranger_multishot": [
@@ -2525,6 +2609,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:18:53.034Z"
+  },
+  {
+   "prompt": "five arrows released at once, a layered burst of bowstring twangs and several arrow whooshes fanning out, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:05.242Z"
   }
  ],
  "skill_ranger_barrage": [
@@ -2579,6 +2670,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:00.302Z"
+  },
+  {
+   "prompt": "a longbow drawn slowly with a creaking string, then released with a deep powerful twang and a fast piercing arrow whoosh and a thunk, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:07.102Z"
   }
  ],
  "skill_ranger_deadeye": [
@@ -2588,6 +2686,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:01.623Z"
+  },
+  {
+   "prompt": "three separate arrows fired one after another, twang whoosh, twang whoosh, twang whoosh, precise and quick, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:08.933Z"
   }
  ],
  "skill_ranger_tumble_shot": [
@@ -2642,6 +2747,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:09.000Z"
+  },
+  {
+   "prompt": "a booming heavy hammer strike with a bright metallic clang and a ringing tail, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.9,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:10.012Z"
   }
  ],
  "skill_templar_judgment_day": [
@@ -2660,6 +2772,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:12.119Z"
+  },
+  {
+   "prompt": "holy ground being consecrated, a radiant humming swell and a soft bell that slowly fades out to silence, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:11.842Z"
   }
  ],
  "skill_templar_dawnbreak": [
@@ -2687,6 +2806,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:15.812Z"
+  },
+  {
+   "prompt": "a hammer thrown through the air with a whoosh, then a huge loud metallic CLANG impact with a holy ringing tail, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:14.228Z"
   }
  ],
  "skill_templar_skyfall_hammer": [
@@ -2696,6 +2822,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:17.025Z"
+  },
+  {
+   "prompt": "a hammer falling from the sky with a rising whistle, then a massive crushing holy impact, a booming crash with ringing metal, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:15.709Z"
   }
  ],
  "skill_templar_divine_smite": [
@@ -2741,6 +2874,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:23.285Z"
+  },
+  {
+   "prompt": "two heavy axe chops in quick succession, chop chop, brutal and meaty, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:16.615Z"
   }
  ],
  "skill_berserker_avatar_of_carnage": [
@@ -2759,6 +2899,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:26.171Z"
+  },
+  {
+   "prompt": "a long deep menacing beastly growl building in rage, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:18.071Z"
   }
  ],
  "skill_berserker_bloodbath": [
@@ -2822,6 +2969,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:35.810Z"
+  },
+  {
+   "prompt": "a series of three fiery ground ruptures, boom boom boom, rumbling quakes with crackling fire between them, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:19.525Z"
   }
  ],
  "skill_warden_thornspear": [
@@ -2903,6 +3057,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T17:19:47.172Z"
+  },
+  {
+   "prompt": "a snarling wolf leaping through the air, then landing with a heavy thud and a vicious growl, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:41:21.273Z"
   }
  ],
  "skill_warden_thornburst": [
