@@ -1405,5 +1405,64 @@
  ],
  "amb_courtyard": [
   1
+ ],
+ "party_join": [
+  1
+ ],
+ "party_leave": [
+  1
+ ],
+ "invite_received": [
+  1
+ ],
+ "countdown_tick": [
+  1
+ ],
+ "tutorial_step": [
+  1
+ ],
+ "xp_tick": [
+  1
+ ],
+ "score_tick": [
+  1
+ ],
+ "new_record": [
+  1
+ ],
+ "bounty_complete": [
+  1
+ ],
+ "skill_refund": [
+  1
+ ],
+ "ledger_open": [
+  1
+ ],
+ "revive_channel": [
+  1
+ ],
+ "knockback": [
+  1,
+  2
+ ],
+ "skill_warden_summon_blink": [
+  1
+ ],
+ "slowed": [
+  1
+ ],
+ "stunned": [
+  1
+ ],
+ "core_voice": [
+  1
+ ],
+ "item_drop": [
+  1
+ ],
+ "training_dummy": [
+  1,
+  2
  ]
 }

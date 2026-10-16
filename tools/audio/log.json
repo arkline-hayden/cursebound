@@ -4096,5 +4096,176 @@
    "takes": 4,
    "at": "2026-10-16T17:22:14.465Z"
   }
+ ],
+ "party_join": [
+  {
+   "prompt": "a heavy wooden door thud and a welcoming low chime, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:40.376Z"
+  }
+ ],
+ "party_leave": [
+  {
+   "prompt": "a door closing softly with a falling note, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:41.587Z"
+  }
+ ],
+ "invite_received": [
+  {
+   "prompt": "a raven wing flutter and a bright two-note chime, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:42.736Z"
+  }
+ ],
+ "countdown_tick": [
+  {
+   "prompt": "a single clock tick with a low metallic tock, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:44.087Z"
+  }
+ ],
+ "tutorial_step": [
+  {
+   "prompt": "a small rising sparkle chime, encouraging, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:45.272Z"
+  }
+ ],
+ "xp_tick": [
+  {
+   "prompt": "a tiny bright coin-like tick, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:46.881Z"
+  }
+ ],
+ "score_tick": [
+  {
+   "prompt": "a quick soft ticker click, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:48.470Z"
+  }
+ ],
+ "new_record": [
+  {
+   "prompt": "a gleaming victory chime with sparkles, short and celebratory, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:49.583Z"
+  }
+ ],
+ "bounty_complete": [
+  {
+   "prompt": "a wax seal stamped, then a gold coin purse jingle and a short fanfare, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:50.762Z"
+  }
+ ],
+ "skill_refund": [
+  {
+   "prompt": "a rune fading with a soft reversed shimmer, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:51.975Z"
+  }
+ ],
+ "ledger_open": [
+  {
+   "prompt": "an old book thumped open with a page rustle and a faint ominous hum, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:53.258Z"
+  }
+ ],
+ "revive_channel": [
+  {
+   "prompt": "a soft rising magical hum with sparkles, steady, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3,
+   "loop": true,
+   "takes": 4,
+   "at": "2026-10-16T19:07:56.028Z"
+  }
+ ],
+ "knockback": [
+  {
+   "prompt": "a quick heavy whoosh and a body sliding on stone, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:57.232Z"
+  }
+ ],
+ "skill_warden_summon_blink": [
+  {
+   "prompt": "a ghostly dissolve and reform whoosh, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:58.550Z"
+  }
+ ],
+ "slowed": [
+  {
+   "prompt": "a heavy dragging sludge sound, slowing down, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:07:59.728Z"
+  }
+ ],
+ "stunned": [
+  {
+   "prompt": "a dizzy ringing with tiny chirping stars, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:08:00.976Z"
+  }
+ ],
+ "core_voice": [
+  {
+   "prompt": "a distorted robotic AI voice tone, glitchy and menacing, no words, retro dark fantasy game creature sound, gritty and slightly bit-crushed, no music, no words",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:08:02.321Z"
+  }
+ ],
+ "item_drop": [
+  {
+   "prompt": "a small item landing with a glassy clink, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:08:03.397Z"
+  }
+ ],
+ "training_dummy": [
+  {
+   "prompt": "a sword thwacking a straw training dummy, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T19:08:04.700Z"
+  }
  ]
 }
