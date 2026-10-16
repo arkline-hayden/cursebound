@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx } from './registry';
 import { heroGhosts, impactBurst, type Pal } from './spectacle';
 import { age, aimAngle, arcTrail, chest, cracks, enlargeHero, groundCircle, heroSprite, keep, pulseRing, sfx, streak } from './tbfx';
+import { skillLayer, skillSfx } from './kit3';
 
 // Berserker presentation (cosmetic only): blood red, hot iron and ember sparks, dread purple for fear.
 // Sim conventions (simulation/src/classes/berserker.ts): b_leap / b_cataclysm carry the landing point in dx/dy;
@@ -114,7 +115,7 @@ registerSkillFx({
     const tip = { x: c.x + u.x * ctx.rx(reach) * 0.8, y: c.y + u.y * ctx.rx(reach) * 0.45 };
     ctx.juice.sparksAt(tip.x, tip.y, 2 + Math.round(fr * 4), hot);
     if (fr > 0.5) ctx.juice.embersAt(c.x, c.y - 4, 1 + Math.round(fr * 2), RAGE);
-    sfx(ctx, 'swing', e.x, e.y, 55, ctx.mine ? 2 : 1);
+    skillSfx(ctx, 'b_chop', 'swing', e.x, e.y, 55, ctx.mine ? 2 : 1);   // 3 recorded variations, picked at random
   },
   // Blood God at max Frenzy: Twin Chop sweeps all around
   b_chop_spin: (ctx, e) => {
@@ -161,8 +162,8 @@ registerSkillFx({
       J.hitStop(110);
       window.dispatchEvent(new CustomEvent('cursebound:banner', { detail: { text: 'Avatar of Carnage!', tone: 'good' } }));
     }
-    sfx(ctx, 'beast_roar', e.x, e.y, 0, 4);
-    sfx(ctx, 'signature_slam', e.x, e.y, 0, 4);
+    skillSfx(ctx, 'b_avatar', 'beast_roar', e.x, e.y, 0, 4);   // the recorded take: roar, flames and slam
+    skillLayer(ctx, 'b_avatar', 'signature_slam', e.x, e.y, 0, 4);
   },
   // Avatar swing whirl: a blood gust at its true radius each swing
   b_avatar_whirl: (ctx, e) => {
@@ -194,7 +195,7 @@ registerSkillFx({
     const spr = heroSprite(ctx, e.slot);
     if (spr) J.afterimage(spr, BLOOD, 0.6, 420);
     ctx.dungeon.flashLight(c.x, c.y, 170, BLOOD, 2.2, 460);
-    sfx(ctx, 'heartbeat', e.x, e.y, 0, 3);
+    skillSfx(ctx, 'b_bloodlust', 'heartbeat', e.x, e.y, 0, 3);
   },
   // Bloodbath: a whirling double cleave at the true radius, Rend drops everywhere, heal motes per enemy hit
   b_bloodbath: (ctx, e) => {
@@ -216,8 +217,8 @@ registerSkillFx({
       if (!ctx.reduced && i % 2 === 0) ctx.dungeon.addDecal('blood', q.x, q.y + 2, GORE, 0.7 + Math.random() * 0.4);
     }
     if (hits > 0) { J.bits('mote', c.x, c.y, 4 + hits * 3, 0xff6a6a); J.orb(c.x, c.y, 0xff5a5a, 0.5 + hits * 0.1, 260); }
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, 3);
-    sfx(ctx, 'heartbeat', e.x, e.y, 0, 2);
+    skillSfx(ctx, 'b_bloodbath', 'skill_sweep', e.x, e.y, 0, 3);
+    skillLayer(ctx, 'b_bloodbath', 'heartbeat', e.x, e.y, 0, 2);
   },
   // Unchained: chains burst apart in iron shards and the rage flares up
   b_unchained: (ctx, e) => {
@@ -237,8 +238,8 @@ registerSkillFx({
     if (spr) { J.afterimage(spr, RAGE, 0.7, 380); J.afterimage(spr, IRON, 0.4, 220); }
     ctx.dungeon.flashLight(c.x, c.y, 210, RAGE, 2.6, 380);
     if (ctx.mine) J.pop(RAGE, 0.14, 160);
-    sfx(ctx, 'chain_break', e.x, e.y, 0, 3);
-    sfx(ctx, 'beast_roar', e.x, e.y, 0, 2);
+    skillSfx(ctx, 'b_unchained', 'chain_break', e.x, e.y, 0, 3);
+    skillLayer(ctx, 'b_unchained', 'beast_roar', e.x, e.y, 0, 2);
   },
 
   // ---- Carnage: steel, smears, rend ----
@@ -253,7 +254,8 @@ registerSkillFx({
     ctx.juice.slash(q.x, q.y - 12, a + Math.PI / 2, storm ? RAGE : IRON, 0.7, { thin: true, ms: 140 });
     ctx.juice.sparksAt(q.x, q.y - 12, storm ? 4 : 3, storm ? RAGE : IRON);
     if (ctx.rank(e.slot, 'b_flaying_spin') && Math.random() < 0.5) ctx.juice.bleed('pursuer', q.x, q.y - 10, 4);
-    sfx(ctx, 'swing', e.x, e.y, 110, ctx.mine ? 2 : 1);
+    // the same spin sound the recorded whirl take covers (played once per cast), so the per-tick swing only plays without it
+    skillLayer(ctx, storm ? 'b_bladestorm' : 'b_whirlwind', 'swing', e.x, e.y, 110, ctx.mine ? 2 : 1);
   },
   // Executioner's Cleave lunge: steel afterimages along the 2.5 unit dash
   b_executioner: (ctx, e) => {
@@ -265,7 +267,7 @@ registerSkillFx({
     J.dust(p.x, p.y, 8, DUST);
     const c = chest(ctx, e.x, e.y);
     J.orb(c.x, c.y, RAGE, 0.6, 180);
-    sfx(ctx, 'dodge', e.x, e.y, 0, 2);
+    skillSfx(ctx, 'b_executioner', 'dodge', e.x, e.y, 0, 2);   // the recorded take: lunge, swoosh and chop
   },
   // the 200 degree, 3.2 unit cleave: the big crescent at the true reach, a ground scar and sparks along the arc
   b_execute_cleave: (ctx, e) => {
@@ -292,8 +294,8 @@ registerSkillFx({
     ctx.dungeon.addDecal('scorch', p.x, p.y + 2, 0x1a0c08, 1);
     ctx.dungeon.flashLight(p.x, p.y - 10, 210, RAGE, 2.6, 280);
     if (ctx.mine) J.hitStop(80);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 0, 2);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 3);
+    skillLayer(ctx, 'b_executioner', 'skill_sweep', e.x, e.y, 0, 2);
+    skillLayer(ctx, 'b_executioner', 'slam_heavy', e.x, e.y, 0, 3);
   },
   // an execution: a gory burst, a skull and the word
   b_execute: (ctx, e) => {
@@ -321,7 +323,7 @@ registerSkillFx({
       ctx.juice.embersAt(p.x, p.y - 8, 24, EMBER);
       ctx.juice.beam(p.x, p.y, 120, 22, EMBER, 260);
     }
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 4);
+    skillLayer(ctx, 'b_leap', 'slam_heavy', e.x, e.y, 0, 4);   // the recorded leap take includes the landing
   },
   b_cataclysm_land: (ctx, e) => {
     const R = e.dx || 2.2;
@@ -329,7 +331,7 @@ registerSkillFx({
     const p = ctx.P(e.x, e.y);
     ctx.juice.beam(p.x, p.y, 160, 30, EMBER, 320);
     ctx.juice.embersAt(p.x, p.y - 10, 26, EMBER);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 0, 4);   // each quake ring adds its own thud after this
+    skillLayer(ctx, 'b_cataclysm', 'slam_heavy', e.x, e.y, 0, 4);   // each quake ring adds its own thud after this
   },
   // each Cataclysm ring (2.2, 3.6, 5): a thick front at the true radius, rock spray on the rim, hotter each ring
   b_quake_ring: (ctx, e) => {
@@ -343,7 +345,7 @@ registerSkillFx({
     debrisRing(ctx, e.x, e.y, R, 8 + i * 3, 1 + (i === 2 ? 1 : 0));
     if (i === 2) { quakeDecal(ctx, e.x, e.y, R * 0.8, 0xffc0a0); if (ctx.mine) J.pop(EMBER, 0.12, 160); }
     ctx.dungeon.flashLight(p.x, p.y - 8, ctx.rx(R) * 2, col, 1.8 + i * 0.3, 240);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 80, 2);
+    skillLayer(ctx, 'b_cataclysm', 'slam_heavy', e.x, e.y, 80, 2);   // the recorded take is the whole series of ruptures
   },
   b_aftershock: (ctx, e) => {
     const R = e.dx || 3.2;
@@ -374,8 +376,8 @@ registerSkillFx({
     if (spr) J.afterimage(spr, DREAD, 0.6, 420);
     ctx.dungeon.flashLight(c.x, c.y, 280, DREAD, 2.4, 420);
     if (ctx.mine) J.pop(DREAD, 0.14, 220);
-    sfx(ctx, 'beast_roar', e.x, e.y, 0, 4);
-    sfx(ctx, 'skill_rally', e.x, e.y, 0, 2);   // Battle Cry for allies in range
+    skillSfx(ctx, 'b_shout', 'beast_roar', e.x, e.y, 0, 4);
+    skillLayer(ctx, 'b_shout', 'skill_rally', e.x, e.y, 0, 2);   // Battle Cry for allies in range
   },
   // Concussive Force: an enemy smashed into a wall
   b_wall_slam: (ctx, e) => {
@@ -440,7 +442,7 @@ function whirlStart(ctx: FxCtx, e: CastFx, color: number) {
   debrisRing(ctx, e.x, e.y, R * 0.9, 6, 1);
   J.sparksAt(c.x, c.y, storm ? 14 : 8, color);
   if (storm) { J.embersAt(c.x, c.y, 14, RAGE); J.orb(c.x, c.y, RAGE, 0.8, 240); if (ctx.mine) J.pop(RAGE, 0.1, 140); }
-  sfx(ctx, 'skill_sweep', e.x, e.y, 0, 3);
+  skillSfx(ctx, e.skill === 'b_bladestorm' ? 'b_bladestorm' : 'b_whirlwind', 'skill_sweep', e.x, e.y, 0, 3);   // the recorded spin take, once per cast
 }
 
 function leapStart(ctx: FxCtx, e: CastFx, height: number, cata: boolean) {
@@ -458,7 +460,7 @@ function leapStart(ctx: FxCtx, e: CastFx, height: number, cata: boolean) {
   J.shockwave(p.x, p.y, ctx.rx(1.2), IRON, 260);
   J.bits('ice', p.x, p.y - 4, 4, ROCK, { angle: -90, spread: 90 });
   heroGhosts(ctx, e.slot, e.dx - e.x, e.dy - e.y, col, 3, 10);
-  sfx(ctx, 'cine_whoosh', e.x, e.y, 0, 2);
+  skillSfx(ctx, cata ? 'b_cataclysm' : 'b_leap', 'cine_whoosh', e.x, e.y, 0, 2);
 }
 
 function bloodBurst(ctx: FxCtx, e: CastFx, harvest: boolean) {

@@ -64,9 +64,9 @@ export interface ProjectileLook {
   key: string; color: number; scale?: number; additive?: boolean; tint?: number;
   trail?: BitKind | 'ember' | 'none'; trailMs?: number; spin?: number;
   end?: (ctx: FxCtx, sx: number, sy: number) => void;
-  /** recorded file (audio/fileCues) played where a projectile of this kind first appears, when the file exists; at most
-   *  once per `spawnGapMs` (default 90) so a volley is one sound. For projectiles no cast event announces. */
-  spawnFile?: string; spawnGapMs?: number;
+  /** called once when a projectile of this kind first appears: the launch sound of projectiles no cast event announces
+   *  (the Sundering Wave, a ricochet). Throttle it (kit3 fileSfx) so a volley is one sound. */
+  spawn?: (ctx: FxCtx, p: Snapshot['projectiles'][number], snap: Snapshot) => void;
 }
 
 /** What CombatScene knows about a kill when it hands it to the killer's class flourish (world coordinates). */

@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import type { SfxId } from '../../audio/AudioEngine';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx } from './registry';
 import { castFlash, chestAt, heroGhosts, impactBurst, screenAngle, type Pal } from './spectacle';
+import { skillLayer, skillSfx } from './kit3';
 
 // Duelist presentation (cosmetic only): crisp white slashes and afterimages, crimson blood, violet shadow work.
 // Branch identity: Edge = crimson and blood, Shadow = violet with crimson eyes, Tempo = silver with gold parry sparks.
@@ -140,7 +141,7 @@ registerSkillFx({
     const flip = flipFor(e.slot);
     J.slash(c.x + u.x * 4, c.y + u.y * 2, ang + (flip ? 0.2 : -0.2), flip ? SILVER : CRIMSON, 1.3, { thin: true, flip, ms: 140 });
     J.sparksAt(c.x + u.x * 36, c.y + u.y * 18, 2, flip ? 0xffffff : CRIMSON_HOT);
-    sfx(ctx, 'swing', e.x, e.y, 55, ctx.mine ? 1 : 0);
+    skillSfx(ctx, 'd_twin_fangs', 'swing', e.x, e.y, 55, ctx.mine ? 1 : 0);   // the file has 3 variations, picked at random
   },
   // Fang Finisher (every 4th connecting swing; 110deg/2.3): razor X at the reach, a heavy crimson wake, a starburst.
   d_fang_finisher: (ctx, e) => {
@@ -184,7 +185,7 @@ registerSkillFx({
     J.sparksAt(mid.x, mid.y, 6, CRIMSON_HOT);
     ctx.dungeon.flashLight(mid.x, mid.y, 130, CRIMSON, 1.8, 180);
     stopFor(ctx, e.slot, 30);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, 'd_rend', 'skill_sweep', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   // Exsanguinate (on an enemy): its bleeds burst out in a blood geyser.
   d_fx_exsang: (ctx, e) => {
@@ -202,7 +203,7 @@ registerSkillFx({
   // Crimson Whirl cast: a crimson flash and glyph under the spinning Duelist (the spins are d_fx_whirl).
   d_crimson_whirl: (ctx, e) => {
     castFlash(ctx, e.x, e.y, P_EDGE, 1.2, { glyph: true });
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, 2);
+    skillSfx(ctx, 'd_crimson_whirl', 'skill_sweep', e.x, e.y, 60, 2);
   },
   // One whirl spin (3 per cast, r2.4): blades ringing the true radius, a crimson ring, a spinning afterimage, blood.
   d_fx_whirl: (ctx, e) => {
@@ -221,7 +222,7 @@ registerSkillFx({
     const s = ctx.actorSprite?.(e.slot);
     if (s?.active) J.afterimage(s, CRIMSON, 0.4, 180, Math.cos(spin) * 6, Math.sin(spin) * 3);
     ctx.dungeon.flashLight(c.x, c.y, 150, CRIMSON, 1.7, 220);
-    sfx(ctx, 'swing', e.x, e.y, 50, ctx.mine ? 2 : 1);
+    skillLayer(ctx, 'd_crimson_whirl', 'swing', e.x, e.y, 50, ctx.mine ? 2 : 1);
   },
   // Execution lunge (x,y -> dx,dy): afterimages down the lunge and a silver-crimson lance along it.
   d_execution: (ctx, e) => {
@@ -231,7 +232,7 @@ registerSkillFx({
     const from = ctx.P(e.x, e.y);
     ctx.juice.dust(from.x, from.y, 5, 0x3a2a2a);
     ctx.juice.ring(from.x, from.y, 16, CRIMSON, 180);
-    sfx(ctx, 'dodge', e.x, e.y, 60, 2);   // the lunge
+    skillSfx(ctx, 'd_execution', 'dodge', e.x, e.y, 60, 2);   // the lunge
   },
   // Execution connecting (on the enemy, aim in dx,dy): a lance clean through, white and crimson starbursts, hit-stop.
   d_fx_execute_hit: (ctx, e) => {
@@ -249,7 +250,7 @@ registerSkillFx({
     ctx.dungeon.addDecal('blood', p.x + u.x * 10, p.y + 3, 0x5a0a10, 0.8);
     ctx.dungeon.flashLight(c.x, c.y, 160, CRIMSON, 2.4, 220);
     stopFor(ctx, e.slot, 75, 0);
-    sfx(ctx, 'crit', e.x, e.y, 60, 2);
+    skillLayer(ctx, 'd_execution', 'crit', e.x, e.y, 60, 2);   // the stab is in the Execution file
   },
   // Coup de Grace (a unit slain outright): a white guillotine, crossing crimson cuts, a blood ring.
   d_fx_execute: (ctx, e) => {
@@ -285,8 +286,8 @@ registerSkillFx({
     const t = chestAt(ctx, e.dx, e.dy);
     ctx.juice.bits('mote', t.x, t.y, 5, SHADOW_HOT);
     stopFor(ctx, e.slot, 28);
-    sfx(ctx, 'blink', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
-    sfx(ctx, 'swing', e.dx, e.dy, 45, 1);   // the arrival cut
+    skillSfx(ctx, 'd_shadowstep', 'blink', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
+    skillLayer(ctx, 'd_shadowstep', 'swing', e.dx, e.dy, 45, 1);   // the arrival cut
   },
   // Phantom Rush cast: the Duelist dissolves into violet, a faint ring at the true 6 reach.
   d_phantom_rush: (ctx, e) => {
@@ -295,7 +296,7 @@ registerSkillFx({
     ctx.juice.ring(p.x, p.y, ctx.rx(6), SHADOW, 420);
     ctx.juice.bits('mote', p.x, p.y - 14, 8, SHADOW_HOT);
     if (ctx.mine) ctx.juice.pop(DUSK, 0.16, 160);
-    sfx(ctx, 'blink', e.x, e.y, 60, 2);
+    skillSfx(ctx, 'd_phantom_rush', 'blink', e.x, e.y, 60, 2);
   },
   // A rush / Thousand Cuts / plain blink (x,y -> dx,dy): ghost trail, a streak and a cut on arrival. Crimson during
   // Thousand Cuts, violet for Phantom Rush (r1.2 strike).
@@ -308,7 +309,7 @@ registerSkillFx({
     const from = ctx.P(e.x, e.y);
     ctx.juice.dust(from.x, from.y - 4, 2, 0x2a1a30);
     arrival(ctx, e.dx, e.dy, cuts ? 0 : 1.2, col, hot, 1);
-    sfx(ctx, 'swing', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
+    skillLayer(ctx, cuts ? 'd_thousand_cuts' : 'd_phantom_rush', 'swing', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
   },
   // Death Mark (x,y -> dx,dy): a crimson-violet blink, a strike, and a skull rising from the marked foe.
   d_death_mark: (ctx, e) => {
@@ -320,7 +321,7 @@ registerSkillFx({
     ctx.juice.bits('skull', t.x, t.y - 10, 2, CRIMSON);
     ctx.dungeon.flashLight(t.x, t.y, 150, CRIMSON, 2, 260);
     stopFor(ctx, e.slot, 30);
-    sfx(ctx, 'blink', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
+    skillSfx(ctx, 'd_death_mark', 'blink', e.dx, e.dy, 45, ctx.mine ? 2 : 1);
   },
   // Death Mark detonation (r in dx): a razor-sharp crimson and violet bloom, crossing cuts, skulls, a blood stain.
   d_fx_mark_burst: (ctx, e) => {
@@ -335,6 +336,7 @@ registerSkillFx({
     J.beam(p.x, p.y, 80, 10, SHADOW, 240);
     J.bits('skull', c.x, c.y - 6, 3, SHADOW_HOT);
     J.bleed('player', c.x, c.y, 14);
+    // Kept shared: the mark detonates up to 2.5s after the cast (its own trigger), so the cast file cannot time it.
     sfx(ctx, 'blade_flurry', e.x, e.y, 80, 3);
     sfx(ctx, 'blast_decay', e.x, e.y, 80, 1);   // the blood bloom
   },
@@ -428,7 +430,7 @@ registerSkillFx({
     const tx = c.x + Math.cos(ang + off) * 40, ty = c.y + Math.sin(ang + off) * 20;
     J.sparksAt(tx, ty, 2, flip ? 0xffffff : CRIMSON_HOT);
     if (Math.random() < 0.3) J.starburst(tx, ty, 0xffffff, 0.6, 120);
-    sfx(ctx, 'blade_flurry', e.x, e.y, 160, ctx.mine ? 2 : 1);   // one three-slash flurry per few cuts, never a machine gun
+    skillLayer(ctx, 'd_hundred_fangs', 'blade_flurry', e.x, e.y, 160, ctx.mine ? 2 : 1);   // one three-slash flurry per few cuts, never a machine gun
   },
 
   // ---- Signature ----
@@ -444,7 +446,7 @@ registerSkillFx({
     J.bits('star', p.x, p.y - 16, 6, CRIMSON_HOT);
     ctx.dungeon.flashLight(p.x, p.y - 10, 260, CRIMSON, 2.4, 600);
     if (ctx.mine) J.pop(0x5a0414, 0.14, 200);
-    sfx(ctx, 'blink', e.x, e.y, 60, 3);
+    skillSfx(ctx, 'd_thousand_cuts', 'blink', e.x, e.y, 60, 3);
   },
   // Thousand Cuts finale burst (r in dx, x1.6 with Finale): the razor bloom. Eight radiating cuts, a crimson column,
   // waves at the true radius, blood, a pop and hit-stop.
@@ -470,8 +472,8 @@ registerSkillFx({
     if (s?.active) for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2 + Math.PI / 4; J.afterimage(s, i % 2 ? CRIMSON : SHADOW, 0.45, 260, Math.cos(a) * 16, Math.sin(a) * 8); }
     J.pop(CRIMSON, 0.16, 220);
     stopFor(ctx, e.slot, 90, 0);
-    sfx(ctx, 'blade_flurry', e.x, e.y, 80, 3);
-    sfx(ctx, 'slam_heavy', e.x, e.y, 80, 2);   // the knockback bloom
+    skillLayer(ctx, 'd_thousand_cuts', 'blade_flurry', e.x, e.y, 80, 3);
+    skillLayer(ctx, 'd_thousand_cuts', 'slam_heavy', e.x, e.y, 80, 2);   // the knockback bloom
   },
 });
 
@@ -499,7 +501,7 @@ function stanceFx(ctx: FxCtx, e: CastFx, R: number, color: number) {
   J.sparksAt(c.x, c.y - 4, 6, color);
   if (e.skill === 'd_mirror_guard') J.bits('star', c.x, c.y, 6, SHADOW_HOT);
   ctx.dungeon.flashLight(c.x, c.y, 110 * R, color, 1.6, 260);
-  sfx(ctx, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);
+  skillSfx(ctx, e.skill, 'skill_guard', e.x, e.y, 60, ctx.mine ? 2 : 1);   // d_riposte / d_mirror_guard / d_hundred_fangs
 }
 
 // ---------------------------------------------------------------- hazards

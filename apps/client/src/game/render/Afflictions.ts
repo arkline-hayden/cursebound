@@ -3,6 +3,8 @@ import { AFFLICTION_RULES } from '@cursebound/content';
 import type { SimEvent, SnapPlayer, Snapshot } from '@cursebound/simulation';
 import { ACTOR_IDS } from '../art/actors';
 import type { SfxId } from '../audio/AudioEngine';
+import { getAudio } from '../audio/bus';
+import { foeVoice } from '../audio/fileCues';
 import { registerHazardFx, registerProjectileFx } from './fx/registry';
 import type { Juice } from './Juice';
 import { iso } from './iso';
@@ -442,6 +444,9 @@ export class AfflictionFx {
         if (e.stage !== 'release') return false;
         const en = snap?.enemies.find((x) => x.i === e.id);
         if (!en) return false;
+        // the foe's recorded attack voice (the scene plays it) already spits: no second spit on top
+        const voice = foeVoice(en.k, 'attack');
+        if (voice && getAudio()?.hasFile(voice)) return false;
         if (e.attack === 'webglob') this.sfx('web_spit', en.x, en.y, 1);
         else if (e.attack === 'lob') this.sfx('poison_spit', en.x, en.y, 1);
         return false;   // the scene still plays its generic cue

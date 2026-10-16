@@ -2,6 +2,8 @@ import * as Phaser from 'phaser';
 import type { SfxId } from '../../audio/AudioEngine';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx, type SnapHazard } from './registry';
 import { castFlash, chestAt, heroGhosts, hitSpark, impactBurst, killPop, type Pal } from './spectacle';
+import { fileSfx, skillLayer, skillSfx } from './kit3';
+import { SKILL_FILE } from '../../audio/fileCues';
 
 // Ranger presentation (cosmetic only). Forest green fletching, gold wind and steel; a red hunter's reticle for the
 // Marksman, toxic green for poison and a hawk for the Wilds. Pixel textures live in art/fx/ranger.ts (fx:ranger:*).
@@ -168,6 +170,17 @@ function fanStreaks(ctx: FxCtx, x: number, y: number, dx: number, dy: number, n:
 registerProjectileFx({
   ranger_arrow: {
     key: 'fx:ranger:arrow', color: GOLD, additive: false, trail: 'mote', trailMs: 85,
+    // Ricochet sends no cast event: its bounce is a plain arrow born at the struck foe. Traced back along its flight
+    // (up to 0.3 s, whatever snapshot first shows it), a hero's arrow passes its archer; a bounce passes no hero.
+    spawn: (ctx, pr, snap) => {
+      const bx = pr.x - pr.vx * 0.3, by = pr.y - pr.vy * 0.3;
+      const fromHero = snap.players.some((h) => {
+        const lx = pr.x - bx, ly = pr.y - by, l2 = lx * lx + ly * ly || 1;
+        const t = Math.max(0, Math.min(1, ((h.x - bx) * lx + (h.y - by) * ly) / l2));
+        return (bx + lx * t - h.x) ** 2 + (by + ly * t - h.y) ** 2 < 0.9 * 0.9;
+      });
+      if (!fromHero) fileSfx(ctx, SKILL_FILE.r_ricochet!, null, pr.x, pr.y, 90);
+    },
     end: (ctx, sx, sy) => { if (Math.random() < 0.45) ctx.juice.bits('feather', sx, sy, 1, FEATHER); },
   },
   ranger_heavy: {
@@ -231,10 +244,12 @@ function volleyFx(ctx: FxCtx, e: CastFx, kind: VolleyKind) {
     J.ring(p.x, p.y, ctx.rx(0.9), GOLD, 200);
     heroGhosts(ctx, e.slot, -e.dx, -e.dy, GOLD, 3, 9);
   }
-  sfx(ctx, 'bow_shot', e.x, e.y, follow ? 90 : 50, ctx.mine ? 2 : 1);
+  // Barrage follow-up fans are covered by the Barrage take (rapid repeated twangs)
+  if (follow) skillLayer(ctx, 'r_barrage', 'bow_shot', e.x, e.y, 90, ctx.mine ? 2 : 1);
+  else skillSfx(ctx, e.skill, 'bow_shot', e.x, e.y, 50, ctx.mine ? 2 : 1);
   // the heavy shaft rips the air; the tumble rolls
-  if (long) sfx(ctx, 'skill_sweep', e.x, e.y, 50, 1);
-  else if (tumble) sfx(ctx, 'dodge', e.x, e.y, 50, 1);
+  if (long) skillLayer(ctx, e.skill, 'skill_sweep', e.x, e.y, 50, 1);
+  else if (tumble) skillLayer(ctx, e.skill, 'dodge', e.x, e.y, 50, 1);
 }
 
 /** A marked shot from x,y to a target point: bow flash, tracer, red hit and the reticle locking on. */
@@ -263,7 +278,7 @@ registerSkillFx({
     const bx = c.x + u.x * 10, by = c.y + u.y * 10;
     gust(ctx, bx, by, Math.atan2(u.y, u.x), WIND, 0.65);
     ctx.juice.sparksAt(bx, by, 2, GOLD);
-    sfx(ctx, 'bow_shot', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    skillSfx(ctx, e.skill, 'bow_shot', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   r_multishot: (ctx, e) => volleyFx(ctx, e, 'multi'),
   r_barrage: (ctx, e) => volleyFx(ctx, e, 'barrage'),
@@ -288,12 +303,12 @@ registerSkillFx({
     J.dust(p.x, p.y, 8, 0x5a4a30);
     ctx.dungeon.flashLight(bx, by, 160, GOLD, 2.2, 170);
     if (ctx.mine) J.hitStop(45);
-    sfx(ctx, 'bow_shot', e.x, e.y, 60, 2);
-    sfx(ctx, 'skill_sweep', e.x, e.y, 60, 1);   // the heavy arrow ripping the air
+    skillSfx(ctx, e.skill, 'bow_shot', e.x, e.y, 60, 2);
+    skillLayer(ctx, e.skill, 'skill_sweep', e.x, e.y, 60, 1);   // the heavy arrow ripping the air
   },
   r_hunters_mark: (ctx, e) => {
     markShot(ctx, e, 1);
-    sfx(ctx, 'bow_shot', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillSfx(ctx, e.skill, 'bow_shot', e.x, e.y, 60, ctx.mine ? 2 : 1);
   },
   r_deadeye: (ctx, e) => {
     // three marked shots arrive in the same tick: the caster flourish plays once
@@ -302,7 +317,7 @@ registerSkillFx({
       deadeyeAt.set(e.slot, ctx.now);
       castFlash(ctx, e.x, e.y, MARKP, 1.5, { glyph: true });
       if (ctx.mine) { ctx.juice.pop(MARK, 0.08, 150); ctx.juice.hitStop(40); }
-      sfx(ctx, 'bow_shot', e.x, e.y, 40, ctx.mine ? 2 : 1);   // the hits themselves play the central impacts
+      skillSfx(ctx, e.skill, 'bow_shot', e.x, e.y, 40, ctx.mine ? 2 : 1);   // the hits themselves play the central impacts
     }
     markShot(ctx, e, 2);
     const p = ctx.P(e.dx, e.dy);
@@ -352,7 +367,7 @@ registerSkillFx({
     J.embersAt(p.x, p.y - 10, 3, EMBER);
     if (Math.random() < 0.25) ctx.dungeon.addDecal('scorch', p.x, p.y + 2, 0x1a1008, 0.6);
     ctx.dungeon.flashLight(p.x, p.y - 10, 90, EMBER, 1.4, 120);
-    sfx(ctx, 'impact_fire', e.x, e.y, 60, 0);
+    skillSfx(ctx, e.skill, 'impact_fire', e.x, e.y, 60, 0);   // fires on every Volley arrow hit: throttled
   },
   r_snare_trap: (ctx, e) => {
     const J = ctx.juice;
@@ -362,7 +377,8 @@ registerSkillFx({
     J.dust(p.x, p.y, 4, 0x5a4a30);
     J.sparksAt(p.x, p.y - 4, 4, STEEL);
     J.ring(p.x, p.y, ctx.rx(0.6), STEEL, 240);
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
+    // placing: the recorded take is the snap (r_trap_spring), so the toss only plays while it is missing
+    skillLayer(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 1 : 0);
   },
   r_trap_volley: (ctx, e) => {
     const c = chestAt(ctx, e.x, e.y);
@@ -380,17 +396,17 @@ registerSkillFx({
     if (blast) {
       impactBurst(ctx, e.x, e.y, R, BLAST, 2, { decal: 'scorch', decalTint: 0x1a1008 });
       J.embersAt(p.x, p.y - 10, 12, EMBER);
-      sfx(ctx, 'blast_fire', e.x, e.y, 80, 1);
+      skillLayer(ctx, 'r_snare_trap', 'blast_fire', e.x, e.y, 80, 1);
     } else if (venom) {
       impactBurst(ctx, e.x, e.y, R, PLAGUE, 2, { decal: 'slime', decalTint: 0x2a4a10 });
       J.bits('bubble', p.x, p.y - 8, 8, TOXIC);
-      sfx(ctx, 'blast_decay', e.x, e.y, 80, 1);
+      skillLayer(ctx, 'r_snare_trap', 'blast_decay', e.x, e.y, 80, 1);
     } else {
       impactBurst(ctx, e.x, e.y, R, STEELP, 2, { dust: 8 });
       // the Snare: a tight gold ring closing in
       J.shockwave(p.x, p.y, ctx.rx(R * 0.5), GOLD, 220, 80);
     }
-    sfx(ctx, 'trap_snap', e.x, e.y, 50, 2);
+    skillSfx(ctx, 'r_snare_trap', 'trap_snap', e.x, e.y, 50, 2);   // the snap (Snare Trap, Trap Volley and Bait bursts)
   },
   r_bait: (ctx, e) => {
     const J = ctx.juice;
@@ -402,8 +418,8 @@ registerSkillFx({
     J.ring(p.x, p.y, ctx.rx(2.2), STEEL, 300);
     J.bleed('pursuer', p.x, p.y - 6, 8);
     J.bits('mote', p.x, p.y - 8, 5, MARK);
-    sfx(ctx, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);
-    sfx(ctx, 'skill_rally', e.x, e.y, 60, 1);   // the lure calling
+    skillSfx(ctx, e.skill, 'throw_whoosh', e.x, e.y, 60, ctx.mine ? 2 : 1);
+    skillLayer(ctx, e.skill, 'skill_rally', e.x, e.y, 60, 1);   // the lure calling
   },
   r_rain_of_arrows: (ctx, e) => {
     const J = ctx.juice;
@@ -420,15 +436,15 @@ registerSkillFx({
     J.ring(p.x, p.y, ctx.rx(1.6), GOLD_HOT, 360);
     ctx.dungeon.flashLight(p.x, p.y - 30, 260, GOLD, 2, 700);
     if (ctx.mine) J.pop(GOLD, 0.08, 200);
-    sfx(ctx, 'bow_shot', e.x, e.y, 0, 3);
-    sfx(ctx, 'cine_whoosh', e.x, e.y, 0, 1);   // the volley rising and falling
+    skillSfx(ctx, e.skill, 'bow_shot', e.x, e.y, 0, 3);
+    skillLayer(ctx, e.skill, 'cine_whoosh', e.x, e.y, 0, 1);   // the volley rising and falling
   },
   r_hawk_dive: (ctx, e) => {
     hawkDove(ctx, e);
     const a = chestAt(ctx, e.x, e.y, 30), b = chestAt(ctx, e.dx, e.dy);
     tracer(ctx, a.x, a.y, b.x, b.y, LEATHER, 2, 260);
     ctx.juice.bitsAlong('feather', a.x, a.y, b.x, b.y, 3, LEATHER);
-    sfx(ctx, 'swing', e.x, e.y, 120, 0);
+    skillSfx(ctx, e.skill, 'swing', e.x, e.y, 120, 0);
   },
   r_hawk_strike: (ctx, e) => {
     const J = ctx.juice;
@@ -695,6 +711,9 @@ registerHazardFx({
     if (!ctx.reduced && Math.random() < 0.07) ctx.juice.bits('mote', p.x + (Math.random() - 0.5) * 10, p.y - 6, 1, MARK);
   },
   ranger_cloud: (ctx, g, h, tick) => {
+    // Venom Cloud has no cast event: its recorded hiss plays once when the cloud appears (silent until the file lands)
+    const v = viewOf(ctx, h);
+    if (v.pulse < 0) { v.pulse = 1; fileSfx(ctx, SKILL_FILE.r_venom_cloud!, null, h.x, h.y, 120, 1); }
     const left = (h.u - tick) / 60;
     const a = Math.max(0, Math.min(1, left / 0.5, (tick - h.b) / 12));
     const c = ctx.P(h.x, h.y);

@@ -166,7 +166,7 @@ export function foeVoice(kind: string, voice: FoeVoice): string | undefined {
   return base ? `${base}_${voice}` : undefined;
 }
 
-/** Boss id -> its death cry (played on top of the kill and the boss_death sting). */
+/** Boss id -> its death cry (layered on the kill sound when the boss falls). */
 export const BOSS_DEATH_FILE: Record<string, string> = {
   prismstag: 'boss_death_stag', bellroot: 'boss_death_golem', corruptcore: 'boss_death_core',
   ironcolossus: 'boss_death_colossus', skydrake: 'boss_death_wyrm', moonhorror: 'boss_death_horror',

@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import type { SfxId } from '../../audio/AudioEngine';
 import { registerHazardFx, registerKillFx, registerProjectileFx, registerSkillFx, type CastFx, type FxCtx } from './registry';
 import { castFlash, chestAt, heroGhosts, impactBurst, screenAngle, trailBits, type Pal } from './spectacle';
-import { arcTrail, skillLayer, skillSfx } from './kit3';
+import { arcTrail, fileSfx, skillLayer, skillSfx } from './kit3';
 import { SKILL_FILE } from '../../audio/fileCues';
 
 // Vanguard presentation (cosmetic only): steel shockwaves, shield glints, gold rally light, red for executes and
@@ -655,7 +655,8 @@ registerHazardFx({
 registerProjectileFx({
   // Sundering Wave: a ground shockwave crescent with glints in its wake; it breaks into rubble where it ends.
   wave: {
-    key: 'fx:vanguard:wave', color: AMBER, scale: 1.1, additive: true, trail: 'star', trailMs: 40, spawnFile: SKILL_FILE.v_sundering_wave,
+    key: 'fx:vanguard:wave', color: AMBER, scale: 1.1, additive: true, trail: 'star', trailMs: 40,
+    spawn: (ctx, p) => fileSfx(ctx, SKILL_FILE.v_sundering_wave!, null, p.x, p.y, 90),   // no cast event of its own: one per volley
     end: (ctx, sx, sy) => {
       ctx.juice.shockwave(sx, sy + 14, 26, AMBER, 240);
       ctx.juice.starburst(sx, sy, GOLD_HOT, 0.7, 140);

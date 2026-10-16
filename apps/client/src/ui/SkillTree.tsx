@@ -9,6 +9,7 @@ import { accountApi } from '@/lib/api';
 import { authStore, refreshAuth } from '@/lib/auth';
 import { score } from '@/lib/format';
 import { NodeIcon, ClassEmblem } from './icons';
+import { sharedAudio } from '@/game/audio/shared';
 
 // LOADOUT / SKILL_ALLOCATION (REQ CLASS01, PRD §6.2, §7): inspect any node before purchase with cost, prerequisites
 // and before/after numbers; a click cannot spend twice (server-validated); builds export as versioned node IDs.
@@ -441,6 +442,19 @@ export function SkillTree({ net, onClose }: { net: GameConnection; onClose?: () 
   const treeRef = useRef<HTMLDivElement>(null);
   const me = phase?.players[slot];
   useEffect(() => { setPending(false); }, [me?.skillPoints, me?.ranks]);
+  // the authority confirmed a spent point: the rune etches in (an imported build's burst of ranks: one per 120 ms)
+  const rankKey = me ? `${me.classId}:${Object.values(me.ranks).reduce((a, r) => a + r, 0)}` : '';
+  const lastRanks = useRef<{ key: string; at: number }>({ key: '', at: 0 });
+  useEffect(() => {
+    const prev = lastRanks.current;
+    lastRanks.current = { key: rankKey, at: prev.at };
+    const [pc, pt] = prev.key.split(':'), [c, t] = rankKey.split(':');
+    if (!prev.key || pc !== c || Number(t) <= Number(pt)) return;   // first sight, a class switch or a refund
+    const now = performance.now();
+    if (now - prev.at < 120) return;
+    lastRanks.current.at = now;
+    void sharedAudio().then((a) => a?.playFile('skill_rank_up', null, { priority: 5, ui: true }));
+  }, [rankKey]);
   const cls = me ? CLASS_BY_ID[me.classId] : null;
   const nodesByBranch = useMemo(() => {
     const out: Record<string, NodeDef[]> = {};

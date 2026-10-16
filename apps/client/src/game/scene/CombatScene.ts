@@ -23,7 +23,7 @@ import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
 import { impactSfx, killSfx, type StingerKind } from '../audio/sfx';
-import { CueGate, SKILL_FILE } from '../audio/fileCues';
+import { BOSS_DEATH_FILE, CueGate, SKILL_FILE, foeVoice } from '../audio/fileCues';
 import { DamageNumbers, NUMBER_COLOR } from '../render/DamageNumbers';
 import { DeathFx, deathStyle } from '../render/DeathFx';
 import { InputController, type Sample } from '@/lib/input';
@@ -129,6 +129,8 @@ export class CombatScene extends Phaser.Scene {
   private actors = new Map<string, ActorView>();
   /** time gates for recorded files that fire from many sources at once (foe voices, volley launches) */
   private cueGate = new CueGate();
+  /** foes that already voiced their alert this floor */
+  private alerted = new Set<number>();
   private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number; color: number; look?: ProjectileLook; born: number }>();
   private hazardG!: Phaser.GameObjects.Graphics;
   private teleG!: Phaser.GameObjects.Graphics;
@@ -224,7 +226,8 @@ export class CombatScene extends Phaser.Scene {
     this.elites = new EliteFx(this, this.juice, this.dungeon);
     this.outlines = new Outlines(this);
     this.aff = new AfflictionFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
-    this.themeFx = new ThemeFoeFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y), (text, tone) => this.banner(text, tone));
+    this.themeFx = new ThemeFoeFx(this, this.juice, (id, x, y, priority = 1) => this.sfx(id, x, priority, y), (text, tone) => this.banner(text, tone),
+      (key, fallback, x, y, priority = 1) => this.sfxFile(key, fallback, x, priority, y));
     this.bossFx = new BossFx({
       scene: this, juice: this.juice, dungeon: this.dungeon, sfx: (id, x, y, priority = 1) => this.sfx(id as SfxId, x, priority, y),
       banner: (text, tone) => this.banner(text, tone), reduced: () => this.settings().reducedEffects, me: () => netStore.get().slot,
@@ -232,7 +235,8 @@ export class CombatScene extends Phaser.Scene {
     });
     this.pickupsR = new PickupRenderer(this, this.juice);
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
-    this.roomFx = new RoomEventRenderer(this, this.juice, this.dungeon, this.net, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
+    this.roomFx = new RoomEventRenderer(this, this.juice, this.dungeon, this.net, (id, x, y, priority = 1) => this.sfx(id, x, priority, y),
+      (key, fallback, x, y, priority = 1) => this.sfxFile(key, fallback, x, priority, y));
     this.hazardG = this.add.graphics().setDepth(-80);
     this.teleG = this.add.graphics().setDepth(-70);
     this.fxG = this.add.graphics().setDepth(4700);
@@ -464,6 +468,24 @@ export class CombatScene extends Phaser.Scene {
     window.dispatchEvent(new CustomEvent('cursebound:banner', { detail: { text, tone } }));
   }
 
+  /**
+   * Enemy alert voices: a pack noticing the heroes ('aggro') or a foe winding up its first attack (wave spawns, summons
+   * and adds never send 'aggro'). Each foe alerts once; a kind at most every 2.5 s and any alert at most every 0.4 s,
+   * so a pack of ten waking together is one or two voices.
+   */
+  private foeAlert(e: SimEvent, snap: Snapshot | null) {
+    if (e.t === 'round_intro') { this.alerted.clear(); return; }   // a new floor: ids start over
+    if (e.t !== 'aggro' && !(e.t === 'enemy_attack' && e.stage === 'windup')) return;
+    if (this.alerted.has(e.id)) return;
+    this.alerted.add(e.id);
+    const en = snap?.enemies.find((x) => x.i === e.id);
+    if (!en || en.boss) return;
+    const voice = foeVoice(en.k, 'alert');
+    const now = this.time.now;
+    if (!voice || !this.audio?.hasFile(voice) || !this.cueGate.ok(voice, now, 2500) || !this.cueGate.ok('foe_alert:any', now, 400)) return;
+    this.sfxFile(voice, null, en.x, 2, en.y, 0.8);
+  }
+
   // ---------------- events → feel ----------------
 
   private handleEvents(snap: Snapshot | null) {
@@ -475,6 +497,7 @@ export class CombatScene extends Phaser.Scene {
   private handleEvent(e: SimEvent, me: number, snap: Snapshot | null) {
     const pal = this.palette();
     const J = this.juice;
+    this.foeAlert(e, snap);   // enemy voices: a foe noticing the heroes (before the renderers below consume 'aggro')
     if (this.themeFx.onEvent(e, me, snap)) return;   // theme foe cues, mini-boss announcements (render/ThemeFoeFx.ts)
     if (this.bossFx.onEvent(e, snap)) return;   // scripted bosses: beams, quakes, glitches, banners (render/bosses)
     if (this.aff.onEvent(e, me, snap)) return;   // afflictions, new foe attacks, idle packs waking (render/Afflictions.ts)
@@ -541,6 +564,8 @@ export class CombatScene extends Phaser.Scene {
           if (v) { v.recoilX = u.x * 6; v.recoilY = u.y * 4; v.squash = 1; }
           if (e.target === me) {
             this.sfx('hit_player', e.x, 2, e.y);
+            // a big hit (15%+ of health) draws a pained grunt on top, at most one a second
+            if (frac >= 0.15 && this.cueGate.ok('hero_grunt', this.time.now, 1000)) this.sfxFile('hero_grunt', null, e.x, 3, e.y, 0.8);
             rumble(frac > 0.2 ? 'heavy' : 'hit');
             J.hitStop(40 + Math.round(frac * 120));
             J.shake(0.004 + frac * 0.02, 120 + frac * 200);
@@ -573,7 +598,9 @@ export class CombatScene extends Phaser.Scene {
           J.embersAt(tq.x, tq.y - 18, 12, 0x6ab4ff);
           J.ring(tq.x, tq.y, 24, 0x6ab4ff, 280);
         }
-        this.sfx(e.kind === 'potion' ? 'potion_glug' : 'heal', e.x, e.slot === me ? 2 : 1, e.y);
+        // a potion keeps its glug; the haste orb (and any other orb kind) has its own absorb take
+        if (e.kind === 'potion') this.sfx('potion_glug', e.x, e.slot === me ? 2 : 1, e.y);
+        else this.sfxFile('orb_pickup', 'heal', e.x, e.slot === me ? 2 : 1, e.y);
         break;
       }
       case 'death': this.onDeath(e, me, snap); break;
@@ -588,7 +615,11 @@ export class CombatScene extends Phaser.Scene {
         break;
       }
       case 'elite': {
-        if (e.fx === 'spawn') this.pendingBanners.push({ id: e.id, tier: e.tier ?? 1, until: this.time.now + 700 });
+        if (e.fx === 'spawn') {
+          this.pendingBanners.push({ id: e.id, tier: e.tier ?? 1, until: this.time.now + 700 });
+          // a champion's aura flaring (one per 600 ms when a floor seeds several at once)
+          if (this.cueGate.ok('elite_spawn', this.time.now, 600)) this.sfxFile('elite_spawn', null, e.x, 4, e.y);
+        }
         const mp = this.mePos(snap);
         this.elites.onEvent(e, {
           sfx: (id, x, y, priority = 1) => this.sfx(id, x, priority, y),
@@ -671,13 +702,24 @@ export class CombatScene extends Phaser.Scene {
           if (en?.boss) this.sfx('boss_telegraph', en.x, 3, en.y);
           else if (en) this.sfx('telegraph_warn', en.x, 0, en.y);
         } else if (en) {
-          if (en.boss) { this.sfx(e.attack === 'charge' ? 'boss_charge' : e.attack === 'ring' ? 'boss_ring' : 'hit_player', en.x, 2, en.y); this.juice.shake(0.008, 180); rumble('slam'); }
-          else if (['shard', 'orb', 'fan', 'lob'].includes(e.attack)) this.sfx('enemy_shoot', en.x, 0, en.y);
-          else this.sfx('enemy_bite', en.x, 0, en.y);
+          if (en.boss) {
+            const cue: SfxId = e.attack === 'charge' ? 'boss_charge' : e.attack === 'ring' ? 'boss_ring' : 'hit_player';
+            // the Hollow Stag's lane charge has its own galloping take
+            if (en.k === 'prismstag' && e.attack === 'charge') this.sfxFile('stag_charge', cue, en.x, 2, en.y);
+            else this.sfx(cue, en.x, 2, en.y);
+            this.juice.shake(0.008, 180); rumble('slam');
+          } else {
+            // the foe's own attack voice when recorded (replaces the generic cue), one per kind per 120 ms
+            const shared: SfxId = ['shard', 'orb', 'fan', 'lob'].includes(e.attack) ? 'enemy_shoot' : 'enemy_bite';
+            const voice = foeVoice(en.k, 'attack');
+            if (voice && this.audio?.hasFile(voice)) { if (this.cueGate.ok(voice, this.time.now, 120)) this.sfxFile(voice, shared, en.x, 1, en.y, 0.85); }
+            else this.sfx(shared, en.x, 0, en.y);
+          }
           if (e.attack === 'slam' || e.attack === 'lightpool_burst') { const q = this.P(en.x, en.y); J.ring(q.x, q.y, iso.rx(3.6), 0xff8a3a, 300); J.dust(q.x, q.y, 12); }
         }
         break;
       }
+      case 'dead': this.sfxFile('hero_death', null, undefined, 6); break;   // a downed hero bled out
       case 'downed': this.sfx('player_downed', undefined, 5); if (e.slot === me) { J.hitStop(160); J.shake(0.02, 300); rumble('downed'); } break;
       case 'revived': { this.sfx('player_revived', undefined, 3); const p = snap?.players[e.slot]; if (p) { const q = this.P(p.x, p.y); J.ring(q.x, q.y, 36, 0xffd890, 400); J.embersAt(q.x, q.y - 14, 16, 0xffd890); } break; }
       case 'boss_phase':
@@ -685,7 +727,7 @@ export class CombatScene extends Phaser.Scene {
         J.shake(0.02, 450); J.flash(0xffffff, 120);
         this.banner(`Phase ${e.phase + 1}`, 'danger');
         break;
-      case 'boss_adds': this.sfx('wave_spawn', undefined, 4); this.banner('Reinforcements!', 'danger'); break;   // summoning circles are the telegraphs
+      case 'boss_adds': this.sfxFile('boss_adds', 'wave_spawn', e.x, 4, e.y); this.banner('Reinforcements!', 'danger'); break;   // summoning circles are the telegraphs
       case 'stagger': this.banner('Staggered!', 'good'); J.hitStop(90); break;
     }
   }
@@ -763,6 +805,14 @@ export class CombatScene extends Phaser.Scene {
       this.sfx('crit', e.x, 2, e.y);
     }
     this.sfx(killSfx(dtype), e.x, 1, e.y);   // char sizzle, ice shatter, zap, squelch, chime; physical keeps the pop and crack
+    // the creature's own death cry on top of the kill sound (bosses: their death take); a cleave through a pack voices
+    // one cry per kind per 100 ms and at most one every 45 ms overall, and the engine caps each cry at 4 voices
+    if (boss) this.sfxFile(BOSS_DEATH_FILE[e.kind], null, e.x, 9, e.y);
+    else if (!snap?.enemies.find((x) => x.i === e.id)?.mb) {   // a named mini-boss has its own death take (render/ThemeFoeFx.ts)
+      const cry = foeVoice(e.kind, 'death');
+      const now = this.time.now;
+      if (cry && this.audio?.hasFile(cry) && this.cueGate.ok(cry, now, 100) && this.cueGate.ok('foe_death:any', now, 45)) this.sfxFile(cry, null, e.x, elite ? 4 : 2, e.y, elite ? 0.9 : 0.6);
+    }
     if (e.by === me) {
       J.hitStop(boss ? 220 : elite ? 70 : 28 + Math.min(20, this.combo) * 1.2);
       J.shake(boss ? 0.02 : elite ? 0.009 : 0.003, boss ? 500 : elite ? 200 : 80);
@@ -1461,7 +1511,7 @@ export class CombatScene extends Phaser.Scene {
         entry = { s: spr, glow, last: 0, color, look, born: now };
         this.projectiles.set(p.i, entry);
         // a projectile with its own recorded launch (no cast event of its own, e.g. the Sundering Wave), once per volley
-        if (look?.spawnFile && this.cueGate.ok(look.spawnFile, now, look.spawnGapMs ?? 90)) this.sfxFile(look.spawnFile, null, p.x, 1, p.y);
+        look?.spawn?.(this.hazardFxCtx(), p, s);
       }
       let x = p.x + p.vx * Math.min(age, 0.1), y = p.y + p.vy * Math.min(age, 0.1);
       let lift = 0;
