@@ -37,6 +37,8 @@ function hash(x: number, y: number, s: number) {
 export interface CourtyardBuild {
   objs: Phaser.GameObjects.GameObject[];
   occluders: Occluder[];
+  /** px each wall tile (house, garden wall) is drawn tall above its floor diamond (tile index -> px; click picking) */
+  wallPx: Map<number, number>;
   decalRT: Phaser.GameObjects.RenderTexture;
   theme: RenderTheme;
   bounds: { x: number; y: number; w: number; h: number };
@@ -64,6 +66,7 @@ export function buildCourtyard(s: Phaser.Scene, map: MapLike, o: { lighting: boo
   const { cx, cy } = plan;
   const objs: Phaser.GameObjects.GameObject[] = [];
   const occluders: Occluder[] = [];
+  const wallPx = new Map<number, number>();
   const b = isoBounds(map.w, map.h);
   const ox = b.minX, oy = b.minY;
   const isWall = (x: number, y: number) => x < 0 || y < 0 || x >= map.w || y >= map.h || map.tiles[y * map.w + x] === 1;
@@ -102,6 +105,7 @@ export function buildCourtyard(s: Phaser.Scene, map: MapLike, o: { lighting: boo
     if (boundary && front) {
       const img = s.add.image(T.x - HW, T.y - (STUB_H - 32), CY.stub, Math.floor(hash(x, y, 3) * STUB_FRAMES)).setOrigin(0, 0).setDepth(depth);
       objs.push(o.lit(img)); sprites++;
+      wallPx.set(y * map.w + x, STUB_H - 32);
       continue;
     }
     // far ranks: roofs behind the houses (never on the near arc, where they would cover the square)
@@ -117,6 +121,8 @@ export function buildCourtyard(s: Phaser.Scene, map: MapLike, o: { lighting: boo
     const img = s.add.image(T.x - HW, T.y - (HOUSE_H - 32), CY.house, frame).setOrigin(0, 0).setDepth(depth - (boundary ? 0 : 0.5));
     if (!boundary) img.setTint(0xd8d0c8);   // the rank behind sits a touch further into the haze
     objs.push(o.lit(img)); sprites++;
+    // facade and roof above the floor diamond (the frame's top is empty sky)
+    wallPx.set(y * map.w + x, (arch ? 100 : WALL_H_BY_LEVEL[level]!) + (arch ? 36 : ROOF_H_BY_LEVEL[level]!) - 16);
     if (boundary && (!isWall(x, y - 1) || !isWall(x - 1, y))) {
       const top = HOUSE_H - 16 - (arch ? 100 : WALL_H_BY_LEVEL[level]!) - (arch ? 36 : ROOF_H_BY_LEVEL[level]!);
       occluders.push({ objs: [img], depth, x0: T.x - HW, x1: T.x + HW, y0: T.y - (HOUSE_H - 32) + top, y1: T.y + HH * 2, alpha: 1 });
@@ -184,7 +190,7 @@ export function buildCourtyard(s: Phaser.Scene, map: MapLike, o: { lighting: boo
   objs.push(grade);
 
   return {
-    objs, occluders, decalRT, theme: COURTYARD_THEME,
+    objs, occluders, wallPx, decalRT, theme: COURTYARD_THEME,
     bounds: { x: b.minX - HW * 2, y: b.minY - HOUSE_H - HH * 2, w: b.width + HW * 4, h: b.height + HOUSE_H + HH * 4 },
     origin: { x: ox, y: oy },
     stats: { sprites, ms: performance.now() - t0 },

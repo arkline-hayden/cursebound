@@ -28,7 +28,7 @@ import { DamageNumbers, NUMBER_COLOR } from '../render/DamageNumbers';
 import { DeathFx, deathStyle } from '../render/DeathFx';
 import { InputController, type Sample } from '@/lib/input';
 import { ClickMove, InputTicks, type DriveFrame } from '../input/ClickMove';
-import { basicReach, pickEnemy, pickGround, type GroundThing } from '../input/targeting';
+import { basicReach, groundAt, pickEnemy, pickGround, spriteBox, type FoeSprite, type GroundThing } from '../input/targeting';
 import { ClickFx } from '../render/ClickFx';
 import { GuideMark } from '../render/GuideMark';
 import { gameCursor, type GameCursor } from '@/ui/pixelCursors';
@@ -318,19 +318,12 @@ export class CombatScene extends Phaser.Scene {
   private updateHover(s: Snapshot) {
     const cam = this.cameras.main;
     const k = this.game.canvas.clientWidth / this.W || 1;
-    const mx = this.input2.pointer.x / k + cam.scrollX, my = this.input2.pointer.y / k + cam.scrollY;
-    let best: { key: string; e: SnapEnemy; v: ActorView; depth: number } | null = null;
-    if (this.input2.pointer.inside && !this.input2.usingPad) {
-      for (const e of s.enemies) {
-        if (e.st === 'dying' || e.boss) continue;
-        const key = `e${e.i}:${e.g}`;
-        const v = this.actors.get(key);
-        if (!v) continue;
-        const sp = v.sprite, w = sp.width * sp.scaleX * 0.42, h = sp.height * sp.scaleY * sp.originY * 0.9;
-        if (mx < sp.x - w || mx > sp.x + w || my < sp.y - h || my > sp.y + 6) continue;
-        if (!best || sp.depth > best.depth) best = { key, e, v, depth: sp.depth };
-      }
-    }
+    const sp = { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY };
+    // the same pick a click makes (driveFrame): the rim marks exactly the foe a click attacks. Bosses keep their
+    // own bar instead of the rim and plate (a click on one still attacks it).
+    const e = this.input2.pointer.inside && !this.input2.usingPad ? pickEnemy(this.foeSprites(s), sp) : null;
+    const hv = e && !e.boss ? this.actors.get(`e${e.i}:${e.g}`) : undefined;
+    const best = e && hv ? { key: `e${e.i}:${e.g}`, e, v: hv } : null;
     const key = best?.key ?? null;
     if (key !== this.hoverKey) {
       const old = this.hoverKey ? this.actors.get(this.hoverKey) : undefined;
@@ -356,6 +349,22 @@ export class CombatScene extends Phaser.Scene {
       }
       window.dispatchEvent(new CustomEvent('cursebound:target', { detail }));
     }
+  }
+
+  /**
+   * Foes as drawn this frame, for pointer picking (input/targeting.ts pickEnemy): each living foe's sprite box, and a
+   * packed cohort's extra bodies, at the drawn (interpolated) position. The hover rim and the click both pick from it.
+   */
+  private foeSprites(s: Snapshot): FoeSprite<SnapEnemy>[] {
+    const box = (spr: Phaser.GameObjects.Sprite) => spriteBox(spr.x, spr.y, spr.width, spr.height, spr.scaleX, spr.scaleY, spr.originY, spr.depth);
+    const out: FoeSprite<SnapEnemy>[] = [];
+    for (const e of s.enemies) {
+      if (e.st === 'dying') continue;
+      const v = this.actors.get(`e${e.i}:${e.g}`);
+      if (!v || v.dying || v.gibbed || !v.sprite.visible) continue;
+      out.push({ e, boxes: [v.sprite, ...v.extras].filter((spr) => spr.visible).map(box) });
+    }
+    return out;
   }
 
   // ---------------- helpers ----------------
@@ -1280,18 +1289,14 @@ export class CombatScene extends Phaser.Scene {
     const k = this.game.canvas.clientWidth / this.W || 1;
     const sp = { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY };
     const over = this.input2.pointer.inside && !s.usingPad;
-    // a held click keeps steering while the pointer crosses the HUD; the WASD scheme always aims at the pointer
-    const cursor = !s.usingPad && (over || s.primary || set.controlScheme === 'wasd') ? iso.toWorld(sp.x, sp.y) : null;
+    // a held click keeps steering while the pointer crosses the HUD; the WASD scheme always aims at the pointer. A
+    // pointer on a wall's face means the floor at the wall's foot, not the ground behind it (targeting.ts groundAt).
+    const cursor = !s.usingPad && (over || s.primary || set.controlScheme === 'wasd')
+      ? groundAt(this.net.map, sp.x, sp.y, (tx, ty) => this.dungeon.wallHeight(tx, ty), self) : null;
     const enemies = latest?.enemies ?? [];
-    const screenHit = (e: SnapEnemy): number | null => {
-      const v = this.actors.get(`e${e.i}:${e.g}`);
-      if (!v || v.dying || v.gibbed) return null;
-      const spr = v.sprite, w = spr.width * spr.scaleX * 0.42, h = spr.height * spr.scaleY * spr.originY * 0.9;
-      if (sp.x < spr.x - w || sp.x > spr.x + w || sp.y < spr.y - h || sp.y > spr.y + 6) return null;
-      return spr.depth;
-    };
     const combat = latest?.phase === 'COMBAT';
-    const hoverEnemy = over && combat ? pickEnemy(enemies, cursor, screenHit) : null;
+    // the foe whose sprite is under the pointer as drawn (the one the hover rim marks), never a nearby body
+    const hoverEnemy = over && combat && latest ? pickEnemy(this.foeSprites(latest), sp) : null;
     const doors = (latest as { doors?: { i?: number; x: number; y: number; nx?: number; ny?: number }[] } | null)?.doors ?? [];
     // the door renderer knows its art's exact bounds: trust its hover first
     const hd = this.doorHover !== null ? doors.find((d, n) => (d.i ?? n) === this.doorHover) : undefined;

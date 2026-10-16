@@ -100,6 +100,8 @@ export class DungeonRenderer {
   buildStats = { sprites: 0, stamps: 0, lights: 0, vignettes: 0, planMs: 0, floorFx: 0, cliffs: 0, normals: false };
   /** the dressing plan of the current map (read-only; tests and tools) */
   plan: DressingPlan | null = null;
+  /** px each wall tile is drawn tall above its floor diamond (tile index -> px), for click picking (wallHeight) */
+  private wallPx = new Map<number, number>();
   /** undoes scene-wide changes of a special floor (the training courtyard's camera background) */
   private undo: (() => void) | null = null;
 
@@ -109,6 +111,17 @@ export class DungeonRenderer {
       scene.lights.enable();
       scene.lights.setAmbientColor(opts.ambient ?? 0x3a3044);
     }
+  }
+
+  /**
+   * How tall the wall at tile (tx, ty) is drawn, in screen px above its floor diamond: full walls, cut-down stubs,
+   * pillars and furniture as placed. 0 for floor, chasms and rock nothing is drawn for. Clicks on a wall's face
+   * resolve to the floor at its foot from this (input/targeting.ts groundAt).
+   */
+  wallHeight(tx: number, ty: number): number {
+    const m = this.map;
+    if (!m || tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) return 0;
+    return this.wallPx.get(ty * m.w + tx) ?? 0;
   }
 
   private lit<T extends Phaser.GameObjects.GameObject & { setPipeline?: (p: string) => unknown }>(o: T): T {
@@ -305,6 +318,7 @@ export class DungeonRenderer {
         if (spr) {
           const main = spr[0]!;
           this.occluders.push({ objs: spr, depth, x0: c.x - main.displayWidth / 2, x1: c.x + main.displayWidth / 2, y0: c.y - main.displayHeight * bdef.originY, y1: c.y + HH, alpha: 1 });
+          this.wallPx.set(y * map.w + x, Math.max(0, main.displayHeight * bdef.originY - HH));
           continue;
         }
       }
@@ -316,6 +330,7 @@ export class DungeonRenderer {
           const img = s.add.image(c.x, c.y + HH * 0.5, p.key).setOrigin(p.originX, p.originY).setDepth(depth);
           this.objs.push(this.lit(img));
           this.occluders.push({ objs: [img], depth, x0: c.x - img.width / 2, x1: c.x + img.width / 2, y0: c.y - img.height, y1: c.y + HH, alpha: 1 });
+          this.wallPx.set(y * map.w + x, Math.max(0, img.height * p.originY - HH * 1.5));
           continue;
         }
       }
@@ -324,8 +339,10 @@ export class DungeonRenderer {
         const sf = stubFrames >= 4 ? pickIsoStub(x, y, seed) : Math.floor(hash(x, y, seed + 1) * stubFrames);
         const img = s.add.image(T.x - HW, T.y - STUB_H, stubKey, Math.min(stubFrames - 1, sf)).setOrigin(0, 0).setDepth(depth);
         this.objs.push(this.lit(img));
+        this.wallPx.set(y * map.w + x, STUB_H);
         continue;
       }
+      this.wallPx.set(y * map.w + x, WALL_H);
       const fN = !isWall(x, y - 1), fW = !isWall(x - 1, y), fNW = !isWall(x - 1, y - 1);
       const frame = Math.min(wallFrames - 1, pickIsoWall(themeId, isWall, x, y, seed, { L: !!w.L?.torch, R: !!w.R?.torch }));
       const img = s.add.image(T.x - HW, T.y - WALL_H, wallKey, frame).setOrigin(0, 0).setDepth(depth);
@@ -470,6 +487,7 @@ export class DungeonRenderer {
     const out = buildCourtyard(this.scene, map, { lighting: this.lighting, lit: (o) => this.lit(o as typeof o & { setPipeline?: (p: string) => unknown }) });
     this.objs.push(...out.objs);
     this.occluders.push(...out.occluders);
+    this.wallPx = out.wallPx;
     this.decalRT = out.decalRT;
     this.theme = out.theme;
     this.bounds = out.bounds;
@@ -624,6 +642,7 @@ export class DungeonRenderer {
     if (this.floorRT) (this.floorRT.texture as unknown as { dataSource: unknown[] }).dataSource.length = 0;
     for (const o of this.objs) { this.scene.tweens?.killTweensOf(o); o.destroy(); }
     this.objs = [];
+    this.wallPx.clear();
     this.normalRT?.destroy(); this.normalRT = null; this.floorRT = null;
     this.stamp?.destroy(); this.stamp = null;
     for (const t of this.torches) { this.scene.lights?.removeLight(t.light); if (t.core) this.scene.lights?.removeLight(t.core); }
