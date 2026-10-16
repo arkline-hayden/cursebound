@@ -93,6 +93,56 @@ export const MECHANICS: MechanicDef[] = [
     applicability: 'Each hero', requires: 'any', color: '#7fe8ff',
     params: { everySec: 6 },
   }),
+  // rule-changers (the second wave): companions, thresholds, movement and chaos
+  m({
+    id: 'shadow_twin', name: 'Shadow Twin', kind: 'boon', stacking: 'compound', unit: 'percent',
+    short: 'A shadow repeats your hits for {v} damage',
+    description: 'A shadow of you walks at your back. Every {strikeSec} s it strikes the foe you last hit for {v} of the direct damage you dealt since its last strike.',
+    applicability: 'Your direct hits', requires: 'any', color: '#a59bd6',
+    params: { strikeSec: 0.4, range: 6 },
+  }),
+  m({
+    id: 'grave_thralls', name: 'Grave Thralls', kind: 'boon', stacking: 'compound', unit: 'percent',
+    short: 'Every {everyKills}th kill raises a thrall: {v} dmg',
+    description: 'Every {everyKills}th kill (and every elite kill) raises a spectral thrall for {lifeSec} s that hunts the nearest foe, striking for {v} of your damage every {strikeSec} s. At most {max} per hero.',
+    applicability: 'Your kills', requires: 'any', color: '#9fe0a8',
+    params: { everyKills: 6, lifeSec: 6, strikeSec: 0.6, speed: 2.8, reach: 0.9, max: 3, riseSec: 0.5 },
+  }),
+  m({
+    id: 'last_stand', name: 'Last Stand', kind: 'boon', stacking: 'compound', unit: 'percent',
+    short: 'Below {threshold%} HP: +{v} dmg, half damage taken',
+    description: 'While below {threshold%} of your maximum health you deal {v} more damage and take {reduce%} less.',
+    applicability: 'Each hero, while wounded', requires: 'any', color: '#ff4a3a',
+    params: { threshold: 0.35, reduce: 0.5 },
+  }),
+  m({
+    id: 'gravity_well', name: 'Gravity Well', kind: 'boon', stacking: 'factor', unit: 'multiplier',
+    short: 'Crits implode: foes pulled in, {v} dmg',
+    description: 'A critical hit tears open a gravity well (once per {cooldownSec} s): foes within {radius} units are dragged toward it and take {v} your damage as astral damage. Bosses hold their ground.',
+    applicability: 'Your critical hits', requires: 'any', color: '#7a6bff',
+    params: { radius: 3, pull: 1.6, cooldownSec: 1.5 },
+  }),
+  m({
+    id: 'momentum', name: 'Momentum', kind: 'boon', stacking: 'compound', unit: 'percent',
+    short: 'Run {chargeDist} units: your next hit deals +{v}',
+    description: 'Moving (dodges included) builds charge. After {chargeDist} units your next hit, and every hit landing that same moment, deals {v} more damage; then the charge resets.',
+    applicability: 'Your movement and hits', requires: 'any', color: '#3fe0a0',
+    params: { chargeDist: 6, stepCap: 0.6 },
+  }),
+  m({
+    id: 'mirror_ward', name: 'Mirror Ward', kind: 'boon', stacking: 'factor', unit: 'multiplier',
+    short: 'Dodges reflect shots back at {v} your dmg',
+    description: 'For {windowSec} s after you dodge, enemy projectiles within {radius} units turn back on their sender, dealing {v} your damage to the first foe they hit.',
+    applicability: 'Enemy projectiles near your dodges', requires: 'any', color: '#e8d4ff',
+    params: { radius: 1.6, windowSec: 0.45, range: 9 },
+  }),
+  m({
+    id: 'pandora', name: "Pandora's Gift", kind: 'boon', stacking: 'factor', unit: 'multiplier',
+    short: 'Each round: a random boon at {v} strength',
+    description: 'At the start of every round a random boon from the Fate deck binds for that round only, at {v} the strength of its weakest card.',
+    applicability: 'Every combat round', requires: 'any', color: '#ff5ce1',
+    params: { chanceCap: 0.9 },
+  }),
 
   // ---------------- Banes ----------------
   m({
@@ -136,6 +186,41 @@ export const MECHANICS: MechanicDef[] = [
     description: 'For {windowSec} s after you dodge, the next hit you take deals {v} extra damage, bypassing shields.',
     applicability: 'Each hero\'s dodges', requires: 'any', color: '#c6e6ff',
     params: { windowSec: 3 },
+  }),
+  m({
+    id: 'blood_price', name: 'Blood Price', kind: 'bane', stacking: 'compound', unit: 'percent',
+    short: 'Skills cost {v} of max HP (never lethal)',
+    description: 'Every active or signature skill you cast costs {v} of your maximum health. It never takes you below {floor%} health.',
+    applicability: 'Each hero\'s skill casts', requires: 'any', color: '#c8102e',
+    params: { floor: 0.01 },
+  }),
+  m({
+    id: 'restless_dead', name: 'Restless Dead', kind: 'bane', stacking: 'chance', unit: 'percent',
+    short: '{v} of the slain rise as hunting wisps',
+    description: 'Each death has a {v} chance to raise a wisp that hunts the nearest hero for {lifeSec} s and bursts on contact for {damage%} of maximum health (ignores armor; a dodge slips through).',
+    applicability: 'Every enemy death', requires: 'any', color: '#8ff0e0',
+    params: { damage: 0.08, riseSec: 0.6, lifeSec: 4.5, speed: 2.4, radius: 0.45, max: 10 },
+  }),
+  m({
+    id: 'grave_hands', name: 'Grave Hands', kind: 'bane', stacking: 'compound', unit: 'percent',
+    short: 'Stand still {graceSec}s: hands claw {v} max HP',
+    description: 'Stay within {leash} units of one spot for {graceSec} s and grave hands rise, clawing {v} of your maximum health every {clawSec} s (ignores armor) until you move.',
+    applicability: 'Each hero in combat', requires: 'any', color: '#7d9a5a',
+    params: { graceSec: 1.5, clawSec: 0.5, leash: 0.6 },
+  }),
+  m({
+    id: 'shadow_pact', name: 'Shadow Pact', kind: 'bane', stacking: 'chance', unit: 'percent',
+    short: '{v} of elites bring a shadow twin',
+    description: 'Each champion or rare has a {v} chance to arrive with a shadow twin: {health%} of its health, {damage%} of its damage. The twin fades when its elite dies.',
+    applicability: 'Champions and rares', requires: 'any', color: '#6c5a9c',
+    params: { health: 0.6, damage: 0.8 },
+  }),
+  m({
+    id: 'pandora_curse', name: "Pandora's Curse", kind: 'bane', stacking: 'factor', unit: 'multiplier',
+    short: 'Each round: a random bane at {v} strength',
+    description: 'At the start of every round a random bane from the Fate deck binds for that round only, at {v} the strength of its weakest card.',
+    applicability: 'Every combat round', requires: 'any', color: '#b03aff',
+    params: { chanceCap: 0.9 },
   }),
 ];
 

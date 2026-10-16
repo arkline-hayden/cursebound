@@ -1,7 +1,7 @@
 import type { CardDef, CardEffect, CardRarity, MechanicEffect } from './types';
 
 // The Fate deck (PRD §9.1, Appendix D3). Every card is a gift plus a price; effects multiply forever.
-// - 24 commons: the original stat-for-stat bargains.
+// - 24 commons: the original stat-for-stat bargains, plus a few twisted commons (a small rule on one side).
 // - Rares: one new rule (a boon or a bane from mechanics.ts) traded against a stat, or rule for rule.
 // - Mythics: build-defining boon + stat gift, paid for with a bane + a harsh stat.
 // There are NO runtime eligibility rules: every card in the deck can always be offered (F08/F09, REQ FATE01).
@@ -62,6 +62,14 @@ export const CARDS: CardDef[] = [
   c('comet_walk', 'Comet Walk', 'transit', ['player.movementSpeed', '75'], ['enemy.projectileSpeed', '100'], 'Streak like a comet. Dodge like one too.'),
   c('iron_orchard', 'Iron Orchard', 'thorn', ['player.armor', '100'], ['enemy.armor', '150'], 'Bark becomes iron on every trunk.'),
 
+  // ---------------- Commons with a twist: a small rule on one side of the bargain ----------------
+  x('quickblood', 'Quickblood', 'blood', 'common', { gift: ['player.recoveryRate', '60'], bane: ['blood_price', '0.03'] }, 'Faster spells, thinner veins.'),
+  x('restless_feet', 'Restless Feet', 'transit', 'common', { boon: ['momentum', '0.5'], price: ['enemy.movementSpeed', '40'] }, 'Strike where the road ends.'),
+  x('haunted_spoils', 'Haunted Spoils', 'gold', 'common', { gift: ['score.pressure', '80'], bane: ['restless_dead', '0.12'] }, 'The dead want it back.'),
+  x('lone_shade', 'Lone Shade', 'shadow', 'common', { boon: ['shadow_twin', '0.15'], price: ['player.maxHealth', '-20'] }, 'Half of you walks apart.'),
+  x('desperation', 'Desperation', 'blood', 'common', { boon: ['last_stand', '0.4'], price: ['player.healing', '-40'] }, 'Pain is a whetstone.'),
+  x('cracked_mirror', 'Cracked Mirror', 'mirror', 'common', { boon: ['mirror_ward', '1.5'], price: ['enemy.projectileSpeed', '50'] }, 'Send it back.'),
+
   // ---------------- Rares: a new rule ----------------
   x('chain_reaction', 'Chain Reaction', 'cataclysm', 'rare', { boon: ['chain_reaction', '0.25'], price: ['enemy.maxHealth', '80'] }, 'Every death is a fuse.'),
   x('vampiric_rite', 'Vampiric Rite', 'blood', 'rare', { boon: ['vampiric_rite', '0.08'], price: ['player.armor', '-40'] }, 'Drink deep. Bleed easy.'),
@@ -80,6 +88,13 @@ export const CARDS: CardDef[] = [
   x('champion_tide', 'Champion Tide', 'gold', 'rare', { gift: ['score.pressure', '120'], price: ['encounter.eliteChance', '200'] }, 'Glory walks with giants.'),
   x('wrath_unbound', 'Wrath Unbound', 'tempo', 'rare', { gift: ['player.attackFrequency', '100'], bane: ['relentless', '0.5'] }, 'Wounded beasts bite hardest.'),
   x('reapers_wager', "Reaper's Wager", 'doom', 'rare', { gift: ['player.damage', '200'], bane: ['the_hunt', '0.3'] }, 'Something follows the brave.'),
+  x('shadow_twin', 'Shadow Twin', 'shadow', 'rare', { boon: ['shadow_twin', '0.35'], bane: ['shadow_pact', '0.6'] }, 'Two shadows. Theirs too.'),
+  x('necromancers_due', "Necromancer's Due", 'soul', 'rare', { boon: ['grave_thralls', '0.5'], bane: ['restless_dead', '0.2'] }, 'The dead serve. Some refuse.'),
+  x('last_stand', 'Last Stand', 'blood', 'rare', { boon: ['last_stand', '0.75'], price: ['player.maxHealth', '-25'] }, 'Bleed. Then win.'),
+  x('gravity_well', 'Gravity Well', 'void', 'rare', { boon: ['gravity_well', '2'], price: ['enemy.maxHealth', '60'], applicability: ['crit'] }, 'All things fall inward.'),
+  x('momentum', 'Momentum', 'transit', 'rare', { boon: ['momentum', '1'], bane: ['grave_hands', '0.04'] }, 'Stop and they take you.'),
+  x('mirror_ward', 'Mirror Ward', 'mirror', 'rare', { boon: ['mirror_ward', '4'], price: ['enemy.projectileCount', '100'] }, 'Return to sender.'),
+  x('blood_magic', 'Blood Magic', 'blood', 'rare', { gift: ['player.recoveryRate', '120'], bane: ['blood_price', '0.05'] }, 'Spells paid in blood.'),
 
   // ---------------- Mythics: build-defining, dramatic prices ----------------
   x('cataclysm', 'Cataclysm', 'cataclysm', 'mythic',
@@ -104,9 +119,30 @@ export const CARDS: CardDef[] = [
     { boon: ['warding_rune', '0.5'], gift: ['player.shieldCapacity', '200'], bane: ['hexed_ground', '0.5'], price: ['player.movementSpeed', '-30'], applicability: ['shield'] }, 'An unbreakable shell on breaking ground.'),
   x('thornlord', 'Thornlord', 'thorn', 'mythic',
     { boon: ['retribution', '10'], gift: ['player.armor', '200'], bane: ['the_hunt', '0.4'], price: ['enemy.attackDamage', '150'] }, 'Every wound a weapon.'),
+  x('pandoras_box', "Pandora's Box", 'chaos', 'mythic',
+    { boon: ['pandora', '1.5'], gift: ['player.damage', '50'], bane: ['pandora_curse', '1.25'] }, 'Hope was the last curse.'),
+  x('lord_of_graves', 'Lord of Graves', 'soul', 'mythic',
+    { boon: ['grave_thralls', '1'], gift: ['player.maxHealth', '100'], bane: ['restless_dead', '0.35'], price: ['encounter.spawnQuantity', '100'] }, 'Rule the dead. Feed them.'),
+  x('collapsing_star', 'Collapsing Star', 'void', 'mythic',
+    { boon: ['gravity_well', '5'], gift: ['player.critTendency', '100'], bane: ['grave_hands', '0.06'], price: ['player.movementSpeed', '-20'], applicability: ['crit'] }, 'Heavy as a dying sun.'),
+  x('doppelganger', 'Doppelganger', 'shadow', 'mythic',
+    { boon: ['shadow_twin', '0.8'], gift: ['player.attackFrequency', '50'], bane: ['shadow_pact', '0.85'], price: ['enemy.damage', '60'] }, 'Which one is you?'),
+  x('deathwish', 'Deathwish', 'doom', 'mythic',
+    { boon: ['last_stand', '1.5'], gift: ['player.damage', '75'], bane: ['blood_price', '0.08'], price: ['player.healing', '-50'] }, "Live on the knife's edge."),
 ];
 
 export const CARD_BY_ID: Record<string, CardDef> = Object.fromEntries(CARDS.map((x) => [x.id, x]));
+
+/** Weakest magnitude any deck card binds, per mechanic id: the base strength Pandora's rolls scale (simulation boons.ts). */
+export const MECHANIC_BASE_MAGNITUDE: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const card of CARDS) {
+    for (const m of [card.boon, card.bane]) {
+      if (m && (out[m.id] === undefined || Number(m.magnitude) < Number(out[m.id]))) out[m.id] = m.magnitude;
+    }
+  }
+  return out;
+})();
 
 /** Tutorial-only sample card (PRD §16.3) — never part of a ranked/random deck. */
 export const TUTORIAL_CARD: CardDef = c('tutorial_twin_blades', 'Twin Blades (tutorial)', 'blood', ['player.damage', '100'], ['enemy.maxHealth', '20'],
@@ -165,4 +201,8 @@ export const FAMILIES: Record<string, { name: string; color: string }> = {
   moon: { name: 'Moon', color: '#ff2a55' },
   hex: { name: 'Hex', color: '#9b5cff' },
   phoenix: { name: 'Phoenix', color: '#ffa53a' },
+  // families introduced with the rule-changer wave
+  shadow: { name: 'Shadow', color: '#a59bd6' },
+  void: { name: 'Void', color: '#7a6bff' },
+  chaos: { name: 'Chaos', color: '#ff5ce1' },
 };

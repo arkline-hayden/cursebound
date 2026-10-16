@@ -8,10 +8,17 @@ describe('content', () => {
   it('keeps the 24 stat-for-stat commons and adds rare/mythic mechanic cards with canonical names', () => {
     expect(new Set(CARDS.map((c) => c.id)).size).toBe(CARDS.length);
     const commons = CARDS.filter((c) => cardRarity(c) === 'common');
-    expect(commons).toHaveLength(24);
-    for (const c of commons) {
+    const plain = commons.filter((c) => !c.boon && !c.bane);
+    expect(plain).toHaveLength(24);
+    for (const c of plain) {
       expect(STAT_BY_ID[c.positive!.stat]).toBeTruthy();
       expect(STAT_BY_ID[c.negative!.stat]).toBeTruthy();
+    }
+    // twisted commons: one small rule on one side of the bargain, a stat on the other
+    for (const c of commons.filter((x) => x.boon || x.bane)) {
+      expect(!!c.boon !== !!c.bane, c.id).toBe(true);
+      expect(c.boon ? c.negative : c.positive, c.id).toBeTruthy();
+      for (const m of [c.boon, c.bane]) if (m) expect(MECHANIC_BY_ID[m.id]).toBeTruthy();
     }
     const rares = CARDS.filter((c) => cardRarity(c) === 'rare');
     const mythics = CARDS.filter((c) => cardRarity(c) === 'mythic');
@@ -35,6 +42,22 @@ describe('content', () => {
     }
     expect(MECHANICS.filter((m) => m.kind === 'boon').length).toBeGreaterThanOrEqual(10);
     expect(MECHANICS.filter((m) => m.kind === 'bane').length).toBeGreaterThanOrEqual(6);
+  });
+  it('the rule-changer wave keeps card faces terse', () => {
+    const wave = ['quickblood', 'restless_feet', 'haunted_spoils', 'lone_shade', 'desperation', 'cracked_mirror', 'shadow_twin', 'necromancers_due', 'last_stand',
+      'gravity_well', 'momentum', 'mirror_ward', 'blood_magic', 'pandoras_box', 'lord_of_graves', 'collapsing_star', 'doppelganger', 'deathwish'];
+    for (const id of wave) {
+      const c = CARDS.find((x) => x.id === id)!;
+      expect(c, id).toBeTruthy();
+      expect(c.name.length, id).toBeLessThanOrEqual(18);
+      expect(c.flavor.length, id).toBeLessThanOrEqual(32);
+    }
+    for (const id of ['shadow_twin', 'grave_thralls', 'last_stand', 'gravity_well', 'momentum', 'mirror_ward', 'pandora', 'blood_price', 'restless_dead', 'grave_hands', 'shadow_pact', 'pandora_curse']) {
+      const m = MECHANIC_BY_ID[id];
+      expect(m, id).toBeTruthy();
+      expect(m.name.length, id).toBeLessThanOrEqual(18);
+      expect(mechanicText(m, m.short, m.unit === 'percent' ? '99.9%' : '×999').length, id).toBeLessThanOrEqual(48);
+    }
   });
   it('the validator rejects malformed fate cards', () => {
     const base = { id: 'bad', version: 1, name: 'Bad', family: 'blood', applicability: [], icon: '', flavor: '' };

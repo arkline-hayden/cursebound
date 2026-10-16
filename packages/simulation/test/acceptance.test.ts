@@ -164,7 +164,10 @@ describe('A06/A07 voting', () => {
     step(s, [], [{ type: 'DURABLE', what: 'commit' }]);
     step(s, [], [{ type: 'DURABLE', what: 'commit' }]);   // repeated durable message is rejected, no reapply
     expect(s.commits.length).toBe(before + 1);
-    expect(s.fate.entries.length).toBe(2);
+    // applied exactly once: one Ledger entry per effect of the committed card (stats and mechanics alike)
+    const committed = CARD_BY_ID[s.commits[s.commits.length - 1].cardId];
+    const effects = [committed.positive, committed.negative, committed.boon, committed.bane].filter(Boolean).length;
+    expect(s.fate.entries.length + (s.fate.mechanicEntries?.length ?? 0)).toBe(effects);
   });
   it('zero votes chooses uniformly via the vote stream', () => {
     const s = toVoting(['vanguard', 'arcanist']);

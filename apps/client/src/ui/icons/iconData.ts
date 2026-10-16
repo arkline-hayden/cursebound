@@ -659,6 +659,9 @@ const FAMILY_MOTIF: Record<string, [string, Ramp]> = {
   moon: ['moon', M.silver],
   hex: ['eye', M.violet],
   phoenix: ['phoenix', M.gold],
+  shadow: ['shadow', M.violet],
+  void: ['rift', M.violet],
+  chaos: ['star', M.magenta],
 };
 
 const cardFamilyOf = new Map<string, [CardFamily, number]>();
@@ -1029,6 +1032,18 @@ const MECH_STYLE: Record<string, [string, Ramp, number, 'boon' | 'bane']> = {
   the_hunt: ['scythe', M.bone, 0xb8b0c8, 'bane'],
   blood_moon: ['moon', M.crimson, 0xff2a55, 'bane'],
   brittle: ['shards', M.white, 0xc6e6ff, 'bane'],
+  shadow_twin: ['shadow', M.violet, 0xa59bd6, 'boon'],
+  grave_thralls: ['skull', M.bone, 0x9fe0a8, 'boon'],
+  last_stand: ['banner', M.crimson, 0xff4a3a, 'boon'],
+  gravity_well: ['rift', M.violet, 0x7a6bff, 'boon'],
+  momentum: ['boot', M.cyan, 0x3fe0a0, 'boon'],
+  mirror_ward: ['mirror', M.silver, 0xe8d4ff, 'boon'],
+  pandora: ['star', M.gold, 0xff5ce1, 'boon'],
+  blood_price: ['drop', M.crimson, 0xc8102e, 'bane'],
+  restless_dead: ['wisp', M.white, 0x8ff0e0, 'bane'],
+  grave_hands: ['paw', M.bone, 0x7d9a5a, 'bane'],
+  shadow_pact: ['shadow', M.bone, 0x6c5a9c, 'bane'],
+  pandora_curse: ['eye', M.crimson, 0xb03aff, 'bane'],
 };
 
 export const MECH_IDS: readonly string[] = Object.keys(MECH_STYLE);
