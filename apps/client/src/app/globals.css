@@ -924,7 +924,7 @@ details[open] > summary::before { content: '\25BE'; }
 .lobby-body { display: flex; flex-direction: column; gap: var(--sp-2); }
 .lobby-body > .engraved, .lobby-vessels .engraved { margin: 0; }
 .lobby-vessels { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
-.lobby-stage.vstage { position: relative; inset: auto; flex: none; height: clamp(220px, 38vh, 420px); border-style: solid; border-width: 8px; border-image: var(--px-frame-inset) 4 / 8px stretch; background-clip: padding-box; image-rendering: pixelated; }
+.lobby-stage.vstage { position: relative; inset: auto; flex: none; height: clamp(300px, 48vh, 460px);   /* tall enough for a 2x stage under the 0.75 UI zoom at 720p (1x left heroes tiny and names clipped) */ border-style: solid; border-width: 8px; border-image: var(--px-frame-inset) 4 / 8px stretch; background-clip: padding-box; image-rendering: pixelated; }
 .lobby-pick { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--sp-3); align-items: stretch; }
 .vstrip { display: grid; grid-template-columns: repeat(5, 64px); gap: var(--sp-1); }
 .lobby-note { margin: 0; font-size: var(--fs-body); }
