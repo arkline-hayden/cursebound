@@ -21,6 +21,11 @@ export interface FxCtx {
   ry(r: number): number;
   /** play a sound panned at a world position */
   sfx(id: SfxId, x?: number, y?: number, priority?: number): void;
+  /** play a recorded file (tools/audio sound list name) panned at a world position when it exists, else the shared
+   *  `fallback` cue (or nothing); see audio.playFile */
+  sfxFile(key: string, fallback: SfxId | null, x?: number, y?: number, priority?: number, volume?: number): void;
+  /** a recorded file exists for this key */
+  hasFile(key: string): boolean;
   /** jagged lightning between two world points */
   bolt(x0: number, y0: number, x1: number, y1: number, color: number): void;
   /** is this event from the local player? */
@@ -59,6 +64,9 @@ export interface ProjectileLook {
   key: string; color: number; scale?: number; additive?: boolean; tint?: number;
   trail?: BitKind | 'ember' | 'none'; trailMs?: number; spin?: number;
   end?: (ctx: FxCtx, sx: number, sy: number) => void;
+  /** recorded file (audio/fileCues) played where a projectile of this kind first appears, when the file exists; at most
+   *  once per `spawnGapMs` (default 90) so a volley is one sound. For projectiles no cast event announces. */
+  spawnFile?: string; spawnGapMs?: number;
 }
 
 /** What CombatScene knows about a kill when it hands it to the killer's class flourish (world coordinates). */

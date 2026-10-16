@@ -23,6 +23,7 @@ import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
 import { impactSfx, killSfx, type StingerKind } from '../audio/sfx';
+import { CueGate, SKILL_FILE } from '../audio/fileCues';
 import { DamageNumbers, NUMBER_COLOR } from '../render/DamageNumbers';
 import { DeathFx, deathStyle } from '../render/DeathFx';
 import { InputController, type Sample } from '@/lib/input';
@@ -126,6 +127,8 @@ export class CombatScene extends Phaser.Scene {
   /** room events: shrines, cursed altar, merchant, treasure imp, cursed coins (render/RoomEvents.ts) */
   roomFx: RoomEventRenderer | null = null;
   private actors = new Map<string, ActorView>();
+  /** time gates for recorded files that fire from many sources at once (foe voices, volley launches) */
+  private cueGate = new CueGate();
   private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number; color: number; look?: ProjectileLook; born: number }>();
   private hazardG!: Phaser.GameObjects.Graphics;
   private teleG!: Phaser.GameObjects.Graphics;
@@ -346,6 +349,8 @@ export class CombatScene extends Phaser.Scene {
       scene: this, juice: this.juice, dungeon: this.dungeon,
       P: (x, y) => iso.p(x, y), U: (dx, dy) => iso.unit(dx, dy), rx: iso.rx, ry: iso.ry,
       sfx: (id, x, y, priority = 1) => this.sfx(id, x, priority, y),
+      sfxFile: (key, fallback, x, y, priority = 1, volume) => this.sfxFile(key, fallback, x, priority, y, volume),
+      hasFile: (key) => !!this.audio?.hasFile(key),
       bolt: (x0, y0, x1, y1, color) => this.bolt(x0, y0, x1, y1, color),
       mine, reduced: this.settings().reducedEffects, particles: particleBudget(), now: this.time.now,
       actorSprite: (slot) => this.actors.get(`p${slot}`)?.sprite,
@@ -416,15 +421,22 @@ export class CombatScene extends Phaser.Scene {
 
   private sfx(id: SfxId, x?: number, priority = 1, y = x) {
     if (!this.audio) return;
-    let pan = 0, dist = 0;
-    if (x !== undefined) {
-      // pan by screen x, attenuate by distance from the camera centre (in 480x270 half-views, independent of zoom)
-      const cam = this.cameras.main, wy = y ?? x;
-      const dx = (this.sxw(x, wy) - cam.midPoint.x) / 480, dy = (iso.y(x, wy) - cam.midPoint.y) / 270;
-      pan = Math.max(-1, Math.min(1, dx));
-      dist = Math.hypot(dx, dy);
-    }
-    this.audio.play(id, { pan, priority, dist });
+    this.audio.play(id, { ...this.place(x, y), priority });
+  }
+
+  /** A recorded file (tools/audio sound list name, audio/fileCues.ts) when it exists, else `fallback` or nothing. */
+  private sfxFile(key: string | undefined, fallback: SfxId | null, x?: number, priority = 1, y = x, volume?: number) {
+    if (!this.audio) return;
+    if (!key) { if (fallback) this.sfx(fallback, x, priority, y); return; }
+    this.audio.playFile(key, fallback, { ...this.place(x, y), priority, volume });
+  }
+
+  /** pan by screen x, attenuate by distance from the camera centre (in 480x270 half-views, independent of zoom) */
+  private place(x?: number, y = x): { pan: number; dist: number } {
+    if (x === undefined) return { pan: 0, dist: 0 };
+    const cam = this.cameras.main, wy = y ?? x;
+    const dx = (this.sxw(x, wy) - cam.midPoint.x) / 480, dy = (iso.y(x, wy) - cam.midPoint.y) / 270;
+    return { pan: Math.max(-1, Math.min(1, dx)), dist: Math.hypot(dx, dy) };
   }
 
   /** Live elemental hit tint for an enemy id (0 when none or expired; expired entries are dropped). */
@@ -596,8 +608,8 @@ export class CombatScene extends Phaser.Scene {
       case 'cast': {
         const kit = SKILL_FX[e.skill];
         if (kit) { kit(this.fxCtx(e.slot === me), e); break; }
-        const sfx = SFX_FOR_SKILL[e.skill];
-        if (sfx) this.sfx(sfx, e.x, e.slot === me ? 2 : 1, e.y);
+        // no kit: the skill's own recorded cast when it has one, else the shared cue
+        this.sfxFile(SKILL_FILE[e.skill], SFX_FOR_SKILL[e.skill] ?? null, e.x, e.slot === me ? 2 : 1, e.y);
         const u = iso.unit(e.dx, e.dy);
         const ang = Math.atan2(u.y, u.x);
         const base = this.P(e.x, e.y);
@@ -1448,6 +1460,8 @@ export class CombatScene extends Phaser.Scene {
         const glow = gfx().softGlow && this.textures.exists('light:soft') ? this.add.image(0, 0, 'light:soft').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setAlpha(0.35).setScale(p.o === 0 ? 0.18 : 0.14).setDepth(4590) : undefined;
         entry = { s: spr, glow, last: 0, color, look, born: now };
         this.projectiles.set(p.i, entry);
+        // a projectile with its own recorded launch (no cast event of its own, e.g. the Sundering Wave), once per volley
+        if (look?.spawnFile && this.cueGate.ok(look.spawnFile, now, look.spawnGapMs ?? 90)) this.sfxFile(look.spawnFile, null, p.x, 1, p.y);
       }
       let x = p.x + p.vx * Math.min(age, 0.1), y = p.y + p.vy * Math.min(age, 0.1);
       let lift = 0;
