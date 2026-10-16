@@ -1,22 +1,25 @@
-/* In-world door vote (DoorPanel.tsx). Chrome comes from the pixel skin in globals.css (.frame, .btn, .chip, .kbd,
-   .fv-section); this module only lays the pieces out. Fonts and sizes use the type tokens only. */
+/* The door view of the Fate vote (DoorPanel.tsx): a title strip and a slim strip of themed mini cards while the hero
+   walks the floor. The card spread itself is FateCards.module.css. Chrome comes from the pixel skin (globals.css:
+   .btn, .chip, .kbd) and the Fate card art (ui/fateArt.ts: the theme's frame, panel texture and sigil). */
 
 /* drawn at the in-game panel scale (globals.css: zoom 0.75, text one size up); viewport units divide by the zoom */
-.layer {
+.layer, .drawerLayer {
   position: fixed; inset: 0; pointer-events: none; z-index: var(--z-overlay); zoom: var(--ui-zoom, 1);
   --fs-small: 24px; --lh-small: 26px; --fs-label: 24px; --fs-label-lg: 28px; --lh-label: 28px;
   --fs-body: 28px; --fs-body-lg: 32px; --lh-body: 32px; --lh-body-lg: 36px;
 }
+.drawerLayer { z-index: var(--z-modal); }
 :global(:root[data-text-size="1"]) .layer, :global(:root[data-text-size="2"]) .layer { --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px; --fs-body: 32px; --fs-body-lg: 40px; --lh-body: 36px; --lh-body-lg: 44px; }
 @media (min-width: 2540px) and (min-height: 1400px) { .layer { --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px; --fs-body: 32px; --fs-body-lg: 40px; --lh-body: 36px; --lh-body-lg: 44px; } }
-.layer > * { pointer-events: auto; }
+.layer > *, .drawerLayer > * { pointer-events: auto; }
 
 .hint {
   position: absolute; top: var(--sp-3); left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); text-align: center;
-  pointer-events: none;
+  pointer-events: none; animation: doorHintIn 0.24s steps(4) both;
 }
 .hint > * { pointer-events: auto; }
+@keyframes doorHintIn { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .title {
   margin: 0; font-family: var(--font-display); font-size: var(--fs-disp); line-height: 1; color: var(--gold);
   text-shadow: 4px 4px 0 var(--black, #000), 8px 8px 0 #3a1a04;
@@ -26,64 +29,43 @@
   font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase;
   color: var(--bone-2); text-shadow: var(--shadow-hard);
 }
+.note { font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--warn); text-shadow: var(--shadow-hard); }
 
-.panel {
-  position: absolute; right: var(--sp-4); top: 50%; transform: translateY(-50%);
-  width: min(440px, calc(92vw / var(--ui-zoom, 1))); max-height: calc(100vh / var(--ui-zoom, 1) - 220px); overflow: auto;
-  display: flex; flex-direction: column; gap: var(--sp-2);
-  font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body);
-  animation: doorPanelIn 0.16s steps(4) both;
-}
-@keyframes doorPanelIn { from { transform: translate(24px, -50%); opacity: 0; } to { transform: translate(0, -50%); opacity: 1; } }
-
-.head { display: flex; align-items: flex-start; gap: var(--sp-2); }
-.numeral {
-  flex: none; min-width: 40px; text-align: center; font-family: var(--font-gothic); font-size: var(--fs-goth); line-height: 1;
-  color: var(--door, var(--gold)); text-shadow: var(--shadow-hard);
-}
-.names { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.dungeon {
-  font-family: var(--font-gothic); font-size: var(--fs-goth-lg); line-height: 1; color: var(--door, var(--gold));
-  text-shadow: 3px 3px 0 #000;
-}
-.desc { color: var(--bone-3); text-shadow: var(--shadow-hard); }
-.lair {
-  align-self: flex-start; font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase;
-  color: var(--blood-hi); text-shadow: var(--shadow-hard); padding: 0 var(--sp-1); box-shadow: inset 0 0 0 2px var(--blood);
-}
-.card { display: flex; align-items: center; gap: var(--sp-2); }
-.cardName { font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; color: var(--gold-hi); text-shadow: var(--shadow-hard); }
-.rarity { font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; text-shadow: var(--shadow-hard); }
-
-.who { display: flex; flex-wrap: wrap; gap: var(--sp-1); align-items: center; color: var(--bone-2); text-shadow: var(--shadow-hard); }
-.hold { height: 8px; background: #000; box-shadow: inset 0 0 0 2px #2a2020; }
-.hold > i { display: block; height: 100%; background: var(--door, var(--gold)); }
-.warn { color: var(--warn); text-shadow: var(--shadow-hard); }
-.note { color: var(--bone-3); text-shadow: var(--shadow-hard); }
-.actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
-.actions > :last-child { flex: 1; }
-
+/* the mini cards: the destination's frame (2x), panel texture and sigil */
 .strip {
   position: absolute; left: 50%; bottom: var(--sp-3); transform: translateX(-50%);
-  display: flex; gap: var(--sp-2); width: min(1180px, calc(100vw / var(--ui-zoom, 1) - 32px));
+  display: flex; gap: var(--sp-3); align-items: flex-end; width: min(1240px, calc(100vw / var(--ui-zoom, 1) - 32px));
 }
-.entry {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
-  cursor: pointer; color: var(--bone); font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body);
+.mini {
+  all: unset; box-sizing: border-box; position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+  cursor: pointer; color: var(--bone); font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body); text-align: left;
+  padding: 4px 8px 6px; image-rendering: pixelated;
+  border-style: solid; border-width: 24px; border-image: var(--fa-frame) 12 / 24px round;
+  background: var(--fa-panel) 0 0 / 64px 64px repeat; background-color: var(--fa-panel-hex); background-clip: padding-box;
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.55);
+  transition: transform 0.18s cubic-bezier(0.3, 1.5, 0.5, 1);
+  animation: miniIn 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
 }
-.entry[aria-current='true'] { filter: drop-shadow(0 -4px 0 var(--door, var(--gold))) drop-shadow(4px 4px 0 rgba(0, 0, 0, 0.6)); }
+.mini:nth-child(2) { animation-delay: 0.05s; }
+.mini:nth-child(3) { animation-delay: 0.1s; }
+@keyframes miniIn { from { opacity: 0; transform: translateY(120px) scale(0.8); } to { opacity: 1; transform: none; } }
+.mini:hover, .mini:focus-visible { transform: translateY(-6px); outline: none; }
+.mini[aria-current='true'] { transform: translateY(-12px); box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--door, var(--gold)), 6px 10px 0 rgba(0, 0, 0, 0.55); }
 .entryHead { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
+.sigil { flex: none; width: 30px; height: 30px; background: var(--fa-sigil) 0 0 / 100% 100% no-repeat; filter: drop-shadow(2px 2px 0 #000); }
 .entryName {
-  font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase;
-  color: var(--door, var(--gold)); text-shadow: var(--shadow-hard); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+  font-family: var(--font-gothic); font-size: var(--fs-goth-sm); line-height: 1; color: var(--door, var(--gold));
+  text-shadow: var(--shadow-hard); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
 }
+.cardName { font-family: var(--font-label); font-size: var(--fs-label); line-height: var(--lh-label); text-transform: uppercase; color: var(--gold-hi); text-shadow: var(--shadow-hard); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .line { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: var(--shadow-hard); }
 .gift { color: var(--good); }
 .price { color: var(--bad); }
 .pips { display: flex; gap: 4px; }
 .pip { width: 10px; height: 10px; transform: rotate(45deg); box-shadow: 0 0 0 2px #000; }
+.hold { height: 8px; margin-top: 2px; background: #000; box-shadow: inset 0 0 0 2px #2a2020; }
+.hold > i { display: block; height: 100%; background: var(--door, var(--gold)); }
 
 @media (max-width: 900px) {
-  .panel { top: auto; bottom: 168px; transform: none; right: 16px; animation: none; }
-  .strip { flex-direction: column; bottom: 8px; }
+  .strip { flex-direction: column; align-items: stretch; bottom: 8px; }
 }
