@@ -513,6 +513,8 @@ export interface SimState {
     /** Bound boons/banes by mechanic id (absent in pre-mechanic checkpoints = none bound). */
     mechanics?: Record<string, FateMechanicState>;
     mechanicEntries?: FateMechanicEntry[];
+    /** Pandora (boons.ts): this round's rolled mechanics, as one extra per-copy factor each. Cleared every round start. */
+    rolled?: Record<string, Big>;
   };
   offer: OfferState | null;
   commits: CommitRecord[];

@@ -5,7 +5,7 @@ import {
   type CardDef, type CardRarity, type LedgerGroup, type MechanicDef, type SkillDef,
 } from '@cursebound/content';
 import { offeredCard } from './blessing';
-import { effectiveFromAcc, formatMechanicValue, perCopyFactor } from './boons';
+import { effectiveFromAcc, formatMechanicValue, mech, perCopyFactor } from './boons';
 import { nextInt, seedRng } from './rng';
 import { expectedFoeCount } from './director';
 import { ledgerPacts } from './roomEvents';
@@ -350,6 +350,32 @@ function mechanicDetails(def: MechanicDef, v: Big, c: MechCtx): string[] {
     }
     case 'brittle':
       return each(({ p, incoming }) => `${p.name}: a ${c.attacker} hit right after a dodge deals ${N(incoming.mul(onePlus))} instead of ${N(incoming)}.`);
+    case 'shadow_twin':
+      return each(({ p, dps }) => `${p.name}: the shade repeats about ${N(dps.mul(v))} damage per second at full attack.`);
+    case 'grave_thralls':
+      return each(({ p, d }) => `${p.name}: each thrall strikes for about ${N(d.damage.mul(d.typeMult.physical).mul(v))} every ${P.strikeSec}s (up to ${P.max} at once).`);
+    case 'last_stand':
+      return each(({ p, d }) => `${p.name}: below ${N(d.maxHp.mul(B(P.threshold)))} health you deal x${N(onePlus)} damage and take ${PCT(ONE.sub(B(P.reduce)))} of every blow.`);
+    case 'gravity_well':
+      return each(({ p, d }) => `${p.name}: each implosion deals about ${N(d.damage.mul(d.typeMult.astral).mul(v))} astral damage, at most every ${P.cooldownSec}s.`);
+    case 'momentum':
+      return each(({ p, hit }) => `${p.name}: every ${P.chargeDist} units travelled, your next hit deals ${N(hit.mul(onePlus))} instead of ${N(hit)}.`);
+    case 'mirror_ward':
+      return each(({ p, d }) => `${p.name}: each reflected shot deals about ${N(d.damage.mul(v))}.`);
+    case 'pandora':
+    case 'pandora_curse': {
+      const kind = def.kind;
+      const pool = MECHANICS.filter((m) => m.kind === kind && m.id !== 'pandora' && m.id !== 'pandora_curse').length;
+      return [`Every round binds one of ${pool} ${kind}s at x${N(v)} the strength of its weakest card, for that round only.`];
+    }
+    case 'blood_price':
+      return each(({ p, d }) => `${p.name}: each skill cast costs about ${N(d.maxHp.mul(v))} health (never below ${PCT(B(P.floor))}).`);
+    case 'restless_dead':
+      return [`About ${PCT(v)} of deaths raise a wisp; each burst deals ${PCT(B(P.damage))} of a hero's maximum health.`];
+    case 'grave_hands':
+      return each(({ p, d }) => `${p.name}: after ${P.graceSec}s in one spot, about ${N(d.maxHp.mul(v))} per claw (${PCT(v.div(B(P.clawSec)))} of max health per second).`);
+    case 'shadow_pact':
+      return [`About ${PCT(v)} of champions and rares bring a twin with ${PCT(B(P.health))} of their health and ${PCT(B(P.damage))} of their damage.`];
   }
   return [];
 }
@@ -362,6 +388,8 @@ function mechanicDangers(def: MechanicDef, v: Big, c: MechCtx): string[] {
   if (def.id === 'volatile_dead' && v.mul(B(P.burnSec / P.pulseSec)).gte(ONE)) out.push('Volatile Dead: standing in a pool for its full burn is lethal.');
   if (def.id === 'blood_moon' && ONE.add(v).powInt(Math.floor(referenceSec(c.nextRound) / P.everySec)).gt(B(10))) out.push('Blood Moon: enemy damage passes x10 by the par time.');
   if (def.id === 'brittle') for (const x of c.players) if (x.incoming.mul(ONE.add(v)).gte(x.d.maxHp)) out.push(`${x.p.name}: a hit right after a dodge would down you.`);
+  if (def.id === 'grave_hands' && v.div(B(P.clawSec)).gte(B('0.5'))) out.push('Grave Hands: two seconds of lingering downs a hero.');
+  if (def.id === 'blood_price' && v.gte(B('0.2'))) out.push('Blood Price: a few casts drain a hero to the brink.');
   return out;
 }
 
@@ -668,9 +696,21 @@ export function ledgerMechanics(state: SimState): LedgerMechanic[] {
     }
     out.push({
       id: def.id, name: def.name, kind: def.kind, color: def.color, stacks: s.stacks, value, raw: S(v),
-      short: mechanicText(def, def.short, value), text: mechanicText(def, def.description, value),
+      short: mechanicText(def, def.short, value), text: mechanicText(def, def.description, value) + pandoraRollText(state, def),
       stacking: STACKING_TEXT[def.stacking], applicability: def.applicability, sources: [...src.values()],
     });
   }
   return out;
+}
+
+/** Pandora's Gift / Curse: name this round's roll (boons.ts rollPandora) after the rules text. */
+function pandoraRollText(state: SimState, def: MechanicDef): string {
+  if ((def.id !== 'pandora' && def.id !== 'pandora_curse') || !state.fate.rolled) return '';
+  for (const id of Object.keys(state.fate.rolled)) {
+    const r = MECHANIC_BY_ID[id];
+    if (!r || r.kind !== def.kind) continue;
+    const v = mech(state, id);
+    return v ? ` This round: ${r.name} (${formatMechanicValue(r, v)}).` : '';
+  }
+  return '';
 }

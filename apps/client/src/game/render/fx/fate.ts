@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { MECHANIC_BY_ID, TICK_RATE } from '@cursebound/content';
+import { MECHANICS, MECHANIC_BY_ID, TICK_RATE } from '@cursebound/content';
+import { GRASP_WARN_SEC } from '@cursebound/simulation';
 import type { SfxId } from '../../audio/AudioEngine';
 import { registerHazardFx, registerSkillFx, type CastFx, type FxCtx } from './registry';
 
@@ -10,6 +11,7 @@ import { registerHazardFx, registerSkillFx, type CastFx, type FxCtx } from './re
 // effects at x,y. Enemy-sourced casts use slot -1.
 // Hazards: fate_blast (pending blast), fate_trail (static trail), fate_pyre (burning pool; telegraph drawn by the
 // generic telegraph layer until it arms), fate_hex (curse circle), fate_reaper (the Reaper; dx,dy = heading).
+// Rule-changer wave (bottom of this file): the shade, thralls, wisps and grave hands, plus their casts.
 
 const EMBER = 0xff7a2a;
 const FIRE_HI = 0xffc94a;
@@ -233,3 +235,190 @@ registerHazardFx({
     g.lineStyle(3, 0xd8d8e8, 1).lineBetween(sx, top + 6, sx + (u.x >= 0 ? -16 : 16), top + 12);
   },
 }, { fate_pyre: EMBER, fate_hex: HEX, fate_reaper: 0x8a7aa8 });
+
+// ---------------- The rule-changer wave (boons.ts documents the event contract) ----------------
+
+const SHADE = 0x6c5a9c;
+const SHADE_HI = 0xc8b8ff;
+const GRAVE = 0x9fe0a8;
+const WISP = 0x8ff0e0;
+const VOID = 0x7a6bff;
+const KINETIC = 0x3fe0a0;
+const LAST = 0xff4a3a;
+const MOSS = 0x7d9a5a;
+
+const THRALL_RISE = Math.round(MECHANIC_BY_ID.grave_thralls.params.riseSec * TICK_RATE);
+const WISP_RISE = Math.round(MECHANIC_BY_ID.restless_dead.params.riseSec * TICK_RATE);
+const GRASP_WARN = Math.round(GRASP_WARN_SEC * TICK_RATE);
+
+/** A ground ring that collapses inward (gravity wells): the reverse of Juice.ring. */
+function implode(ctx: FxCtx, x: number, y: number, R: number, color: number) {
+  const p = ctx.P(x, y);
+  if (ctx.reduced) { ctx.juice.ring(p.x, p.y, ctx.rx(R), color, 260); return; }
+  const g = ctx.scene.add.graphics().setDepth(4641).setBlendMode(Phaser.BlendModes.ADD);
+  const st = { k: 1 };
+  ctx.scene.tweens.add({
+    targets: st, k: 0.05, duration: 260, ease: 'Cubic.easeIn',
+    onUpdate: () => {
+      g.clear();
+      g.lineStyle(3, color, 0.9).strokeEllipse(p.x, p.y, ctx.rx(R) * 2 * st.k, ctx.ry(R) * 2 * st.k);
+      g.lineStyle(1, 0xffffff, 0.8).strokeEllipse(p.x, p.y, ctx.rx(R) * 1.3 * st.k, ctx.ry(R) * 1.3 * st.k);
+    },
+    onComplete: () => g.destroy(),
+  });
+}
+
+registerSkillFx({
+  boon_shadow_twin: (ctx, e) => {
+    streak(ctx, e.x, e.y, e.dx, e.dy, SHADE, 3, 160);
+    const a = chest(ctx, e.x, e.y), t = chest(ctx, e.dx, e.dy);
+    ctx.juice.slash(t.x, t.y, Math.atan2(t.y - a.y, t.x - a.x), SHADE_HI, 0.9, { thin: true });
+    const hero = ctx.actorSprite?.(e.slot);
+    if (hero) { const s = ctx.P(e.x, e.y); ctx.juice.afterimage(hero, 0x2a1e4a, 0.7, 260, s.x - hero.x, s.y - hero.y); }
+    sfx(ctx, 'blink', e.x, e.y, 140, ctx.mine ? 2 : 1);   // the shade's strike
+  },
+  boon_grave_thralls: (ctx, e) => {
+    const p = ctx.P(...point(e));
+    ctx.juice.ring(p.x, p.y, ctx.rx(1), GRAVE, 320);
+    ctx.juice.dust(p.x, p.y, 8, 0x3a4a34);
+    ctx.juice.sparksAt(p.x, p.y - 10, 6, GRAVE);
+    sfx(ctx, 'summon_rise', e.x, e.y, 250, ctx.mine ? 2 : 1);   // a thrall claws out of the ground
+  },
+  boon_last_stand: (ctx, e) => {
+    const p = ctx.P(...point(e));
+    ctx.juice.ring(p.x, p.y, ctx.rx(1.6), LAST, 360);
+    ctx.juice.embersAt(p.x, p.y - 18, 16, LAST);
+    ctx.juice.number(p.x, p.y - 30, 'LAST STAND', '#ff4a3a', 'md');
+    if (ctx.mine) { ctx.juice.pop(LAST, 0.18, 220); sfx(ctx, 'heartbeat', e.x, e.y, 600, 3); }
+  },
+  boon_gravity_well: (ctx, e) => {
+    implode(ctx, e.x, e.y, Math.max(1, e.dx || 3), VOID);
+    const p = ctx.P(...point(e));
+    ctx.juice.orb(p.x, p.y - 10, VOID, 1.2, 280, 0.4);
+    ctx.juice.sparksAt(p.x, p.y - 10, 10, 0xdacaff);
+    ctx.dungeon.flashLight(p.x, p.y - 10, 160, VOID, 2, 260);
+    sfx(ctx, 'gravity_well', e.x, e.y, 200, ctx.mine ? 2 : 1);
+  },
+  boon_momentum_ready: (ctx, e) => {
+    const p = ctx.P(...point(e));
+    ctx.juice.ring(p.x, p.y, ctx.rx(0.9), KINETIC, 240);
+    ctx.juice.sparksAt(p.x, p.y - 20, 8, KINETIC);
+    if (ctx.mine) sfx(ctx, 'combo', e.x, e.y, 300, 2);   // charged: the next hit lands heavy
+  },
+  boon_momentum: (ctx, e) => {
+    const c = chest(ctx, e.x, e.y), g = ctx.P(e.x, e.y);
+    ctx.juice.starburst(c.x, c.y, KINETIC, 1.3);
+    ctx.juice.shockwave(g.x, g.y, ctx.rx(1.4), KINETIC, 300);
+    sfx(ctx, 'impact_heavy', e.x, e.y, 120, ctx.mine ? 2 : 1);
+  },
+  boon_mirror_ward: (ctx, e) => {
+    const p = chest(ctx, e.x, e.y);
+    ctx.juice.starburst(p.x, p.y, 0xe8d4ff, 0.9);
+    ctx.juice.sparksAt(p.x, p.y, 6, PRISM);
+    sfx(ctx, 'shield_bash', e.x, e.y, 90, ctx.mine ? 2 : 1);   // the shot rings off the ward
+  },
+  // one event per hero at round start; each client calls out its own hero's roll
+  boon_pandora: (ctx, e) => {
+    if (!ctx.mine) return;
+    const p = ctx.P(...point(e));
+    const boon = MECHANICS[e.dx], bane = MECHANICS[e.dy];
+    ctx.juice.pop(0xff5ce1, 0.16, 260);
+    ctx.juice.ring(p.x, p.y, ctx.rx(1.8), 0xff5ce1, 420);
+    if (boon) ctx.juice.number(p.x, p.y - 44, boon.name.toUpperCase(), '#ffd86a', 'lg');
+    if (bane) ctx.juice.number(p.x, p.y - 20, bane.name.toUpperCase(), '#ff3d5a', 'lg');
+    sfx(ctx, 'fate_blessing', e.x, e.y, 500, 3);
+    if (bane) sfx(ctx, 'altar_pact', e.x, e.y, 500, 2);
+  },
+  bane_blood_price: (ctx, e) => {
+    const c = chest(ctx, e.x, e.y), g = ctx.P(e.x, e.y);
+    ctx.juice.embersAt(c.x, c.y, 8, 0xc8102e);
+    ctx.juice.ring(g.x, g.y, ctx.rx(0.7), 0xc8102e, 200);
+  },
+  bane_restless_dead: (ctx, e) => {
+    const p = ctx.P(...point(e));
+    ctx.juice.dust(p.x, p.y, 5, 0x2a3a3a);
+    ctx.juice.ring(p.x, p.y, ctx.rx(0.6), WISP, 260);
+    sfx(ctx, 'horror_moan', e.x, e.y, 700, 1);   // the dead stir (spaced out: deaths come in waves)
+  },
+  bane_wisp_burst: (ctx, e) => {
+    burst(ctx, e.x, e.y, 0.9, WISP, 0xffffff, false);
+    sfx(ctx, 'impact_astral', e.x, e.y, 100, 2);
+  },
+  bane_grave_hands: (ctx, e) => {
+    const c = chest(ctx, e.x, e.y), g = ctx.P(e.x, e.y);
+    ctx.juice.claw(c.x, c.y + 8, -Math.PI / 2, MOSS, 1.1);
+    ctx.juice.dust(g.x, g.y, 6, 0x3a3428);
+    sfx(ctx, 'trap_snap', e.x, e.y, 200, 2);
+  },
+  bane_shadow_pact: (ctx, e) => {
+    streak(ctx, e.dx, e.dy, e.x, e.y, SHADE, 4, 260);
+    const p = ctx.P(...point(e));
+    ctx.juice.dust(p.x, p.y, 12, 0x1a1428);
+    ctx.juice.ring(p.x, p.y, ctx.rx(1.2), SHADE, 380);
+    ctx.dungeon.flashLight(p.x, p.y - 16, 140, SHADE, 1.8, 300);
+    sfx(ctx, 'summon_rise', e.x, e.y, 300, 2);   // a shadow peels off the elite
+  },
+});
+
+registerHazardFx({
+  // Shadow Twin: a dark, hooded double walking at the hero's back
+  fate_shade: (ctx, g, h) => {
+    const p = ctx.P(h.x, h.y);
+    const bob = Math.round(Math.sin(ctx.now / 300 + h.i) * 2);
+    g.fillStyle(0x000000, 0.3).fillEllipse(p.x, p.y, ctx.rx(0.45) * 2, ctx.ry(0.45) * 2);
+    const top = p.y - 34 + bob;
+    g.fillStyle(0x140e22, 0.78).fillTriangle(p.x - 9, p.y - 2 + bob, p.x + 9, p.y - 2 + bob, p.x, top);
+    g.fillStyle(0x221a38, 0.85).fillCircle(p.x, top + 6, 5);
+    const ex = Math.round(ctx.U(h.dx || 1, h.dy).x * 2);
+    g.fillStyle(SHADE_HI, 1).fillRect(p.x - 3 + ex, top + 5, 2, 1).fillRect(p.x + 1 + ex, top + 5, 2, 1);
+    g.lineStyle(1, SHADE, 0.6).strokeEllipse(p.x, p.y - 14 + bob, 22, 40);
+  },
+  // Grave Thralls: a pale grave-green revenant (clawing out of the ground while it rises)
+  fate_thrall: (ctx, g, h, tick) => {
+    const p = ctx.P(h.x, h.y);
+    const rise = Math.max(0, Math.min(1, (tick - h.b) / THRALL_RISE));
+    const a = Math.max(0, Math.min(1, (h.u - tick) / 30));
+    g.fillStyle(0x0a140c, 0.4 * a).fillEllipse(p.x, p.y, ctx.rx(0.5) * 2, ctx.ry(0.5) * 2);
+    const hgt = 30 * rise;
+    const top = p.y - hgt;
+    g.fillStyle(0x2a3a2c, 0.85 * a).fillRect(p.x - 6, top + 8, 12, Math.max(0, hgt - 8));
+    g.fillStyle(BONE, 0.95 * a).fillRect(p.x - 4, top, 8, 8);
+    const glow = Math.floor(tick / 8) % 2 ? GRAVE : 0xd8ffd8;
+    g.fillStyle(glow, a).fillRect(p.x - 3, top + 3, 2, 2).fillRect(p.x + 1, top + 3, 2, 2);
+    if (rise >= 1) {
+      const u = ctx.U(h.dx || 1, h.dy);
+      const sw = Math.sin(ctx.now / 90 + h.i) * 3;
+      g.lineStyle(2, BONE, 0.9 * a).lineBetween(p.x, top + 12, p.x + u.x * 10 + sw, top + 14 + u.y * 6);
+    }
+    g.lineStyle(1, GRAVE, 0.5 * a).strokeEllipse(p.x, p.y, ctx.rx(h.r) * 2, ctx.ry(h.r) * 2);
+  },
+  // Restless Dead: a hunting wisp (a pale flame with a tail), ringed red as the danger it is
+  fate_wisp: (ctx, g, h, tick) => {
+    const p = ctx.P(h.x, h.y);
+    const rise = Math.max(0, Math.min(1, (tick - h.b) / WISP_RISE));
+    const y = p.y - 6 - 14 * rise;
+    g.lineStyle(1, 0xff5a5a, 0.7 * rise).strokeEllipse(p.x, p.y, ctx.rx(h.r) * 2, ctx.ry(h.r) * 2);
+    const u = ctx.U(h.dx || 1, h.dy);
+    for (let k = 3; k >= 1; k--) g.fillStyle(WISP, 0.18 * k * rise).fillCircle(p.x - u.x * k * 4, y - u.y * k * 2, 4 - k * 0.8);
+    const pulse = 3 + (Math.floor(tick / 6) % 2);
+    g.fillStyle(WISP, 0.5 * rise).fillCircle(p.x, y, (pulse + 3) * rise);
+    g.fillStyle(0xffffff, 0.95 * rise).fillCircle(p.x, y, pulse * rise);
+  },
+  // Grave Hands: the ground cracks beneath a lingering hero and fingers claw upward until they grip
+  fate_grasp: (ctx, g, h, tick) => {
+    const p = ctx.P(h.x, h.y);
+    const rx = ctx.rx(h.r), ry = ctx.ry(h.r);
+    const prog = Math.max(0, Math.min(1, (tick - h.b) / GRASP_WARN));
+    const blink = prog >= 1 && Math.floor(tick / 5) % 2 === 0;
+    g.fillStyle(0x0c120a, 0.45).fillEllipse(p.x, p.y, rx * 2, ry * 2);
+    g.lineStyle(2, blink ? 0xd8ffb0 : MOSS, 0.9).strokeEllipse(p.x, p.y, rx * 2, ry * 2);
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2 + 0.3;
+      const bx = p.x + Math.cos(ang) * rx * 0.7, by = p.y + Math.sin(ang) * ry * 0.7;
+      const len = 4 + 10 * prog;
+      const curl = Math.sin(ctx.now / 140 + i) * 2;
+      g.lineStyle(2, BONE, 0.9).lineBetween(bx, by, bx + curl, by - len);
+      g.lineStyle(1, BONE, 0.8).lineBetween(bx + curl, by - len, bx + curl + (bx < p.x ? 3 : -3), by - len + 3);
+    }
+  },
+}, { fate_thrall: GRAVE, fate_wisp: WISP, fate_grasp: MOSS });
