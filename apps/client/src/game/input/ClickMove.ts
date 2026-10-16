@@ -1,4 +1,4 @@
-import { SKILL_BY_ID } from '@cursebound/content';
+import { SKILL_BY_ID, TICK_RATE } from '@cursebound/content';
 import { ACTION } from '@cursebound/simulation';
 import { circleFree, findPathEx, lineClear, nearestFloorTile, pathLength, pointInTile, type GridMap, type Pt } from './path';
 import { engageDecision, shotClear, type GroundKind, type GroundThing, type PickableEnemy, type Reach } from './targeting';
@@ -6,7 +6,10 @@ import { engageDecision, shotClear, type GroundKind, type GroundThing, type Pick
 // Diablo-style click-to-move controller. Turns clicks into the existing per-tick intention (world move vector + aim
 // offset + ACTION bits) so the authority, prediction and replays are untouched:
 //   LMB ground            walk there along a smoothed A* path (marker on the ground)
-//   hold LMB              keep walking toward the cursor (re-path ~7 Hz, straight steering when in view)
+//   hold LMB              keep walking toward the cursor (re-path ~7 Hz, straight steering when in view) once the
+//                         press is held past CLICK.holdMs or dragged; a shorter press is a click and walks to the
+//                         clicked point (the camera follows the hero, so the ground under a still pointer slides
+//                         along with every step: tracking it from the first frame dragged clicks past their point)
 //   LMB foe               attack-move: close to basic-attack reach (and projectile line of sight), then stand and
 //                         swing at it until it falls; still holding, take the next foe under the cursor or walk on
 //   Shift + LMB           attack in place toward the cursor, never move
@@ -15,7 +18,9 @@ import { engageDecision, shotClear, type GroundKind, type GroundThing, type Pick
 //   Space                 dodge toward the cursor
 // Phases: COMBAT allows everything, VOTING walking and dodging only (doors), anything else sends neutral input.
 // Direct movement (arrow keys, WASD scheme, gamepad stick) always wins and cancels click orders. Pure (time and
-// world state come in per frame), so the decision logic is unit tested from tests/.
+// world state come in per frame), so the decision logic is unit tested from tests/. InputTicks (below) is the bridge
+// from rendered frames to the authority's 60 Hz input ticks: it re-runs the controller for every tick a frame
+// carries, from the predicted body that tick starts at.
 
 export type Scheme = 'click' | 'wasd';
 
@@ -40,6 +45,8 @@ export interface DriveFrame {
   reach: Reach;
   /** ground point under the pointer (null when the pointer is off the canvas) */
   cursor: Pt | null;
+  /** the pointer on screen in view px, independent of the camera (null: no mouse); tells a dragged hold from a click */
+  pointer: Pt | null;
   hoverEnemy: PickableEnemy | null;
   hoverGround: GroundThing | null;
   /** move / attack button held, pressed since the previous frame, attack-in-place modifier held */
@@ -76,6 +83,9 @@ export const CLICK = {
   arriveTol: 0.15,
   gotoTol: { pickup: 0.3, loot: 0.35, door: 0.4 } as Record<GroundKind, number>,
   waypointTol: 0.35,
+  /** a ground press steers after the cursor (hold to move) once held this long or dragged this far (view px) */
+  holdMs: 250,
+  dragPx: 6,
   holdRepathMs: 150,
   chaseRepathMs: 220,
   stuckMs: 400,
@@ -114,6 +124,8 @@ export class ClickMove {
   private stuckAt = -1e9;
   private lastSelf: Pt | null = null;
   private pendingMoveTo: Pt | null = null;
+  /** a held ground press that is still a click: when and where (screen) it went down. Null once it steers. */
+  private heldClick: { at: number; pointer: Pt | null } | null = null;
 
   /** Contract: a UI (minimap, door panel) asks the hero to walk to a world point. */
   moveTo(x: number, y: number) {
@@ -169,7 +181,7 @@ export class ClickMove {
       if (this.holdMode === 'force' && !canAct) this.holdMode = null;
       if (this.holdMode === 'force') this.cancel();
       else if (this.holdMode === 'attack') this.retarget(f, canAct);
-      if (this.holdMode === 'walk' && f.cursor && !keyMoving) this.trackCursor(f);
+      if (this.holdMode === 'walk' && f.cursor && !keyMoving && this.steering(f)) this.trackCursor(f);
     } else this.holdMode = null;
 
     if (!canAct && this.order?.k === 'attack') this.cancel();
@@ -259,7 +271,11 @@ export class ClickMove {
       this.fx.push({ kind: 'item', x: g.x, y: g.y });
       return;
     }
-    if (f.cursor) { this.setWalk(f, f.cursor.x, f.cursor.y, true); this.holdMode = 'walk'; }
+    if (f.cursor) {
+      this.setWalk(f, f.cursor.x, f.cursor.y, true);
+      this.holdMode = 'walk';
+      this.heldClick = { at: f.now, pointer: f.pointer };
+    }
   }
 
   private setAttack(e: PickableEnemy) {
@@ -276,6 +292,24 @@ export class ClickMove {
       if (f.map) { const ti = nearestFloorTile(f.map, p.x, p.y); if (ti >= 0) m = pointInTile(f.map, ti, p.x, p.y); }
       this.fx.push({ kind: 'move', x: m.x, y: m.y, ui });
     }
+  }
+
+  /**
+   * Does a held ground press steer after the cursor yet? Only once it is held past CLICK.holdMs, dragged on screen
+   * or the hero has reached the clicked point; until then it is a click and the walk keeps the clicked point. The
+   * play camera is locked on the hero, so the ground under a pointer resting on screen slides along with every step:
+   * following it from the first frame moved a click's goal on by however far the hero walked while the button was
+   * down. The drag test uses the screen pointer, which the camera does not move.
+   */
+  private steering(f: DriveFrame): boolean {
+    const c = this.heldClick;
+    if (!c) return true;
+    const dragged = !!(f.pointer && c.pointer && len(f.pointer.x - c.pointer.x, f.pointer.y - c.pointer.y) > CLICK.dragPx);
+    const o = this.order;
+    const reached = o?.k === 'walk' && !!f.self && len(o.x - f.self.x, o.y - f.self.y) < CLICK.standOnSelf;
+    if (f.now - c.at < CLICK.holdMs && !dragged && !reached) return false;
+    this.heldClick = null;
+    return true;
   }
 
   /** Holding the move button on the ground: the walk goal follows the cursor. */
@@ -298,6 +332,7 @@ export class ClickMove {
     const e = canAct ? f.hoverEnemy : null;
     if (e) { this.setAttack(e); return; }
     this.holdMode = 'walk';
+    this.heldClick = null;   // held all along: walk after the cursor straight away
   }
 
   private pressedStopSkill(f: DriveFrame): boolean {
@@ -427,6 +462,45 @@ export class ClickMove {
     this.pathGoal = null;
     this.pathEnd = null;
     this.progressBest = Infinity;
+  }
+}
+
+/** ms per authority input tick */
+export const TICK_MS = 1000 / TICK_RATE;
+/** the longest frame still treated as ordinary pacing (~20 fps); anything longer is a stall (see InputTicks) */
+export const STALL_MS = 50;
+
+/**
+ * Rendered frames to the authority's 60 Hz input ticks (CombatScene.sendInputs). Per frame:
+ *  - how many ticks the frame carries, on the real clock. Phaser's smoothed delta spread a stall over the next ten
+ *    frames, and the frames after a stall sent its ticks late. The authority holds our last input through any gap
+ *    (authority.ts), so ticks sent late moved the hero twice (a click overshot its point and was snapped back) and
+ *    stood in its input queue as lasting lag. A frame longer than STALL_MS therefore sends only its own tick.
+ *  - the controller runs once per frame (clicks, hover, markers) and again for every further tick, from the
+ *    predicted body that tick starts at: several ticks on one steer walked past the goal on slow frames.
+ *  - fresh presses of a frame that carries no tick (refresh rates above 60 Hz) ride on the next one that does, so
+ *    a dodge still goes toward the cursor it was pressed at.
+ */
+export class InputTicks {
+  private acc = 0;
+  private last: number | null = null;
+  private carry = 0;
+
+  /** `send` applies one tick's intention (sends it, predicts it) and returns the predicted body after it, or null. */
+  run(now: number, cm: ClickMove, f: DriveFrame, send: (out: DriveOut) => Pt | null): number {
+    const dt = this.last === null ? TICK_MS : Math.max(0, now - this.last);
+    this.last = now;
+    this.acc = dt > STALL_MS ? TICK_MS : this.acc + dt;
+    let ticks = 0;
+    while (this.acc >= TICK_MS - 1e-3) { this.acc -= TICK_MS; ticks++; }   // (a frame of exactly one tick is one tick)
+    const frame = this.carry ? { ...f, buttons: f.buttons | this.carry, pressed: f.pressed | this.carry } : f;
+    this.carry = ticks ? 0 : frame.pressed;
+    let out = cm.update(frame);
+    for (let i = 0; i < ticks; i++) {
+      const self = send(out);
+      if (i + 1 < ticks) out = cm.update({ ...frame, self: self ?? frame.self, primaryEdge: false, pressed: 0 });
+    }
+    return ticks;
   }
 }
 
