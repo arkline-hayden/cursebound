@@ -80,6 +80,8 @@ interface ActorView {
   dying: boolean;
   recoilX: number; recoilY: number; squash: number;
   lastAfterimage: number; lastStep: number;
+  /** world position last frame and when the body last moved: a hero frozen mid-run (round over, menus) stops stepping */
+  wx?: number; wy?: number; movedAt?: number;
   shield?: Phaser.GameObjects.Sprite;
   kind: string;
   /** cosmetic scale (elites are drawn bigger) */
@@ -1389,7 +1391,13 @@ export class CombatScene extends Phaser.Scene {
     const pr = this.net.pred;
     const dashing = predicted ? pr.dodgeTimer > 0 : p.anim === 'dodge';
     const locomotion = p.anim === 'run' || p.anim === 'idle' || p.anim === 'dodge';
-    const anim = dashing ? 'dodge' : predicted && locomotion ? (Math.abs(pr.vx) + Math.abs(pr.vy) > 0.05 ? 'run' : 'idle') : p.anim;
+    const nowMs = performance.now();
+    if (v.wx === undefined || Math.abs(x - v.wx) + Math.abs(y - (v.wy ?? y)) > 0.002) v.movedAt = nowMs;
+    v.wx = x; v.wy = y;
+    const stalled = nowMs - (v.movedAt ?? nowMs) > 150;
+    let anim = dashing ? 'dodge' : predicted && locomotion ? (Math.abs(pr.vx) + Math.abs(pr.vy) > 0.05 ? 'run' : 'idle') : p.anim;
+    // the snapshot (or a stale prediction) can hold 'run' after the sim stops moving the hero: stand, and no footsteps
+    if (anim === 'run' && stalled) anim = 'idle';
     const aimX = predicted ? pr.ax : p.ax, aimY = predicted ? pr.ay : p.ay;
     const st: ActorState = anim === 'death' ? 'death' : anim === 'downed' ? 'downed' : anim as ActorState;
     this.play(v, st, dashing ? this.dirOf(predicted ? pr.dodgeDirX : p.ddx, predicted ? pr.dodgeDirY : p.ddy) : this.dirOf(aimX, aimY));
