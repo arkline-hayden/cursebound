@@ -15,7 +15,8 @@ import { bountyRoomOption, classUnlocked, countdownText, progressStore, refreshB
 import { clearGuestSession, joinViaHost } from '@/lib/p2p/guest';
 import { markHosting, stopHostBridge } from '@/lib/p2p/host';
 import { presenceOnline, presenceStore, resolveCode, setStatus, startPresence, type PeerId } from '@/lib/p2p/presence';
-import { ClassPicker } from '@/ui/ClassPicker';
+import { VesselHall } from '@/ui/VesselSelect';
+import { prewarmVesselStage } from '@/ui/VesselStage';
 import { EmberField } from '@/ui/EmberField';
 import { FireTitle } from '@/ui/FireTitle';
 import { SpectralHalo } from '@/ui/SpectralHalo';
@@ -26,7 +27,8 @@ import { ClassEmblem } from '@/ui/icons';
 // HOME (PRD §16.1) as a proper title screen over the live isometric attract-mode dungeon:
 //   1. TITLE — the burning wordmark alone, centred, with a blinking "press any key" plate.
 //   2. MENU  — the wordmark rises and a single centred column of carved plaques takes its place.
-//   3. VESSEL — choosing to play opens the character select (name + class) as its own carved dialog.
+//   3. VESSEL — choosing to play opens the Vessel Select hall (ui/VesselSelect.tsx): the class lineup in a portal
+//      chamber, the name field and the confirm button, full screen over the (paused) backdrop.
 // The account plate (top-right) shows who is signed in; the footer carries the build and authority status.
 // Online (cloud signed in), a slim friends plate sits under the account plate: who is online, what they are doing,
 // and Join for open co-op parties (peer-to-peer, lib/p2p). Party invites arrive as toasts.
@@ -157,6 +159,14 @@ export default function Home() {
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', wake); };
   }, [stage]);
 
+  // MENU: build the Vessel Select art in idle time so the hall opens straight into the lineup
+  useEffect(() => {
+    if (stage !== 'menu') return;
+    let cancel: (() => void) | null = null;
+    const t = setTimeout(() => { cancel = prewarmVesselStage(CLASSES.map((c) => c.id)); }, 1200);
+    return () => { clearTimeout(t); cancel?.(); };
+  }, [stage]);
+
   // MENU: focus the first plaque when the menu appears (keyboard players land on it)
   useEffect(() => {
     if (stage === 'menu' && pane === 'none') menuRef.current?.querySelector<HTMLElement>('.menu-item')?.focus({ preventScroll: true });
@@ -284,7 +294,7 @@ export default function Home() {
 
   return (
     <div className={`menu-root title-root stage-${stage}`}>
-      <MenuBackdrop classId={classId} />
+      <MenuBackdrop classId={classId} paused={pane === 'vessel'} />
       <div className="vignette-screen" aria-hidden="true" />
       <EmberField intensity={stage === 'title' ? 1.4 : 0.8} spirit={stage === 'title' ? 0.65 : 0.5} />
       <div className="title-letterbox top" aria-hidden="true" />
@@ -371,28 +381,32 @@ export default function Home() {
       </main>
 
       {pane === 'vessel' && (
-        <Dialog title={copy.title} tone="ember" wide onClose={close}>
-          <div className="col vessel-select">
-            {signedIn ? (
-              <p className="muted vs-who">Descending as <b className="gold-text">{auth.account!.displayName}</b> <span className="faint">({auth.account!.username})</span> — this run is saved to your account.</p>
-            ) : (
-              <label className="name-row">
-                <span className="engraved">Your name</span>
-                <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} aria-label="Your name" />
-                <Link className="faint vs-signin" href="/account">Sign in to keep your runs</Link>
-              </label>
-            )}
-            <span className="engraved" id="cls-label">Choose your vessel</span>
-            {intent === 'tutorial' && <p className="muted">One short guided room: walking, skills, dodging, loot and the Fate doors. Skippable, never scored.</p>}
-            {intent === 'bounty' && bounty && <p className="muted">Today&apos;s modifier: <b className="gold-text">{bounty.modifier.name}</b> — {bounty.modifier.description}{bounty.completed ? '' : ` First finished run earns ×${bounty.xpMultiplier} XP.`}</p>}
-            <ClassPicker value={classId} onChange={chooseClass} labelledBy="cls-label" idPrefix="title-vessel" level={progress?.level ?? null} />
-            {err && <p className="neg" role="alert">{err}</p>}
-            <div className="row vs-foot">
-              <span className="grow" />
-              <button className="btn big primary" disabled={offline || !!busy} onClick={go}>{busy ? copy.busy : `${copy.go} as ${cls?.name ?? 'vessel'}`}</button>
-            </div>
-          </div>
-        </Dialog>
+        <VesselHall
+          title={copy.title}
+          intro={intent === 'tutorial'
+            ? 'One short guided room: walking, skills, dodging, loot and the Fate doors. Skippable, never scored.'
+            : intent === 'bounty' && bounty
+              ? <>Today&apos;s modifier: <b className="gold-text">{bounty.modifier.name}</b> — {bounty.modifier.description}{bounty.completed ? '' : ` First finished run earns ×${bounty.xpMultiplier} XP.`}</>
+              : undefined}
+          value={classId}
+          onChange={chooseClass}
+          level={progress?.level ?? null}
+          who={signedIn ? (
+            <p className="vh-who">Descending as <b className="gold-text">{auth.account!.displayName}</b></p>
+          ) : (
+            <label className="name-row vh-name">
+              <span className="engraved">Your name</span>
+              <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} aria-label="Your name" />
+            </label>
+          )}
+          goLabel={copy.go}
+          busyLabel={copy.busy}
+          busy={!!busy}
+          disabled={offline}
+          err={err}
+          onConfirm={go}
+          onBack={close}
+        />
       )}
 
       {pane === 'party' && (

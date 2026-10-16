@@ -51,7 +51,8 @@ const SONG_FADE = 1.6;
 
 interface SongVoice { el: HTMLAudioElement; src: MediaElementAudioSourceNode; gain: GainNode; stopTimer: ReturnType<typeof setTimeout> | null }
 
-const UI_SFX = new Set<SfxId>(['ui_click', 'ui_hover', 'ui_confirm', 'ui_error', 'vote_cast', 'vote_lock', 'fate_commit', 'level_up', 'move_click', 'minimap_ping']);
+const UI_SFX = new Set<SfxId>(['ui_click', 'ui_hover', 'ui_confirm', 'ui_error', 'vote_cast', 'vote_lock', 'fate_commit', 'level_up', 'move_click', 'minimap_ping',
+  'vessel_shift', 'vessel_locked', 'vessel_roar', 'vessel_pick_vanguard', 'vessel_pick_arcanist', 'vessel_pick_duelist', 'vessel_pick_hexbinder', 'vessel_pick_artificer', 'vessel_pick_templar', 'vessel_pick_berserker', 'vessel_pick_cryomancer', 'vessel_pick_ranger', 'vessel_pick_warden']);
 
 const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   ui_hover: 0, move_click: 1, footstep: 0,
@@ -76,6 +77,8 @@ const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
   core_charge: 6, core_laser: 6, core_firewall: 7, core_glitch: 5, core_purge_alarm: 9, core_purge: 8, core_deploy: 5,
   colossus_raise: 6, colossus_hammer: 8, colossus_stomp: 7, colossus_vent: 6, lava_vent: 4, lava_erupt: 6,
   drake_screech: 8, drake_gale: 6, drake_dive: 6, thunder_feather: 4, skyfall: 8, horror_moan: 9, tentacle_burst: 4, gravity_well: 6, void_beam: 7,
+  vessel_shift: 3, vessel_locked: 5, vessel_roar: 9,
+  vessel_pick_vanguard: 6, vessel_pick_arcanist: 6, vessel_pick_duelist: 6, vessel_pick_hexbinder: 6, vessel_pick_artificer: 6, vessel_pick_templar: 6, vessel_pick_berserker: 6, vessel_pick_cryomancer: 6, vessel_pick_ranger: 6, vessel_pick_warden: 6,
 };
 
 /** At most this many simultaneous voices of one cue (oldest is stolen). */
@@ -85,6 +88,8 @@ const PER_ID_CAP: Partial<Record<SfxId, number>> = {
   telegraph_warn: 4, move_click: 1, minimap_ping: 2, heartbeat: 1,
   thunder_feather: 4, tentacle_burst: 4, void_beam: 1, drake_gale: 1,
   coin_pickup: 3, imp_jingle: 2,   // room events
+  vessel_shift: 2, vessel_locked: 1, vessel_roar: 1,
+  vessel_pick_vanguard: 1, vessel_pick_arcanist: 1, vessel_pick_duelist: 1, vessel_pick_hexbinder: 1, vessel_pick_artificer: 1, vessel_pick_templar: 1, vessel_pick_berserker: 1, vessel_pick_cryomancer: 1, vessel_pick_ranger: 1, vessel_pick_warden: 1,
   impact_light: 4, impact_heavy: 3, impact_fire: 4, impact_frost: 4, impact_storm: 4, impact_decay: 4, impact_astral: 3,
   kill_burn: 3, kill_shatter: 3, kill_zap: 3, kill_squelch: 3, kill_chime: 2,
   bow_shot: 4, gun_shot: 4, blade_flurry: 3, blast_fire: 3, blast_frost: 3, zap_strike: 3, blast_decay: 3, smite: 2, slam_heavy: 3,
@@ -99,6 +104,7 @@ const MERGE_SEC: Partial<Record<SfxId, number>> = {
   kill: 0.04, kill_burn: 0.05, kill_shatter: 0.05, kill_zap: 0.05, kill_squelch: 0.05, kill_chime: 0.08, crit: 0.06,
   gun_shot: 0.045, bow_shot: 0.04, blade_flurry: 0.06,
   core_laser: 2, core_glitch: 3, core_deploy: 2,
+  vessel_shift: 0.05,
 };
 
 /** Big moments that briefly pull the music down: [dB, hold s, release s]. */
@@ -110,6 +116,7 @@ const SFX_DUCK: Partial<Record<SfxId, [number, number, number]>> = {
   blast_fire: [-3, 0.1, 0.4], zap_strike: [-3, 0.1, 0.4], smite: [-3, 0.15, 0.5],
   core_purge: [-7, 0.5, 1], colossus_hammer: [-5, 0.2, 0.6],
   drake_screech: [-5, 0.5, 0.8], horror_moan: [-6, 1, 1.2],
+  vessel_roar: [-9, 1, 1.4],
 };
 
 const MAX_VOICES = 32;
