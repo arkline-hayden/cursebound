@@ -42,15 +42,15 @@ e('countdown_tick', 'Lobby or vote countdown, last seconds', 'a single clock tic
 e('tutorial_step', 'Tutorial: a step completed', 'a small rising sparkle chime, encouraging', 0.8, { tier: 3 });
 
 sec('vessel', 'Class select (Vessel Select)', 'The lineup screen. Each class gets its own sting when picked.', 'ui');
-e('vessel_shift', 'Moving the highlight to another hero', 'a soft airy whoosh with a faint stone scrape', 0.5, { v: 2 });
+e('vessel_shift', 'Moving the highlight to another hero', 'a shimmering magical whoosh, bright crystalline sparkle sweeping past with a soft airy tail', 0.7, { v: 2 });
 e('vessel_locked', 'Highlighting a locked class', 'a heavy iron padlock rattling against chains, a dull thunk', 0.8);
 e('vessel_roar', 'Confirming a hero: the portal swallows them', 'a portal erupting with a deep roar, swirling wind and a bright magical flare', 2.0);
-e('vessel_pick_vanguard', 'Vanguard selected', 'a shield slammed down on stone and a steel ring, heroic and heavy', 1.0);
-e('vessel_pick_arcanist', 'Arcanist selected', 'a crackle of arcane fire and a shimmering astral chime', 1.0);
+e('vessel_pick_vanguard', 'Vanguard selected', 'a massive shield slam on stone, a booming impact with a heroic steel ring and rumble', 1.2);
+e('vessel_pick_arcanist', 'Arcanist selected', 'a full rich magic burst, a crackling fireball whoosh into a shimmering astral explosion with a sparkling tail', 1.3);
 e('vessel_pick_duelist', 'Duelist selected', 'two blades crossing with a sharp ring and a quick swish', 1.0);
 e('vessel_pick_hexbinder', 'Hexbinder selected', 'a sinister whispering hiss and a sickly bubbling curse', 1.0);
 e('vessel_pick_artificer', 'Artificer selected', 'clanking gears, a steam hiss and a tesla zap', 1.0);
-e('vessel_pick_templar', 'Templar selected', 'a holy bell strike with a radiant choir-like synth swell', 1.0);
+e('vessel_pick_templar', 'Templar selected', 'a huge holy BOOM, a thunderous divine impact with a giant bell strike and a radiant choir-like swell', 1.5);
 e('vessel_pick_berserker', 'Berserker selected', 'a heavy axe thud into wood and a guttural roar-like rumble', 1.0);
 e('vessel_pick_cryomancer', 'Cryomancer selected', 'crystalline ice forming with a cold glassy shimmer', 1.0);
 e('vessel_pick_ranger', 'Ranger selected', 'a bowstring drawn taut and released with a wind whoosh', 1.0);
@@ -90,7 +90,7 @@ e('player_downed', 'A hero is downed', 'a hero collapsing, armor clattering to t
 e('hero_death', 'A hero dies (bleeds out)', 'a final dying warrior gasp, low and grim', 1.2, { kind: 'vox', tier: 2 });
 e('player_revived', 'A hero is revived', 'a revival, a rising holy chime and a deep breath of air, hopeful', 1.5);
 e('revive_channel', 'Holding to revive an ally (loop while channeling)', 'a soft rising magical hum with sparkles, steady', 3.0, { loop: true, tier: 3 });
-e('heartbeat', 'Low health / Bloodlust pulse', 'a single slow heavy heartbeat, a deep double thump', 1.0);
+e('heartbeat', 'Low health / Bloodlust pulse', 'a loud clear heartbeat, a punchy double thump in the low-mid range, tense and audible', 1);
 e('combo', 'Combo counter goes up', 'a quick rising blip, a punchy chiptune counter tick', 0.5, { v: 3 });
 
 sec('impact', 'Hits, crits & kills', 'Every damage type sounds different. These are what make combat feel crunchy.', 'sfx');
@@ -100,7 +100,7 @@ e('impact_fire', 'Fire damage hit', 'a fiery impact, a whoomp of flame with crac
 e('impact_frost', 'Frost damage hit', 'an icy impact, a glassy crack and a tinkle of frost', 0.6, { v: 3 });
 e('impact_storm', 'Lightning damage hit', 'an electric impact, a sharp zap snap with buzzing sparks', 0.6, { v: 3 });
 e('impact_decay', 'Poison / decay damage hit', 'a wet sickly impact, a squelching splat with a gurgle', 0.6, { v: 3 });
-e('impact_astral', 'Holy / astral damage hit', 'a radiant impact, a bright crystalline ping with a soft thump', 0.6, { v: 3 });
+e('impact_astral', 'Holy / astral damage hit', 'a loud radiant impact, a bright crystalline crack with a punchy thump and a shimmering ring', 0.6, { v: 3 });
 e('hit_enemy', 'Generic hit on an enemy (fallback)', 'a meaty hit on a monster, a fleshy thud', 0.4, { v: 4 });
 e('crit', 'Critical hit (layered on top)', 'a big critical hit, a sharp metallic ka-ching crack with a bass punch', 0.7, { v: 2 });
 e('kill', 'Enemy killed by physical damage', 'a monster killed, a crunchy bone-breaking burst', 0.6, { v: 3 });
@@ -267,20 +267,20 @@ sec('fallbacks', 'Shared spell families (fallbacks)', 'Generic cast and blast so
 e('cast_fire', 'Generic fire cast', 'a fire spell igniting, a rising whoosh of flame with crackles', 0.6);
 e('blast_fire', 'Generic fire explosion', 'a fiery explosion, a deep boom and a rolling fireball', 1.0);
 e('cast_frost', 'Generic frost cast', 'a frost spell forming, a crystalline icy shimmer', 0.6);
-e('blast_frost', 'Generic frost burst', 'an ice burst, a hard crack and a hiss of frost with shards', 0.9);
+e('blast_frost', 'Generic frost burst', 'a big full ice explosion, a heavy booming crack, shattering glassy shards and a roaring hiss of frost', 1.1);
 e('cast_storm', 'Generic lightning cast', 'a lightning spell charging, a rising electric whine and a snap', 0.6);
 e('zap_strike', 'Generic lightning strike', 'a lightning bolt striking, a split-second crack and a short thunder roll', 1.0);
 e('cast_decay', 'Generic poison / curse cast', 'a dark curse cast, a gurgling whisper and sickly tones', 0.6);
 e('blast_decay', 'Generic rot burst', 'a burst of rot, a wet pop and a splattering spray', 0.8);
 e('cast_holy', 'Generic holy cast', 'a holy spell, a soft choir-like swell and a bell', 0.8);
-e('smite', 'Generic holy strike', 'a holy strike, a thump, a crack of judgement and ringing bells', 1.0);
+e('smite', 'Generic holy strike', 'a powerful holy strike with lots of oomph, a deep booming impact, a crack of light and big ringing bells', 1.2);
 e('cast_astral', 'Generic astral cast', 'starlight magic, an ascending glittering shimmer', 0.6);
 e('bow_shot', 'Generic bow shot', 'a bow twang and an arrow whoosh', 0.5, { v: 2 });
 e('gun_shot', 'Generic mechanical shot', 'a mechanical bolt gun firing, a clack and twang', 0.5, { v: 2 });
 e('throw_whoosh', 'Generic throw', 'an object thrown with a quick whoosh', 0.5);
 e('slam_heavy', 'Generic heavy slam', 'a heavy ground slam, a deep thud with rubble', 1.0);
-e('blade_flurry', 'Generic blade flurry', 'a quick flurry of blade slashes', 0.8);
-e('shield_bash', 'Generic shield bash', 'a heavy shield bash, a metallic thud', 0.6);
+e('blade_flurry', 'Generic blade flurry', 'a rapid flurry of five or six quick blade slashes in succession, swish swish swish, ending in a final sharp cut', 1.4);
+e('shield_bash', 'Generic shield bash', 'a loud heavy shield bash, a big metallic clang with a deep punchy thud', 0.7);
 e('summon_rise', 'Generic summon rising', 'something rising from the ground with a dark magical whoosh', 1.2);
 e('beast_howl', 'Generic beast howl', 'a wolf howl echoing', 1.5);
 e('beast_roar', 'Generic beast roar', 'a deep beast roar', 1.2);
@@ -290,7 +290,7 @@ e('trap_snap', 'Generic trap snap', 'a metal trap snapping shut', 0.6);
 e('blink', 'Generic blink / teleport', 'a quick magical blink, a pop with a reversed whoosh', 0.6);
 e('skill_guard', 'Generic guard / stance', 'a shield raised with a solid clank', 0.6);
 e('skill_sweep', 'Generic wide sweep', 'a wide weapon sweep whoosh', 0.7);
-e('skill_rally', 'Generic war cry / lure call', 'a short battle horn blast', 1.0);
+e('skill_rally', 'Generic war cry / lure call', 'a rousing war horn blast that rises in pitch then holds, layered with a battle shout-like roar, epic and heroic', 1.4);
 e('skill_fireline', 'Generic fire line', 'a line of fire igniting along the ground', 1.0);
 e('skill_arc', 'Generic arcing lightning', 'arcing lightning zaps', 0.7);
 e('skill_phase', 'Generic phase / warp', 'a warping phase shift whoosh', 0.6);
@@ -311,7 +311,7 @@ e('poisoned', 'Poison ticking on you', 'a sickly sizzling burn with a faint bubb
 e('blind_burst', 'You are blinded', 'a blinding flash, a bright whump and a high ringing tone', 0.8);
 e('web_spit', 'A web is spat at you', 'a sticky web shot, a wet thwip', 0.5);
 e('rooted', 'You are webbed / rooted down', 'sticky webbing or roots wrapping tight, stretching creaks', 0.7);
-e('silenced', 'You are silenced (no skills)', 'a muffled magical snuff, a dull hushed thump', 0.6);
+e('silenced', 'You are silenced (no skills)', 'a clear magical silencing effect, a sharp hush whoosh into a muffled thump, like a sound being snuffed out, clearly audible', 0.8);
 e('slowed', 'You are slowed', 'a heavy dragging sludge sound, slowing down', 0.6, { tier: 3 });
 e('stunned', 'You or a foe is stunned', 'a dizzy ringing with tiny chirping stars', 0.8, { tier: 3 });
 
@@ -392,14 +392,14 @@ e('core_firewall', 'Firewall walls close in', 'walls of digital fire roaring and
 e('core_glitch', 'Glitch teleport', 'a harsh digital glitch stutter and a static burst', 0.8);
 e('core_purge_alarm', 'Purge countdown alarm (find a safe tile)', 'a blaring computer alarm, urgent repeating beeps', 2.0);
 e('core_purge', 'System purge detonates', 'a massive electronic purge blast, a whooshing digital explosion', 1.5);
-e('core_deploy', 'Drones deploy', 'mechanical hatches opening and drones whirring out', 1.0);
+e('core_deploy', 'Drones deploy', 'mechanical hatches clanking open, then small drones whirring and buzzing as they fly out, hovering propeller hum', 1.6);
 e('core_voice', 'The Core speaks during its entrance', 'a distorted robotic AI voice tone, glitchy and menacing, no words', 2.0, { tier: 3, kind: 'vox' });
 e('boss_death_core', 'The Corrupted Core dies', 'a giant machine shutting down, a collapsing electronic whine and sparking explosions', 3.0, { tier: 2 });
 
 sec('boss_colossus', 'Boss: The Iron Colossus', 'A molten iron colossus with a hammer.', 'sfx');
 e('colossus_raise', 'Colossus raises its hammer', 'a massive iron hammer creaking upward, grinding metal and hissing steam', 1.2);
 e('colossus_hammer', 'Hammer quake slam', 'a colossal hammer smashing the ground, a molten boom and shockwave', 1.8);
-e('colossus_stomp', 'Piston stomp', 'a giant iron foot stomping, a heavy metallic thud with a hiss', 1.0);
+e('colossus_stomp', 'Piston stomp', 'a gigantic iron foot stomping down, a massive bassy boom shaking the ground, metal clang and a steam hiss', 1.2);
 e('colossus_vent', 'Furnace vents (overheat)', 'a furnace venting scalding steam with a roaring hiss', 2.0);
 e('lava_vent', 'Slag bubbles before erupting', 'molten lava bubbling and gurgling', 1.5);
 e('lava_erupt', 'Lava erupts', 'lava erupting violently with a fiery whoosh', 1.2);
@@ -446,7 +446,7 @@ e('imp_jingle', 'A treasure imp appears / runs', 'a sack of coins bouncing and j
 e('imp_portal', 'The treasure imp escapes through a portal', 'a rift tearing open with a rising warble and a sucking pop', 1.5);
 
 sec('world', 'Dungeon, doors & cinematics', 'Round flow, Fate doors, portals and cutscenes.', 'sfx');
-e('round_start', 'A round begins', 'a war horn blast echoing through a dungeon', 2.0);
+e('round_start', 'A round begins', 'a low distorted war horn blast, deep and gritty with overdriven bass, echoing through a dungeon', 2.2);
 e('round_clear', 'Round cleared', 'a victorious bright chime with a deep resolving drum', 2.0);
 e('door_appear', 'Fate doors rise from the floor', 'massive stone doors rising, grinding stone and a magical hum', 2.0);
 e('door_hum', 'Standing near a Fate door', 'a magical door humming with a low pulsing resonance', 3.0, { loop: true });

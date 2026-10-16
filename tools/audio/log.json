@@ -6,6 +6,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:13:49.181Z"
+  },
+  {
+   "prompt": "a soft airy whoosh with a faint stone scrape, sound more shimmery, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:49.201Z"
+  },
+  {
+   "prompt": "a shimmering magical whoosh, bright crystalline sparkle sweeping past with a soft airy tail, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:00.185Z"
   }
  ],
  "vessel_locked": [
@@ -33,6 +47,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:14:07.359Z"
+  },
+  {
+   "prompt": "a shield slammed down on stone and a steel ring, heroic and heavy, sound more impactful, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:50.392Z"
+  },
+  {
+   "prompt": "a massive shield slam on stone, a booming impact with a heroic steel ring and rumble, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:01.748Z"
   }
  ],
  "vessel_pick_arcanist": [
@@ -42,6 +70,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:14:08.664Z"
+  },
+  {
+   "prompt": "a crackle of arcane fire and a shimmering astral chime, doesnt sound like a sound effect currently - we need it to sound more full, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:51.737Z"
+  },
+  {
+   "prompt": "a full rich magic burst, a crackling fireball whoosh into a shimmering astral explosion with a sparkling tail, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.3,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:04.033Z"
   }
  ],
  "vessel_pick_duelist": [
@@ -78,6 +120,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:14:14.275Z"
+  },
+  {
+   "prompt": "a holy bell strike with a radiant choir-like synth swell, none are impactful - we need a BOOM, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:52.827Z"
+  },
+  {
+   "prompt": "a huge holy BOOM, a thunderous divine impact with a giant bell strike and a radiant choir-like swell, retro 8-bit chiptune UI sound for a dark fantasy game menu, crisp and short, no music",
+   "seconds": 1.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:04.896Z"
   }
  ],
  "vessel_pick_berserker": [
@@ -294,6 +350,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:14:45.248Z"
+  },
+  {
+   "prompt": "a single slow heavy heartbeat, a deep double thump, too low pitched cant hear anything, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:54.025Z"
+  },
+  {
+   "prompt": "a loud clear heartbeat, a punchy double thump in the low-mid range, tense and audible, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:06.100Z"
   }
  ],
  "combo": [
@@ -366,6 +436,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:14:56.107Z"
+  },
+  {
+   "prompt": "a radiant impact, a bright crystalline ping with a soft thump, almost nothing audible, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:55.089Z"
+  },
+  {
+   "prompt": "a loud radiant impact, a bright crystalline crack with a punchy thump and a shimmering ring, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:07.399Z"
   }
  ],
  "hit_enemy": [
@@ -483,6 +567,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:15:12.509Z"
+  },
+  {
+   "prompt": "an ice burst, a hard crack and a hiss of frost with shards, too toned down, not full enough, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.9,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:56.343Z"
+  },
+  {
+   "prompt": "a big full ice explosion, a heavy booming crack, shattering glassy shards and a roaring hiss of frost, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:08.659Z"
   }
  ],
  "cast_storm": [
@@ -537,6 +635,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:15:20.734Z"
+  },
+  {
+   "prompt": "a holy strike, a thump, a crack of judgement and ringing bells, needs more oomph, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:57.772Z"
+  },
+  {
+   "prompt": "a powerful holy strike with lots of oomph, a deep booming impact, a crack of light and big ringing bells, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:10.290Z"
   }
  ],
  "cast_astral": [
@@ -591,6 +703,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:15:28.978Z"
+  },
+  {
+   "prompt": "a quick flurry of blade slashes, all these sounds effects are just one blade slash - perhaps lengthen the generation?, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:51:58.972Z"
+  },
+  {
+   "prompt": "a rapid flurry of five or six quick blade slashes in succession, swish swish swish, ending in a final sharp cut, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:12.312Z"
   }
  ],
  "shield_bash": [
@@ -600,6 +726,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:15:29.593Z"
+  },
+  {
+   "prompt": "a heavy shield bash, a metallic thud, none are audible, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:52:00.094Z"
+  },
+  {
+   "prompt": "a loud heavy shield bash, a big metallic clang with a deep punchy thud, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.7,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:13.085Z"
   }
  ],
  "summon_rise": [
@@ -681,6 +821,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:15:43.588Z"
+  },
+  {
+   "prompt": "a short battle horn blast, sounds like a car horn right now lol - no change in pitch., 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:52:01.512Z"
+  },
+  {
+   "prompt": "a rousing war horn blast that rises in pitch then holds, layered with a battle shout-like roar, epic and heroic, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:14.758Z"
   }
  ],
  "skill_fireline": [
@@ -852,6 +1006,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:16:07.681Z"
+  },
+  {
+   "prompt": "a muffled magical snuff, a dull hushed thump, no sound currently, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:52:02.765Z"
+  },
+  {
+   "prompt": "a clear magical silencing effect, a sharp hush whoosh into a muffled thump, like a sound being snuffed out, clearly audible, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 0.8,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:16.285Z"
   }
  ],
  "enemy_shoot": [
@@ -1032,6 +1200,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:16:35.568Z"
+  },
+  {
+   "prompt": "mechanical hatches opening and drones whirring out, hatch sound is there, but no drone sound, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:52:04.950Z"
+  },
+  {
+   "prompt": "mechanical hatches clanking open, then small drones whirring and buzzing as they fly out, hovering propeller hum, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.6,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:18.143Z"
   }
  ],
  "colossus_raise": [
@@ -1059,6 +1241,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:16:39.766Z"
+  },
+  {
+   "prompt": "a giant iron foot stomping, a heavy metallic thud with a hiss, none are impactful, no oomph, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:52:05.891Z"
+  },
+  {
+   "prompt": "a gigantic iron foot stomping down, a massive bassy boom shaking the ground, metal clang and a steam hiss, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:19.633Z"
   }
  ],
  "colossus_vent": [
@@ -1266,6 +1462,20 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T16:17:15.422Z"
+  },
+  {
+   "prompt": "a war horn blast echoing through a dungeon, needs to low and distorted, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:52:07.122Z"
+  },
+  {
+   "prompt": "a low distorted war horn blast, deep and gritty with overdriven bass, echoing through a dungeon, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 2.2,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T16:53:21.586Z"
   }
  ],
  "round_clear": [
