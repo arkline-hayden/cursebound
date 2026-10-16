@@ -20,6 +20,8 @@ interface View {
   kind: string;
   tier: number;
   lastSpark: number;
+  /** the pop-out arc has landed (its clink played, or it was already lying there when first seen) */
+  landed: boolean;
 }
 
 const LOOK: Record<string, { tex: string; fallback: string; glow: number; spark: number }> = {
@@ -31,7 +33,8 @@ export class PickupRenderer {
   private views = new Map<number, View>();
   private collected = new Set<number>();
 
-  constructor(private scene: Phaser.Scene, private juice: Juice) {
+  /** `onDrop`: a freshly dropped potion or orb lands at world (x, y) (the scene plays item_drop) */
+  constructor(private scene: Phaser.Scene, private juice: Juice, private onDrop?: (kind: string, x: number, y: number) => void) {
     this.ensureTextures();
   }
 
@@ -63,7 +66,7 @@ export class PickupRenderer {
     }
   }
 
-  private make(p: SnapPickup, now: number): View {
+  private make(p: SnapPickup, now: number, tick: number): View {
     const s = this.scene;
     const look = LOOK[p.k] ?? LOOK.potion;
     const tex = s.textures.exists(look.tex) ? look.tex : look.fallback;
@@ -74,7 +77,7 @@ export class PickupRenderer {
       ? s.add.image(0, 0, 'light:soft').setBlendMode(Phaser.BlendModes.ADD).setTint(look.glow).setAlpha(0.4).setScale(p.t > 0 ? 0.24 : 0.17, (p.t > 0 ? 0.24 : 0.17) * 0.8)
       : undefined;
     const shadow = s.add.ellipse(0, 0, 12, 5, 0x000000, 0.5).setDepth(-58);
-    const v: View = { spr, glow, shadow, x: p.x, y: p.y, seen: now, kind: p.k, tier: p.t, lastSpark: now };
+    const v: View = { spr, glow, shadow, x: p.x, y: p.y, seen: now, kind: p.k, tier: p.t, lastSpark: now, landed: tick - p.b > 30 };
     this.views.set(p.i, v);
     return v;
   }
@@ -85,7 +88,7 @@ export class PickupRenderer {
     for (const p of pickups ?? []) {
       if (!LOOK[p.k] || this.collected.has(p.i)) continue;
       seen.add(p.i);
-      const v = this.views.get(p.i) ?? this.make(p, now);
+      const v = this.views.get(p.i) ?? this.make(p, now, tick);
       // magnet pull arrives in 20 Hz steps: glide toward the authoritative spot
       const k = Math.min(1, delta / 55);
       v.x += (p.x - v.x) * k; v.y += (p.y - v.y) * k;
@@ -93,6 +96,7 @@ export class PickupRenderer {
       const age = now - v.seen;
       // pop out of the body in a little arc, then bob
       const pop = age < 320 ? Math.sin((age / 320) * Math.PI) * 18 : 0;
+      if (!v.landed && age >= 300) { v.landed = true; this.onDrop?.(p.k, p.x, p.y); }
       const bob = Math.sin(now / 280 + p.i) * 2.5;
       const lift = 8 + pop + bob;
       const left = p.u > 0 ? p.u - tick : Infinity;

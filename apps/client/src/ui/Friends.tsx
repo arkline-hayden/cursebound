@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CLASSES } from '@cursebound/content';
 import { hostStore } from '@/lib/p2p/host';
 import { dismissInvite, invite, presenceStore, type Friend, type Invite, type PeerId } from '@/lib/p2p/presence';
 import { runtimeConfigSync } from '@/lib/runtime';
 import { useStore } from '@/lib/store';
 import { ClassEmblem } from './icons';
+import { playUiFile } from './uiCues';
 
 // Online-mode social bits (docs/contracts/ONLINE_CONTRACT.md): the friends plate on the title screen (who is online,
 // what they are doing, Join), incoming party invites as pixel toasts, and the lobby's "Invite friends" picker.
@@ -83,6 +84,15 @@ export function InviteToasts({ busy, onJoin }: { busy: boolean; onJoin: (inv: In
     const id = setInterval(() => { for (const i of presenceStore.get().invites) if (Date.now() - i.at > 60_000) dismissInvite(i.id); }, 5000);
     return () => clearInterval(id);
   }, [invites.length]);
+  // a fresh invite: raven wings and a chime (invites already up when the toasts mount stay quiet; a re-sent invite
+  // from the same party is a new arrival)
+  const latest = invites.reduce((a, i) => Math.max(a, i.at), 0);
+  const heardAt = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = heardAt.current;
+    heardAt.current = Math.max(prev ?? 0, latest);
+    if (prev !== null && latest > prev && Date.now() - latest < 5000) playUiFile('invite_received', 'ui_toast', { priority: 5 });
+  }, [latest]);
   if (!invites.length) return null;
   return (
     <div className="invite-toasts" aria-live="polite">

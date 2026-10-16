@@ -7,6 +7,8 @@ import { clearSeat } from '@/lib/profile';
 import { keyCap, settingsStore, updateSettings, type Action } from '@/lib/settings';
 import { padGlyph, padStore } from '@/lib/gamepad';
 import { useStore } from '@/lib/store';
+import { useEffect, useRef } from 'react';
+import { playUiFile } from './uiCues';
 
 // "First Descent" prompts (simulation tutorialRoom.ts, snapshot `gd`): one short line just below the hero (the
 // camera keeps the hero dead centre), with the real bound keys — or controller glyphs while a pad is in use — and
@@ -25,6 +27,15 @@ export function TutorialGuide({ net }: { net: GameConnection }) {
   const fam = useStore(padStore, (s) => s.family);
   const slot = useStore(netStore, (s) => s.slot);
   const gd = snap?.gd;
+  // a step completed: a rising sparkle, once per step (the "Done" flash, or the authority moving straight on)
+  const finished = gd ? (gd.d < 0 ? gd.s : gd.s - 1) : null;
+  const lastFinished = useRef<number | null>(null);
+  useEffect(() => {
+    if (finished === null) return;
+    const prev = lastFinished.current;
+    lastFinished.current = prev === null ? finished : Math.max(prev, finished);
+    if (prev !== null && finished > prev) playUiFile('tutorial_step', 'ui_confirm', { priority: 5 });
+  }, [finished]);
   if (!gd || (phase !== 'COMBAT' && phase !== 'VOTING') || gd.s >= TOTAL) return null;
   // beside a legendary its quick-compare (GearLayer) takes the centre and does the teaching: step aside
   const me = snap.players[slot];

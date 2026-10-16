@@ -189,6 +189,9 @@ const STATUS_TEXT: Record<string, [string, string, SfxId | null]> = {
   slowed: ['SLOWED', '#a8b8c8', null],
 };
 
+/** Recorded takes for statuses landing on the local hero (tier 3), played instead of the shared cue when present. */
+const STATUS_FILE: Record<string, string> = { slowed: 'slowed' };
+
 export class AfflictionFx {
   private under: Phaser.GameObjects.Graphics;
   private over: Phaser.GameObjects.Graphics;
@@ -401,7 +404,9 @@ export class AfflictionFx {
         if (!st) return true;
         if (e.sec <= 0) { if (mine) J.number(q.x, q.y - 44, 'IMMUNE', '#a8a0b0', 'sm'); return true; }
         J.number(q.x, q.y - 44, st[0], st[1], mine ? 'md' : 'sm');
-        if (st[2]) this.sfx(st[2], e.x, e.y, mine ? 3 : 1);
+        const file = mine ? STATUS_FILE[e.s] : undefined;
+        if (file) getAudio()?.playFile(file, st[2], { priority: 3, volume: 0.8 });
+        else if (st[2]) this.sfx(st[2], e.x, e.y, mine ? 3 : 1);
         if (e.s === 'frozen') { J.ring(q.x, q.y, 22, 0xbfeeff, 260); J.sparksAt(q.x, q.y - 16, 8, 0xe8fbff); }
         if (e.s === 'chained' && e.ax !== undefined && e.ay !== undefined) { const A = iso.p(e.ax, e.ay); J.dust(A.x, A.y, 5, 0x3a3430); J.sparksAt(A.x, A.y - 6, 6, 0xb8b0a0); }
         if (e.s === 'rooted') J.dust(q.x, q.y, 4, 0xd8d0c0);

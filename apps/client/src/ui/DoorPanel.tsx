@@ -10,6 +10,7 @@ import { ForecastDetail, MechLine, StatLine, cardDef, signed } from './FateVote'
 import { CardIcon } from './icons';
 import { BlessingIcon } from './itemIcons';
 import styles from './DoorPanel.module.css';
+import { useCountdownTick } from './uiCues';
 
 // VOTING / FATE_COMMIT: the in-world door vote (REQ VOTE01 rules unchanged). The party walks the cleared floor to
 // three themed doors; standing in one is a vote (solo: 1 s commits; co-op: everyone in the same door). This overlay
@@ -46,6 +47,7 @@ export function DoorPanel({ net, onLedger }: { net: GameConnection; onLedger: ()
   const slot = useStore(netStore, (s) => s.slot);
   const serverTick = useStore(netStore, (s) => s.serverTick);
   const commit = useStore(netStore, (s) => s.commit);
+  useCountdownTick(phase?.phase === 'VOTING' && offer ? deadlineSeconds(offer.deadlineTick, serverTick) : null);
   const [hover, setHover] = useState<number | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [detail, setDetail] = useState<number | null>(null);

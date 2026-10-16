@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { BOSSES, ENEMY_BY_ID, SHRINES, SKILL_BY_ID } from '@cursebound/content';
-import { BOSS_DEATH_FILE, CueGate, FOE_VOICE, SHRINE_FILE, SKILL_FILE, foeVoice } from '../apps/client/src/game/audio/fileCues';
+import { BOSS_DEATH_FILE, CueGate, FOE_VOICE, FoeWatch, SHRINE_FILE, SKILL_FILE, countdownSecond, foeVoice, seatDelta } from '../apps/client/src/game/audio/fileCues';
 
 // Recorded-file cues (tools/audio/sounds.mjs tier 2) must each be triggered somewhere in the client: either named
 // literally in apps/client/src (playFile / sfxFile / skillSfx / fileSfx call sites and the audio/fileCues.ts tables) or
@@ -80,6 +80,62 @@ describe('tier-2 recorded cues', () => {
     expect(Object.keys(BOSS_DEATH_FILE).sort()).toEqual(BOSSES.map((b) => b.id).sort());
     expect(Object.keys(SHRINE_FILE).sort()).toEqual(SHRINES.map((s) => s.id).sort());
     for (const k of [...Object.values(BOSS_DEATH_FILE), ...Object.values(SHRINE_FILE)]) expect(T2_KEYS.has(k), k).toBe(true);
+  });
+});
+
+// Tier 3: lobby / social / results / menu moments and combat details (the ui_* panel cues and ready_up are shared
+// SfxIds the interface already plays by name). Every tier-3 key must be named somewhere in the client source.
+const TIER3 = ENTRIES.filter((e) => e.tier === 3);
+
+describe('tier-3 recorded cues', () => {
+  it('are all wired', () => {
+    expect(TIER3.length).toBeGreaterThan(0);
+    expect(TIER3.map((e) => e.file).filter((k) => !literal(k))).toEqual([]);
+  });
+
+  it('include the moments wired by file name', () => {
+    const keys = new Set(TIER3.map((e) => e.file));
+    for (const k of ['party_join', 'party_leave', 'invite_received', 'countdown_tick', 'tutorial_step', 'xp_tick', 'score_tick',
+      'new_record', 'bounty_complete', 'skill_refund', 'ledger_open', 'revive_channel', 'knockback', 'skill_warden_summon_blink',
+      'slowed', 'stunned', 'core_voice', 'item_drop', 'training_dummy']) expect(keys.has(k), `${k} is not a tier-3 entry`).toBe(true);
+  });
+});
+
+describe('tier-3 helpers', () => {
+  it('seatDelta counts seats filled and emptied, quiet on first sight', () => {
+    expect(seatDelta(null, [0, 1])).toEqual({ joined: 0, left: 0 });
+    expect(seatDelta([0], [0, 1])).toEqual({ joined: 1, left: 0 });
+    expect(seatDelta([0, 1, 2], [0, 2])).toEqual({ joined: 0, left: 1 });
+    expect(seatDelta([0, 1], [0, 2])).toEqual({ joined: 1, left: 1 });
+  });
+
+  it('countdownSecond shows only the last five whole seconds', () => {
+    expect(countdownSecond(null)).toBeNull();
+    expect(countdownSecond(12)).toBeNull();
+    expect(countdownSecond(5)).toBe(5);
+    expect(countdownSecond(4.2)).toBe(5);
+    expect(countdownSecond(0.3)).toBe(1);
+    expect(countdownSecond(0)).toBeNull();
+  });
+
+  it('FoeWatch reports stuns on the stagger edge and shoves along a fresh hit', () => {
+    const w = new FoeWatch();
+    const foe = (x: number, stag = false, boss = false) => ({ i: 1, x, y: 0, stag, boss });
+    const hit = () => ({ dx: 1, dy: 0 });
+    const none = () => undefined;
+    const walk = () => 3;
+    expect(w.step(0, [foe(0)], hit, walk)).toEqual({ stunned: [], knocked: [] });   // first sight seeds
+    // 3 ticks (0.05 s): walking covers 0.15 at most; a 0.3 shove along the hit reads as knockback
+    expect(w.step(3, [foe(0.3)], hit, walk).knocked).toHaveLength(1);
+    expect(w.step(6, [foe(0.6)], none, walk).knocked).toHaveLength(0);   // no fresh hit: just movement
+    expect(w.step(9, [foe(0.7)], hit, walk).knocked).toHaveLength(0);    // walking pace
+    expect(w.step(12, [foe(0.4)], hit, walk).knocked).toHaveLength(0);   // toward the hitter
+    expect(w.step(12, [foe(2, true)], hit, walk)).toEqual({ stunned: [], knocked: [] });   // same snapshot again: ignored
+    expect(w.step(15, [foe(0.4, true)], none, walk).stunned).toHaveLength(1);
+    expect(w.step(18, [foe(0.4, true)], none, walk).stunned).toHaveLength(0);   // still stunned: no repeat
+    expect(w.step(21, [foe(1.4, false, true)], hit, walk).knocked).toHaveLength(0);   // bosses are never shoved
+    w.clear();
+    expect(w.step(24, [foe(5, true)], hit, walk)).toEqual({ stunned: [], knocked: [] });   // a new floor seeds again
   });
 });
 

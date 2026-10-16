@@ -361,6 +361,42 @@ export class AudioEngine {
     if (fallback) this.play(fallback, opts);
   }
 
+  /**
+   * Start a recorded loop (a channel, e.g. revive_channel) on the combat bus, faded in. Returns its stop handle (fades
+   * out), or null while there is nothing to play: no such file, still decoding, or audio still locked (callers retry).
+   */
+  loopFile(key: string, opts: { volume?: number } = {}): { stop(): void } | null {
+    const ctx = this.ctx, s = this.synth, group = this.groups.combat;
+    if (!ctx || ctx.state !== 'running' || !s || !group || !SampleBank.has(key)) return null;
+    const take = this.samples.pick(key, () => s.rand());
+    if (!take) return null;
+    const src = ctx.createBufferSource();
+    src.buffer = take.buf;
+    src.loop = true;
+    src.loopStart = take.offset;
+    src.loopEnd = take.buf.duration;
+    const out = ctx.createGain();
+    const t0 = ctx.currentTime;
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(Math.min(1.5, Math.max(0, opts.volume ?? 1)) * take.gain, t0 + 0.12);
+    src.connect(out);
+    out.connect(group);
+    src.start(t0, take.offset);
+    let stopped = false;
+    return {
+      stop: () => {
+        if (stopped) return;
+        stopped = true;
+        const t = ctx.currentTime;
+        out.gain.cancelScheduledValues(t);
+        out.gain.setValueAtTime(out.gain.value, t);
+        out.gain.linearRampToValueAtTime(0, t + 0.2);
+        try { src.stop(t + 0.25); } catch { /* already stopped */ }
+        setTimeout(() => { try { src.disconnect(); out.disconnect(); } catch { /* gone */ } }, 400);
+      },
+    };
+  }
+
   play(id: SfxId, opts: { pan?: number; priority?: number; volume?: number; dist?: number; file?: string } = {}): void {
     const critical = CRITICAL_SFX.includes(id);
     if (!opts.file || opts.file === id) this.caption(id, critical);

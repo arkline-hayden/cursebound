@@ -7,10 +7,12 @@ import { presenceStore } from '@/lib/p2p/presence';
 import { progressStore, refreshProgress } from '@/lib/progress';
 import { authStore } from '@/lib/auth';
 import { cachedProfile } from '@/lib/profile';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { seatDelta } from '@/game/audio/fileCues';
 import { LobbyVessels } from './VesselSelect';
 import { InviteFriends } from './Friends';
+import { playUiFile } from './uiCues';
 
 // LOBBY (PRD §16.1): invite code, roster, classes, readiness and trust mode. No host privileges.
 // A gothic character-select hall sized to fit 1280x720: header with the code tablet, the party stage (every member's
@@ -24,6 +26,17 @@ export function Lobby({ net }: { net: GameConnection }) {
   const online = useStore(presenceStore, (s) => s.conn === 'online');
   const level = useStore(progressStore, (s) => s.progress?.level ?? null);   // locked classes (progression)
   useEffect(() => { if (!progressStore.get().progress) void refreshProgress(authStore.get().account?.profileId ?? cachedProfile()?.id ?? null); }, []);
+  // a seat filled or emptied (not our own arrival: the first roster we see stays quiet)
+  const seatKey = room ? room.seats.map((s) => s.slot).join(',') : null;
+  const lastSeats = useRef<number[] | null>(null);
+  useEffect(() => {
+    if (seatKey === null) { lastSeats.current = null; return; }
+    const next = seatKey ? seatKey.split(',').map(Number) : [];
+    const { joined, left } = seatDelta(lastSeats.current, next);
+    lastSeats.current = next;
+    if (joined) playUiFile('party_join', 'ui_confirm', { priority: 5 });
+    else if (left) playUiFile('party_leave', 'ui_back', { priority: 5 });
+  }, [seatKey]);
   if (!room) return null;
   const me = room.seats.find((s) => s.you);
   const solo = room.mode === 'solo';

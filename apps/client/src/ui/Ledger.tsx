@@ -146,7 +146,7 @@ export function Ledger({ net, onClose }: { net: GameConnection; onClose: () => v
   const ql = q.toLowerCase();
   const mechanics = (view?.mechanics ?? []).filter((m) => !q || m.name.toLowerCase().includes(ql) || m.short.toLowerCase().includes(ql) || m.sources.some((s) => cardName(s.cardId).toLowerCase().includes(ql)));
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="ledger-h" style={{ zIndex: 'var(--z-ledger)' }}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="ledger-h" data-sfx-open="ledger_open" style={{ zIndex: 'var(--z-ledger)' }}>
       <div className="frame sheet fit ornate crest ledger-sheet">
         <div className="panel-head">
           <div>
