@@ -27,7 +27,7 @@ export const FLOOR_FOR_THEME: Record<string, Floor> = {
 
 /** Pitch randomisation spread per cue (fraction); UI and big cinematic cues barely vary. */
 export function pitchSpread(id: SfxId): number {
-  if (id.startsWith('ui_') || id === 'move_click' || id === 'minimap_ping' || id.startsWith('vote_') || id === 'fate_commit') return 0.01;
+  if (id.startsWith('ui_') || id.startsWith('vessel_') || id === 'move_click' || id === 'minimap_ping' || id.startsWith('vote_') || id === 'fate_commit') return 0.01;
   if (id === 'footstep') return 0.12;
   if (id === 'hit_enemy' || id === 'kill' || id === 'enemy_death' || id === 'swing' || id === 'enemy_bite') return 0.09;
   // tonal cues stay in the song's key; layered impacts and typed kills vary enough that a pack's worth never drones
@@ -907,6 +907,84 @@ export function synthSfx(s: Synth, id: SfxId, o: AudioNode, t: number, env: SfxE
       s.noiseHit(o, t, { dur: 0.9, f: 300, f2: 2200, q: 1.2, gain: 0.18, attack: 0.06 });
       s.crunchHit(o, t + 0.05, { dur: 0.25, f: 1200, q: 0.8, gain: 0.16, drive: 4 });
       return s.tone(o, t, { f: 58, f2: 40, dur: 0.8, gain: 0.2 });
+    // ---------------------------------------------------------------- Vessel Select (ui/VesselSelect.tsx)
+    case 'vessel_shift':
+      // a soft cloth-and-air whoosh as the spotlight slides to the next hero
+      s.noiseHit(o, t, { dur: 0.18, f: 380, f2: 1500, q: 1.4, gain: 0.05, attack: 0.07 });
+      return s.tone(o, t + 0.02, { f: 140, f2: 90, dur: 0.12, gain: 0.03, attack: 0.04 });
+    case 'vessel_locked':
+      // a dull, heavy thunk and the chains settling: this vessel will not answer yet
+      s.tone(o, t, { f: 92, f2: 52, dur: 0.16, gain: 0.3, filter: 500 });
+      s.noiseHit(o, t, { dur: 0.07, type: 'lowpass', f: 420, gain: 0.16, brown: true });
+      s.click('chain', o, t + 0.05, 0.6);
+      s.click('chain', o, t + 0.12, 0.35);
+      return 0.35;
+    case 'vessel_roar': {
+      // the chosen portal roars open: a rising rush and sub swell into a whoomp (0.9 s, with the flare), a bell in
+      // the key and a long falling tail as the hero is swallowed
+      s.noiseHit(o, t, { dur: 0.95, f: 180, f2: 3600, q: 1.1, gain: 0.16, attack: 0.8 });
+      s.tone(o, t, { f: 38, f2: 75, dur: 1.0, gain: 0.3, attack: 0.7, glide: 0.95 });
+      [0, 7, 12, 19].forEach((d, k) => s.tone(o, t + 0.15 + k * 0.15, { type: 'triangle', f: mtof(key + 12 + d), dur: 0.7, gain: 0.025, attack: 0.03 }));
+      s.crunchHit(o, t + 0.9, { dur: 0.28, type: 'lowpass', f: 1800, gain: 0.32, drive: 4 });
+      s.tone(o, t + 0.9, { f: 70, f2: 28, dur: 1.2, gain: 0.5, glide: 1.0 });
+      s.bigBell(o, t + 0.9, mtof(key - 12), 2.6, 0.1);
+      s.noiseHit(o, t + 0.92, { dur: 1.1, f: 3200, f2: 160, q: 1, gain: 0.12, attack: 0.01 });
+      return 2.6;
+    }
+    case 'vessel_pick_vanguard':
+      // steel on an anvil and a short war-horn stab
+      s.click('anvil', o, t, 1);
+      s.brass(o, t + 0.04, mtof(key - 12), 0.5, 0.08, 1.1);
+      s.brass(o, t + 0.04, mtof(key - 5), 0.5, 0.05, 1);
+      return 0.04 + s.tone(o, t, { f: 110, f2: 55, dur: 0.25, gain: 0.25 });
+    case 'vessel_pick_arcanist':
+      // a crackle of embers under a climbing arcane arpeggio and a spark of storm
+      for (let k = 0; k < 6; k++) s.noiseHit(o, t + r() * 0.3, { dur: 0.02, f: 2500 + r() * 2500, q: 3, gain: 0.05, attack: 0.002 });
+      [0, 4, 7, 11, 14].forEach((d, k) => s.tone(o, t + k * 0.05, { type: 'triangle', f: mtof(key + 12 + d), dur: 0.4, gain: 0.035, attack: 0.01 }));
+      return 0.3 + s.tone(o, t + 0.3, { type: 'square', f: 2400, f2: 600, dur: 0.08, gain: 0.025, filter: 4000 });
+    case 'vessel_pick_duelist':
+      // a blade drawn: a bright rising shing and a cold glint
+      s.noiseHit(o, t, { dur: 0.22, type: 'highpass', f: 1800, f2: 7000, gain: 0.1, attack: 0.03 });
+      s.bell(o, t + 0.12, 2637, 0.5, 0.05, 1.6);
+      return 0.12 + s.bell(o, t + 0.16, 3520, 0.45, 0.03, 1.8);
+    case 'vessel_pick_hexbinder':
+      // a cursed bell pair a semitone apart over a whisper
+      s.bell(o, t, mtof(key + 12), 0.9, 0.06, 0.8);
+      s.bell(o, t + 0.02, mtof(key + 13), 0.9, 0.05, 0.8);
+      s.click('whisper', o, t + 0.05, 0.9);
+      return s.tone(o, t, { type: 'sawtooth', f: mtof(key - 12), dur: 0.7, gain: 0.03, filter: 500, attack: 0.15 });
+    case 'vessel_pick_artificer':
+      // gears catching, a blip arpeggio and a hiss of steam
+      for (let k = 0; k < 4; k++) s.click('chain', o, t + k * 0.04, 0.5);
+      [0, 7, 12].forEach((d, k) => s.tone(o, t + 0.12 + k * 0.06, { type: 'square', f: mtof(key + 24 + d), dur: 0.07, gain: 0.03, filter: 3500 }));
+      return 0.3 + s.noiseHit(o, t + 0.3, { dur: 0.35, type: 'highpass', f: 4000, gain: 0.05, attack: 0.03 });
+    case 'vessel_pick_templar':
+      // a held choir chord and a bell from above
+      s.choirNote(o, t, mtof(key + 12), 0.9, 0.035);
+      s.choirNote(o, t, mtof(key + 16), 0.9, 0.025);
+      s.choirNote(o, t, mtof(key + 19), 0.9, 0.025);
+      s.bell(o, t + 0.08, mtof(key + 24), 0.8, 0.05, 1.2);
+      return 0.9;
+    case 'vessel_pick_berserker':
+      // a war drum and a growl
+      s.drum('taiko', o, t, 1.1);
+      s.tone(o, t + 0.05, { type: 'sawtooth', f: 85, f2: 70, dur: 0.4, gain: 0.1, filter: 650, q: 4, attack: 0.03 });
+      return s.noiseHit(o, t + 0.05, { dur: 0.35, f: 380, f2: 240, q: 1, gain: 0.1, attack: 0.04 }) + 0.05;
+    case 'vessel_pick_cryomancer':
+      // glassy chimes and frost settling
+      for (let k = 0; k < 5; k++) s.bell(o, t + k * 0.045 + r() * 0.02, mtof(key + 24 + [0, 7, 12, 16, 19][k]!), 0.6, 0.035, 1.8);
+      s.click('ice', o, t + 0.05, 0.8);
+      return s.noiseHit(o, t, { dur: 0.5, type: 'highpass', f: 6500, gain: 0.03, attack: 0.15 });
+    case 'vessel_pick_ranger':
+      // a gust, a bowstring pluck and a hawk's call
+      s.noiseHit(o, t, { dur: 0.3, f: 500, f2: 2200, q: 1.2, gain: 0.06, attack: 0.12 });
+      s.pluck(o, t + 0.08, mtof(key), 0.4, 0.12);
+      return 0.25 + s.tone(o, t + 0.25, { f: 1900, f2: 2600, dur: 0.18, gain: 0.025, attack: 0.02, glide: 0.15 });
+    case 'vessel_pick_warden':
+      // a hollow wooden knock, rustling leaves and a distant spirit howl
+      s.drum('log', o, t, 0.9);
+      for (let k = 0; k < 5; k++) s.noiseHit(o, t + 0.04 + r() * 0.2, { dur: 0.05, f: 2600 + r() * 1800, q: 2, gain: 0.03, attack: 0.01 });
+      return 0.1 + s.tone(o, t + 0.1, { type: 'triangle', f: 360, f2: 620, dur: 0.6, gain: 0.03, attack: 0.08, glide: 0.35 });
     default:
       return bossSfx(s, id, o, t, env) ?? 0.1;   // theme bosses (bossRecipes.ts)
   }

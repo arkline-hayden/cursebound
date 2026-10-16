@@ -9,13 +9,13 @@ import { authStore } from '@/lib/auth';
 import { cachedProfile } from '@/lib/profile';
 import { useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { ActorPortrait, actorFor } from './ClassPortrait';
-import { ClassPicker } from './ClassPicker';
+import { LobbyVessels } from './VesselSelect';
 import { InviteFriends } from './Friends';
 
 // LOBBY (PRD §16.1): invite code, roster, classes, readiness and trust mode. No host privileges.
-// A gothic character-select hall sized to fit 1280x720: header with the code tablet, the shared vessel picker beside
-// the gathered roster, and a pinned footer so Leave and Ready are always on screen.
+// A gothic character-select hall sized to fit 1280x720: header with the code tablet, the party stage (every member's
+// hero on a portal plinth with their name over it, yours in the centre; ui/VesselSelect.tsx) above the class strip,
+// and a pinned footer so Leave and Ready are always on screen.
 // Online, the host of a co-op room also gets "Invite friends" beside the code (friends join peer-to-peer).
 
 export function Lobby({ net }: { net: GameConnection }) {
@@ -56,35 +56,18 @@ export function Lobby({ net }: { net: GameConnection }) {
         </header>
 
         <div className="sheet-body lobby-body">
-          <section className="lobby-vessel" aria-labelledby="lobby-cls">
-            <span className="engraved" id="lobby-cls">{me?.ready ? 'Vessel locked — undo Ready to change' : 'Choose your vessel'}</span>
-            <ClassPicker value={myClass} onChange={(id) => net.lobby({ classId: id })} disabled={!!me?.ready} labelledBy="lobby-cls" idPrefix="lobby-vessel" level={level} />
-          </section>
-
-          <section className="lobby-party" aria-labelledby="lobby-party-h">
-            <span className="engraved" id="lobby-party-h">Party {room.seats.length}/{solo ? 1 : 5}</span>
-            <ul className="roster" aria-live="polite">
-              {room.seats.map((s) => (
-                <li key={s.slot} className={`seat ${s.you ? 'you' : ''} ${s.connected ? '' : 'away'}`}>
-                  <span className="seat-portrait"><ActorPortrait actor={actorFor(s.classId)} size={96} animate={s.ready && s.connected} /></span>
-                  <span className="seat-info">
-                    <span className="seat-name">{s.name}{s.you ? ' (you)' : ''}</span>
-                    <span className="seat-line">
-                      <span className="seat-class">{CLASS_BY_ID[s.classId]?.name ?? s.classId}</span>
-                      <span className={`chip ${s.ready ? 'good' : s.connected ? '' : 'bad'}`}>{s.connected ? (s.ready ? 'Ready' : 'Choosing') : 'Offline'}</span>
-                    </span>
-                  </span>
-                </li>
-              ))}
-              {!solo && room.seats.length < 5 && <li className="seat empty"><span className="seat-portrait" /><span className="seat-info"><span className="seat-name">Open seat</span><span className="seat-class">Share the code to fill it</span></span></li>}
-            </ul>
-            {!solo && (
-              <p className="faint lobby-note">
-                {online ? <>Friends join from their friends list, or anywhere with the code.</> : room.lan.enabled ? <>Others on your network open {room.lan.hosts.join(' or ')} and join with the code.</> : <>Open another browser window here and join with the code. LAN sharing is off unless started with --lan.</>}
-                {' '}The party size locks when everyone is ready.
-              </p>
-            )}
-          </section>
+          <span className="engraved" id="lobby-party-h">Party {room.seats.length}/{solo ? 1 : 5}</span>
+          <ul className="sr-only" aria-labelledby="lobby-party-h" aria-live="polite">
+            {room.seats.map((s) => <li key={s.slot}>{s.name}{s.you ? ' (you)' : ''}: {CLASS_BY_ID[s.classId]?.name ?? s.classId}, {s.connected ? (s.ready ? 'ready' : 'choosing') : 'offline'}</li>)}
+          </ul>
+          <LobbyVessels seats={room.seats} maxSeats={solo ? 1 : 5} myClass={myClass} level={level} disabled={!!me?.ready} onChoose={(id) => net.lobby({ classId: id })} labelledBy="lobby-cls"
+            pickHeading={<span className="engraved" id="lobby-cls">{me?.ready ? 'Vessel locked — undo Ready to change' : 'Choose your vessel'}</span>} />
+          {!solo && (
+            <p className="faint lobby-note">
+              {online ? <>Friends join from their friends list, or anywhere with the code.</> : room.lan.enabled ? <>Others on your network open {room.lan.hosts.join(' or ')} and join with the code.</> : <>Open another browser window here and join with the code. LAN sharing is off unless started with --lan.</>}
+              {' '}The party size locks when everyone is ready.
+            </p>
+          )}
         </div>
 
         <footer className="sheet-foot lobby-foot">

@@ -152,7 +152,21 @@ export type SfxId =
   | 'horror_moan'
   | 'tentacle_burst'
   | 'gravity_well'
-  | 'void_beam';
+  | 'void_beam'
+  // Vessel Select (ui/VesselSelect.tsx): the highlight moving, a locked vessel, the confirm roar and each class's sting
+  | 'vessel_shift'
+  | 'vessel_locked'
+  | 'vessel_roar'
+  | 'vessel_pick_vanguard'
+  | 'vessel_pick_arcanist'
+  | 'vessel_pick_duelist'
+  | 'vessel_pick_hexbinder'
+  | 'vessel_pick_artificer'
+  | 'vessel_pick_templar'
+  | 'vessel_pick_berserker'
+  | 'vessel_pick_cryomancer'
+  | 'vessel_pick_ranger'
+  | 'vessel_pick_warden';
 
 export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 
@@ -326,7 +340,26 @@ export const SFX_IDS: readonly SfxId[] = [
   'tentacle_burst',
   'gravity_well',
   'void_beam',
+  'vessel_shift',
+  'vessel_locked',
+  'vessel_roar',
+  'vessel_pick_vanguard',
+  'vessel_pick_arcanist',
+  'vessel_pick_duelist',
+  'vessel_pick_hexbinder',
+  'vessel_pick_artificer',
+  'vessel_pick_templar',
+  'vessel_pick_berserker',
+  'vessel_pick_cryomancer',
+  'vessel_pick_ranger',
+  'vessel_pick_warden',
 ];
+
+/** The Vessel Select sting for a class (each class has its own; unknown ids get the Vanguard's). */
+export function vesselPickSfx(classId: string): SfxId {
+  const id = `vessel_pick_${classId}`;
+  return (SFX_IDS as readonly string[]).includes(id) ? (id as SfxId) : 'vessel_pick_vanguard';
+}
 
 /** Layered impact cue for a hit's damage type; physical splits by weapon weight (heavy = hammers, axes, slams). */
 export function impactSfx(dtype: string, heavy: boolean): SfxId {
@@ -421,4 +454,6 @@ export const SFX_CAPTIONS: Partial<Record<SfxId, string>> = {
   tentacle_burst: '[tentacles burst out]',
   gravity_well: '[gravity drags]',
   void_beam: '[void beam hums]',
+  vessel_locked: '[the lock holds]',
+  vessel_roar: '[the portal roars]',
 };

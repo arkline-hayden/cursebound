@@ -10,19 +10,24 @@ import { GFX_PRESETS } from './gfxProfile';
 // combat, with the chosen hero idling by torchlight and the dead shuffling in the dark. Purely decorative.
 // Graphics tier: low skips the second WebGL game entirely and shows a static dark vignette; medium draws the
 // scene without bloom; lights and the frame cap follow the tier like the combat view.
+// `paused` sleeps the game loop while something covers the whole screen (the Vessel Select hall).
 
-export default function MenuBackdrop({ classId }: { classId: string }) {
+export default function MenuBackdrop({ classId, paused = false }: { classId: string; paused?: boolean }) {
   const tier = useStore(settingsStore, (x) => x.s.graphics);
   const knobs = GFX_PRESETS[tier] ?? GFX_PRESETS.high;
   if (!knobs.menuBackdrop) return <div className="menu-backdrop-static" aria-hidden="true" />;
-  return <LiveBackdrop classId={classId} tier={tier} />;
+  return <LiveBackdrop classId={classId} tier={tier} paused={paused} />;
 }
 
-function LiveBackdrop({ classId, tier }: { classId: string; tier: keyof typeof GFX_PRESETS }) {
+function LiveBackdrop({ classId, tier, paused }: { classId: string; tier: keyof typeof GFX_PRESETS; paused: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const heroRef = useRef<((c: string) => void) | null>(null);
   const classRef = useRef(classId);
   classRef.current = classId;
+  const gameRef = useRef<import('phaser').Game | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  useEffect(() => { const g = gameRef.current; if (!g) return; if (paused) g.loop.sleep(); else g.loop.wake(); }, [paused]);
   useEffect(() => { heroRef.current?.(classId); }, [classId]);
   useEffect(() => {
     let game: import('phaser').Game | null = null;
@@ -93,9 +98,11 @@ function LiveBackdrop({ classId, tier }: { classId: string; tier: keyof typeof G
         scale: { mode: Phaser.Scale.NONE }, audio: { noAudio: true }, banner: false,
         input: { keyboard: false, mouse: false, touch: false, gamepad: false }, scene: MenuScene,
       } as Phaser.Types.Core.GameConfig);
+      gameRef.current = game;
+      if (pausedRef.current) game.events.once('ready', () => { if (pausedRef.current) game?.loop.sleep(); });
       void BASE_W; void BASE_H;
     })().catch(() => undefined);
-    return () => { cancelled = true; heroRef.current = null; game?.destroy(true); };
+    return () => { cancelled = true; heroRef.current = null; gameRef.current = null; game?.destroy(true); };
   }, [tier]);
   return <div ref={ref} aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden' }} />;
 }
