@@ -615,5 +615,785 @@
  ],
  "stinger_party_wipe": [
   1
+ ],
+ "class_unlock": [
+  1
+ ],
+ "skill_rank_up": [
+  1
+ ],
+ "hero_grunt": [
+  1,
+  2,
+  3
+ ],
+ "hero_death": [
+  1
+ ],
+ "skill_vanguard_cleave": [
+  1,
+  2,
+  3
+ ],
+ "skill_vanguard_earthbreaker": [
+  1
+ ],
+ "skill_vanguard_guard_stance": [
+  1
+ ],
+ "skill_vanguard_sweeping_strike": [
+  1
+ ],
+ "skill_vanguard_sundering_wave": [
+  1
+ ],
+ "skill_vanguard_rally_cry": [
+  1
+ ],
+ "skill_vanguard_shield_charge": [
+  1
+ ],
+ "skill_vanguard_retaliate": [
+  1
+ ],
+ "skill_vanguard_whirlwind": [
+  1
+ ],
+ "skill_vanguard_executioners_chop": [
+  1
+ ],
+ "skill_vanguard_war_banner": [
+  1
+ ],
+ "skill_vanguard_thunderous_shout": [
+  1
+ ],
+ "skill_arcanist_spark": [
+  1,
+  2,
+  3
+ ],
+ "skill_arcanist_astral_nova": [
+  1
+ ],
+ "skill_arcanist_fireline": [
+  1
+ ],
+ "skill_arcanist_arc_bolt": [
+  1
+ ],
+ "skill_arcanist_tempest_field": [
+  1
+ ],
+ "skill_arcanist_phase_step": [
+  1
+ ],
+ "skill_arcanist_event_horizon": [
+  1
+ ],
+ "skill_arcanist_meteor": [
+  1
+ ],
+ "skill_arcanist_flame_wall": [
+  1
+ ],
+ "skill_arcanist_overload": [
+  1
+ ],
+ "skill_arcanist_ball_lightning": [
+  1
+ ],
+ "skill_arcanist_blink_strike": [
+  1
+ ],
+ "skill_arcanist_rift_gate": [
+  1
+ ],
+ "skill_arcanist_singularity": [
+  1
+ ],
+ "skill_duelist_twin_fangs": [
+  1,
+  2,
+  3
+ ],
+ "skill_duelist_thousand_cuts": [
+  1
+ ],
+ "skill_duelist_rend": [
+  1
+ ],
+ "skill_duelist_crimson_whirl": [
+  1
+ ],
+ "skill_duelist_shadowstep": [
+  1
+ ],
+ "skill_duelist_phantom_rush": [
+  1
+ ],
+ "skill_duelist_death_mark": [
+  1
+ ],
+ "skill_duelist_riposte": [
+  1
+ ],
+ "skill_duelist_mirror_guard": [
+  1
+ ],
+ "skill_duelist_execution": [
+  1
+ ],
+ "skill_duelist_hundred_fangs": [
+  1
+ ],
+ "skill_artificer_repeater": [
+  1,
+  2,
+  3
+ ],
+ "skill_artificer_mortar_barrage": [
+  1
+ ],
+ "skill_artificer_deploy_turret": [
+  1
+ ],
+ "skill_artificer_turret_shot": [
+  1,
+  2,
+  3
+ ],
+ "skill_artificer_flame_turret": [
+  1
+ ],
+ "skill_artificer_tesla_coil": [
+  1
+ ],
+ "skill_artificer_steam_grenade": [
+  1
+ ],
+ "skill_artificer_cluster_charge": [
+  1
+ ],
+ "skill_artificer_firebomb": [
+  1
+ ],
+ "skill_artificer_grenade_throw": [
+  1
+ ],
+ "skill_artificer_overclock": [
+  1
+ ],
+ "skill_artificer_rocket_jump": [
+  1
+ ],
+ "skill_artificer_boiler_overdrive": [
+  1
+ ],
+ "skill_artificer_drone_zap": [
+  1,
+  2
+ ],
+ "skill_artificer_explosion": [
+  1,
+  2,
+  3
+ ],
+ "skill_hexbinder_hex_bolt": [
+  1,
+  2,
+  3
+ ],
+ "skill_hexbinder_grave_tide": [
+  1
+ ],
+ "skill_hexbinder_plague_cloud": [
+  1
+ ],
+ "skill_hexbinder_blightbloom": [
+  1
+ ],
+ "skill_hexbinder_locust_swarm": [
+  1
+ ],
+ "skill_hexbinder_blood_tether": [
+  1
+ ],
+ "skill_hexbinder_hemorrhage": [
+  1
+ ],
+ "skill_hexbinder_sanguine_lance": [
+  1
+ ],
+ "skill_hexbinder_summon_wraith": [
+  1
+ ],
+ "skill_hexbinder_banshee": [
+  1
+ ],
+ "skill_hexbinder_grave_legion": [
+  1
+ ],
+ "skill_hexbinder_death_knell": [
+  1
+ ],
+ "skill_cryomancer_ice_shard": [
+  1,
+  2,
+  3
+ ],
+ "skill_cryomancer_ice_wall": [
+  1
+ ],
+ "skill_cryomancer_glacial_prison": [
+  1
+ ],
+ "skill_cryomancer_frost_effigy": [
+  1
+ ],
+ "skill_cryomancer_effigy_burst": [
+  1
+ ],
+ "skill_cryomancer_blizzard": [
+  1
+ ],
+ "skill_cryomancer_frozen_orb": [
+  1
+ ],
+ "skill_cryomancer_hailstone": [
+  1,
+  2
+ ],
+ "skill_cryomancer_absolute_zero": [
+  1
+ ],
+ "skill_cryomancer_glacial_comet": [
+  1
+ ],
+ "skill_cryomancer_frost_nova": [
+  1
+ ],
+ "skill_cryomancer_glacial_spike": [
+  1
+ ],
+ "skill_cryomancer_cold_snap": [
+  1
+ ],
+ "skill_cryomancer_shatter": [
+  1
+ ],
+ "skill_ranger_quick_shot": [
+  1,
+  2,
+  3
+ ],
+ "skill_ranger_rain_of_arrows": [
+  1
+ ],
+ "skill_ranger_multishot": [
+  1
+ ],
+ "skill_ranger_barrage": [
+  1
+ ],
+ "skill_ranger_longshot": [
+  1
+ ],
+ "skill_ranger_ricochet": [
+  1
+ ],
+ "skill_ranger_explosive_tip": [
+  1,
+  2
+ ],
+ "skill_ranger_hunters_mark": [
+  1
+ ],
+ "skill_ranger_power_shot": [
+  1
+ ],
+ "skill_ranger_deadeye": [
+  1
+ ],
+ "skill_ranger_tumble_shot": [
+  1
+ ],
+ "skill_ranger_snare_trap": [
+  1
+ ],
+ "skill_ranger_hunters_bait": [
+  1
+ ],
+ "skill_ranger_venom_cloud": [
+  1
+ ],
+ "skill_ranger_hawk_dive": [
+  1
+ ],
+ "skill_templar_hallowed_hammer": [
+  1,
+  2,
+  3
+ ],
+ "skill_templar_judgment_day": [
+  1
+ ],
+ "skill_templar_consecrate": [
+  1
+ ],
+ "skill_templar_dawnbreak": [
+  1
+ ],
+ "skill_templar_beacon_of_light": [
+  1
+ ],
+ "skill_templar_hammer_of_judgment": [
+  1
+ ],
+ "skill_templar_skyfall_hammer": [
+  1
+ ],
+ "skill_templar_divine_smite": [
+  1
+ ],
+ "skill_templar_shield_charge": [
+  1
+ ],
+ "skill_templar_aegis_dome": [
+  1
+ ],
+ "skill_templar_intercession": [
+  1
+ ],
+ "skill_berserker_twin_chop": [
+  1,
+  2,
+  3
+ ],
+ "skill_berserker_avatar_of_carnage": [
+  1
+ ],
+ "skill_berserker_bloodlust": [
+  1
+ ],
+ "skill_berserker_bloodbath": [
+  1
+ ],
+ "skill_berserker_unchained": [
+  1
+ ],
+ "skill_berserker_whirlwind": [
+  1
+ ],
+ "skill_berserker_executioners_cleave": [
+  1
+ ],
+ "skill_berserker_earthshatter_leap": [
+  1
+ ],
+ "skill_berserker_intimidating_shout": [
+  1
+ ],
+ "skill_berserker_cataclysm": [
+  1
+ ],
+ "skill_warden_thornspear": [
+  1,
+  2,
+  3
+ ],
+ "skill_warden_wild_hunt": [
+  1
+ ],
+ "skill_warden_entangle": [
+  1
+ ],
+ "skill_warden_verdant_totem": [
+  1
+ ],
+ "skill_warden_worldroot_eruption": [
+  1
+ ],
+ "skill_warden_call_of_the_pack": [
+  1
+ ],
+ "skill_warden_wolf_bite": [
+  1,
+  2,
+  3
+ ],
+ "skill_warden_spirit_of_the_ursa": [
+  1
+ ],
+ "skill_warden_alpha_pounce": [
+  1
+ ],
+ "skill_warden_thornburst": [
+  1
+ ],
+ "skill_warden_bramble_wall": [
+  1
+ ],
+ "skill_warden_ironthorn_pod": [
+  1
+ ],
+ "elite_spawn": [
+  1
+ ],
+ "foe_ghoul_hound_alert": [
+  1
+ ],
+ "foe_ghoul_hound_attack": [
+  1,
+  2
+ ],
+ "foe_ghoul_hound_death": [
+  1
+ ],
+ "foe_gloom_bat_alert": [
+  1
+ ],
+ "foe_gloom_bat_attack": [
+  1,
+  2
+ ],
+ "foe_gloom_bat_death": [
+  1
+ ],
+ "foe_bile_toad_alert": [
+  1
+ ],
+ "foe_bile_toad_attack": [
+  1,
+  2
+ ],
+ "foe_bile_toad_death": [
+  1
+ ],
+ "foe_bonewarden_alert": [
+  1
+ ],
+ "foe_bonewarden_attack": [
+  1,
+  2
+ ],
+ "foe_bonewarden_death": [
+  1
+ ],
+ "foe_hex_cultist_alert": [
+  1
+ ],
+ "foe_hex_cultist_attack": [
+  1,
+  2
+ ],
+ "foe_hex_cultist_death": [
+  1
+ ],
+ "foe_brood_sac_alert": [
+  1
+ ],
+ "foe_brood_sac_attack": [
+  1,
+  2
+ ],
+ "foe_brood_sac_death": [
+  1
+ ],
+ "foe_carrion_mite_alert": [
+  1
+ ],
+ "foe_carrion_mite_attack": [
+  1,
+  2
+ ],
+ "foe_carrion_mite_death": [
+  1
+ ],
+ "foe_gaoler_alert": [
+  1
+ ],
+ "foe_gaoler_attack": [
+  1,
+  2
+ ],
+ "foe_gaoler_death": [
+  1
+ ],
+ "foe_rime_wraith_alert": [
+  1
+ ],
+ "foe_rime_wraith_attack": [
+  1,
+  2
+ ],
+ "foe_rime_wraith_death": [
+  1
+ ],
+ "foe_gloom_shade_alert": [
+  1
+ ],
+ "foe_gloom_shade_attack": [
+  1,
+  2
+ ],
+ "foe_gloom_shade_death": [
+  1
+ ],
+ "foe_web_weaver_alert": [
+  1
+ ],
+ "foe_web_weaver_attack": [
+  1,
+  2
+ ],
+ "foe_web_weaver_death": [
+  1
+ ],
+ "foe_harpy_diver_alert": [
+  1
+ ],
+ "foe_harpy_diver_attack": [
+  1,
+  2
+ ],
+ "foe_harpy_diver_death": [
+  1
+ ],
+ "foe_gale_wisp_alert": [
+  1
+ ],
+ "foe_gale_wisp_attack": [
+  1,
+  2
+ ],
+ "foe_gale_wisp_death": [
+  1
+ ],
+ "foe_storm_hawk_alert": [
+  1
+ ],
+ "foe_storm_hawk_attack": [
+  1,
+  2
+ ],
+ "foe_storm_hawk_death": [
+  1
+ ],
+ "foe_cloud_golem_alert": [
+  1
+ ],
+ "foe_cloud_golem_attack": [
+  1,
+  2
+ ],
+ "foe_cloud_golem_death": [
+  1
+ ],
+ "foe_moon_crawler_alert": [
+  1
+ ],
+ "foe_moon_crawler_attack": [
+  1,
+  2
+ ],
+ "foe_moon_crawler_death": [
+  1
+ ],
+ "foe_lunar_leaper_alert": [
+  1
+ ],
+ "foe_lunar_leaper_attack": [
+  1,
+  2
+ ],
+ "foe_lunar_leaper_death": [
+  1
+ ],
+ "foe_lunar_sentry_alert": [
+  1
+ ],
+ "foe_lunar_sentry_attack": [
+  1,
+  2
+ ],
+ "foe_lunar_sentry_death": [
+  1
+ ],
+ "foe_void_shambler_alert": [
+  1
+ ],
+ "foe_void_shambler_attack": [
+  1,
+  2
+ ],
+ "foe_void_shambler_death": [
+  1
+ ],
+ "foe_maint_drone_alert": [
+  1
+ ],
+ "foe_maint_drone_attack": [
+  1,
+  2
+ ],
+ "foe_maint_drone_death": [
+  1
+ ],
+ "foe_firewall_sentinel_alert": [
+  1
+ ],
+ "foe_firewall_sentinel_attack": [
+  1,
+  2
+ ],
+ "foe_firewall_sentinel_death": [
+  1
+ ],
+ "foe_glitch_wraith_alert": [
+  1
+ ],
+ "foe_glitch_wraith_attack": [
+  1,
+  2
+ ],
+ "foe_glitch_wraith_death": [
+  1
+ ],
+ "foe_malware_swarm_alert": [
+  1
+ ],
+ "foe_malware_swarm_attack": [
+  1,
+  2
+ ],
+ "foe_malware_swarm_death": [
+  1
+ ],
+ "foe_watcher_drone_alert": [
+  1
+ ],
+ "foe_watcher_drone_attack": [
+  1,
+  2
+ ],
+ "foe_watcher_drone_death": [
+  1
+ ],
+ "foe_sentry_turret_alert": [
+  1
+ ],
+ "foe_sentry_turret_attack": [
+  1,
+  2
+ ],
+ "foe_sentry_turret_death": [
+  1
+ ],
+ "foe_crater_spawn_alert": [
+  1
+ ],
+ "foe_crater_spawn_attack": [
+  1,
+  2
+ ],
+ "foe_crater_spawn_death": [
+  1
+ ],
+ "foe_gale_harpy_alert": [
+  1
+ ],
+ "foe_gale_harpy_attack": [
+  1,
+  2
+ ],
+ "foe_gale_harpy_death": [
+  1
+ ],
+ "foe_wind_elemental_alert": [
+  1
+ ],
+ "foe_wind_elemental_attack": [
+  1,
+  2
+ ],
+ "foe_wind_elemental_death": [
+  1
+ ],
+ "foe_treasure_imp_alert": [
+  1
+ ],
+ "foe_treasure_imp_attack": [
+  1,
+  2
+ ],
+ "foe_treasure_imp_death": [
+  1
+ ],
+ "miniboss_awaken": [
+  1
+ ],
+ "miniboss_enrage": [
+  1
+ ],
+ "miniboss_shield": [
+  1
+ ],
+ "miniboss_death": [
+  1
+ ],
+ "boss_adds": [
+  1
+ ],
+ "stag_charge": [
+  1
+ ],
+ "boss_death_stag": [
+  1
+ ],
+ "boss_death_golem": [
+  1
+ ],
+ "boss_death_core": [
+  1
+ ],
+ "boss_death_colossus": [
+  1
+ ],
+ "boss_death_wyrm": [
+  1
+ ],
+ "boss_death_horror": [
+  1
+ ],
+ "coin_drop": [
+  1
+ ],
+ "orb_pickup": [
+  1
+ ],
+ "blessing_apply": [
+  1
+ ],
+ "shrine_fury": [
+  1
+ ],
+ "shrine_haste": [
+  1
+ ],
+ "shrine_warding": [
+  1
+ ],
+ "shrine_fortune": [
+  1
+ ],
+ "shrine_renewal": [
+  1
+ ],
+ "merchant_greet": [
+  1
+ ],
+ "amb_courtyard": [
+  1
  ]
 }
