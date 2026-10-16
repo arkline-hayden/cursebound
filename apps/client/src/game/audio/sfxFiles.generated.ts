@@ -451,4 +451,4 @@ export const SFX_FILES: Record<string, readonly string[]> = {
 };
 
 /** Recorded music tracks present under /audio/ (file stems: song-title, song-floor-forge, song-boss-core…). */
-export const MUSIC_FILES: readonly string[] = ['song-boss', 'song-loadout', 'song-results', 'song-title'];
+export const MUSIC_FILES: readonly string[] = ['song-boss', 'song-boss-colossus', 'song-boss-core', 'song-boss-golem', 'song-boss-horror', 'song-boss-stag', 'song-boss-wyrm', 'song-floor-catacombs', 'song-floor-flooded', 'song-floor-forge', 'song-floor-frost', 'song-floor-fungal', 'song-floor-moon', 'song-floor-ossuary', 'song-floor-sanctum', 'song-floor-server', 'song-floor-sky', 'song-loadout', 'song-results', 'song-title', 'song-training'];
