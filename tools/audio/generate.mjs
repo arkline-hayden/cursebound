@@ -62,7 +62,7 @@ async function call(url, body) {
 }
 const take = (j) => j.i.tool === 'music'
   ? call('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', { prompt: promptFor(j), music_length_ms: Math.round(j.i.seconds * 1000), force_instrumental: true })
-  : call('https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128', { text: promptFor(j), duration_seconds: Math.min(22, Math.max(0.5, j.i.seconds)), prompt_influence: 0.6, ...(j.i.loop ? { loop: true } : {}) });
+  : call('https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128', { text: promptFor(j), duration_seconds: Math.min(22, Math.max(0.5, j.i.seconds)), prompt_influence: j.i.influence ?? 0.6, ...(j.i.loop ? { loop: true } : {}) });
 
 const picks = readPicks();
 let made = 0, failed = 0, stop = false;

@@ -14,7 +14,7 @@ export const STYLE = {
 const S = [];
 let cur = null;
 const sec = (key, title, blurb, kind) => { cur = { key, title, blurb, kind, items: [] }; S.push(cur); };
-const e = (file, when, prompt, sec_, o = {}) => cur.items.push({ file, when, prompt, seconds: sec_, variants: o.v ?? 1, loop: !!o.loop, tier: o.tier ?? 1, kind: o.kind ?? cur.kind, id: o.id ?? null, tool: o.tool ?? (cur.kind === 'music' ? 'music' : 'sfx'), note: o.note ?? '' });
+const e = (file, when, prompt, sec_, o = {}) => cur.items.push({ file, when, prompt, seconds: sec_, variants: o.v ?? 1, loop: !!o.loop, tier: o.tier ?? 1, kind: o.kind ?? cur.kind, id: o.id ?? null, tool: o.tool ?? (cur.kind === 'music' ? 'music' : 'sfx'), note: o.note ?? '', influence: o.inf ?? null });
 
 // ---------------------------------------------------------------- 1. interface
 sec('ui', 'Interface & menus', 'Buttons, panels, the title screen and the lobby. Short and quiet; these play constantly.', 'ui');
@@ -208,14 +208,14 @@ k('cryomancer', 'shatter', 'Shatter (frozen enemy broken)', 'frozen ice smashed 
 
 cls('ranger', 'Ranger', 'Bows, traps and the wild. Crisp and windy.');
 k('ranger', 'quick_shot', 'Quick Shot (basic attack)', 'a bow firing an arrow, a taut twang and a fast whoosh', 0.5, { v: 3, id: 'bow_shot' });
-k('ranger', 'rain_of_arrows', 'Rain of Arrows (signature)', 'a volley of many arrows fired skyward with a chorus of bowstring twangs, then dozens of arrows raining down and thudding into the ground', 3.5);
+k('ranger', 'rain_of_arrows', 'Rain of Arrows (signature)', 'a hailstorm of dozens of arrows striking the ground all around, rapid overlapping thuds and whistles like heavy rain of arrows hitting wood and dirt, many many arrows', 3.5, { inf: 0.85 });
 k('ranger', 'multishot', 'Multishot', 'five arrows released at once, a layered burst of bowstring twangs and several arrow whooshes fanning out', 1.2);
 k('ranger', 'barrage', 'Barrage', 'a rapid barrage of arrows, quick repeated twangs', 1.2);
 k('ranger', 'longshot', 'Longshot', 'a powerful long-range arrow, a heavy twang and a sonic whoosh', 1.0);
 k('ranger', 'ricochet', 'Ricochet', 'an arrow ricocheting off targets with metallic pings', 0.8);
 k('ranger', 'explosive_tip', 'Explosive Tip', 'an arrow striking and exploding with a small fiery pop', 0.7, { v: 2 });
 k('ranger', 'hunters_mark', "Hunter's Mark", 'a target being marked, a sharp lock-on ping with a hunting horn hint', 0.8);
-k('ranger', 'power_shot', 'Power Shot', 'a longbow drawn slowly with a creaking string, then released with a deep powerful twang and a fast piercing arrow whoosh and a thunk', 1.8);
+k('ranger', 'power_shot', 'Power Shot', 'a loud powerful bow shot, a sharp heavy bowstring twang, a fast whooshing arrow and a hard thunk impact', 1.4, { inf: 0.8 });
 k('ranger', 'deadeye', 'Deadeye', 'three separate arrows fired one after another, twang whoosh, twang whoosh, twang whoosh, precise and quick', 1.8);
 k('ranger', 'tumble_shot', 'Tumble Shot', 'a quick roll followed by an arrow shot', 0.8);
 k('ranger', 'snare_trap', 'Snare Trap (snaps shut)', 'a metal bear trap snapping shut', 0.6, { id: 'trap_snap' });

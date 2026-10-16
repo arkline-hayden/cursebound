@@ -2600,6 +2600,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T18:41:04.041Z"
+  },
+  {
+   "prompt": "a hailstorm of dozens of arrows striking the ground all around, rapid overlapping thuds and whistles like heavy rain of arrows hitting wood and dirt, many many arrows, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 3.5,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:52:01.275Z"
   }
  ],
  "skill_ranger_multishot": [
@@ -2677,6 +2684,13 @@
    "loop": false,
    "takes": 4,
    "at": "2026-10-16T18:41:07.102Z"
+  },
+  {
+   "prompt": "a loud powerful bow shot, a sharp heavy bowstring twang, a fast whooshing arrow and a hard thunk impact, 16-bit retro dark fantasy game sound effect, gritty lo-fi with a subtle chiptune edge, punchy, clean tail, no music, no voice",
+   "seconds": 1.4,
+   "loop": false,
+   "takes": 4,
+   "at": "2026-10-16T18:52:02.811Z"
   }
  ],
  "skill_ranger_deadeye": [
