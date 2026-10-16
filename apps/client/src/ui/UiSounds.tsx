@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { sharedAudio } from '@/game/audio/shared';
 import type { SfxId } from '@/game/audio/sfx';
+import { playUiFile } from './uiCues';
 
 // Interface sounds for the whole app, from one set of document listeners (mounted once in the root layout):
 //   hover / keyboard or pad focus onto a control -> ui_hover · click -> ui_click, ui_confirm (primary buttons),
@@ -10,7 +11,8 @@ import type { SfxId } from '@/game/audio/sfx';
 //   range -> ui_slider (per notch) · typing in a text field -> ui_type · a dialog appearing / leaving ->
 //   ui_panel_open / ui_panel_close.
 // A control (or any ancestor) can pick its own cue with data-sfx="<cue>", or opt out with data-sfx="none" (the
-// vessel lineup, which voices itself). Nothing plays over the game canvas.
+// vessel lineup, which voices itself); a dialog can pick its own recorded opening with data-sfx-open="<file>".
+// Nothing plays over the game canvas.
 
 const CONTROL = 'button, a[href], [role="button"], [role="tab"], [role="radio"], [role="menuitem"], input[type="checkbox"], input[type="range"], select, summary';
 const BACK = /^(back|close|leave|cancel|not ready|resume)\b/i;
@@ -93,18 +95,26 @@ export function UiSounds() {
       play('ui_slider', 0.8);
     };
     // dialogs coming and going (settings, ledger, gear, pause, friends, vessel select, room event panels…)
-    const dialogsIn = (nodes: NodeList): boolean => {
-      for (const n of nodes) if (n instanceof Element && (n.matches('[role="dialog"]') || n.querySelector('[role="dialog"]'))) return true;
-      return false;
+    // a dialog may name its own recorded opening sound with data-sfx-open="<file>" (the Fate Ledger: ledger_open),
+    // played instead of ui_panel_open (which stays its fallback while the file is missing)
+    const dialogIn = (nodes: NodeList): Element | null => {
+      for (const n of nodes) {
+        if (!(n instanceof Element)) continue;
+        const d = n.matches('[role="dialog"]') ? n : n.querySelector('[role="dialog"]');
+        if (d) return d;
+      }
+      return null;
     };
     const mo = new MutationObserver((records) => {
-      let opened = false, closed = false;
-      for (const r of records) { if (dialogsIn(r.addedNodes)) opened = true; if (dialogsIn(r.removedNodes)) closed = true; }
+      let opened: Element | null = null, closed = false;
+      for (const r of records) { opened ??= dialogIn(r.addedNodes); if (dialogIn(r.removedNodes)) closed = true; }
       if (!opened && !closed) return;
       const now = performance.now();
       if (now - panelAt < 150) return;
       panelAt = now;
-      play(opened ? 'ui_panel_open' : 'ui_panel_close');
+      const own = opened?.getAttribute('data-sfx-open');
+      if (own) playUiFile(own, 'ui_panel_open');
+      else play(opened ? 'ui_panel_open' : 'ui_panel_close');
     });
     mo.observe(document.body, { childList: true, subtree: true });
     document.addEventListener('pointerover', onOver);

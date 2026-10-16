@@ -19,6 +19,7 @@ import type { RunBreakdown } from '@cursebound/simulation';
 import { Breakdown } from './Breakdown';
 import { sharedAudio } from '@/game/audio/shared';
 import { TutorialDone } from './TutorialDone';
+import { playUiFile } from './uiCues';
 
 // RESULTS (PRD §16.1, §13): collective score, clear depth, end reason, builds, Fate timeline, score breakdown
 // and death recap. Local records are labelled Local and never presented as verified competition.
@@ -31,9 +32,13 @@ const END_LABEL: Record<string, string> = {
 
 /** the class-unlock award last voiced (module scope: XpLine remounts when the cloud award replaces the local one) */
 let lastUnlockSound = '';
+/** the XP award, run score and board record last voiced (same reason: the sheet and the XP line can remount) */
+let lastXpSound = '';
+let lastScoreSound = '';
+let lastRecordSound = '';
 
 /** XP gained, the bounty doubling, the new XP bar, level-ups and class unlocks (progression). */
-function XpLine({ award }: { award: XpAward }) {
+function XpLine({ award, runId }: { award: XpAward; runId: string }) {
   // a class unlocked: chains break (once per award, though the local award may be replaced by the cloud's)
   const unlockKey = award.unlocked.length ? `${award.unlocked.join(',')}@${award.levelAfter}` : '';
   useEffect(() => {
@@ -41,6 +46,14 @@ function XpLine({ award }: { award: XpAward }) {
     lastUnlockSound = unlockKey;
     void sharedAudio().then((a) => a?.playFile('class_unlock', null, { priority: 7, ui: true }));
   }, [unlockKey]);
+  // the XP line reveals (no count-up animation): one coin tick, and the bounty seal when the day's bounty paid double
+  const awardKey = `${runId}:${award.bounty ? 1 : 0}`;
+  useEffect(() => {
+    if (awardKey === lastXpSound) return;
+    lastXpSound = awardKey;
+    playUiFile('xp_tick', null, { volume: 0.6, priority: 3 });
+    if (award.bounty) setTimeout(() => playUiFile('bounty_complete', null, { priority: 6 }), 260);
+  }, [awardKey, award.bounty]);
   const into = award.xpAfter - totalXpForLevel(award.levelAfter);
   const pct = Math.max(0, Math.min(100, (into / xpToNext(award.levelAfter)) * 100));
   return (
@@ -90,6 +103,20 @@ export function Results({ net }: { net: GameConnection }) {
       const r = b.rows.find((x) => x.runId === results.runId); if (r) setRank(r.rank);
     }).catch(() => undefined);
   }, [results]);
+  // the score reveals (shown at once, no count-up): one soft ticker click per run
+  const scoreRun = results && !results.guided ? results.runId : '';
+  useEffect(() => {
+    if (!scoreRun || scoreRun === lastScoreSound) return;
+    lastScoreSound = scoreRun;
+    playUiFile('score_tick', null, { volume: 0.6, priority: 3 });
+  }, [scoreRun]);
+  // a new record: the run tops its board (local or online; practice attempts never count)
+  const recordRun = results && !results.practice && !results.training && (rank === 1 || onlineRank === 1) ? results.runId : '';
+  useEffect(() => {
+    if (!recordRun || recordRun === lastRecordSound) return;
+    lastRecordSound = recordRun;
+    playUiFile('new_record', null, { priority: 7 });
+  }, [recordRun]);
   if (!results) {
     return <div className="overlay"><div className="frame ornate notice-panel" role="status">{phase?.storagePending ? 'Saving the final summary is pending — the result will appear once storage recovers.' : 'Recording the final run summary…'}</div></div>;
   }
@@ -135,7 +162,7 @@ export function Results({ net }: { net: GameConnection }) {
             </div>
             <h2 id="res-h" className="res-score">{score(r.scoreText)}</h2>
             <div className="panel-sub">{END_LABEL[r.endReason] ?? r.endReason} · depth {r.depth} · {Math.round(r.activeTicks / 60)}s of combat · party of {r.n}</div>
-            {award && <XpLine award={award} />}
+            {award && <XpLine award={award} runId={r.runId} />}
           </div>
           <div className="res-chips">
             <span className="chip">{r.trustLabel}</span>

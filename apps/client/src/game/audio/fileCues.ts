@@ -1,3 +1,5 @@
+import { TICK_RATE } from '@cursebound/content';
+
 /**
  * Recorded-file cues beyond the shared SfxId list (tools/audio/sounds.mjs, tier 2): per-skill casts, enemy voices,
  * boss deaths, shrine variants. Each plays through audio.playFile(key, fallback): the file when it exists in
@@ -188,4 +190,70 @@ export class CueGate {
     this.last.set(key, now);
     return true;
   }
+}
+
+// ---------------------------------------------------------------- tier 3 (tools/audio/sounds.mjs)
+// Lobby / social / results / menu moments and a few combat details, each through playFile with a quiet fallback or
+// none. Where they fire: party_join / party_leave (ui/Lobby.tsx, seatDelta), invite_received (ui/Friends.tsx
+// InviteToasts), countdown_tick (ui/uiCues.ts useCountdownTick: door vote, Fate vote, loadout timer), tutorial_step
+// (ui/TutorialGuide.tsx), xp_tick / score_tick / new_record / bounty_complete (ui/Results.tsx), skill_refund
+// (ui/SkillTree.tsx), ledger_open (ui/Ledger.tsx via data-sfx-open, ui/UiSounds.tsx), revive_channel (a loop,
+// AudioEngine.loopFile, scene/CombatScene.ts), knockback / stunned (CombatScene, FoeWatch below), the spirit wolf's
+// blink and training dummy hits (CombatScene), slowed (render/Afflictions.ts), core_voice
+// (cinematic/entrances/corruptCore.ts), item_drop (render/Pickups.ts, on landing).
+
+/** Lobby seats gained / lost between two renders (slot lists); null = first sight (nothing announced). */
+export function seatDelta(prev: readonly number[] | null, next: readonly number[]): { joined: number; left: number } {
+  if (!prev) return { joined: 0, left: 0 };
+  const a = new Set(prev), b = new Set(next);
+  return { joined: next.filter((s) => !a.has(s)).length, left: prev.filter((s) => !b.has(s)).length };
+}
+
+/** The whole seconds a countdown shows while in its last `last` seconds (1..last), else null. */
+export function countdownSecond(secs: number | null, last = 5): number | null {
+  if (secs === null || !Number.isFinite(secs)) return null;
+  const c = Math.ceil(secs);
+  return c >= 1 && c <= last ? c : null;
+}
+
+/** A foe as FoeWatch reads it from a snapshot (SnapEnemy fields). */
+export interface FoeSample { i: number; x: number; y: number; stag: boolean; boss: boolean }
+
+/**
+ * Per-snapshot foe watcher for cues the simulation sends no event for:
+ *  - stunned: a foe's stagger flag turning on (skill stuns, a boss's stagger break);
+ *  - knocked: a foe pushed away along a hero's hit faster than it can walk (knock.ts impact slides, authored shoves).
+ *    `hitDir(id)` is the world direction of the latest direct hit on that foe when it landed a moment ago, `speed(id)`
+ *    its walking speed (world units / s). Bosses are never knocked back.
+ * Foes seen for the first time only seed the state. DOM-free (tested).
+ */
+export class FoeWatch {
+  private prev = new Map<number, { x: number; y: number; stag: boolean }>();
+  private tick = -1;
+
+  step(tick: number, foes: readonly FoeSample[], hitDir: (id: number) => { dx: number; dy: number } | undefined,
+    speed: (id: number) => number): { stunned: FoeSample[]; knocked: FoeSample[] } {
+    const stunned: FoeSample[] = [], knocked: FoeSample[] = [];
+    if (tick === this.tick) return { stunned, knocked };
+    const dt = this.tick < 0 ? 0 : (tick - this.tick) / TICK_RATE;
+    this.tick = tick;
+    const next = new Map<number, { x: number; y: number; stag: boolean }>();
+    for (const f of foes) {
+      const p = this.prev.get(f.i);
+      next.set(f.i, { x: f.x, y: f.y, stag: f.stag });
+      if (!p) continue;
+      if (f.stag && !p.stag) stunned.push(f);
+      if (f.boss || dt <= 0 || dt > 0.25) continue;
+      const h = hitDir(f.i);
+      const hl = h ? Math.hypot(h.dx, h.dy) : 0;
+      if (!h || hl < 1e-6) continue;
+      const along = ((f.x - p.x) * h.dx + (f.y - p.y) * h.dy) / hl;
+      if (along > speed(f.i) * dt + 0.09) knocked.push(f);
+    }
+    this.prev = next;
+    return { stunned, knocked };
+  }
+
+  /** A new floor: ids start over. */
+  clear() { this.prev.clear(); this.tick = -1; }
 }

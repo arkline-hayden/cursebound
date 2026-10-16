@@ -10,6 +10,7 @@ import { authStore, refreshAuth } from '@/lib/auth';
 import { score } from '@/lib/format';
 import { NodeIcon, ClassEmblem } from './icons';
 import { sharedAudio } from '@/game/audio/shared';
+import { playUiFile, useCountdownTick } from './uiCues';
 
 // LOADOUT / SKILL_ALLOCATION (REQ CLASS01, PRD §6.2, §7): inspect any node before purchase with cost, prerequisites
 // and before/after numbers; a click cannot spend twice (server-validated); builds export as versioned node IDs.
@@ -427,6 +428,7 @@ export function SkillTree({ net, onClose }: { net: GameConnection; onClose?: () 
   const phase = useStore(netStore, (s) => s.phase);
   const slot = useStore(netStore, (s) => s.slot);
   const serverTick = useStore(netStore, (s) => s.serverTick);
+  useCountdownTick(phase ? deadlineSeconds(phase.deadlineTick, serverTick) : null);
   const [focus, setFocus] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [roomy, setRoomy] = useState(false);
@@ -449,7 +451,9 @@ export function SkillTree({ net, onClose }: { net: GameConnection; onClose?: () 
     const prev = lastRanks.current;
     lastRanks.current = { key: rankKey, at: prev.at };
     const [pc, pt] = prev.key.split(':'), [c, t] = rankKey.split(':');
-    if (!prev.key || pc !== c || Number(t) <= Number(pt)) return;   // first sight, a class switch or a refund
+    if (!prev.key || pc !== c || Number(t) === Number(pt)) return;   // first sight or a class switch
+    // a refund (Refund all): the runes fade (the button itself stays quiet: data-sfx="none")
+    if (Number(t) < Number(pt)) { playUiFile('skill_refund', 'ui_back', { priority: 5 }); return; }
     const now = performance.now();
     if (now - prev.at < 120) return;
     lastRanks.current.at = now;
@@ -575,7 +579,7 @@ export function SkillTree({ net, onClose }: { net: GameConnection; onClose?: () 
             <span className="lbl" aria-hidden="true">Skill<br />points</span>
           </div>
           <div className="tree-tools">
-            {(loadout || training) && <button className="btn small ghost" onClick={() => net.refund()} data-tip={training ? 'Free while training' : 'Before round 1 only'}>Refund all</button>}
+            {(loadout || training) && <button className="btn small ghost" data-sfx="none" onClick={() => net.refund()} data-tip={training ? 'Free while training' : 'Before round 1 only'}>Refund all</button>}
             <button className="btn small ghost" onClick={exportBuild} aria-live="polite">{copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Copy failed' : 'Copy build'}</button>
             {signedIn && <button className="btn small ghost" disabled={savedState === 'saving'} onClick={saveToAccount} aria-live="polite" data-tip="Keep this build in your account">{savedState === 'ok' ? 'Saved' : savedState === 'fail' ? 'Save failed' : savedState === 'saving' ? 'Saving…' : 'Save build'}</button>}
             {(loadout || training) && <button className="btn small ghost" aria-expanded={importOpen} aria-controls="import-pop" onClick={() => { setImportOpen((v) => !v); setImportErr(null); }}>Import…</button>}

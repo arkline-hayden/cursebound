@@ -59,6 +59,8 @@ registerEntrance('corruptcore', (k) => {
     tl.call(ROAR - T(0.05), () => pup.play('attack', face, true));
     tl.call(T(3.3), () => pup.play('idle', face));
   }
+  // the Core speaks as its eye opens on the party (recorded voice, tier 3; nothing plays without the file)
+  tl.call(REVEAL + T(0.2), (ctx) => k.sfx(ctx, 'core_voice', 4));
   tl.call(ROAR, (ctx) => {
     if (!ctx.skipping) {
       J.shockwave(sq.x, sq.y, iso.rx(5.5), CYAN, 800);

@@ -22,8 +22,8 @@ import { BossFx } from '../render/bosses';
 import { DoorRenderer } from '../render/Doors';
 import { CinematicDirector } from '../cinematic/Cinematic';
 import { getAudio } from '../audio/bus';
-import { impactSfx, killSfx, type StingerKind } from '../audio/sfx';
-import { BOSS_DEATH_FILE, CueGate, SKILL_FILE, foeVoice } from '../audio/fileCues';
+import { SFX_IDS, impactSfx, killSfx, type StingerKind } from '../audio/sfx';
+import { BOSS_DEATH_FILE, CueGate, FoeWatch, SKILL_FILE, foeVoice } from '../audio/fileCues';
 import { DamageNumbers, NUMBER_COLOR } from '../render/DamageNumbers';
 import { DeathFx, deathStyle } from '../render/DeathFx';
 import { InputController, type Sample } from '@/lib/input';
@@ -57,6 +57,8 @@ function hpNum(compact: string): string {
 const BOSS_KINDS = new Set(BOSSES.map((b) => b.id));
 /** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
 const CAM_LIFT = 22;
+/** shared cue ids (cutscene cues that are not one are recorded file names) */
+const SFX_ID_SET: ReadonlySet<string> = new Set(SFX_IDS);
 /** Kill-streak milestones and their colours (escalating). */
 const STREAKS: [number, number][] = [[5, 0xffd890], [10, 0xffa040], [15, 0xff6a3a], [25, 0xff3a5a], [40, 0xd06aff], [60, 0xffffff]];
 const ELITE_HAZARD_LIGHT: Record<string, number> = { moltenBlast: 0xff7a2a, frostOrb: 0x8fd8ff, plague: 0x6ab03a, thunder: 0xc8e8ff };
@@ -131,6 +133,13 @@ export class CombatScene extends Phaser.Scene {
   private cueGate = new CueGate();
   /** foes that already voiced their alert this floor */
   private alerted = new Set<number>();
+  /** per-snapshot foe watcher (stuns, knockback slides) and the latest direct hero hit on each foe (world direction) */
+  private foeWatch = new FoeWatch();
+  private hitDirs = new Map<number, { dx: number; dy: number; at: number }>();
+  /** the revive channel's loop while a downed hero's revive progress rises, and each downed hero's last progress */
+  private reviveLoop: { stop(): void } | null = null;
+  private reviveProg = new Map<number, number>();
+  private reviveAt = 0;
   private projectiles = new Map<number, { s: Phaser.GameObjects.Sprite; glow?: Phaser.GameObjects.Image; last: number; color: number; look?: ProjectileLook; born: number }>();
   private hazardG!: Phaser.GameObjects.Graphics;
   private teleG!: Phaser.GameObjects.Graphics;
@@ -233,7 +242,10 @@ export class CombatScene extends Phaser.Scene {
       banner: (text, tone) => this.banner(text, tone), reduced: () => this.settings().reducedEffects, me: () => netStore.get().slot,
       fxCtx: () => this.hazardFxCtx(),
     });
-    this.pickupsR = new PickupRenderer(this, this.juice);
+    // a potion or orb landing from its pop-out arc: a glassy clink (a burst of drops is one or two)
+    this.pickupsR = new PickupRenderer(this, this.juice, (_kind, x, y) => {
+      if (this.cueGate.ok('item_drop', this.time.now, 90)) this.sfxFile('item_drop', null, x, 1, y, 0.7);
+    });
     this.doorsR = new DoorRenderer(this, this.dungeon, (id, x, y, priority = 1) => this.sfx(id, x, priority, y));
     this.roomFx = new RoomEventRenderer(this, this.juice, this.dungeon, this.net, (id, x, y, priority = 1) => this.sfx(id, x, priority, y),
       (key, fallback, x, y, priority = 1) => this.sfxFile(key, fallback, x, priority, y));
@@ -263,7 +275,8 @@ export class CombatScene extends Phaser.Scene {
     this.game.canvas.setAttribute('role', 'img');
     this.cine = new CinematicDirector({
       scene: this, juice: this.juice, dungeon: this.dungeon, net: this.net,
-      sfx: (id, x, y, priority = 2) => this.sfx(id as SfxId, x, priority, y),
+      // shared cues by id; anything else is a recorded file name (the Core's voice), silent without its file
+      sfx: (id, x, y, priority = 2) => { if (SFX_ID_SET.has(id)) this.sfx(id as SfxId, x, priority, y); else this.sfxFile(id, null, x, priority, y); },
       stinger: (kind) => { (getAudio() ?? this.audio)?.stinger(kind as StingerKind); },
       follow: () => { const c = this.P(this.camTarget.x, this.camTarget.y); return { x: c.x, y: c.y - CAM_LIFT }; },
       heroActor: (classId) => this.heroActor(classId),
@@ -271,6 +284,9 @@ export class CombatScene extends Phaser.Scene {
     const endCine = () => { this.cine?.destroy(); this.cine = null; };
     this.events.once('shutdown', endCine);
     this.events.once('destroy', endCine);
+    const endLoops = () => { this.reviveLoop?.stop(); this.reviveLoop = null; };
+    this.events.once('shutdown', endLoops);
+    this.events.once('destroy', endLoops);
     this.applyPostFx();
     this.watch.born = performance.now();
     this.ready = true;
@@ -486,6 +502,51 @@ export class CombatScene extends Phaser.Scene {
     this.sfxFile(voice, null, en.x, 2, en.y, 0.8);
   }
 
+  /** A training dummy: the guided tutorial's straw ghouls (they never move or attack), or any foe on the training grounds. */
+  private isDummy(id: number, snap: Snapshot | null): boolean {
+    if (!snap || (!snap.tr && !snap.gd)) return false;
+    const en = snap.enemies.find((x) => x.i === id);
+    return !!en && !en.boss && (!!snap.tr || en.k === 'pursuer');
+  }
+
+  /**
+   * Cues the simulation sends no event for, read off each new snapshot: a foe stunned (its stagger flag turning on;
+   * bosses on a stagger break) and a foe knocked back along a hero's hit (knock.ts slides, authored shoves).
+   * Throttled: the stun ring at most every 0.3 s, a knockback whoosh every 0.12 s.
+   */
+  private watchFoes(s: Snapshot) {
+    const now = this.time.now;
+    for (const [id, h] of this.hitDirs) if (now - h.at > 250) this.hitDirs.delete(id);
+    const { stunned, knocked } = this.foeWatch.step(s.tick, s.enemies, (id) => this.hitDirs.get(id),
+      (id) => (ENEMY_BY_ID[s.enemies.find((x) => x.i === id)?.k ?? '']?.moveSpeed ?? 3));
+    for (const f of stunned) {
+      if (!this.cueGate.ok('stunned', now, f.boss ? 0 : 300)) continue;
+      this.sfxFile('stunned', null, f.x, f.boss ? 4 : 1, f.y, f.boss ? 1 : 0.6);
+    }
+    for (const f of knocked) {
+      this.hitDirs.delete(f.i);   // one whoosh per shove
+      if (this.cueGate.ok('knockback', now, 120)) this.sfxFile('knockback', null, f.x, 1, f.y, 0.7);
+    }
+  }
+
+  /**
+   * The revive channel: while any downed hero's revive progress rises, the recorded loop hums (started once, stopped
+   * a moment after the progress stalls, the hero is back up, or the floor changes). Silent without the file.
+   */
+  private watchRevive(s: Snapshot) {
+    const now = this.time.now;
+    let rising = false;
+    for (const p of s.players) {
+      const was = this.reviveProg.get(p.s);
+      if (p.life === 'downed') { if (was !== undefined && p.rev > was + 1e-4 && p.self <= 0) rising = true; this.reviveProg.set(p.s, p.rev); }
+      else this.reviveProg.delete(p.s);
+    }
+    if (rising) this.reviveAt = now;
+    const channeling = now - this.reviveAt < 200;
+    if (channeling && !this.reviveLoop && this.audio?.hasFile('revive_channel')) this.reviveLoop = this.audio.loopFile('revive_channel', { volume: 0.75 });
+    else if (!channeling && this.reviveLoop) { this.reviveLoop.stop(); this.reviveLoop = null; }
+  }
+
   // ---------------- events → feel ----------------
 
   private handleEvents(snap: Snapshot | null) {
@@ -517,6 +578,7 @@ export class CombatScene extends Phaser.Scene {
             const fresh = v.flinchAt === undefined || J.clock - v.flinchAt > FLINCH_MS * 0.6;
             if (fresh || mag > (v.flinchMag ?? 0)) { v.flinchAt = J.clock; v.flinchMag = mag; v.flinchSide = u.x > 0.05 ? 1 : u.x < -0.05 ? -1 : (v.flinchSide ?? 1); }
           }
+          if (e.sx !== undefined) this.hitDirs.set(e.target, { dx, dy, at: this.time.now });   // knockback watch (FoeWatch)
           if (e.sx !== undefined) this.lastHit.set(e.target, { ux: u.x, uy: u.y, crit: e.crit, big: !!e.kill && (v?.lastHp ?? 0) >= 0.85, at: this.time.now, dtype: e.dtype });
           const big = e.crit || e.kill;
           // one rolling number per foe (crits roll their own, gold), render/DamageNumbers.ts
@@ -553,7 +615,11 @@ export class CombatScene extends Phaser.Scene {
           if (this.time.now - this.lastHitSfx > 40) {
             this.lastHitSfx = this.time.now;
             const cls = e.src !== undefined ? snap?.players.find((pl) => pl.s === e.src)?.c : undefined;
-            this.sfx(impactSfx(e.dtype, !!cls && HEAVY_WEAPON.has(cls)), e.x, 0, e.y);
+            const impact = impactSfx(e.dtype, !!cls && HEAVY_WEAPON.has(cls));
+            // a training dummy (the tutorial's straw ghouls, any foe on the training grounds) thwacks instead
+            if (e.sx !== undefined && this.isDummy(e.target, snap) && this.audio?.hasFile('training_dummy')) {
+              if (this.cueGate.ok('training_dummy', this.time.now, 90)) this.sfxFile('training_dummy', impact, e.x, 0, e.y, 0.85);
+            } else this.sfx(impact, e.x, 0, e.y);
           }
           if (e.crit && this.time.now - this.lastCritSfx > 70) { this.lastCritSfx = this.time.now; this.sfx('crit', e.x, 1, e.y); }
         } else {
@@ -612,6 +678,8 @@ export class CombatScene extends Phaser.Scene {
         const f = this.P(e.fx, e.fy), t = this.P(e.x, e.y);
         J.embersAt(f.x, f.y - 12, 8, tint); J.ring(f.x, f.y, 18, tint, 220);
         J.ring(t.x, t.y, 24, tint, 280); J.embersAt(t.x, t.y - 12, 6, tint); J.dust(t.x, t.y, 3, 0x2a3a2a);
+        // the Warden's spirit beasts have their own dissolve-and-reform take (other summons stay silent, as before)
+        if (e.kind.startsWith('w_') && this.cueGate.ok('summon_blink', this.time.now, 250)) this.sfxFile('skill_warden_summon_blink', null, e.x, e.slot === me ? 2 : 1, e.y, 0.8);
         break;
       }
       case 'elite': {
@@ -934,6 +1002,7 @@ export class CombatScene extends Phaser.Scene {
         for (const k of [...this.actors.keys()]) this.destroyView(k);
         this.renderSelf.init = false; this.combo = 0; this.lastHit.clear(); this.pickupsR.clear(); this.pendingBanners = [];
         this.roomFx?.clear();
+        this.foeWatch.clear(); this.hitDirs.clear(); this.reviveProg.clear(); this.reviveLoop?.stop(); this.reviveLoop = null;
         this.numbers.clear(); this.deaths.clear();
         this.clickFx?.clear();
         this.camSnap = 'cut';   // a new round starts the camera on the hero
@@ -946,6 +1015,7 @@ export class CombatScene extends Phaser.Scene {
     this.cine?.ingest(this.net.events, latest);   // cutscene triggers (reads, does not consume)
     this.bossFx.sync(latest, this.net.map);   // which entities belong to scripted bosses (render/bosses)
     this.handleEvents(latest);
+    if (latest) { this.watchFoes(latest); this.watchRevive(latest); }
     J.update(delta / 1000);
     this.numbers.update();
     this.deaths.update();
