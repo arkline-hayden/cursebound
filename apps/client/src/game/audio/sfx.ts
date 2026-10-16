@@ -166,7 +166,18 @@ export type SfxId =
   | 'vessel_pick_berserker'
   | 'vessel_pick_cryomancer'
   | 'vessel_pick_ranger'
-  | 'vessel_pick_warden';
+  | 'vessel_pick_warden'
+  // interface cues that exist only as recorded files (public/audio/sfx; no synthesized fallback): silent until a file lands
+  | 'ui_back'
+  | 'ui_tab'
+  | 'ui_panel_open'
+  | 'ui_panel_close'
+  | 'ui_toggle'
+  | 'ui_slider'
+  | 'ui_type'
+  | 'ui_toast'
+  | 'press_start'
+  | 'ready_up';
 
 export type MixGroup = 'music' | 'combat' | 'ui' | 'ambience';
 
@@ -353,6 +364,16 @@ export const SFX_IDS: readonly SfxId[] = [
   'vessel_pick_cryomancer',
   'vessel_pick_ranger',
   'vessel_pick_warden',
+  'ui_back',
+  'ui_tab',
+  'ui_panel_open',
+  'ui_panel_close',
+  'ui_toggle',
+  'ui_slider',
+  'ui_type',
+  'ui_toast',
+  'press_start',
+  'ready_up',
 ];
 
 /** The Vessel Select sting for a class (each class has its own; unknown ids get the Vanguard's). */

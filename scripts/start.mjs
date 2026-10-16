@@ -53,6 +53,8 @@ if (apiBusy || webBusy) {
 const env = { ...process.env, CURSEBOUND_PORT: String(API_PORT), CURSEBOUND_CLIENT_PORT: String(WEB_PORT), CURSEBOUND_DATA_DIR: dataDir, ...(lan ? { CURSEBOUND_LAN: '1' } : {}), NEXT_TELEMETRY_DISABLED: '1' };
 const tsxCli = path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const nextCli = path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next');
+// recorded sound files dropped into apps/client/public/audio/sfx are picked up on every start
+spawnSync(process.execPath, [path.join(root, 'scripts', 'audio-manifest.mjs')], { cwd: root, stdio: 'inherit' });
 const clientDir = path.join(root, 'apps', 'client');
 const host = lan ? '0.0.0.0' : '127.0.0.1';
 

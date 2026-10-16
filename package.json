@@ -20,6 +20,7 @@
     "replay:verify": "tsx tools/balance/src/replayVerify.ts",
     "balance": "tsx tools/balance/src/harness.ts",
     "stress": "tsx tools/balance/src/stress.ts",
+    "audio:manifest": "node scripts/audio-manifest.mjs",
     "assets:validate": "tsx tools/assets/src/validate.ts",
     "db:backup": "tsx apps/server/src/cli/backup.ts",
     "db:restore": "tsx apps/server/src/cli/restore.ts",

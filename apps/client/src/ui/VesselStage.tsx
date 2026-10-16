@@ -190,7 +190,7 @@ export function VesselStage({ variant, slots, selected, pulse, powers, poses, in
   const enter = (i: number | null) => { setHover(i); onHover?.(i); };
 
   return (
-    <div ref={wrap} className={`vstage ${variant}${className ? ` ${className}` : ''}`}>
+    <div ref={wrap} className={`vstage ${variant}${className ? ` ${className}` : ''}`} data-sfx="none">
       <canvas ref={canvas} className="vstage-canvas" style={canvasStyle} aria-hidden="true" />
       {geo && (
         <div className="vstage-layer" style={{ '--slot-w': `${Math.round(spec.spacing * k) - 8}px` } as CSSProperties} role={interactive ? 'radiogroup' : undefined} aria-labelledby={interactive ? labelledBy : undefined} aria-describedby={interactive ? describedBy : undefined}

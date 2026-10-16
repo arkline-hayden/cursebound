@@ -28,6 +28,7 @@ import { getAudio, setCurrentAudio } from './bus';
 import { MusicDirector } from './MusicDirector';
 import { BOSS_SONGS, GENERIC_BOSS_SONG, IntensityFollower, MENU_SONG, THEME_SONGS, type SongSpec } from './music';
 import { FLOOR_FOR_THEME, pitchSpread, synthSfx, type SfxEnv } from './recipes';
+import { SampleBank } from './samples';
 import { AUDIO_THEMES, CRITICAL_SFX, SFX_CAPTIONS, STINGER_TIMING, type AudioTheme, type MixGroup, type MusicTrack, type SfxId, type StingerKind } from './sfx';
 import { STINGER_DUCK, playStinger } from './stingers';
 import { Synth, makeImpulse } from './synth';
@@ -52,10 +53,14 @@ const SONG_FADE = 1.6;
 interface SongVoice { el: HTMLAudioElement; src: MediaElementAudioSourceNode; gain: GainNode; stopTimer: ReturnType<typeof setTimeout> | null }
 
 const UI_SFX = new Set<SfxId>(['ui_click', 'ui_hover', 'ui_confirm', 'ui_error', 'vote_cast', 'vote_lock', 'fate_commit', 'level_up', 'move_click', 'minimap_ping',
-  'vessel_shift', 'vessel_locked', 'vessel_roar', 'vessel_pick_vanguard', 'vessel_pick_arcanist', 'vessel_pick_duelist', 'vessel_pick_hexbinder', 'vessel_pick_artificer', 'vessel_pick_templar', 'vessel_pick_berserker', 'vessel_pick_cryomancer', 'vessel_pick_ranger', 'vessel_pick_warden']);
+  'vessel_shift', 'vessel_locked', 'vessel_roar', 'vessel_pick_vanguard', 'vessel_pick_arcanist', 'vessel_pick_duelist', 'vessel_pick_hexbinder', 'vessel_pick_artificer', 'vessel_pick_templar', 'vessel_pick_berserker', 'vessel_pick_cryomancer', 'vessel_pick_ranger', 'vessel_pick_warden',
+  'ui_back', 'ui_tab', 'ui_panel_open', 'ui_panel_close', 'ui_toggle', 'ui_slider', 'ui_type', 'ui_toast', 'press_start', 'ready_up']);
+
+/** Cues with no synthesized recipe: they play only from a recorded file (silent until one exists). */
+const FILE_ONLY = new Set<SfxId>(['ui_back', 'ui_tab', 'ui_panel_open', 'ui_panel_close', 'ui_toggle', 'ui_slider', 'ui_type', 'ui_toast', 'press_start', 'ready_up']);
 
 const DEFAULT_PRIORITY: Partial<Record<SfxId, number>> = {
-  ui_hover: 0, move_click: 1, footstep: 0,
+  ui_hover: 0, move_click: 1, footstep: 0, ui_type: 0, ui_slider: 0, ui_toggle: 2, ui_tab: 3, ui_back: 4, ui_panel_open: 4, ui_panel_close: 3, ui_toast: 3, press_start: 8, ready_up: 6,
   hit_enemy: 1, enemy_shoot: 1, enemy_bite: 2, swing: 2, kill: 4, combo: 5, heartbeat: 9,
   attack_melee: 2, attack_spark: 2, dodge: 2, heal: 2, shield: 2, enemy_death: 3, crit: 3, hit_player: 4,
   ui_click: 4, skill_guard: 4, skill_sweep: 4, skill_rally: 4, skill_fireline: 4, skill_arc: 4, skill_phase: 4,
@@ -137,6 +142,8 @@ type AudioCtor = new () => AudioContext;
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private synth: Synth | null = null;
+  /** recorded sound files (public/audio/sfx): played instead of the recipe when a cue has one */
+  private readonly samples = new SampleBank();
   private master: GainNode | null = null;
   private groups: Partial<Record<MixGroup, GainNode>> = {};
   private musicDuck: GainNode | null = null;
@@ -170,6 +177,7 @@ export class AudioEngine {
   constructor(onCaption?: (text: string, sfx: SfxId) => void) {
     this.onCaption = onCaption;
     setCurrentAudio(this);
+    if (typeof window !== 'undefined') this.samples.prefetch();
   }
 
   get unlocked(): boolean {
@@ -200,6 +208,7 @@ export class AudioEngine {
       this.ctx = ctx;
       this.build(ctx);
       this.applyVolumes();
+      this.samples.load(ctx);
     }
     if (this.ctx.state !== 'running') {
       try {
@@ -338,6 +347,9 @@ export class AudioEngine {
     const ctx = this.ctx;
     const s = this.synth;
     if (!ctx || ctx.state !== 'running' || !s) return;
+    // a recorded take when the cue has one (footsteps pick the floor's surface set); recipe-less cues stay silent without
+    const take = this.samples.pick(id === 'footstep' ? `footstep_${FLOOR_FOR_THEME[this.themeId] ?? 'stone'}` : id, s.rand);
+    if (!take && FILE_ONLY.has(id)) return;
     const now = ctx.currentTime;
     this.voices = this.voices.filter((v) => v.end > now);
     const priority = critical ? 99 : opts.priority ?? DEFAULT_PRIORITY[id] ?? 3;
@@ -388,14 +400,30 @@ export class AudioEngine {
     for (let i = 0; i < chain.length - 1; i++) (chain[i] as AudioNode).connect(chain[i + 1] as AudioNode);
     (chain[chain.length - 1] as AudioNode).connect(group);
     const spread = pitchSpread(id);
-    s.pv = 1 + (s.rand() * 2 - 1) * spread;
-    s.fv = 1 + (s.rand() * 2 - 1) * spread * 0.8;
     let dur = 0.1;
-    try {
-      dur = synthSfx(s, id, out, now + 0.005, this.env(id));
-    } finally {
-      s.pv = 1;
-      s.fv = 1;
+    if (take) {
+      // recorded file: levelled take, a gentler pitch wobble than the recipes (UI cues stay exact), leading silence skipped
+      const src = ctx.createBufferSource();
+      src.buffer = take.buf;
+      const rate = UI_SFX.has(id) ? 1 : 1 + (s.rand() * 2 - 1) * spread * 0.5;
+      src.playbackRate.value = rate;
+      const lv = ctx.createGain();
+      lv.gain.value = take.gain;
+      src.connect(lv);
+      lv.connect(out);
+      chain.unshift(src, lv);
+      src.start(now + 0.005, take.offset);
+      dur = Math.max(0.05, (take.buf.duration - take.offset) / rate);
+      if (id === 'footstep') this.foot++;
+    } else {
+      s.pv = 1 + (s.rand() * 2 - 1) * spread;
+      s.fv = 1 + (s.rand() * 2 - 1) * spread * 0.8;
+      try {
+        dur = synthSfx(s, id, out, now + 0.005, this.env(id));
+      } finally {
+        s.pv = 1;
+        s.fv = 1;
+      }
     }
     const duck = SFX_DUCK[id];
     if (duck) this.duck(duck[0], duck[1], duck[2]);
@@ -405,6 +433,20 @@ export class AudioEngine {
         try { n.disconnect(); } catch { /* already disconnected */ }
       }
     }, (dur + 0.6) * 1000);
+  }
+
+  /**
+   * Play a cue as soon as audio is unlocked and its recorded file is decoded (up to `maxMs`): for the gesture that
+   * unlocks audio ("Press any key"), when the file cannot be ready yet. A cue with a recipe falls back to it on timeout.
+   */
+  playWhenReady(id: SfxId, opts: { pan?: number; priority?: number; volume?: number; dist?: number } = {}, maxMs = 900): void {
+    const t0 = performance.now();
+    const tick = (): void => {
+      if (this.unlocked && (this.samples.ready(id) || !SampleBank.has(id))) { this.play(id, opts); return; }
+      if (performance.now() - t0 > maxMs) { if (this.unlocked && !FILE_ONLY.has(id)) this.play(id, opts); return; }
+      setTimeout(tick, 25);
+    };
+    tick();
   }
 
   private env(id: SfxId): SfxEnv {

@@ -217,7 +217,7 @@ export function VesselHall({ title, intro, value, onChange, level, who, goLabel,
         <div className="vh-go frame inset">
           {who}
           {err && <p className="neg vh-err" role="alert">{err}</p>}
-          <button className="btn big primary vh-confirm" disabled={disabled || busy || flourish || lock.locked} onClick={confirm}>
+          <button className="btn big primary vh-confirm" data-sfx="none" disabled={disabled || busy || flourish || lock.locked} onClick={confirm}>
             {busy ? busyLabel : lock.locked ? `Locked until level ${classUnlockLevel(cls.id)}` : `${goLabel} as ${cls.name}`}
             {!busy && !lock.locked && <span className="kbd">{glyph(0, 'Enter')}</span>}
           </button>
@@ -298,7 +298,7 @@ function VesselStrip({ value, level, disabled, labelledBy, onChoose }: { value: 
           const lk = lockOf(c, level);
           const sel = c.id === value;
           return (
-            <button key={c.id} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={sel} aria-disabled={disabled || lk.locked || undefined}
+            <button key={c.id} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" data-sfx="none" aria-checked={sel} aria-disabled={disabled || lk.locked || undefined}
               aria-label={lk.locked ? `${c.name}: locked, ${lk.line.toLowerCase()}` : `${c.name}: ${c.role}`} tabIndex={i === current ? 0 : -1}
               className={`vessel-tile${lk.locked ? ' locked' : ''}`} style={{ '--accent': readableAccent(c.accent) } as CSSProperties}
               onClick={() => pick(i)} onFocus={() => { setPeek(c.id); if (!lk.locked) pick(i); }} onBlur={() => setPeek(null)} onMouseEnter={() => setPeek(c.id)} onKeyDown={(e) => onKey(e, i)}>

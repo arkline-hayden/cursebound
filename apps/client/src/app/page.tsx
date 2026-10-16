@@ -149,10 +149,21 @@ export default function Home() {
     }).catch((e: ApiError) => setErr(e.message));
   }, []);
 
-  // TITLE: any key (except bare navigation/modifier keys) or a click wakes the menu
+  // TITLE: any key (except bare navigation/modifier keys) or a click wakes the menu (with its sound, once)
+  const pressStartAt = useRef(0);
+  const pressStartSfx = () => {
+    const now = performance.now();
+    if (now - pressStartAt.current < 800) return;
+    pressStartAt.current = now;
+    void sharedAudio().then((e) => e?.playWhenReady('press_start'));
+  };
   useEffect(() => {
     if (stage !== 'title') return;
-    const wake = () => { setStage('menu'); try { sessionStorage.setItem(STAGE_KEY, '1'); } catch { /* ignore */ } };
+    const wake = () => {
+      setStage('menu');
+      try { sessionStorage.setItem(STAGE_KEY, '1'); } catch { /* ignore */ }
+      pressStartSfx();
+    };
     const onKey = (e: KeyboardEvent) => { if (['Tab', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return; e.preventDefault(); wake(); };
     window.addEventListener('keydown', onKey);
     window.addEventListener('pointerdown', wake);
@@ -335,7 +346,7 @@ export default function Home() {
         </header>
 
         {stage === 'title' ? (
-          <button className="press-start" data-pad-any onClick={() => { setStage('menu'); try { sessionStorage.setItem(STAGE_KEY, '1'); } catch { /* ignore */ } }}>
+          <button className="press-start" data-pad-any data-sfx="none" onClick={() => { pressStartSfx(); setStage('menu'); try { sessionStorage.setItem(STAGE_KEY, '1'); } catch { /* ignore */ } }}>
             Press any key
           </button>
         ) : (

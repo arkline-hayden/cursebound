@@ -74,7 +74,7 @@ export function Lobby({ net }: { net: GameConnection }) {
           <Link className="btn ghost" href="/">Leave</Link>
           <span className="grow" />
           {!solo && <span className="foot-note">{ready}/{room.seats.length} ready</span>}
-          <button className={`btn big ${me?.ready ? '' : 'primary'}`} onClick={() => net.lobby({ ready: !me?.ready })}>
+          <button className={`btn big ${me?.ready ? '' : 'primary'}`} data-sfx={me?.ready ? 'ui_back' : solo ? 'ui_confirm' : 'ready_up'} onClick={() => net.lobby({ ready: !me?.ready })}>
             {me?.ready ? 'Not ready' : solo ? 'To the loadout' : 'Ready'}
           </button>
         </footer>
