@@ -31,6 +31,7 @@ export * from './progression';
 export * from './bounties';
 export * from './roomEvents';
 export * from './minibosses';
+export * from './glossary';
 
 /** The immutable content manifest (PRD §15.3, §21.2). Its hash pins runs, rooms and leaderboards. */
 export const CONTENT_MANIFEST = {

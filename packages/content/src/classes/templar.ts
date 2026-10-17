@@ -22,7 +22,7 @@ export const SKILLS: SkillDef[] = [
     compressionSupport: true, icon: 'node:t_hammer' },
   { id: 't_judgment_day', classId: 'templar', name: 'Judgment Day', slot: 'signature', damageType: 'astral', damageCoef: '4', cooldownSec: 8.5, charges: 1,
     shape: { kind: 'circle', radius: 3, selfCentered: false, range: 6 },
-    description: `Call a pillar of light onto the aimed point (up to 6 units). After 0.35s it crashes down: enemies within 3.5 units are dragged up to 2 units inward, then take 4x astral damage in a 3 unit radius and are stunned for 1.5s (bosses take 180 stagger). The ground stays consecrated for 5s: ${GROUND}.`,
+    description: `Call a pillar of light onto the aimed point (up to 6 units). After 0.35s it crashes down: enemies within 3.5 units are pulled up to 2 units inward, then take 4x astral damage in a 3 unit radius and are stunned for 1.5s (bosses take 180 stagger). The ground stays consecrated for 5s: ${GROUND}.`,
     compressionSupport: true, icon: 'node:t_judgment_day' },
   // ---- Radiance ----
   { id: 't_consecrate', classId: 'templar', name: 'Consecrate', slot: 'active', damageType: 'astral', damageCoef: '0.35', cooldownSec: 5.5, charges: 1,
@@ -30,7 +30,7 @@ export const SKILLS: SkillDef[] = [
     description: `Sanctify the ground around you (radius 2.6) for 5s: ${GROUND}.`, compressionSupport: true, icon: 'node:t_consecrate' },
   { id: 't_dawnbreak', classId: 'templar', name: 'Dawnbreak', slot: 'active', damageType: 'astral', damageCoef: '1.8', cooldownSec: 6.5, charges: 1,
     shape: { kind: 'circle', radius: 3.5, selfCentered: true, range: 0 }, knockback: 0.8,
-    description: 'Erupt in a nova of dawn light (radius 3.5): 1.8x astral damage, enemies are stunned for 1s and knocked back (bosses take 60 stagger), allies inside heal 8% of their maximum health. Leaves Consecration (radius 2.6, 5s) under you.',
+    description: 'Erupt in a nova of dawn light (radius 3.5): 1.8x astral damage, enemies are stunned for 1s and knocked back (bosses take 60 stagger), allies inside heal 8% of their maximum health. Leaves consecrated ground (radius 2.6, 5s) under you.',
     compressionSupport: true, icon: 'node:t_dawnbreak' },
   { id: 't_beacon', classId: 'templar', name: 'Beacon of Light', slot: 'active', damageType: 'astral', damageCoef: '0.55', cooldownSec: 8.5, charges: 1,
     shape: { kind: 'aura', radius: 3, duration: 8 },
@@ -52,38 +52,38 @@ export const SKILLS: SkillDef[] = [
   // ---- Aegis ----
   { id: 't_shield_charge', classId: 'templar', name: 'Shield Charge', slot: 'active', damageType: 'physical', damageCoef: '1.6', cooldownSec: 4, charges: 1,
     shape: { kind: 'line', length: 5, width: 2, duration: 0.28, tickInterval: 0.28 }, knockback: 1.2,
-    description: 'Charge 5 units behind your shield (stops at walls). Every enemy you plough into takes 1.6x physical damage and is hurled 1.2 units aside (bosses take 30 stagger). You take x0.5 damage while charging.',
+    description: 'Rush 5 units behind your shield (stops at walls). Every enemy you plough into takes 1.6x physical damage and is shoved 1.2 units aside (knockback; bosses take 30 stagger). You take x0.5 damage during the rush.',
     compressionSupport: true, icon: 'node:t_shield_charge' },
   { id: 't_aegis_charge', classId: 'templar', name: 'Aegis Charge', slot: 'active', damageType: 'physical', damageCoef: '1.6', cooldownSec: 7, charges: 1,
     shape: { kind: 'line', length: 5, width: 2, duration: 0.28, tickInterval: 0.28 }, knockback: 1.2,
-    description: 'Shield Charge (5 units, 1.6x physical, x0.5 damage taken while charging), then raise an Aegis Dome (radius 3) where you stop for 4s: allies inside take x0.6 damage and enemy projectiles that enter the dome are destroyed.',
+    description: 'Shield Charge (5 units, 1.6x physical, x0.5 damage taken during the rush), then raise a dome of light (radius 3) where you stop for 4s: allies inside take x0.6 damage and enemy projectiles that enter the dome are destroyed.',
     compressionSupport: true, icon: 'node:t_aegis_charge' },
   { id: 't_intercession', classId: 'templar', name: 'Intercession', slot: 'active', damageType: 'physical', damageCoef: '1.2', cooldownSec: 6.5, charges: 1,
     shape: { kind: 'teleport', range: 8 },
-    description: 'Leap (0.4s, untargetable) to the ally nearest your aim within 8 units, or 6 units along your aim. Landing deals 1.2x physical in a 2.2 unit radius and knocks enemies back. You and allies within 3 units take a Vow: a holy shield of 18% maximum health for 6s; when a Vow\'s shield breaks it bursts for 1.5x astral in a 2.2 unit radius.',
+    description: 'Leap (0.4s, invulnerable) to the ally nearest your aim within 8 units, or 6 units along your aim. Landing deals 1.2x physical in a 2.2 unit radius and knocks enemies back. You and allies within 3 units take a Vow: a holy shield of 18% maximum health for 6s; when a Vow\'s shield breaks it bursts for 1.5x astral in a 2.2 unit radius.',
     compressionSupport: true, icon: 'node:t_intercession' },
 ];
 
 export const NODES: NodeDef[] = [
   // ---- Templar / Radiance ----
-  n('t_consecrate', 'radiance', 'Consecrate', 1, 0, { starting: true, grantsSkill: 't_consecrate', description: 'Sanctifies the ground around you for 5s, burning enemies and healing allies.' }),
+  n('t_consecrate', 'radiance', 'Consecrate', 1, 0, { starting: true, grantsSkill: 't_consecrate', description: 'Consecrates the ground around you for 5s, hurting enemies and healing allies inside.' }),
   n('t_hallowed_ground', 'radiance', 'Hallowed Ground', 3, 1, { prereqs: [{ node: 't_consecrate', rank: 1 }], modifiers: [{ stat: 'skill.t_consecrate.damage', factorPerRank: '1.12' }], upgrades: 't_consecrate', description: 'Upgrades Consecrate: damage ×{value} per rank, all holy ground too.' }),
   n('t_benediction', 'radiance', 'Benediction', 3, 1, { modifiers: [{ stat: 'player.holyHealing', factorPerRank: '1.1' }], description: 'Raises every heal and shield you grant ×{value} per rank.' }),
   n('t_radiant_core', 'radiance', 'Radiant Core', 2, 1, { modifiers: [{ stat: 'player.astralDamage', factorPerRank: '1.08' }], description: 'Raises astral damage ×{value} per rank.' }),
-  n('t_sanctuary', 'radiance', 'Sanctuary', 1, 2, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_blinding_light'], mechanics: ['sanctuary'], upgrades: 't_consecrate', description: 'Upgrades Consecrate: your holy ground moves with you, evolutions too.' }),
-  n('t_blinding_light', 'radiance', 'Blinding Light', 1, 2, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_sanctuary'], mechanics: ['blinding_light'], upgrades: 't_consecrate', description: 'Upgrades Consecrate: blinds enemies inside for 1s; they take ×1.15 damage for 4s.' }),
+  n('t_sanctuary', 'radiance', 'Sanctuary', 1, 2, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_blinding_light'], mechanics: ['sanctuary'], upgrades: 't_consecrate', description: 'Upgrades Consecrate: its holy ground moves with you, evolutions too.' }),
+  n('t_blinding_light', 'radiance', 'Blinding Light', 1, 2, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_sanctuary'], mechanics: ['blinding_light'], upgrades: 't_consecrate', description: 'Upgrades Consecrate: blinds the enemies inside it when cast.' }),
   n('t_dawnbreak', 'radiance', 'Dawnbreak', 1, 2, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_beacon'], grantsSkill: 't_dawnbreak', description: 'Bursts light for 1.8× astral that stuns, heals allies 8%, and consecrates the ground.' }),
   n('t_beacon', 'radiance', 'Beacon of Light', 1, 2, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_dawnbreak'], grantsSkill: 't_beacon', description: 'Plants an 8s beacon that shoots 0.55× astral bolts and heals allies nearby.' }),
-  n('t_radiant_ward', 'radiance', 'Radiant Ward', 1, 3, { mechanics: ['radiant_ward'], description: 'Turns healing beyond an ally\'s max health into a shield worth 50% of it.' }),
-  n('t_searing_light', 'radiance', 'Searing Light', 1, 3, { mechanics: ['searing_light'], description: 'Makes your holy ground leave enemies taking ×1.12 damage for 1s per pulse.' }),
-  n('t_avenging_light', 'radiance', 'Avenging Light', 1, 4, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_sanctum'], mechanics: ['avenging_light'], description: 'Makes every heal you grant also smite the nearest enemy for 60% of the heal.' }),
+  n('t_radiant_ward', 'radiance', 'Radiant Ward', 1, 3, { mechanics: ['radiant_ward'], description: 'Turns your healing beyond an ally\'s max health into a shield worth 50% of the excess.' }),
+  n('t_searing_light', 'radiance', 'Searing Light', 1, 3, { mechanics: ['searing_light'], description: 'Each pulse of your consecrated ground leaves enemies inside Vulnerable (×1.12) for 1s.' }),
+  n('t_avenging_light', 'radiance', 'Avenging Light', 1, 4, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_sanctum'], mechanics: ['avenging_light'], description: 'Every heal you grant also smites the enemy nearest the healed ally for 60% of the heal.' }),
   n('t_sanctum', 'radiance', 'Holy Sanctum', 1, 4, { prereqs: [{ node: 't_consecrate', rank: 1 }], excludes: ['t_avenging_light'], mechanics: ['sanctum'], description: 'Makes allies in your holy ground take ×0.8 damage and attack ×1.2 faster.' }),
 
   // ---- Templar / Judgment ----
   n('t_hammer_throw', 'judgment', 'Hammer of Judgment', 1, 0, { starting: true, grantsSkill: 't_hammer_throw', description: 'Hurls a returning hammer that hits enemies for 1.3× physical both ways.' }),
   n('t_weighted_head', 'judgment', 'Weighted Head', 3, 1, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], modifiers: [{ stat: 'skill.t_hammer_throw.damage', factorPerRank: '1.12' }], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: damage ×{value} per rank, evolutions too.' }),
   n('t_zealotry', 'judgment', 'Zealotry', 3, 1, { modifiers: [{ stat: 'player.attackFrequency', factorPerRank: '1.05' }], description: 'Raises attack speed ×{value} per rank.' }),
-  n('t_condemnation', 'judgment', 'Condemnation', 2, 1, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], mechanics: ['condemn'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: hits Condemn; your swings detonate it for 0.8× per rank.' }),
+  n('t_condemnation', 'judgment', 'Condemnation', 2, 1, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], mechanics: ['condemn'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: hits Condemn enemies; your basic swings detonate it for 0.8× per rank.' }),
   n('t_shepherd', 'judgment', 'Shepherd\'s Return', 1, 2, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_hammerfall'], mechanics: ['shepherd'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: the return pulls enemies 1.5 units toward you.' }),
   n('t_hammerfall', 'judgment', 'Grinding Halt', 1, 2, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_shepherd'], mechanics: ['hammerfall'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: hovers 1.2s at range, grinding for 0.35× every 0.2s.' }),
   n('t_skyfall', 'judgment', 'Skyfall Hammer', 1, 2, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_smite'], grantsSkill: 't_skyfall', description: 'Throws the hammer to a point where a pillar of light smites for 2.2× and stuns.' }),
@@ -94,7 +94,7 @@ export const NODES: NodeDef[] = [
   n('t_heavens_call', 'judgment', 'Heaven\'s Call', 1, 4, { prereqs: [{ node: 't_hammer_throw', rank: 1 }], excludes: ['t_inquisitor'], mechanics: ['heavens_call'], upgrades: 't_hammer_throw', description: 'Upgrades Hammer of Judgment: each cast calls 3 smites on nearby enemies for 1×.' }),
 
   // ---- Templar / Aegis ----
-  n('t_shield_charge', 'aegis', 'Shield Charge', 1, 0, { starting: true, grantsSkill: 't_shield_charge', description: 'Charges 5 units behind your shield for 1.6×, taking half damage while charging.' }),
+  n('t_shield_charge', 'aegis', 'Shield Charge', 1, 0, { starting: true, grantsSkill: 't_shield_charge', description: 'Rushes 5 units behind your shield for 1.6× with knockback, taking half damage on the way.' }),
   n('t_bulwark_of_faith', 'aegis', 'Bulwark of Faith', 3, 1, { modifiers: [{ stat: 'player.armor', factorPerRank: '1.1' }], description: 'Raises armor ×{value} per rank.' }),
   n('t_steadfast', 'aegis', 'Steadfast', 3, 1, { modifiers: [{ stat: 'player.maxHealth', factorPerRank: '1.07' }], description: 'Raises max health ×{value} per rank.' }),
   n('t_shield_slam', 'aegis', 'Shield Slam', 2, 1, { prereqs: [{ node: 't_shield_charge', rank: 1 }], mechanics: ['shield_slam'], upgrades: 't_shield_charge', description: 'Upgrades Shield Charge: ends in a slam for 0.8× and a 0.5s stun per rank.' }),
@@ -104,7 +104,7 @@ export const NODES: NodeDef[] = [
   n('t_intercession', 'aegis', 'Intercession', 1, 2, { prereqs: [{ node: 't_shield_charge', rank: 1 }], excludes: ['t_aegis_charge'], grantsSkill: 't_intercession', description: 'Leaps to an ally and grants nearby allies an 18% Vow shield that bursts when broken.' }),
   n('t_guardian_angel', 'aegis', 'Guardian Angel', 1, 3, { mechanics: ['guardian_angel'], description: 'Makes revives near you ×1.5 faster, and downed allies bleed out at half speed.' }),
   n('t_divine_intervention', 'aegis', 'Divine Intervention', 1, 3, { mechanics: ['divine_intervention'], description: 'Saves you or a nearby ally from going down once per round, at 30% health.' }),
-  n('t_living_bastion', 'aegis', 'Living Bastion', 1, 4, { prereqs: [{ node: 't_shield_charge', rank: 1 }], excludes: ['t_retribution'], mechanics: ['living_bastion'], description: 'Shields allies within 4 units: they take ×0.75 damage, with 25% redirected to you.' }),
+  n('t_living_bastion', 'aegis', 'Living Bastion', 1, 4, { prereqs: [{ node: 't_shield_charge', rank: 1 }], excludes: ['t_retribution'], mechanics: ['living_bastion'], description: 'Stands as a living shield for allies within 4 units: they take ×0.75 damage, 25% redirected to you.' }),
   n('t_retribution', 'aegis', 'Retribution', 1, 4, { prereqs: [{ node: 't_shield_charge', rank: 1 }], excludes: ['t_living_bastion'], mechanics: ['retribution'], description: 'Stores 40% of damage taken; your next Aegis skill releases 200% of it as a nova.' }),
 ];
 

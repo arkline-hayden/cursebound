@@ -62,41 +62,105 @@ export function validateMechanics(): string[] {
   return errs;
 }
 
-function detectCycles(nodes: NodeDef[]): string[] {
+/**
+ * Prerequisites that deliberately cross branches (node id -> prerequisite ids). The skill tree draws connectors only
+ * inside a branch column, so a cross-branch link must be listed here (and shown some other way) to be allowed. None yet.
+ */
+export const CROSS_BRANCH_PREREQS: Record<string, string[]> = {};
+
+/**
+ * Skills that no node grants but a node provides (a summon's attack): an upgrade of one must require its provider.
+ * Class basic and signature skills are always owned and need no provider.
+ */
+export const SKILL_PROVIDERS: Record<string, string> = { af_drone_zap: 'af_drone' };
+
+/**
+ * Skill-tree structure (PRD §6.2, SkillTree.tsx): the rules that keep prerequisites meaningful and the drawn tree
+ * truthful. Takes any node list so tests can feed malformed trees.
+ *  - no prerequisite cycles; every prerequisite sits at a lower tier, in the same class and (unless listed in
+ *    CROSS_BRANCH_PREREQS) the same branch, so each connector runs down its own column;
+ *  - choices (excludes) are declared on both nodes, pair nodes of one tier and branch (or two transformations of the
+ *    same skill, such as two Astral Nova keystones), and never sit on a node's own prerequisite chain;
+ *  - an upgrade requires (directly or through its chain) the node that grants or provides the skill it upgrades, and
+ *    an evolution requires its branch's base skill;
+ *  - every node is reachable by spending points greedily in its branch (each choice on its own).
+ */
+export function validateTree(nodes: NodeDef[]): string[] {
   const errs: string[] = [];
+  const byId: Record<string, NodeDef> = Object.fromEntries(nodes.map((x) => [x.id, x]));
+  // cycles
   const state = new Map<string, number>();
   const visit = (id: string, path: string[]) => {
     const s = state.get(id);
     if (s === 1) { errs.push(`prerequisite cycle: ${[...path, id].join(' -> ')}`); return; }
     if (s === 2) return;
     state.set(id, 1);
-    const node = NODE_BY_ID[id];
-    for (const p of node?.prereqs ?? []) visit(p.node, [...path, id]);
+    for (const p of byId[id]?.prereqs ?? []) visit(p.node, [...path, id]);
     state.set(id, 2);
   };
-  for (const node of nodes) visit(node.id, []);
-  return errs;
-}
-
-/** A node is reachable if, spending points greedily in its branch, all tier and prereq requirements can be met. */
-function unreachable(classId: string): string[] {
-  const nodes = NODES.filter((x) => x.classId === classId);
-  const ranks = new Map<string, number>();
-  for (const x of nodes) if (x.starting) ranks.set(x.id, x.rankLimit);
-  const branchSpent = (b: string) => nodes.filter((x) => x.branch === b && !x.starting).reduce((s, x) => s + (ranks.get(x.id) ?? 0) * x.costPerRank, 0);
-  let progress = true;
-  while (progress) {
-    progress = false;
-    for (const x of nodes) {
-      const r = ranks.get(x.id) ?? 0;
-      if (r >= x.rankLimit) continue;
-      if (branchSpent(x.branch) < BRANCH_TIER_POINTS[x.tier]) continue;
-      if (!x.prereqs.every((p) => (ranks.get(p.node) ?? 0) >= p.rank)) continue;
-      ranks.set(x.id, r + 1);   // exclusions are ignored here: each choice must be reachable on its own
-      progress = true;
+  for (const x of nodes) visit(x.id, []);
+  if (errs.length) return errs;   // the chain walks below assume an acyclic graph
+  const chain = (id: string, out = new Set<string>()): Set<string> => {
+    for (const p of byId[id]?.prereqs ?? []) if (!out.has(p.node)) { out.add(p.node); chain(p.node, out); }
+    return out;
+  };
+  const grantOf: Record<string, NodeDef> = {};
+  for (const x of nodes) if (x.grantsSkill) grantOf[`${x.classId}/${x.grantsSkill}`] = x;
+  for (const x of nodes) {
+    for (const p of x.prereqs) {
+      const pre = byId[p.node];
+      if (!pre) { errs.push(`${x.id}: unknown prerequisite ${p.node}`); continue; }
+      if (pre.classId !== x.classId) errs.push(`${x.id}: cross-class prerequisite ${p.node}`);
+      if (pre.tier >= x.tier) errs.push(`${x.id}: prerequisite ${p.node} must sit at a lower tier (${pre.tier} >= ${x.tier})`);
+      if (pre.branch !== x.branch && !CROSS_BRANCH_PREREQS[x.id]?.includes(p.node)) errs.push(`${x.id}: prerequisite ${p.node} is in another branch (${pre.branch}); list it in CROSS_BRANCH_PREREQS if deliberate`);
+      if (p.rank < 1 || p.rank > pre.rankLimit) errs.push(`${x.id}: prerequisite ${p.node} rank ${p.rank} is outside 1..${pre.rankLimit}`);
+    }
+    const ancestors = chain(x.id);
+    for (const id of (x.excludes ?? [])) {
+      const other = byId[id];
+      if (!other) { errs.push(`${x.id}: excludes unknown node ${id}`); continue; }
+      if (other.classId !== x.classId) errs.push(`${x.id}: excludes a node of another class`);
+      if (!(other.excludes ?? []).includes(x.id)) errs.push(`${x.id}: exclusion with ${id} must be declared on both nodes`);
+      if (other.tier !== x.tier) errs.push(`${x.id}: a choice pairs nodes of one tier (${id} is tier ${other.tier})`);
+      if (other.branch !== x.branch && !(x.upgrades && x.upgrades === other.upgrades)) errs.push(`${x.id}: choice with ${id} crosses branches without transforming the same skill`);
+      if (ancestors.has(id)) errs.push(`${x.id}: cannot require a node it excludes (${id})`);
+    }
+    // a prerequisite chain that contains both sides of a choice can never be completed
+    const line = [x.id, ...ancestors];
+    for (const a of line) for (const b of byId[a]?.excludes ?? []) if (a < b && line.includes(b)) errs.push(`${x.id}: its prerequisites include both ${a} and ${b}, which exclude each other`);
+    if (x.upgrades) {
+      const skill = SKILL_BY_ID[x.upgrades];
+      const giver = grantOf[`${x.classId}/${x.upgrades}`] ?? (SKILL_PROVIDERS[x.upgrades] ? byId[SKILL_PROVIDERS[x.upgrades]] : undefined);
+      const cls = CLASSES.find((c) => c.id === x.classId);
+      if (giver) { if (!ancestors.has(giver.id)) errs.push(`${x.id}: upgrades ${x.upgrades} but does not require ${giver.id}, the node that grants it`); }
+      else if (skill && cls && x.upgrades !== cls.basicSkill && x.upgrades !== cls.signatureSkill) errs.push(`${x.id}: upgrades ${x.upgrades}, which no node grants (add it to SKILL_PROVIDERS)`);
+    }
+    if (x.grantsSkill && x.tier > 0) {
+      const base = nodes.find((b) => b.classId === x.classId && b.branch === x.branch && b.tier === 0 && b.grantsSkill);
+      if (base && !ancestors.has(base.id)) errs.push(`${x.id}: an evolution must require its branch's base skill ${base.id}`);
     }
   }
-  return nodes.filter((x) => (ranks.get(x.id) ?? 0) < x.rankLimit).map((x) => `${x.id}: unreachable`);
+  // reachability: spend greedily per branch, each choice on its own (exclusions ignored)
+  for (const classId of new Set(nodes.map((x) => x.classId))) {
+    const own = nodes.filter((x) => x.classId === classId);
+    const ranks = new Map<string, number>();
+    for (const x of own) if (x.starting) ranks.set(x.id, x.rankLimit);
+    const branchSpent = (b: string) => own.filter((x) => x.branch === b && !x.starting).reduce((s, x) => s + (ranks.get(x.id) ?? 0) * x.costPerRank, 0);
+    let progress = true;
+    while (progress) {
+      progress = false;
+      for (const x of own) {
+        const r = ranks.get(x.id) ?? 0;
+        if (r >= x.rankLimit) continue;
+        if (branchSpent(x.branch) < BRANCH_TIER_POINTS[x.tier]) continue;
+        if (!x.prereqs.every((p) => (ranks.get(p.node) ?? 0) >= p.rank)) continue;
+        ranks.set(x.id, r + 1);
+        progress = true;
+      }
+    }
+    for (const x of own) if ((ranks.get(x.id) ?? 0) < x.rankLimit) errs.push(`${x.id}: unreachable`);
+  }
+  return errs;
 }
 
 export function validateContent(): string[] {
@@ -126,22 +190,9 @@ export function validateContent(): string[] {
       else if (!node.description.startsWith(`Upgrades ${up.name}: `)) errs.push(`${node.id}: upgrade copy must start "Upgrades ${up.name}: "`);
       if (node.grantsSkill) errs.push(`${node.id}: a node either grants or upgrades a skill, not both`);
     }
-    for (const p of node.prereqs) {
-      if (!NODE_BY_ID[p.node]) errs.push(`${node.id}: unknown prerequisite ${p.node}`);
-      else if (NODE_BY_ID[p.node].classId !== node.classId) errs.push(`${node.id}: cross-class prerequisite`);
-    }
     if (node.rankLimit < 1) errs.push(`${node.id}: rankLimit < 1`);
   }
-  errs.push(...detectCycles(NODES));
-  for (const node of NODES) {
-    for (const x of node.excludes ?? []) {
-      const other = NODE_BY_ID[x];
-      if (!other) errs.push(`${node.id}: excludes unknown node ${x}`);
-      else if (other.classId !== node.classId) errs.push(`${node.id}: excludes a node of another class`);
-      else if (!(other.excludes ?? []).includes(node.id)) errs.push(`${node.id}: exclusion with ${x} must be declared on both nodes`);
-      if (node.prereqs.some((p) => p.node === x)) errs.push(`${node.id}: cannot require a node it excludes (${x})`);
-    }
-  }
+  errs.push(...validateTree(NODES));
   for (const cls of CLASSES) {
     const nodes = NODES.filter((x) => x.classId === cls.id);
     if (cls.branches.length !== 3) errs.push(`${cls.id}: classes have exactly 3 branches (one active skill slot each)`);
@@ -170,7 +221,6 @@ export function validateContent(): string[] {
     }
     if (!SKILL_BY_ID[cls.basicSkill]) errs.push(`${cls.id}: missing basic skill`);
     if (!SKILL_BY_ID[cls.signatureSkill]) errs.push(`${cls.id}: missing signature skill`);
-    errs.push(...unreachable(cls.id));
   }
   for (const s of SKILLS) {
     if (!POS_DECIMAL.test(s.damageCoef)) errs.push(`${s.id}: invalid damageCoef`);

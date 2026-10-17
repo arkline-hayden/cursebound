@@ -9,6 +9,7 @@ import { accountApi } from '@/lib/api';
 import { authStore, refreshAuth } from '@/lib/auth';
 import { score } from '@/lib/format';
 import { NodeIcon, ClassEmblem } from './icons';
+import { KeywordText } from './Keywords';
 import { sharedAudio } from '@/game/audio/shared';
 import { playUiFile, useCountdownTick } from './uiCues';
 
@@ -118,7 +119,7 @@ function changes(p: Player, n: NodeDef, cls: ClassDef): Change[] {
       ? { from: <><NodeIcon nodeId={evo.grantsSkill} size={16} /> {skillName(evo)}</>, to, meta: cooldownMeta(n.grantsSkill) }
       : { label: 'New', to, meta: cooldownMeta(n.grantsSkill) });
   }
-  if (n.upgrades && !n.modifiers.length) out.push({ to: nodeText(n, rank) });
+  if (n.upgrades && !n.modifiers.length) out.push({ to: <KeywordText as="span" text={nodeText(n, rank)} classId={cls.id} /> });
   for (const m of n.modifiers) {
     const f = Big.from(m.factorPerRank);
     const cur = `×${fx(f.powInt(rank).toNumber())}`, nxt = `×${fx(f.powInt(next).toNumber())}`;
@@ -215,20 +216,68 @@ function useSize<T extends HTMLElement>() {
 // pieces
 // ---------------------------------------------------------------------------------------------------------------
 
-function Links({ nodes, geo, me, w, h }: { nodes: NodeDef[]; geo: Geo; me: Player; w: number; h: number }) {
-  const segs: { x: number; y: number; w: number; h: number; tone: 'dim' | 'lit' | 'hot' }[] = [];
-  const vert = (x: number, y0: number, y1: number, tone: 'dim' | 'lit' | 'hot') => segs.push({ x: x - 3, y: Math.min(y0, y1), w: 6, h: Math.abs(y1 - y0) + 2, tone });
-  const horz = (y: number, x0: number, x1: number, tone: 'dim' | 'lit' | 'hot') => segs.push({ x: Math.min(x0, x1) - 3, y: y - 3, w: Math.abs(x1 - x0) + 6, h: 6, tone });
+/**
+ * Connector routing: one orthogonal line per prerequisite (content validate.ts keeps every prerequisite in its own
+ * branch column at a lower tier, so every requirement is drawn). A line leaves the bottom of the prerequisite, jogs in
+ * the channel just above the next row and drops onto the node. A line spanning several tiers runs its vertical stretch
+ * down a lane that no socket (or roomy label) in the rows it crosses covers, so it never reads as touching a node it
+ * does not belong to.
+ */
+function routeLinks(nodes: NodeDef[], geo: Geo, w: number) {
+  const tierOf: Record<string, number> = Object.fromEntries(nodes.map((n) => [n.id, n.tier]));
+  const rows = new Map<number, { x: number; half: number; top: number }[]>();
+  for (const n of nodes) {
+    const p = geo.pos[n.id];
+    if (!p) continue;
+    const list = rows.get(n.tier) ?? [];
+    list.push({ x: p.x, half: Math.max(p.s / 2, geo.roomy ? p.label / 2 : 0) + 6, top: p.y - p.s / 2 });
+    rows.set(n.tier, list);
+  }
+  const channel = (t: number) => even(Math.min(...(rows.get(t) ?? [{ top: geo.ys[t] ?? 0 }]).map((r) => r.top)) - 10);
+  const blocked = (x: number, t0: number, t1: number) => {
+    for (let t = t0; t <= t1; t++) for (const r of rows.get(t) ?? []) if (Math.abs(x - r.x) < r.half + 3) return true;
+    return false;
+  };
+  const lane = (ax: number, bx: number, t0: number, t1: number) => {
+    if (!blocked(ax, t0, t1)) return ax;
+    if (!blocked(bx, t0, t1)) return bx;
+    const cands: number[] = [];
+    for (let t = t0; t <= t1; t++) for (const r of rows.get(t) ?? []) cands.push(r.x - r.half - 4, r.x + r.half + 4);
+    const free = cands.map(even).filter((x) => x > 4 && x < w - 4 && !blocked(x, t0, t1));
+    return free.sort((p, q) => Math.abs(p - bx) + Math.abs(p - ax) - (Math.abs(q - bx) + Math.abs(q - ax)))[0] ?? ax;
+  };
+  const paths: { from: string; to: string; pts: [number, number][] }[] = [];
   for (const n of nodes) for (const pr of n.prereqs) {
     const a = geo.pos[pr.node], b = geo.pos[n.id];
     if (!a || !b) continue;
-    const met = (me.ranks[pr.node] ?? 0) >= pr.rank;
-    const tone = met ? (owns(me, n.id) ? 'hot' : 'lit') : 'dim';
+    const ta = tierOf[pr.node] ?? 0, tb = n.tier;
     const y0 = a.y + a.s / 2, y1 = b.y - b.s / 2;
-    if (y1 <= y0) { horz(b.y, a.x, b.x, tone); continue; }
-    if (a.x === b.x) { vert(a.x, y0, y1, tone); continue; }
-    const mid = even(y1 - Math.min(16, (y1 - y0) / 2));
-    vert(a.x, y0, mid, tone); horz(mid, a.x, b.x, tone); vert(b.x, mid, y1, tone);
+    let pts: [number, number][];
+    if (tb <= ta || y1 <= y0) pts = [[a.x, a.y], [b.x, b.y]];   // never in valid content: a flat link between peers
+    else if (tb === ta + 1 || !blocked(a.x, ta + 1, tb - 1)) {
+      const cy = channel(tb);
+      pts = a.x === b.x ? [[a.x, y0], [b.x, y1]] : [[a.x, y0], [a.x, cy], [b.x, cy], [b.x, y1]];
+    } else {
+      const c0 = channel(ta + 1), c1 = channel(tb), lx = lane(a.x, b.x, ta + 1, tb - 1);
+      pts = [[a.x, y0], [a.x, c0], [lx, c0], [lx, c1], [b.x, c1], [b.x, y1]];
+    }
+    paths.push({ from: pr.node, to: n.id, pts });
+  }
+  return paths;
+}
+
+function Links({ nodes, geo, me, w, h }: { nodes: NodeDef[]; geo: Geo; me: Player; w: number; h: number }) {
+  const segs: { x: number; y: number; w: number; h: number; tone: 'dim' | 'lit' | 'hot' }[] = [];
+  const paths = useMemo(() => routeLinks(nodes, geo, w), [nodes, geo, w]);
+  for (const { from, to, pts } of paths) {
+    const pr = NODE_BY_ID[to]?.prereqs.find((x) => x.node === from);
+    const met = (me.ranks[from] ?? 0) >= (pr?.rank ?? 1);
+    const tone = met ? (owns(me, to) ? 'hot' : 'lit') : 'dim';
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      if (x0 === x1) segs.push({ x: x0 - 3, y: Math.min(y0, y1), w: 6, h: Math.abs(y1 - y0) + 2, tone });
+      else segs.push({ x: Math.min(x0, x1) - 3, y: y0 - 3, w: Math.abs(x1 - x0) + 6, h: 6, tone });
+    }
   }
   const core = { dim: '#4c2c0c', lit: '#bc600e', hot: '#ec941e' };
   return (
@@ -394,7 +443,7 @@ function Detail({ me, cls, node, pending, onSpend, mastery }: { me: Player; cls:
           </div>
         </div>
         <KindPlate node={node} evo={evo} />
-        {desc && <p className="td-desc">{desc}</p>}
+        {desc && <KeywordText className="td-desc" text={desc} classId={cls.id} />}
         {delta.length > 0 && (
           <div className="td-change">
             <span className="lbl">What changes</span>
