@@ -137,6 +137,11 @@ export class InputController {
     if (bound && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow') || /^F\d{1,2}$/.test(e.code))) e.preventDefault();
     if (isDown && e.repeat) return;
     if (isDown && this.cinematic) return;
+    // a menu open over a live (multiplayer) game: keys belong to the menu, except the ledger / pause toggles
+    if (isDown && document.querySelector('[role="dialog"][aria-modal="true"]')) {
+      const k = settingsStore.get().s.keys;
+      if (!k.ledger?.includes(e.code) && !k.pause?.includes(e.code)) return;
+    }
     this.usingPad = false;
     this.press(e.code, isDown);
   }

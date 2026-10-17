@@ -221,7 +221,7 @@ export default function Play() {
       <main id="main">{overlay}</main>
       {showLedger && net && <Ledger net={net} onClose={() => setShowLedger(false)} />}
       {(paused || (serverPaused.paused && serverPaused.reason !== 'client lost' && !showLedger)) && net && stage === 'RUN' && !results && (
-        <PauseMenu net={net} onClose={() => { setPaused(false); net.pause(false); }} onLedger={() => { setPaused(false); setShowLedger(true); }} />
+        <PauseMenu net={net} onClose={() => { setPaused(false); if (phase?.mode === 'solo') net.pause(false); }} onLedger={() => { setPaused(false); setShowLedger(true); }} />
       )}
       {banner && <div key={banner.id} className={`banner ${['danger', 'good', 'info'].includes(banner.tone) ? banner.tone : ''} ${banner.sub ? '' : 'callout'}`} aria-hidden="true"><span className="bn-text">{banner.text}</span>{banner.sub && <span className="bn-sub">{banner.sub}</span>}</div>}
       {(status === 'reconnecting' || status === 'connecting') && (

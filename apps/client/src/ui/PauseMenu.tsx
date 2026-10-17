@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { netStore, type GameConnection } from '@/lib/net';
 import { useStore } from '@/lib/store';
+import { settingsStore } from '@/lib/settings';
 import { SettingsPanel } from './SettingsPanel';
 
 // Pause / menu (PRD §3.3): retirement is always available. Solo confirms once; multiplayer needs a majority of
@@ -18,6 +19,18 @@ export function PauseMenu({ net, onClose, onLedger }: { net: GameConnection; onC
   const [showSettings, setShowSettings] = useState(false);
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => { first.current?.focus(); }, []);
+  // Escape / the pause key always closes the menu (multiplayer keeps running behind it): handled here, ahead of the
+  // game's own pause toggle, so it can never re-open or fight the menu. A key being rebound in Settings captures first.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || (e.target as HTMLElement)?.tagName === 'INPUT') return;
+      if (e.code !== 'Escape' && !settingsStore.get().s.keys.pause.includes(e.code)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
   if (!phase) return null;
   const solo = phase.mode === 'solo';
   const myRetire = phase.retire.includes(slot);
@@ -52,6 +65,7 @@ export function PauseMenu({ net, onClose, onLedger }: { net: GameConnection; onC
           )}
         </div>
         <footer className="sheet-foot pause-foot">
+          {showSettings && <button className="menu-item blood" onClick={onClose}>Back to the game</button>}
           <span>Seed <code>{phase.seed}</code> · {phase.trust === 'lan' ? 'LAN' : 'Local'} records{phase.practice ? ' · practice attempt' : ''}{phase.resumed ? ' · resumed' : ''}</span>
         </footer>
       </div>
