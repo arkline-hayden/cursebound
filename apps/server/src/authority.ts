@@ -3,7 +3,7 @@ import { BOUNTY_MIN_DEPTH, CARD_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, SIM_
 import { BUILD_ID, LIMITS, type ServerMessage } from '@cursebound/protocol';
 import {
   buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, runBreakdown, serializeState, stateHash, step,
-  voteCounts, type Command, type CreateRunParams, type PlayerInput, type SimEvent, type SimState, STATE_SCHEMA,
+  inCinematic, voteCounts, type Command, type CreateRunParams, type PlayerInput, type SimEvent, type SimState, STATE_SCHEMA,
 } from '@cursebound/simulation';
 import type { Logger } from './persistence/logger';
 import type { Store } from './persistence/store';
@@ -73,6 +73,10 @@ export class RunAuthority {
   private awards = new Map<string, XpAward>();
   private queues: PlayerInput[][] = [];
   private last: (PlayerInput | null)[] = [];
+  /** ticks each seat's last input was held through an empty queue whose own inputs have not arrived yet (tick) */
+  private held: number[] = [];
+  /** presses of late inputs taken as done (submitInput), applied with the seat's next tick */
+  private carry: number[] = [];
   private buckets: { tokens: number; at: number }[] = [];
   private pending: { cmd: Command; slot?: number; requestId?: string; voteSeq?: number }[] = [];
   private journal: Journal;
@@ -111,7 +115,7 @@ export class RunAuthority {
     if (o.createParams) this.journal.header = o.createParams;
     if (o.resume) this.journal.resumeFrom = { tick: o.state.tick };
     this.lastPhase = o.state.phase;
-    for (let i = 0; i < o.state.n; i++) { this.queues.push([]); this.last.push(null); this.buckets.push({ tokens: LIMITS.inputBurst, at: Date.now() }); }
+    for (let i = 0; i < o.state.n; i++) { this.queues.push([]); this.last.push(null); this.held.push(0); this.carry.push(0); this.buckets.push({ tokens: LIMITS.inputBurst, at: Date.now() }); }
     this.created = o.createParams && !this.ephemeral ? this.createRunRecord() : Promise.resolve();
     if (o.resume && this.state.awaitingDurable === 'commit') {
       // the restored checkpoint already contains the committed card: acknowledge durability, never reapply
@@ -141,8 +145,18 @@ export class RunAuthority {
     const q = this.queues[slot];
     const lastSeq = q.length ? q[q.length - 1].seq : (this.last[slot]?.seq ?? this.state.players[slot].lastInputSeq);
     if (inp.seq <= lastSeq) return false;       // duplicate/resent inputs never repeat an action
+    if (this.held[slot] > 0) {
+      // Late (network jitter, a client frame stall): a tick already went by holding the previous input in its place
+      // and moved the hero. Applying it as well moved the hero twice (the client predicts every input once, so it was
+      // corrected forward) and kept it queued as lasting lag. It is taken as done: its presses ride on the next tick,
+      // its intent on any further held tick. The client replays its inputs the same way (SNAPSHOT held, net.ts).
+      this.held[slot]--;
+      this.carry[slot] |= inp.buttons;
+      this.last[slot] = inp;
+      return true;
+    }
     q.push(inp);
-    if (q.length > LIMITS.maxQueuedInputs) q.splice(0, q.length - 2);   // stale backlog: resync to the latest
+    if (q.length > LIMITS.maxQueuedInputs) { q.splice(0, q.length - 2); this.held[slot] = 0; }   // stale backlog: resync to the latest
     return true;
   }
 
@@ -201,15 +215,33 @@ export class RunAuthority {
     const tickNo = s.tick;
     // heroes move in COMBAT and, without attacking, during the in-world door vote (doors.ts)
     const combat = s.phase === 'COMBAT' || s.phase === 'VOTING';
+    const cine = inCinematic(s);
     const inputs: (PlayerInput | null)[] = [];
     const jIn: JournalTick['i'] = [];
     for (let slot = 0; slot < s.n; slot++) {
       const q = this.queues[slot];
       let inp: PlayerInput | null = null;
       if (combat && s.players[slot].connected) {
-        if (q.length) { inp = q.shift()!; this.last[slot] = inp; }
-        else inp = this.last[slot];        // continuous held input until the next intention arrives
-      } else if (!combat) { q.length = 0; this.last[slot] = null; }   // no stale held input across phases
+        const carry = this.carry[slot];
+        this.carry[slot] = 0;
+        if (q.length) {
+          const next = q.shift()!;
+          this.last[slot] = next;
+          inp = carry ? { ...next, buttons: next.buttons | carry } : next;
+        } else {
+          // continuous held input until the next intention arrives; the input this tick stood in for is taken as
+          // done when it arrives (submitInput)
+          inp = this.last[slot];
+          if (inp) {
+            if (carry) inp = { ...inp, buttons: inp.buttons | carry };
+            // (a cutscene hold ignores inputs and the client sends none: nothing stands in for anything)
+            this.held[slot] = cine ? 0 : Math.min(LIMITS.lateTicks, this.held[slot] + 1);
+          }
+        }
+      } else {
+        this.held[slot] = 0; this.carry[slot] = 0;
+        if (!combat) { q.length = 0; this.last[slot] = null; }   // no stale held input across phases
+      }
       inputs.push(inp);
       if (inp) jIn.push([slot, inp.seq, inp.moveX, inp.moveY, inp.aimX, inp.aimY, inp.buttons]);
     }
@@ -475,7 +507,9 @@ export class RunAuthority {
       if (!l.connected) continue;
       // slow peers: replace obsolete snapshots instead of queueing them unboundedly
       if (l.buffered() > LIMITS.snapshotChunkBytes * 4) continue;
-      const msg = { t: 'SNAPSHOT' as const, ack: this.state.players[l.slot]?.lastInputSeq ?? 0, snap: l.debug && dbgSnap ? dbgSnap : snap };
+      // held: the client replays its unacknowledged inputs knowing the next that many are taken as done (net.ts onSnap)
+      const held = this.held[l.slot] ?? 0;
+      const msg = { t: 'SNAPSHOT' as const, ack: this.state.players[l.slot]?.lastInputSeq ?? 0, ...(held ? { held } : {}), snap: l.debug && dbgSnap ? dbgSnap : snap };
       l.send(msg);
       if (events.length) l.send({ t: 'EVENTS', tick: this.state.tick, events });
     }
@@ -531,7 +565,8 @@ export class RunAuthority {
   resync(link: SeatLink) {
     this.sendPhase(link);
     if (this.state.phase === 'VOTING') this.sendOffer(link);
-    link.send({ t: 'SNAPSHOT', ack: this.state.players[link.slot]?.lastInputSeq ?? 0, snap: buildSnapshot(this.state, link.debug) });
+    const held = this.held[link.slot] ?? 0;
+    link.send({ t: 'SNAPSHOT', ack: this.state.players[link.slot]?.lastInputSeq ?? 0, ...(held ? { held } : {}), snap: buildSnapshot(this.state, link.debug) });
     if (this.state.phase === 'RESULTS') link.send({ t: 'RESULTS', summary: this.summary() });
     if (this.paused) link.send({ t: 'PAUSED', paused: true, reason: this.pauseReason });
   }

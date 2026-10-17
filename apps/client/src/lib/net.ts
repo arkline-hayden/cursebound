@@ -1,4 +1,4 @@
-import { contentHash, DODGE, RULES } from '@cursebound/content';
+import { contentHash, DODGE, RULES, TICK_RATE } from '@cursebound/content';
 import { BUILD_ID, PROTOCOL_VERSION, type EventOp, type ServerMessage, type TrainOp } from '@cursebound/protocol';
 import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type RecapEntry, type Snapshot, type SimEvent } from '@cursebound/simulation';
 import { wsTransport, type GameTransport } from './p2p/transport';
@@ -87,9 +87,19 @@ export class GameConnection {
     /** the aim the authority holds once it has our inputs (it keeps the last non-zero aim input, stepPlayer): the
      *  local hero faces this, not the snapshot's aim, which trails our predicted body by the input round trip */
     ax: 1, ay: 0,
+    /** the latest input tick's stretch of the walk: the scene draws the hero from (px, py) to (qx, qy) as the clock
+     *  runs through the tick (game/selfView.ts). (qx, qy) is the body, less held ticks it includes early (onSnap). */
+    px: 0, py: 0, qx: 0, qy: 0,
   };
+  /** how far reconciliations moved the predicted body since the scene last took it (it blends this out, selfView.ts) */
+  drift = { x: 0, y: 0 };
   /** dodge bit of the last input the authority acknowledged (edge detection for replay) */
   private ackDodge = false;
+  /** inputs still to send that the authority's held ticks already stood in for (onSnap), and a dodge press among them */
+  private owed = 0;
+  private owedDodge = false;
+  /** the body's move per owed tick (drawn as each owed input goes out) */
+  private owedStep = { x: 0, y: 0 };
   correction = 0;
   private lastHud = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -153,7 +163,7 @@ export class GameConnection {
     switch (m.t) {
       case 'WELCOME': netStore.set({ welcome: m, slot: m.slot }); break;
       case 'ROOM': netStore.set({ room: m }); break;
-      case 'SNAPSHOT': this.onSnap(m.snap as Snapshot, m.ack); break;
+      case 'SNAPSHOT': this.onSnap(m.snap as Snapshot, m.ack, m.held ?? 0); break;
       case 'EVENTS': {
         const me = netStore.get().slot;
         for (const e of m.events as SimEvent[]) {
@@ -201,7 +211,7 @@ export class GameConnection {
     }
   }
 
-  private onSnap(snap: Snapshot, ack: number) {
+  private onSnap(snap: Snapshot, ack: number, held = 0) {
     const now = performance.now();
     this.snaps.push({ at: now, snap });
     if (this.snaps.length > 30) this.snaps.shift();
@@ -212,7 +222,7 @@ export class GameConnection {
       for (const p of this.pending) if (p.seq <= ack) this.ackDodge = p.dodge;
       this.pending = this.pending.filter((p) => p.seq > ack);
       if (!movesIn(snap.phase) || cinematicHeld(snap)) this.pending = [];   // inputs the authority dropped at a phase change / cinematic hold never replay
-      const prevX = this.pred.x, prevY = this.pred.y;
+      const prevQx = this.pred.qx, prevQy = this.pred.qy, prevPx = this.pred.px, prevPy = this.pred.py;
       const b = this.pred;
       b.x = me.x; b.y = me.y; b.vx = me.vx; b.vy = me.vy;
       b.dodgeTimer = me.dt; b.dodgeDirX = me.ddx; b.dodgeDirY = me.ddy;
@@ -225,13 +235,33 @@ export class GameConnection {
       b.lock = me.lk ?? 0; b.teth = me.teth ?? null; b.tethT = me.tk ?? 0;   // frozen / rooted / chained (afflictions.ts)
       let prev = this.ackDodge;
       if (me.life === 'alive' && movesIn(snap.phase) && !cinematicHeld(snap)) {
+        // `held` ticks already moved the authority's body on our last input in place of inputs that had not reached
+        // it; it takes the next that many to arrive as done (authority.ts submitInput), so the replay skips them too
+        // (carrying a dodge press on). Replaying them anyway put the prediction a tick ahead for every held tick, and
+        // each network hiccup came back as a correction. More held ticks than inputs in flight (the snapshot
+        // overtook our next input, or we stalled): the next inputs we send are the ones they stood in for.
+        let skip = held, carry = false;
         for (const p of this.pending) {
-          predictMoveTick(this.map, b, p.mx, p.my, p.ax, p.ay, p.dodge && !prev, b.speed, me.c, b.rr);
-          prev = p.dodge;
+          const dodge: boolean = p.dodge || carry;
+          if (skip > 0) { skip--; carry = dodge; continue; }
+          predictMoveTick(this.map, b, p.mx, p.my, p.ax, p.ay, dodge && !prev, b.speed, me.c, b.rr);
+          prev = dodge; carry = false;
         }
-      }
+        this.owed = skip; this.owedDodge = carry;
+      } else { this.owed = 0; this.owedDodge = false; }
       b.prevDodge = prev;
-      if (b.valid) this.correction = Math.hypot(b.x - prevX, b.y - prevY);
+      // Owed ticks happened early (this snapshot overtook the inputs they stand in for, or we stalled): the body is
+      // that far ahead of our own clock, and is drawn there as each owed tick comes round, not as a jump now.
+      this.owedStep = { x: b.vx / TICK_RATE, y: b.vy / TICK_RATE };
+      const qx = b.x - this.owedStep.x * this.owed, qy = b.y - this.owedStep.y * this.owed;
+      if (b.valid) {
+        // the tick the hero is drawn along moves with the body; the scene blends the jump out instead of showing it
+        const dx = qx - prevQx, dy = qy - prevQy;
+        this.correction = Math.hypot(dx, dy);
+        b.px = prevPx + dx; b.py = prevPy + dy;
+        this.drift.x += dx; this.drift.y += dy;
+      } else { b.px = qx; b.py = qy; }
+      b.qx = qx; b.qy = qy;
       b.valid = true;
     }
     if (now - this.lastHud > 100) {
@@ -243,9 +273,11 @@ export class GameConnection {
 
   /** Called by the scene at 60 Hz with the sampled intention. Applies local prediction immediately. */
   sendInput(mx: number, my: number, ax: number, ay: number, buttons: number) {
+    const b = this.pred;
+    b.px = b.qx; b.py = b.qy;   // this tick's stretch starts where the last one ended
     const st = netStore.get();
     const snap = this.snaps[this.snaps.length - 1]?.snap;
-    if (!snap || !movesIn(snap.phase) || cinematicHeld(snap) || st.paused.paused) return;
+    if (!snap || !movesIn(snap.phase) || cinematicHeld(snap) || st.paused.paused) { b.px = b.qx = b.x; b.py = b.qy = b.y; return; }
     const q = (v: number) => Math.max(-1, Math.min(1, Math.round(v * 127) / 127));
     const qa = (v: number) => Math.max(-64, Math.min(64, Math.round(v * 64) / 64));
     const seq = ++this.seq;
@@ -260,13 +292,22 @@ export class GameConnection {
     const pax = this.pred.ax, pay = this.pred.ay;
     this.pending.push({ seq, mx: input.mx, my: input.my, ax: pax, ay: pay, dodge });
     if (this.pending.length > 120) this.pending.shift();
-    const edge = dodge && !this.pred.prevDodge;
-    this.pred.prevDodge = dodge;
-    if (me && me.life === 'alive' && this.pred.valid) {
-      const b = this.pred;
+    // a tick the authority already held our last input through stands in for this one (onSnap): it moved the body
+    // the reconciliation started from, and the authority takes this input as done (its press carried on)
+    if (this.owed > 0) {
+      this.owed--; this.owedDodge ||= dodge;
+      b.qx = b.x - this.owedStep.x * this.owed; b.qy = b.y - this.owedStep.y * this.owed;
+      return;
+    }
+    const pressed = dodge || this.owedDodge;
+    this.owedDodge = false;
+    const edge = pressed && !b.prevDodge;
+    b.prevDodge = pressed;
+    if (me && me.life === 'alive' && b.valid) {
       b.guardTimer = me.guard ? 1 : 0;
       if (predictMoveTick(this.map, b, input.mx, input.my, pax, pay, edge, b.speed, me.c, b.rr)) b.dashAt = performance.now();
     }
+    b.qx = b.x; b.qy = b.y;
   }
 
   vote(cardSlot: number | null, locked: boolean) {
