@@ -76,7 +76,7 @@ export const MINIBOSS_MECHANICS: MiniBossMechanicDef[] = [
   },
   {
     id: 'poison', name: 'Venom Trail', short: 'Leaves poisonous puddles where it walks',
-    params: { every: 0.45, radius: 0.85, sec: 3, coef: 0.3 },
+    params: { every: 0.45, radius: 0.85, sec: 1.5, coef: 0.3 },
   },
 ];
 

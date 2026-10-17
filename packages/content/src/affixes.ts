@@ -97,7 +97,7 @@ export const AFFIX_RULES = {
   // Venomous: poison trail (dps coefficient on the elite's damage)
   venomTrailEvery: 0.35,
   venomTrailRadius: 0.65,
-  venomTrailSec: 3.5,
+  venomTrailSec: 1.75,
   venomDpsCoef: '0.25',
   // Glacial: freezing aura (a chill stack every few ticks to heroes inside)
   glacialRadius: 2.4,

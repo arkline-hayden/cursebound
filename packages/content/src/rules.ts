@@ -261,7 +261,7 @@ export const AFFLICTION_RULES = {
   silenceSec: 2,
   slowCap: 0.6,
   /** lingering ground patches: Bile Toad venom puddles and Web Weaver webs */
-  venomPuddleSec: 2.5,
+  venomPuddleSec: 1.25,
   venomPuddleRadius: 1.1,
   webPatchSec: 3,
   webPatchRadius: 1.2,

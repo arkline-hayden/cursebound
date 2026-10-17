@@ -65,7 +65,7 @@ export const ENEMIES: EnemyDef[] = [
     perception: { sight: 14, hearing: 10, reactionTicks: 12 }, preferredRange: [5, 8],
     utility: { pursue: 0.3, flank: 0.4, retreat: 0.7, cast: 1.0, reposition: 0.7 },
     attacks: [
-      { id: 'pool', name: 'Hex Pool', kind: 'pool', damageType: 'decay', damageCoef: '0.6', windupSec: 0.7, releaseSec: 0.1, recoverySec: 0.6, cooldownSec: 4.5, range: 8, duration: 5, telegraph: { kind: 'circle', radius: 1.6 } },
+      { id: 'pool', name: 'Hex Pool', kind: 'pool', damageType: 'decay', damageCoef: '0.6', windupSec: 0.7, releaseSec: 0.1, recoverySec: 0.6, cooldownSec: 4.5, range: 8, duration: 2.5, telegraph: { kind: 'circle', radius: 1.6 } },
       { id: 'orb', name: 'Curse Orb', kind: 'projectile', damageType: 'decay', damageCoef: '0.9', inflict: { status: 'silenced', sec: 2 }, windupSec: 0.45, releaseSec: 0.05, recoverySec: 0.5, cooldownSec: 2.6, range: 8, projectileSpeed: 5, projectileCount: 1, telegraph: { kind: 'line', length: 8, width: 0.35 } },
     ],
     weaknesses: { ember: '1.2' },

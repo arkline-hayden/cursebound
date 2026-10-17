@@ -405,7 +405,7 @@ describe('named mini-bosses: encounter, mechanics, loot', () => {
     const { s, e } = boss('MB_POISON', 'harpy', ['poison']);
     e.moveSpeed = 2; e.attack = null;
     for (const a of ENEMY_BY_ID.harpy.attacks) e.cooldowns[a.id] = 9999;
-    run(s, T(3));
+    run(s, T(1.2));
     expect(s.hazards.some((h) => h.kind === 'venom' && h.ownerId === e.id)).toBe(true);
   });
 

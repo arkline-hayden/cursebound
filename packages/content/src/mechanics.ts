@@ -150,7 +150,7 @@ export const MECHANICS: MechanicDef[] = [
     short: 'Slain foes leave fire: {v} max HP/{pulseSec}s',
     description: 'Every kill leaves a burning pool, telegraphed for {armSec} s, that burns for {burnSec} s and deals {v} of a hero\'s maximum health every {pulseSec} s (ignores armor; shields absorb). Bigger cohorts leave bigger pools.',
     applicability: 'Every enemy death', requires: 'any', color: '#ff6a2a',
-    params: { armSec: 0.8, burnSec: 4, pulseSec: 0.5, maxPools: 20 },
+    params: { armSec: 0.8, burnSec: 2, pulseSec: 0.5, maxPools: 20 },
   }),
   m({
     id: 'hexed_ground', name: 'Hexed Ground', kind: 'bane', stacking: 'compound', unit: 'percent',
