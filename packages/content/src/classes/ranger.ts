@@ -2,7 +2,8 @@ import type { ClassDef, NodeDef, SkillDef } from '../types';
 import { node } from './common';
 
 // Ranger: bow hunter. Kit rules (implemented in simulation/src/classes/ranger.ts and cc.ts):
-//   Mark   - a Marked enemy takes your hits with x3 critical tendency (Marks are per Ranger; Hunter's Mark keeps one).
+//   Mark   - a Marked enemy takes your hits with x3 critical tendency (Marks are per Ranger; Hunter's Mark replaces
+//            your old Marks, while Deadeye and Apex hawks can leave several).
 //   Snare  - the enemy cannot move for the duration (it can still attack). Shares control resistance with Freeze:
 //            within 4s of any crowd control each further Snare lasts half as long. Bosses take stagger instead.
 //   Poison - decay damage over time; scales with decay damage (Toxicology, Plague Bearer).
@@ -31,7 +32,7 @@ export const SKILLS: SkillDef[] = [
   sk({ id: 'r_longshot', name: 'Longshot', slot: 'active', damageType: 'physical', damageCoef: '2.8', cooldownSec: 4, charges: 1,
     shape: { kind: 'projectile', speed: 26, radius: 0.35, range: 16, pierce: 99, spreadDeg: 0 },
     description: 'A heavy arrow that flies 16 units and pierces everything for 2.8x physical damage, x1.6 against enemies more than 6 units away.' }),
-  hidden('r_ricochet', 'Ricochet', '0.5', 'physical', { kind: 'projectile', speed: 16, radius: 0.18, range: 5, pierce: 0, spreadDeg: 0 }, 'Ricocheting Volley arrow.', 'node:r_ricochet'),
+  hidden('r_ricochet', 'Ricochet', '0.5', 'physical', { kind: 'projectile', speed: 16, radius: 0.18, range: 5, pierce: 0, spreadDeg: 0 }, 'Ricochet arrow from a Volley skill.', 'node:r_ricochet'),
   hidden('r_explosion', 'Explosive Tip', '0.4', 'physical', { kind: 'circle', radius: 1.2, selfCentered: false, range: 0 }, 'Explosive Tips blast.', 'node:r_explosive_tips'),
   // ---- Marksman ----
   sk({ id: 'r_hunters_mark', name: "Hunter's Mark", slot: 'active', damageType: 'physical', damageCoef: '1', cooldownSec: 3, charges: 1,
@@ -50,7 +51,7 @@ export const SKILLS: SkillDef[] = [
     description: 'Toss a trap that arms after 0.4s and lasts 15s; the first enemy to step on it springs it for 2x physical damage (radius 1.6) and Snares enemies for 1.5s.' }),
   sk({ id: 'r_trap_volley', name: 'Trap Volley', slot: 'active', damageType: 'physical', damageCoef: '2', cooldownSec: 5.5, charges: 1,
     shape: { kind: 'circle', radius: 1.6, selfCentered: false, range: 7 },
-    description: 'Toss 3 Snare Traps in a fan (25 degrees apart); up to 6 traps at once.' }),
+    description: 'Toss 3 traps in a fan (25° apart); up to 6 traps at once.' }),
   sk({ id: 'r_bait', name: "Hunter's Bait", slot: 'active', damageType: 'physical', damageCoef: '2', cooldownSec: 7, charges: 1,
     shape: { kind: 'circle', radius: 2.2, selfCentered: false, range: 8 },
     description: 'Throw bait to the aimed point: non-boss enemies within 6 units are lured to it for 2.5s, then it springs a trap burst (radius 2.2).' }),
@@ -75,13 +76,13 @@ export const NODES: NodeDef[] = [
   n('r_longshot', 'volley', 'Longshot', 1, 2, { prereqs: [{ node: 'r_multishot', rank: 1 }], excludes: ['r_barrage'], grantsSkill: 'r_longshot',
     description: 'Fires a 16-unit piercing arrow for 2.8×, ×1.6 against distant enemies.' }),
   n('r_hunters_rhythm', 'volley', "Hunter's Rhythm", 1, 2, { prereqs: [{ node: 'r_multishot', rank: 1 }], mechanics: ['hunters_rhythm'],
-    description: 'Makes your next 3 Quick Shots after a Volley skill fire 2 extra arrows.' }),
+    description: 'After a Volley skill, your next 3 basic attacks (Quick Shot) fire 2 extra arrows.' }),
   n('r_arrow_storm', 'volley', 'Arrow Storm', 1, 3, { prereqs: [{ node: 'r_multishot', rank: 1 }], mechanics: ['arrow_storm'], upgrades: 'r_multishot', description: 'Upgrades Multishot: holds 2 charges, evolutions too.' }),
   n('r_explosive_tips', 'volley', 'Explosive Tips', 1, 3, { prereqs: [{ node: 'r_multishot', rank: 1 }], mechanics: ['explosive_tips'],
     upgrades: 'r_multishot', description: 'Upgrades Multishot: arrows explode for 0.4× in radius 1.2, evolutions too.' }),
-  n('r_echoing_volley', 'volley', 'Echoing Volley', 1, 4, { excludes: ['r_point_blank'], mechanics: ['echoing_volley'],
+  n('r_echoing_volley', 'volley', 'Echoing Volley', 1, 4, { prereqs: [{ node: 'r_multishot', rank: 1 }], excludes: ['r_point_blank'], mechanics: ['echoing_volley'],
     upgrades: 'r_multishot', description: 'Upgrades Multishot: fires again at ×0.7 damage 0.25s later, evolutions too.' }),
-  n('r_point_blank', 'volley', 'Point Blank', 1, 4, { excludes: ['r_echoing_volley'], mechanics: ['point_blank'],
+  n('r_point_blank', 'volley', 'Point Blank', 1, 4, { prereqs: [{ node: 'r_multishot', rank: 1 }], excludes: ['r_echoing_volley'], mechanics: ['point_blank'],
     upgrades: 'r_multishot', description: 'Upgrades Multishot: ×1.5 damage within 3.5 units, and each cast springs you back 2.5.' }),
 
   // ---- Ranger / Marksman ----
@@ -92,11 +93,11 @@ export const NODES: NodeDef[] = [
   n('r_lingering_mark', 'marksman', 'Lingering Mark', 2, 1, { prereqs: [{ node: 'r_hunters_mark', rank: 1 }], mechanics: ['lingering_mark'],
     upgrades: 'r_hunters_mark', description: 'Upgrades Hunter\'s Mark: +4s duration and ×1.05 damage to Marked per rank.' }),
   n('r_predator', 'marksman', "Predator's Mark", 1, 2, { prereqs: [{ node: 'r_hunters_mark', rank: 1 }], excludes: ['r_exposed'], mechanics: ['predator'],
-    upgrades: 'r_hunters_mark', description: 'Upgrades Hunter\'s Mark: on a kill, the Mark leaps on and the cooldown resets.' }),
+    upgrades: 'r_hunters_mark', description: 'Upgrades Hunter\'s Mark: when your Mark dies, it leaps to an enemy within 8 units and the cooldown resets.' }),
   n('r_exposed', 'marksman', 'Exposed Weakness', 1, 2, { prereqs: [{ node: 'r_hunters_mark', rank: 1 }], excludes: ['r_predator'], mechanics: ['exposed'],
-    upgrades: 'r_hunters_mark', description: 'Upgrades Hunter\'s Mark: Marked enemies take ×1.25 damage from all sources.' }),
+    upgrades: 'r_hunters_mark', description: 'Upgrades Hunter\'s Mark: Marked enemies take ×1.25 damage from everyone\'s direct hits.' }),
   n('r_power_shot', 'marksman', 'Power Shot', 1, 2, { prereqs: [{ node: 'r_hunters_mark', rank: 1 }], excludes: ['r_deadeye'], grantsSkill: 'r_power_shot',
-    description: 'Fires a 3.5× piercing arrow that always crits Marked enemies and Marks the first hit.' }),
+    description: 'Fires a 3.5× piercing arrow that always crits Marked enemies and Marks the first hit if you have none.' }),
   n('r_deadeye', 'marksman', 'Deadeye', 1, 2, { prereqs: [{ node: 'r_hunters_mark', rank: 1 }], excludes: ['r_power_shot'], grantsSkill: 'r_deadeye',
     description: 'Marks the 3 enemies nearest your aim and shoots each for 1.6× physical.' }),
   n('r_tumble_shot', 'marksman', 'Tumble Shot', 1, 2, { mechanics: ['tumble_shot'],
@@ -108,19 +109,19 @@ export const NODES: NodeDef[] = [
   n('r_steady_aim', 'marksman', 'Steady Aim', 1, 4, { excludes: ['r_wind_dancer'], mechanics: ['steady_aim'],
     description: 'Gives ×2 critical tendency and ×1.3 crit damage after standing still for 0.75s.' }),
   n('r_wind_dancer', 'marksman', 'Wind Dancer', 1, 4, { excludes: ['r_steady_aim'], mechanics: ['wind_dancer'],
-    description: 'Makes your next 3 hits after a dodge crit for ×1.25; Tumble Shot fires 5 arrows.' }),
+    description: 'After a dodge, your next 3 hits within 3s crit with ×1.25 crit damage; Tumble Shot fires 5 arrows.' }),
 
   // ---- Ranger / Wilds ----
   n('r_snare_trap', 'wilds', 'Snare Trap', 1, 0, { starting: true, grantsSkill: 'r_snare_trap',
     description: 'Tosses a trap that springs for 2× physical and snares enemies for 1.5s (3 at once).' }),
-  n('r_toxicology', 'wilds', 'Toxicology', 3, 1, { modifiers: [{ stat: 'player.decayDamage', factorPerRank: '1.1' }], description: 'Raises poison (decay) damage ×{value} per rank.' }),
+  n('r_toxicology', 'wilds', 'Toxicology', 3, 1, { modifiers: [{ stat: 'player.decayDamage', factorPerRank: '1.1' }], description: 'Raises decay damage ×{value} per rank, poison included.' }),
   n('r_fleet_foot', 'wilds', 'Fleet Foot', 3, 1, { modifiers: [{ stat: 'player.movementSpeed', factorPerRank: '1.04' }], description: 'Raises movement speed ×{value} per rank.' }),
   n('r_hair_trigger', 'wilds', 'Hair Trigger', 2, 1, { prereqs: [{ node: 'r_snare_trap', rank: 1 }], mechanics: ['hair_trigger'],
     upgrades: 'r_snare_trap', description: 'Upgrades Snare Trap: arms instantly, and +0.3 burst radius per rank.' }),
   n('r_blast_traps', 'wilds', 'Blast Traps', 1, 2, { prereqs: [{ node: 'r_snare_trap', rank: 1 }], excludes: ['r_venom_snare'], mechanics: ['blast_traps'],
     upgrades: 'r_snare_trap', description: 'Upgrades Snare Trap: ×2 damage in ×1.4 radius, with knockback instead of a snare.' }),
   n('r_venom_snare', 'wilds', 'Venom Snare', 1, 2, { prereqs: [{ node: 'r_snare_trap', rank: 1 }], excludes: ['r_blast_traps'], mechanics: ['venom_snare'],
-    upgrades: 'r_snare_trap', description: 'Upgrades Snare Trap: snares 2.5s and leaves a poison cloud (0.35× every 0.5s).' }),
+    upgrades: 'r_snare_trap', description: 'Upgrades Snare Trap: snares 2.5s and leaves a toxic cloud (0.35× decay every 0.5s for 4s).' }),
   n('r_trap_volley', 'wilds', 'Trap Volley', 1, 2, { prereqs: [{ node: 'r_snare_trap', rank: 1 }], excludes: ['r_bait'], grantsSkill: 'r_trap_volley',
     description: 'Tosses 3 traps in a fan; up to 6 traps at once.' }),
   n('r_bait', 'wilds', "Hunter's Bait", 1, 2, { prereqs: [{ node: 'r_snare_trap', rank: 1 }], excludes: ['r_trap_volley'], grantsSkill: 'r_bait',
@@ -128,13 +129,13 @@ export const NODES: NodeDef[] = [
   n('r_hawk_companion', 'wilds', 'Hawk Companion', 1, 2, { mechanics: ['hawk_companion'],
     description: 'Adds a hawk that dives your Mark or the nearest enemy for 1.2× every 2s.' }),
   n('r_poison_tips', 'wilds', 'Poison Tips', 1, 3, { mechanics: ['poison_tips'],
-    description: 'Makes arrows and hawk dives poison for 20% of the hit per second over 4s.' }),
+    description: 'Makes Quick Shot, Volley skills, Tumble Shot and hawk dives poison for 20% of the hit per second for 4s.' }),
   n('r_twin_hawks', 'wilds', 'Twin Hawks', 1, 3, { prereqs: [{ node: 'r_hawk_companion', rank: 1 }], mechanics: ['twin_hawks'],
     description: 'Adds a second hawk, and hawk dives deal ×1.25 damage.' }),
   n('r_apex_predator', 'wilds', 'Apex Predator', 1, 4, { prereqs: [{ node: 'r_hawk_companion', rank: 1 }], excludes: ['r_plague_bearer'], mechanics: ['apex_predator'],
     description: 'Makes hawks dive every 0.8s for ×1.5 damage and Mark what they hit.' }),
   n('r_plague_bearer', 'wilds', 'Plague Bearer', 1, 4, { excludes: ['r_apex_predator'], modifiers: [{ stat: 'player.decayDamage', factorPerRank: '1.5' }], mechanics: ['plague_bearer'],
-    description: 'Makes all hits poison, poison ×{value}, and poison spreads when a victim dies.' }),
+    description: 'All your hits poison (15% per second), poison ×{value}, and it spreads when a poisoned enemy dies.' }),
 ];
 
 export const CLASS: ClassDef = {
@@ -144,7 +145,7 @@ export const CLASS: ClassDef = {
     { id: 'marksman', name: 'Marksman', theme: 'Marks, critical strikes and executions' },
     { id: 'wilds', name: 'Wilds', theme: 'Traps, poison and a hawk companion' },
   ],
-  accent: '#6fa83c', role: 'Ranged hunter · precision',
+  accent: '#6fa83c', role: 'Ranged hunter · precision',
   base: { maxHealth: 820, armor: 16, damage: 82, attackFrequency: 2.2, moveSpeed: 4.8, critTendency: '0.3', critMultiplier: '2', shieldCapacity: 0.6 },
   basicSkill: 'r_quick_shot', signatureSkill: 'r_rain_of_arrows',
   nodes: NODES.map((x) => x.id),

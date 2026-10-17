@@ -8,7 +8,7 @@ import type { NodeDef } from '../types';
  * Shared melee passives (RULES.meleeDamageTakenMult / meleeLungeDist; simulation stats.ts and players.ts), appended
  * to every melee class's basic attack description so the copy always states the live numbers.
  */
-export const MELEE_PASSIVES = `Melee: Close Quarters, you take ${Math.round((1 - Number(RULES.meleeDamageTakenMult)) * 100)}% less damage; a swing with no foe in reach lunges up to ${RULES.meleeLungeDist} units onto the nearest foe in its arc.`;
+export const MELEE_PASSIVES = `Close Quarters: you take ${Math.round((1 - Number(RULES.meleeDamageTakenMult)) * 100)}% less damage, and a swing with no enemy in reach lunges up to ${RULES.meleeLungeDist} units onto the nearest enemy in its arc.`;
 
 /**
  * Points that must already be spent in a branch to unlock each tier (tier 0..4). Every branch's base active skill is a
