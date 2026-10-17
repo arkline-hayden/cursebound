@@ -2,7 +2,8 @@ import { Big } from '@cursebound/numeric';
 import { AFFLICTION_RULES, BOSS_BY_ID, ENEMY_BY_ID, RULES, TICK_SEC, type EnemyAttackDef } from '@cursebound/content';
 import { dropPatch, inflictHit, pushPlayer } from './afflictions';
 import { enemyAttackDamage, hitPlayer, tickDots } from './combat';
-import { inCone, inLine, lineOfSight, moveCircle, norm, rayDistance, dist2 } from './geometry';
+import { inCone, inLine, lineOfSight, moveCircle, norm, rayDistance, sweepDistance, dist2 } from './geometry';
+import { clearLane } from './follow';
 import { findPath, nearestFloor, tileCenter } from './map';
 import { hooks } from './hooks';
 import { actMul, isFrozen, lureGoal, moveMul } from './cc';
@@ -39,6 +40,24 @@ const AI = {
   cowardBelow: 0.3, regroupR: 10, fleeSec: 2.5,
   evadeMinTicks: 30,
 };
+/**
+ * Big bodies among pillars (bosses; the Hollow Stag's lairs are full of them). A boss walks with a body of walkBody
+ * at most and only heads straight for a point when a lane laneSlack narrower than that body is clear of walls
+ * (bossSees, follow.ts clearLane), else it follows an A* route planned for that body (map.ts findPath `body`: no
+ * squeezing through one-tile gaps between a pillar and a wall), so it routes round a pillar instead of grinding into
+ * it; the slack lets it brush past corners and walk the centres of tiles beside a pillar. The Lane Charge sweeps a
+ * body of chargeBody at most: a boss starts one only when that body has a clear lane to its hero (else it walks until
+ * it has one, giving up on the module after laneWaitSec). A charge stopped dead by a wall staggers it for slamSec, ends the module (the pattern moves on) and
+ * bounces it slamRecoil back off the stone; grazing a pillar just slides past. After a slam it cannot be
+ * slam-staggered again for slamImmuneSec (a blocked charge then simply ends): one slam, one punish window, no loop.
+ */
+export const BOSS_BODY = { walkBody: 0.6, laneSlack: 0.15, chargeBody: 0.9, laneWaitSec: 3, slamSec: 1.5, slamImmuneSec: 6, slamRecoil: 0.35 };
+
+/** Can a boss walk straight from (x0, y0) to (x1, y1) without grinding its body into a wall? */
+export function bossSees(state: SimState, e: EnemyState, x0: number, y0: number, x1: number, y1: number): boolean {
+  return clearLane(state.map!, x0, y0, x1, y1, Math.max(0, Math.min(e.radius, BOSS_BODY.walkBody) - BOSS_BODY.laneSlack));
+}
+
 /** Roles that break off and regroup when badly hurt (ranged casters and skirmishers; melee bruisers never do). */
 const COWARDS = new Set(['skirmisher', 'artillery', 'hexer', 'broodcaller', 'wraith', 'shade', 'weaver', /* theme foes */ 'gale', 'blinker']);
 /** Roles that keep a melee ally between themselves and the hero. */
@@ -318,18 +337,20 @@ function goalFor(state: SimState, e: EnemyState, target: PlayerState): [number, 
 
 export function moveToward(state: SimState, e: EnemyState, gx: number, gy: number) {
   const map = state.map!;
+  // bosses only cut straight across where their big body fits (BOSS_BODY), ordinary foes wherever a ray does
+  const sees = (x: number, y: number) => e.boss ? bossSees(state, e, e.x, e.y, x, y) : lineOfSight(map, e.x, e.y, x, y);
   let wx = gx, wy = gy;
-  if (!lineOfSight(map, e.x, e.y, gx, gy)) {
+  if (!sees(gx, gy)) {
     const goalTile = Math.floor(gy) * map.w + Math.floor(gx);
     if (!e.path.length || e.pathAge > 45 || e.pathGoal !== goalTile) {
-      e.path = findPath(map, e.x, e.y, gx, gy);
+      e.path = findPath(map, e.x, e.y, gx, gy, undefined, e.boss ? Math.min(e.radius, BOSS_BODY.walkBody) : 0);
       e.pathGoal = goalTile;
       e.pathAge = 0;
     }
     // advance along path, skipping nodes we can see past
     while (e.path.length > 1) {
       const [nx, ny] = tileCenter(map, e.path[1]);
-      if (lineOfSight(map, e.x, e.y, nx, ny)) e.path.shift(); else break;
+      if (sees(nx, ny)) e.path.shift(); else break;
     }
     if (e.path.length) [wx, wy] = tileCenter(map, e.path[0]);
   } else {
@@ -601,6 +622,27 @@ function landLeap(state: SimState, ev: SimEvent[], e: EnemyState, a: EnemyAttack
   ev.push({ t: 'foe_fx', id: e.id, fx: 'leap_land', x: e.x, y: e.y, r: R });
 }
 
+/**
+ * A boss's charge stopped dead by a wall (BOSS_BODY): it bounces back off the stone, and unless it slammed one within
+ * slamImmuneSec it staggers (the readable punish window) and the charge module is over, so the pattern moves on when
+ * the stagger ends instead of re-aiming the same charge at the same pillar. True = staggered (the attack is gone);
+ * false = the charge just ends and recovers as usual.
+ */
+function slamWall(state: SimState, ev: SimEvent[], e: EnemyState): boolean {
+  const at = e.attack!;
+  const r = moveCircle(state.map!, e.x, e.y, -at.dx * BOSS_BODY.slamRecoil, -at.dy * BOSS_BODY.slamRecoil, Math.min(e.radius, BOSS_BODY.chargeBody));
+  e.x = r.x; e.y = r.y; e.vx = 0; e.vy = 0; e.path = [];
+  at.timer = 0;
+  if ((e.cooldowns['_slam'] ?? 0) > 0) return false;
+  e.cooldowns['_slam'] = BOSS_BODY.slamImmuneSec;
+  e.staggerUntil = state.tick + Math.round(BOSS_BODY.slamSec / DT);
+  e.state = 'stagger';
+  e.attack = null;
+  e.patternStep++;
+  ev.push({ t: 'stagger', id: e.id });
+  return true;
+}
+
 function stepAttack(state: SimState, ev: SimEvent[], e: EnemyState) {
   const at = e.attack!;
   const a = attackDefs(e).find((x) => x.id === at.attackId)!;
@@ -618,7 +660,8 @@ function stepAttack(state: SimState, ev: SimEvent[], e: EnemyState) {
       // charge travels the telegraphed lane; speed scales literally with enemy movement speed
       const baseSpeed = (a.telegraph.kind === 'line' ? a.telegraph.length : a.range) / Math.max(0.05, a.releaseSec);
       const speed = baseSpeed * toFloatClamped(fateFactor(state, 'enemy.movementSpeed'), 1e7);
-      const r = moveCircle(state.map!, e.x, e.y, at.dx * speed * DT, at.dy * speed * DT, Math.min(e.radius, 0.9));
+      const want = speed * DT;
+      const r = moveCircle(state.map!, e.x, e.y, at.dx * want, at.dy * want, Math.min(e.radius, BOSS_BODY.chargeBody));
       const fromX = e.x, fromY = e.y;
       e.x = r.x; e.y = r.y;
       for (const p of alivePlayers(state)) {
@@ -632,11 +675,8 @@ function stepAttack(state: SimState, ev: SimEvent[], e: EnemyState) {
         hitPlayer(state, ev, p, enemyAttackDamage(state, e, a.damageCoef, true), { attack: a.name, source: foeName(e), fromX: e.x, fromY: e.y, dtype: a.damageType, srcId: e.id });
       }
       if (r.hitWall && e.boss) {
-        // charging into a wall staggers the Prism Stag (readable punish window)
-        e.staggerUntil = state.tick + Math.round(1.5 / DT);
-        e.state = 'stagger';
-        ev.push({ t: 'stagger', id: e.id });
-        at.timer = 0;
+        // a boss slides past a pillar it grazes; one stopped dead has slammed into the stone (BOSS_BODY)
+        if (Math.sqrt(dist2(fromX, fromY, e.x, e.y)) < want * 0.5 && slamWall(state, ev, e)) return;
       } else if (r.hitWall) at.timer = 0;
     }
     if (a.kind === 'leap') stepLeap(state, e, at);   // theme foes: airborne toward the marked circle
@@ -777,6 +817,20 @@ export function stepEnemy(state: SimState, ev: SimEvent[], e: EnemyState) {
 
 // ---------------- Bosses (PRD §14.3) ----------------
 
+/**
+ * Does the charging body have a clear run at the hero: up to where it would bowl them over (a body short of them), or
+ * the charge's full length when they are further off? Only the run up counts; what lies beyond a hero who dodges is
+ * the wall the charge may slam into.
+ */
+function chargeLaneClear(state: SimState, e: EnemyState, a: EnemyAttackDef, target: PlayerState): boolean {
+  const len = a.telegraph.kind === 'line' ? a.telegraph.length : a.range;
+  // a hair narrower than the body: resting contact and quantized positions never read as blocked
+  const body = Math.max(0, Math.min(e.radius, BOSS_BODY.chargeBody) - 0.02);
+  const run = Math.min(len, Math.sqrt(dist2(e.x, e.y, target.x, target.y)) - body);
+  if (run <= 1e-6) return true;
+  return sweepDistance(state.map!, e.x, e.y, target.x - e.x, target.y - e.y, body, run) >= run - 1e-6;
+}
+
 function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
   if (bossScript(e.kind)?.step(state, ev, e)) return;   // scripted bosses run their own AI (bosses/*)
   const def = BOSS_BY_ID[e.kind];
@@ -792,7 +846,12 @@ function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
   }
   // reinforcements: one wave per health threshold crossed (2/3, 1/3), each exactly once
   RULES.bossReinforceAt.forEach((at, i) => { if (frac <= at) bossReinforcements(state, ev, e, i + 1); });
-  if (e.staggerUntil > state.tick) { e.state = 'stagger'; e.attack = null; return; }
+  if (e.staggerUntil > state.tick) {
+    // a stagger ends the module it cuts short (the Bell Slam's own exposed-core window included): the pattern moves
+    // on afterwards instead of repeating that module, and its stagger, forever
+    if (e.attack) e.patternStep++;
+    e.state = 'stagger'; e.attack = null; return;
+  }
   if (e.state === 'stagger') e.state = 'idle';
   if (e.attack) { stepAttack(state, ev, e); return; }
   if ((e.cooldowns['_pause'] ?? 0) > 0) {
@@ -823,6 +882,14 @@ function stepBoss(state: SimState, ev: SimEvent[], e: EnemyState) {
     e.state = 'move';
     e.stuckTimer += DT;
     if (e.stuckTimer > 3) { e.patternStep++; e.stuckTimer = 0; }   // never stall a pattern forever
+    return;
+  }
+  // a charge needs a clear lane for its body: with a pillar in the way it walks round until it has one (BOSS_BODY)
+  if (a.kind === 'charge' && !chargeLaneClear(state, e, a, target)) {
+    moveToward(state, e, target.x, target.y);
+    e.state = 'move';
+    e.stuckTimer += DT;
+    if (e.stuckTimer > BOSS_BODY.laneWaitSec) { e.patternStep++; e.stuckTimer = 0; }
     return;
   }
   e.stuckTimer = 0;

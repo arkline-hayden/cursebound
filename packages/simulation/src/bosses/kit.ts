@@ -1,10 +1,11 @@
 import type { Big } from '@cursebound/numeric';
 import { BOSS_BY_ID, RULES, TICK_SEC, type EnemyAttackDef, type TelegraphShape } from '@cursebound/content';
 import { inflictHit } from '../afflictions';
+import { BOSS_BODY, bossSees } from '../ai';
 import { actMul, moveMul } from '../cc';
 import { enemyAttackDamage, hitPlayer } from '../combat';
 import { bossReinforcements } from '../director';
-import { dist2, inCone, isWall, lineOfSight, moveCircle, norm, rayDistance } from '../geometry';
+import { dist2, inCone, isWall, moveCircle, norm, rayDistance } from '../geometry';
 import { registerGlobalHooks } from '../hooks';
 import { findPath, nearestFloor, tileCenter } from '../map';
 import { toFloatClamped } from '../stats';
@@ -83,17 +84,23 @@ export function face(e: EnemyState, x: number, y: number) {
   if (fx || fy) { e.fx = fx; e.fy = fy; }
 }
 
-/** Walk toward a point: straight in sight, else along an A* path (replanned now and then); chill slows, freeze stops. */
+/**
+ * Walk toward a point: straight where the body fits, else along an A* path planned for the body (replanned now and
+ * then) so it routes round pillars instead of grinding into them (ai.ts BOSS_BODY); chill slows, freeze stops.
+ */
 export function walkToward(state: SimState, e: EnemyState, gx: number, gy: number, speedMul = 1) {
   const map = state.map!;
   let wx = gx, wy = gy;
-  if (!lineOfSight(map, e.x, e.y, gx, gy)) {
+  if (!bossSees(state, e, e.x, e.y, gx, gy)) {
     const goal = Math.floor(gy) * map.w + Math.floor(gx);
     e.pathAge++;
-    if (!e.path.length || e.pathAge > 45 || e.pathGoal !== goal) { e.path = findPath(map, e.x, e.y, gx, gy); e.pathGoal = goal; e.pathAge = 0; }
+    if (!e.path.length || e.pathAge > 45 || e.pathGoal !== goal) {
+      e.path = findPath(map, e.x, e.y, gx, gy, undefined, Math.min(e.radius, BOSS_BODY.walkBody));
+      e.pathGoal = goal; e.pathAge = 0;
+    }
     while (e.path.length > 1) {
       const [nx, ny] = tileCenter(map, e.path[1]);
-      if (lineOfSight(map, e.x, e.y, nx, ny)) e.path.shift(); else break;
+      if (bossSees(state, e, e.x, e.y, nx, ny)) e.path.shift(); else break;
     }
     if (e.path.length) [wx, wy] = tileCenter(map, e.path[0]);
   } else e.path = [];

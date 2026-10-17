@@ -109,6 +109,42 @@ export function lineOfSight(map: MapState, x0: number, y0: number, x1: number, y
   return rayDistance(map, x0, y0, dx, dy, d) >= d - 1e-6;
 }
 
+/** True when a circle of radius r at (x, y) overlaps no wall tile. */
+export function circleClear(map: MapState, x: number, y: number, r: number): boolean {
+  const minX = Math.floor(x - r), maxX = Math.floor(x + r);
+  const minY = Math.floor(y - r), maxY = Math.floor(y + r);
+  for (let ty = minY; ty <= maxY; ty++) {
+    for (let tx = minX; tx <= maxX; tx++) {
+      if (!isWall(map, tx, ty)) continue;
+      const cx = Math.max(tx, Math.min(x, tx + 1)), cy = Math.max(ty, Math.min(y, ty + 1));
+      if ((x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Body-sized ray cast: how far a circle of radius r can travel from (x, y) along (dx, dy) before it would touch a wall,
+ * up to maxDist (marched in steps of at most a quarter tile and half the radius, exact circle-vs-tile overlap at
+ * each). Big bodies aim with it past pillars a thin ray slips by (ai.ts: the Lane Charge). 0 when the start overlaps.
+ */
+export function sweepDistance(map: MapState, x: number, y: number, dx: number, dy: number, r: number, maxDist: number): number {
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1e-9 || maxDist <= 0) return 0;
+  if (r <= 0) return rayDistance(map, x, y, dx, dy, maxDist);
+  dx /= len; dy /= len;
+  if (!circleClear(map, x, y, r)) return 0;
+  const stepLen = Math.min(0.25, Math.max(0.05, r * 0.5));
+  const steps = Math.min(4096, Math.ceil(maxDist / stepLen));
+  let last = 0;
+  for (let i = 1; i <= steps; i++) {
+    const t = Math.min(maxDist, i * stepLen);
+    if (!circleClear(map, x + dx * t, y + dy * t, r)) return last;
+    last = t;
+  }
+  return maxDist;
+}
+
 /** Segment (p0->p1, thickened by r) vs circle intersection: returns earliest parameter t in [0,1] or -1. */
 export function sweepCircle(x0: number, y0: number, x1: number, y1: number, r: number, cx: number, cy: number, cr: number): number {
   const dx = x1 - x0, dy = y1 - y0;

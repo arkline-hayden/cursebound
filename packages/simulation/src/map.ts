@@ -1,4 +1,4 @@
-import { isWall, lineOfSight } from './geometry';
+import { circleClear, isWall, lineOfSight } from './geometry';
 import { generateDungeon } from './mapgen';
 import type { MapState } from './types';
 
@@ -11,7 +11,35 @@ export function generateMap(seed: string, round: number, boss: boolean, theme?: 
 
 // ---------------- A* (8-connected, no corner cutting) ----------------
 
-export function findPath(map: MapState, sx: number, sy: number, gx: number, gy: number, maxNodes = 900): number[] {
+/** Sample points of a tile (fractions of a tile) where a big body may stand: centre first, then edges and corners. */
+const ROOM_SAMPLES = [0.5, 0.1, 0.9];
+
+/** Is there a spot in tile (tx, ty) where a body of radius `body` touches no wall? (big bodies' A*, findPath) */
+export function roomFor(map: MapState, tx: number, ty: number, body: number): boolean {
+  for (const fy of ROOM_SAMPLES) for (const fx of ROOM_SAMPLES) if (circleClear(map, tx + fx, ty + fy, body)) return true;
+  return false;
+}
+
+/**
+ * A* over floor tiles. `body` > 0 plans for a big body (bosses): tiles with no room for a circle of that radius anywhere
+ * in them (one-tile gaps between a pillar and a wall, say) are impassable, except the start and goal tiles. When no
+ * such path exists it falls back to the plain tile path (the body slides as far as it can).
+ */
+export function findPath(map: MapState, sx: number, sy: number, gx: number, gy: number, maxNodes = 900, body = 0): number[] {
+  if (body > 0) {
+    const room = new Map<number, boolean>();
+    const open = (i: number) => {
+      let v = room.get(i);
+      if (v === undefined) { v = roomFor(map, i % map.w, (i / map.w) | 0, body); room.set(i, v); }
+      return v;
+    };
+    const p = aStar(map, sx, sy, gx, gy, maxNodes, open);
+    if (p.length) return p;
+  }
+  return aStar(map, sx, sy, gx, gy, maxNodes, null);
+}
+
+function aStar(map: MapState, sx: number, sy: number, gx: number, gy: number, maxNodes: number, passable: ((i: number) => boolean) | null): number[] {
   const w = map.w, h = map.h;
   const start = Math.floor(sy) * w + Math.floor(sx);
   let goal = Math.floor(gy) * w + Math.floor(gx);
@@ -68,6 +96,7 @@ export function findPath(map: MapState, sx: number, sy: number, gx: number, gy: 
       const ni = ny * w + nx;
       if (map.tiles[ni] === 1) continue;
       if (dx && dy && (map.tiles[cy * w + nx] === 1 || map.tiles[ny * w + cx] === 1)) continue;
+      if (passable && ni !== goal && !passable(ni)) continue;
       const ng = cur.g + (dx && dy ? 1.41421356 : 1);
       if (ng < (gScore.get(ni) ?? Infinity)) {
         gScore.set(ni, ng);
