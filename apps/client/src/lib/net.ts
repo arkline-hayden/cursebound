@@ -1,5 +1,5 @@
 import { contentHash, DODGE, RULES, TICK_RATE } from '@cursebound/content';
-import { BUILD_ID, PROTOCOL_VERSION, type EventOp, type ServerMessage, type TrainOp } from '@cursebound/protocol';
+import { BUILD_ID, PROTOCOL_VERSION, SNAP_CODEC, SnapDecoder, unpackEvents, type EventOp, type ServerMessage, type TrainOp } from '@cursebound/protocol';
 import { predictMoveTick, type CardForecast, type LedgerView, type MapState, type OfferForecast, type RecapEntry, type Snapshot, type SimEvent } from '@cursebound/simulation';
 import { wsTransport, type GameTransport } from './p2p/transport';
 import { roomWsUrl } from './runtime';
@@ -104,6 +104,9 @@ export class GameConnection {
   private lastHud = 0;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   onSnapshot: ((s: Snapshot) => void) | null = null;
+  /** delta snapshots (protocol snapcodec.ts): rebuilds full snapshots; `sack` once WELCOME confirmed the codec */
+  private snapIn = new SnapDecoder();
+  private sack = false;
 
   constructor(public roomId: string, public token: string, private transport: TransportFactory = async () => wsTransport(await roomWsUrl())) {}
 
@@ -128,8 +131,11 @@ export class GameConnection {
     this.ws = ws;
     ws.onopen = () => {
       this.retries = 0;
-      // the seat token travels in the HELLO message, never in the URL
-      ws.send(JSON.stringify({ t: 'HELLO', protocol: PROTOCOL_VERSION, build: BUILD_ID, contentHash: contentHash(), roomId: this.roomId, seatToken: this.token }));
+      this.snapIn.reset();
+      this.sack = false;
+      // the seat token travels in the HELLO message, never in the URL; `snap` offers delta snapshots (an older
+      // authority ignores it and keeps sending full ones)
+      ws.send(JSON.stringify({ t: 'HELLO', protocol: PROTOCOL_VERSION, build: BUILD_ID, contentHash: contentHash(), roomId: this.roomId, seatToken: this.token, snap: SNAP_CODEC }));
       netStore.set({ status: 'open' });
       this.pingTimer = setInterval(() => this.send({ t: 'PING', c: performance.now() }), 2000);
     };
@@ -161,12 +167,24 @@ export class GameConnection {
 
   private onMessage(m: ServerMessage) {
     switch (m.t) {
-      case 'WELCOME': netStore.set({ welcome: m, slot: m.slot }); break;
+      case 'WELCOME':
+        this.sack = this.snapIn.ordered = m.snap === SNAP_CODEC;
+        netStore.set({ welcome: m, slot: m.slot });
+        break;
       case 'ROOM': netStore.set({ room: m }); break;
-      case 'SNAPSHOT': this.onSnap(m.snap as Snapshot, m.ack, m.held ?? 0); break;
+      case 'SNAPSHOT': {
+        // full or delta; null = a late (reordered) snapshot or a delta whose base is gone: dropped, the next one is
+        // encoded against the newest snapshot we acknowledge here
+        const snap = this.snapIn.decode(m) as unknown as Snapshot | null;
+        if (!snap) break;
+        if (this.sack) this.send({ t: 'SACK', tick: snap.tick });
+        this.onSnap(snap, m.ack, m.held ?? 0);
+        break;
+      }
       case 'EVENTS': {
         const me = netStore.get().slot;
-        for (const e of m.events as SimEvent[]) {
+        // a delta seat gets the batch packed (protocol snapcodec.ts packEvents)
+        for (const e of (m.pk ? unpackEvents(m.pk) : m.events ?? []) as SimEvent[]) {
           this.events.push(e);
           if (e.t === 'recap' && e.slot === me) netStore.set({ recap: e.recap });   // the live "You died to…" card
         }

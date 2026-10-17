@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks';
 import crypto from 'node:crypto';
 import type { WebSocket } from 'ws';
 import { CLASS_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, TICK_RATE, classUnlockLevel, contentHash, isClassUnlocked } from '@cursebound/content';
-import { BUILD_ID, LIMITS, PROTOCOL_VERSION, boardKey, parseClientMessage, quantizeInput, sanitizeName, type ClientMessage, type SeatView, type ServerMessage } from '@cursebound/protocol';
+import { BUILD_ID, LIMITS, PROTOCOL_VERSION, SNAP_CODEC, boardKey, parseClientMessage, quantizeInput, sanitizeName, type ClientMessage, type SeatView, type ServerMessage } from '@cursebound/protocol';
 import { createRun, deserializeState, restoreBreakdown, type CreateRunParams, type SimState } from '@cursebound/simulation';
 import { RunAuthority, type AuthorityHost, type SeatLink } from './authority';
 import type { ServerConfig } from './config';
@@ -106,7 +106,8 @@ export class Room implements AuthorityHost {
     ws.send(JSON.stringify(msg));
   }
 
-  attach(seat: Seat, ws: WebSocket) {
+  /** `snapCodec`: the delta snapshot codec the client announced in HELLO (snapcodec.ts); deltas only when it matches */
+  attach(seat: Seat, ws: WebSocket, snapCodec?: number) {
     if (seat.socket && seat.socket !== ws) { try { seat.socket.close(4000, 'replaced by a newer connection'); } catch { /* ignore */ } }
     seat.socket = ws;
     const reconnect = seat.disconnectedAt !== null;
@@ -116,11 +117,15 @@ export class Room implements AuthorityHost {
       get connected() { return ws.readyState === ws.OPEN; },
       send: (m) => this.send(ws, m),
       buffered: () => ws.bufferedAmount,
+      // one serialization per message for every seat that gets the same bytes (authority.sendSnapshot)
+      sendRaw: (s) => { if (ws.readyState === ws.OPEN) ws.send(s); },
+      codec: snapCodec === SNAP_CODEC ? SNAP_CODEC : 0,
     };
     this.seatLinks.set(seat.slot, link);
     this.send(ws, {
       t: 'WELCOME', slot: seat.slot, roomId: this.id, code: this.code, protocol: PROTOCOL_VERSION, contentHash: contentHash(), build: BUILD_ID, mode: this.mode,
       trust: this.trust, runId: this.authority?.state.runId ?? null, resumed: !!this.authority?.state.resumed, tutorial: this.tutorial, challengeId: this.challengeId, tickRate: TICK_RATE,
+      ...(link.codec ? { snap: link.codec } : {}),
     });
     this.broadcastRoom();
     if (this.authority) {
@@ -181,6 +186,7 @@ export class Room implements AuthorityHost {
         const l = this.seatLinks.get(seat.slot); if (l) l.debug = msg.overlay;
         return;
       }
+      case 'SACK': { const l = this.seatLinks.get(seat.slot); if (a && l) a.ackSnapshot(l, msg.tick); return; }
       case 'PING': if (seat.socket) this.send(seat.socket, { t: 'PONG', c: msg.c, serverTick: a?.state.tick ?? 0 }); return;
       // training grounds tools: seat-scoped, accepted only in training rooms (the simulation re-checks state.training)
       case 'TRAIN': {
@@ -354,7 +360,7 @@ export class RoomManager {
           this.log.info('reconnect_after_hold', { roomId: room.id, slot: seat.slot });
         }
         clearTimeout(helloTimer);
-        room.attach(seat, ws);
+        room.attach(seat, ws, msg.snap);
         return;
       }
       room!.handle(seat, msg).catch((err) => this.log.error('room_handle_failed', { err: err as Error }));

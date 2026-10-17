@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { BOUNTY_MIN_DEPTH, CARD_BY_ID, RULES, RULES_VERSION, SCORE_VERSION, SIM_VERSION, CONTENT_VERSION, TICK_RATE, contentHash, describeAward, xpForRun, type XpAward } from '@cursebound/content';
-import { BUILD_ID, LIMITS, type ServerMessage } from '@cursebound/protocol';
+import { BUILD_ID, LIMITS, SnapHistory, encodeSnapDelta, packEvents, type ServerMessage, type SnapDelta } from '@cursebound/protocol';
 import {
   buildSnapshot, checksum, clearedDepth, computeForecast, computeLedger, hasSpendableNode, runBreakdown, serializeState, stateHash, step,
   inCinematic, voteCounts, type Command, type CreateRunParams, type PlayerInput, type SimEvent, type SimState, STATE_SCHEMA,
@@ -18,7 +18,14 @@ export interface SeatLink {
   debug: boolean;
   send(msg: ServerMessage): void;
   buffered(): number;
+  /** send an already serialized ServerMessage (snapshots and event batches are serialized once for every seat) */
+  sendRaw?(json: string): void;
+  /** delta snapshot codec this seat decodes (protocol snapcodec.ts SNAP_CODEC); 0 / absent = full snapshots only */
+  codec?: number;
 }
+
+/** per-seat snapshot stream: the newest snapshot tick the seat acknowledged (SACK), -1 = none yet */
+interface SnapStream { ack: number; sent: number }
 
 export interface AuthorityHost {
   links(): SeatLink[];
@@ -34,9 +41,39 @@ interface Journal { v: 1; runId: string; header?: CreateRunParams; resumeFrom?: 
 // Sim events forwarded to clients (EVENTS). Any type the client reacts to must be listed (test/presentation.test.ts).
 // 'recap': a hero's death recap for the live "You died to…" card (simulation runStats.ts)
 export const PRESENTATION = new Set(['hit', 'heal', 'shield', 'death', 'spawn', 'cast', 'enemy_attack', 'dodge', 'pickup', 'elite', 'downed', 'revived', 'dead', 'teleport', 'boss_phase', 'stagger', 'wave', 'objective', 'incident', 'loot', 'equip', 'perk', 'door_chosen', 'round_intro', 'boss_intro', 'afflict', 'foe_fx', 'aggro', 'blessing', 'training', 'recap', 'room_event', 'miniboss', 'summon_blink', 'boss_adds']);
+// Presentation events a seat still gets while its link is backed up (cosmetic hits, casts and effects are dropped):
+// the HUD and the run flow react to these.
+const VITAL_EVENTS = new Set(['downed', 'revived', 'dead', 'recap', 'boss_phase', 'boss_intro', 'boss_adds', 'round_intro', 'door_chosen', 'wave', 'objective', 'incident', 'loot', 'equip', 'miniboss', 'room_event', 'blessing', 'training', 'pickup']);
 const MAX_EVENTS_PER_BATCH = 240;
 const SNAPSHOT_EVERY = Math.round(TICK_RATE / 20);
 const TICK_MS = 1000 / TICK_RATE;
+/** a link with more than this queued (WebSocket bufferedAmount) skips snapshots until it drains: the next one it gets
+ *  is the newest, never a backlog (a delta stays decodable: it is against the seat's acknowledged snapshot) */
+const SNAPSHOT_BACKLOG_BYTES = 64 * 1024;
+/** adaptive snapshot rate from the acknowledgements (delta seats): when the newest acknowledged snapshot trails the
+ *  authority by more than LAG_HALF ticks the seat gets every 2nd snapshot (10 Hz), past LAG_QUARTER every 4th (5 Hz);
+ *  catches a congested path the local socket cannot see (a peer-to-peer guest behind the host bridge, a TCP backlog) */
+const LAG_HALF = Math.round(TICK_RATE * 0.5);
+const LAG_QUARTER = Math.round(TICK_RATE * 1.5);
+/** snapshots the authority keeps as delta bases (3.2 s at 20 Hz); an older acknowledgement gets a full snapshot */
+const SNAP_HISTORY = 64;
+
+const r3 = (v: number) => Math.round(v * 1000) / 1000;
+const EVENT_FLOATS = ['x', 'y', 'dx', 'dy', 'sx', 'sy', 'tx', 'ty', 'fx', 'fy', 'ax', 'ay', 'nx', 'ny', 'frac', 'r'];
+/** Presentation copy of a sim event with positions and directions rounded like the snapshot's (3 decimals): an event
+ *  batch was ~40% float digits. The sim's own event is never modified. */
+export function wireEvent(e: SimEvent): SimEvent {
+  let out: Record<string, unknown> | null = null;
+  const src = e as unknown as Record<string, unknown>;
+  for (const k of EVENT_FLOATS) {
+    const v = src[k];
+    if (typeof v !== 'number' || Number.isInteger(v)) continue;
+    const q = r3(v);
+    if (q === v) continue;
+    (out ??= { ...src })[k] = q;
+  }
+  return (out ?? e) as SimEvent;
+}
 
 export interface AuthorityOptions {
   state: SimState;
@@ -96,6 +133,11 @@ export class RunAuthority {
   private tickMs: number[] = [];
   stalls = 0;
   private lastSnapshotBytes = 0;
+  /** bytes put on the wire by the last snapshot round (every seat: snapshot or delta, plus events) */
+  private lastWireBytes = 0;
+  private snapCount = 0;
+  private history = new SnapHistory(SNAP_HISTORY);
+  private streams = new WeakMap<SeatLink, SnapStream>();
   private lastOfferSent: string | null = null;
   private created: Promise<void>;
 
@@ -272,7 +314,7 @@ export class RunAuthority {
       if (o.cmd.type === 'VOTE') link.send({ t: 'VOTE_ACK', offerId: o.cmd.offerId, seq: o.cmd.seq, accepted: o.ok, code: o.code });
     });
     this.handleEvents(res.events);
-    for (const e of res.events) if (PRESENTATION.has(e.t)) this.eventBuffer.push(e);
+    for (const e of res.events) if (PRESENTATION.has(e.t)) this.eventBuffer.push(wireEvent(e));
     if (s.tick % SNAPSHOT_EVERY === 0) this.sendSnapshot();
     if (s.phase !== this.lastPhase) {
       this.lastPhase = s.phase;
@@ -490,11 +532,33 @@ export class RunAuthority {
     for (const l of this.host.links()) if (l.connected) l.send(msg);
   }
 
+  private stream(l: SeatLink): SnapStream {
+    let s = this.streams.get(l);
+    if (!s) { s = { ack: -1, sent: 0 }; this.streams.set(l, s); }
+    return s;
+  }
+
+  /** SACK: the newest snapshot tick a delta seat decoded (its next delta is encoded against that snapshot). */
+  ackSnapshot(l: SeatLink, tick: number) {
+    if (!l.codec || tick > this.state.tick) return;
+    const s = this.stream(l);
+    if (tick > s.ack) s.ack = tick;
+  }
+
+  /** one serialized message to a seat (sendRaw when the host offers it; the bytes are the same either way) */
+  private sendJson(l: SeatLink, json: string, msg: () => ServerMessage): number {
+    if (l.sendRaw) l.sendRaw(json); else l.send(msg());
+    return json.length;
+  }
+
   sendSnapshot() {
+    const s = this.state;
     const links = this.host.links();
-    const anyDebug = links.some((l) => l.debug);
-    const snap = buildSnapshot(this.state, false);
-    const dbgSnap = anyDebug ? buildSnapshot(this.state, true) : null;
+    const snap = buildSnapshot(s, false);
+    const snapObj = snap as unknown as Record<string, unknown>;
+    this.history.add(snapObj);
+    const n = ++this.snapCount;
+    let dbgSnap: ReturnType<typeof buildSnapshot> | null = null;
     let events = this.eventBuffer;
     this.eventBuffer = [];
     if (events.length > MAX_EVENTS_PER_BATCH) {
@@ -503,17 +567,65 @@ export class RunAuthority {
       const hits = events.filter((e) => e.t === 'hit' && (e as { targetKind: string }).targetKind !== 'player');
       events = [...important, ...hits.slice(0, Math.max(0, MAX_EVENTS_PER_BATCH - important.length))];
     }
+    // every payload is serialized once, however many seats get it (full snapshot, each delta base, event batches)
+    const payloads = new Map<number, { json: string; delta: SnapDelta | null }>();   // base tick (-1 = full) -> payload
+    const payload = (base: number) => {
+      let p = payloads.get(base);
+      if (!p) {
+        const b = base >= 0 ? this.history.get(base) : undefined;
+        const delta = b ? encodeSnapDelta(b, snapObj) : null;
+        p = { json: JSON.stringify(delta ?? snap), delta };
+        payloads.set(base, p);
+        if (!delta) this.lastSnapshotBytes = p.json.length;
+      }
+      return p;
+    };
+    const tick = s.tick;
+    // event batches: all, or only the vital ones for a backed-up link; packed (no repeated keys) for delta seats
+    let vital: SimEvent[] | null = null;
+    const batches = new Map<string, { json: string; msg: ServerMessage } | null>();
+    const sendEvents = (l: SeatLink, vitalOnly: boolean): number => {
+      const k = `${vitalOnly ? 'v' : 'a'}${l.codec ? 'p' : 'o'}`;
+      let b = batches.get(k);
+      if (b === undefined) {
+        const list = vitalOnly ? (vital ??= events.filter((e) => VITAL_EVENTS.has(e.t))) : events;
+        const msg: ServerMessage | null = !list.length ? null : l.codec ? { t: 'EVENTS', tick, pk: packEvents(list) } : { t: 'EVENTS', tick, events: list };
+        b = msg ? { json: JSON.stringify(msg), msg } : null;
+        batches.set(k, b);
+      }
+      return b ? this.sendJson(l, b.json, () => b!.msg) : 0;
+    };
+    let wire = 0;
     for (const l of links) {
       if (!l.connected) continue;
-      // slow peers: replace obsolete snapshots instead of queueing them unboundedly
-      if (l.buffered() > LIMITS.snapshotChunkBytes * 4) continue;
+      const st = this.stream(l);
+      const ack = s.players[l.slot]?.lastInputSeq ?? 0;
       // held: the client replays its unacknowledged inputs knowing the next that many are taken as done (net.ts onSnap)
       const held = this.held[l.slot] ?? 0;
-      const msg = { t: 'SNAPSHOT' as const, ack: this.state.players[l.slot]?.lastInputSeq ?? 0, ...(held ? { held } : {}), snap: l.debug && dbgSnap ? dbgSnap : snap };
-      l.send(msg);
-      if (events.length) l.send({ t: 'EVENTS', tick: this.state.tick, events });
+      // backpressure: a backed-up link skips this snapshot (the next it gets is the newest; never a backlog), and an
+      // acknowledgement trailing far behind (a congested path the socket cannot see) lowers that seat's rate
+      const lag = l.codec && st.ack >= 0 ? tick - st.ack : 0;
+      const every = lag > LAG_QUARTER ? 4 : lag > LAG_HALF ? 2 : 1;
+      if (l.buffered() > SNAPSHOT_BACKLOG_BYTES || n % every !== 0) {
+        wire += sendEvents(l, true);
+        continue;
+      }
+      if (l.debug) {
+        dbgSnap ??= buildSnapshot(s, true);
+        l.send({ t: 'SNAPSHOT', ack, ...(held ? { held } : {}), snap: dbgSnap });
+      } else {
+        const base = l.codec && st.ack >= 0 && this.history.get(st.ack) ? st.ack : -1;
+        const { json: body, delta } = payload(base);
+        // the host bridge (client p2p/host.ts) recognizes snapshots by this prefix without parsing them
+        const json = `{"t":"SNAPSHOT","ack":${ack},${held ? `"held":${held},` : ''}"${delta ? 'delta' : 'snap'}":${body}}`;
+        wire += this.sendJson(l, json, () => (delta ? { t: 'SNAPSHOT', ack, ...(held ? { held } : {}), delta } : { t: 'SNAPSHOT', ack, ...(held ? { held } : {}), snap }));
+      }
+      st.sent++;
+      wire += sendEvents(l, false);
     }
-    this.lastSnapshotBytes = JSON.stringify(snap).length;
+    this.lastWireBytes = wire;
+    // full snapshot size for metrics() when every seat got a delta: sampled once a second, not paid every snapshot
+    if (!payloads.has(-1) && n % 20 === 0) this.lastSnapshotBytes = JSON.stringify(snap).length;
   }
 
   phaseData() {
@@ -565,8 +677,10 @@ export class RunAuthority {
   resync(link: SeatLink) {
     this.sendPhase(link);
     if (this.state.phase === 'VOTING') this.sendOffer(link);
+    const snap = buildSnapshot(this.state, link.debug);
+    if (!link.debug) this.history.add(snap as unknown as Record<string, unknown>);   // a base the seat may acknowledge
     const held = this.held[link.slot] ?? 0;
-    link.send({ t: 'SNAPSHOT', ack: this.state.players[link.slot]?.lastInputSeq ?? 0, ...(held ? { held } : {}), snap: buildSnapshot(this.state, link.debug) });
+    link.send({ t: 'SNAPSHOT', ack: this.state.players[link.slot]?.lastInputSeq ?? 0, ...(held ? { held } : {}), snap });
     if (this.state.phase === 'RESULTS') link.send({ t: 'RESULTS', summary: this.summary() });
     if (this.paused) link.send({ t: 'PAUSED', paused: true, reason: this.pauseReason });
   }
@@ -598,7 +712,7 @@ export class RunAuthority {
       runId: this.state.runId, phase: this.state.phase, round: this.state.round, tick: this.state.tick,
       tickMs: { p50: pct(0.5), p95: pct(0.95), p99: pct(0.99), max: sorted[sorted.length - 1] ?? 0 },
       enemies: this.state.enemies.length, projectiles: this.state.projectiles.length, hazards: this.state.hazards.length,
-      snapshotBytes: this.lastSnapshotBytes, stalls: this.stalls, journalTicks: this.journal.ticks.length, storagePending: this.storagePending, storageBusy: this.storageBusy,
+      snapshotBytes: this.lastSnapshotBytes, wireBytes: this.lastWireBytes, stalls: this.stalls, journalTicks: this.journal.ticks.length, storagePending: this.storagePending, storageBusy: this.storageBusy,
     };
   }
 

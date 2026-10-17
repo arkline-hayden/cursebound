@@ -1,9 +1,9 @@
 import { api, ApiError } from '../api';
 import { roomWsUrl } from '../runtime';
 import { createStore } from '../store';
-import { CHANNEL_LABEL, browserPeer, iceServers, type PeerLike } from './peer';
+import { CHANNEL_LABEL, SNAP_CHANNEL_LABEL, browserPeer, iceServers, type PeerLike } from './peer';
 import { presenceSignaling, type PeerId, type Signaling, type SignalIn } from './presence';
-import { RPC_PREFIX, rpcFrame, wsTransport, type ChannelLike, type GameTransport } from './transport';
+import { RPC_PREFIX, isDeltaFrame, isSnapshotFrame, rpcFrame, wsTransport, type ChannelLike, type GameTransport } from './transport';
 
 // Host bridge (docs/contracts/ONLINE_CONTRACT.md step 2 and 3): a module singleton in the host's window that answers
 // guests' offers for the co-op room this window hosts. For each guest it links a local profile to the guest's
@@ -33,6 +33,10 @@ interface GuestPipe {
   session: string;
   pc: PeerLike;
   ch: ChannelLike | null;
+  /** the guest's unreliable snapshot channel (peer.ts SNAP_CHANNEL_LABEL), when its build opens one */
+  snapCh: ChannelLike | null;
+  /** snapshots dropped because the path was backed up (newest-only backpressure) */
+  dropped: number;
   sock: GameTransport | null;
   state: 'signal' | 'rpc' | 'pipe' | 'closed';
   /** joined with a seat (counts toward the room's seats) */
@@ -48,6 +52,17 @@ export const MID_RUN_JOIN = false;
 
 /** at most this many unanswered/handshaking sessions at once (guards the host against offer floods) */
 const MAX_PENDING = 6;
+
+/** Backpressure (toGuest): a snapshot is dropped, never queued, while this much is already waiting on its channel.
+ *  The next snapshot (50 ms later) is newer anyway, and a delta stays decodable because it is encoded against the
+ *  newest snapshot the guest acknowledged (protocol snapcodec.ts). Without this a reliable ordered channel on a slow
+ *  path (a TURN relay, a busy uplink) queued 20 snapshots a second faster than it drained: seconds of lag, then a
+ *  channel the browser closes when its send queue fills. */
+export const SNAPSHOT_BACKLOG_BYTES = 48 * 1024;
+/** larger frames never go on the unreliable channel (one lost fragment loses all of it; full snapshots go reliably) */
+const UNRELIABLE_MAX_BYTES = 32 * 1024;
+/** a guest this far behind on reliable frames (events, phases) cannot catch up: end the pipe, it rejoins with a resync */
+export const CHANNEL_HARD_LIMIT_BYTES = 4 * 1024 * 1024;
 
 export class HostBridge {
   private room: HostRoom | null = null;
@@ -102,11 +117,17 @@ export class HostBridge {
 
   private async answer(key: string, m: SignalIn, sdp: string) {
     const pc = this.deps.createPeer(await this.deps.iceServers());
-    const p: GuestPipe = { key, from: m.from, session: m.session, pc, ch: null, sock: null, state: 'signal', seated: false, remoteSet: false, iceQueue: [], outQueue: [] };
+    const p: GuestPipe = { key, from: m.from, session: m.session, pc, ch: null, snapCh: null, dropped: 0, sock: null, state: 'signal', seated: false, remoteSet: false, iceQueue: [], outQueue: [] };
     this.pipes.set(key, p);
     pc.onicecandidate = (e) => { if (e.candidate && p.state !== 'closed') this.deps.signaling.send(p.from.accountId, p.session, { kind: 'ice', candidate: e.candidate.toJSON() }); };
     pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' || pc.connectionState === 'closed') this.close(p); };
-    pc.ondatachannel = (e) => { if (e.channel.label === CHANNEL_LABEL && !p.ch && p.state !== 'closed') this.attach(p, e.channel); else e.channel.close(); };
+    pc.ondatachannel = (e) => {
+      const c = e.channel;
+      if (p.state === 'closed') c.close();
+      else if (c.label === CHANNEL_LABEL && !p.ch) this.attach(p, c);
+      else if (c.label === SNAP_CHANNEL_LABEL && !p.snapCh) { p.snapCh = c; c.onclose = () => { if (p.snapCh === c) p.snapCh = null; }; }
+      else c.close();
+    };
     try {
       await pc.setRemoteDescription({ type: 'offer', sdp });
       p.remoteSet = true;
@@ -190,7 +211,7 @@ export class HostBridge {
       if (p.state === 'closed') { sock.close(); return; }
       p.sock = sock;
       sock.onopen = () => { for (const q of p.outQueue.splice(0)) sock.send(q); };
-      sock.onmessage = (data) => { if (p.ch?.readyState === 'open') p.ch.send(data); };
+      sock.onmessage = (data) => this.toGuest(p, data);
       sock.onclose = (code, reason) => {
         if (p.sock !== sock) return;
         // tell the guest why (4001-4004 refusals are final), then end this pipe; the guest reconnects with rejoin
@@ -202,6 +223,42 @@ export class HostBridge {
     }).catch(() => this.close(p));
   }
 
+  /**
+   * authority → guest. Delta snapshots ride the unreliable snapshot channel when the guest opened one; any snapshot is
+   * dropped while its channel is backed up (newest only, SNAPSHOT_BACKLOG_BYTES). Everything else (events, phases,
+   * acks, full snapshots) goes reliably and in order on `cb`.
+   */
+  private toGuest(p: GuestPipe, data: string) {
+    const ch = p.ch;
+    if (ch?.readyState !== 'open') return;
+    try {
+      if (isSnapshotFrame(data)) {
+        const u = p.snapCh;
+        if (u?.readyState === 'open' && data.length <= UNRELIABLE_MAX_BYTES && isDeltaFrame(data)) {
+          if ((u.bufferedAmount ?? 0) > SNAPSHOT_BACKLOG_BYTES) { p.dropped++; return; }
+          try { u.send(data); return; } catch { /* too large for this peer's SCTP limit: reliable below */ }
+        }
+        if ((ch.bufferedAmount ?? 0) > SNAPSHOT_BACKLOG_BYTES) { p.dropped++; return; }
+      } else if ((ch.bufferedAmount ?? 0) > CHANNEL_HARD_LIMIT_BYTES) {
+        this.deps.log?.('p2p_guest_backlog', { accountId: p.from.accountId, buffered: ch.bufferedAmount });
+        this.close(p);
+        return;
+      }
+      ch.send(data);
+    } catch (err) {
+      // the browser refuses a send when the channel's queue is full: this pipe is done, the guest rejoins
+      this.deps.log?.('p2p_send_failed', { accountId: p.from.accountId, err: String(err) });
+      this.close(p);
+    }
+  }
+
+  /** snapshots dropped for backpressure per connected guest (diagnostics) */
+  droppedSnapshots(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const p of this.pipes.values()) if (p.state === 'pipe') out[p.from.accountId] = p.dropped;
+    return out;
+  }
+
   private close(p: GuestPipe, sayBye = true) {
     if (this.pipes.get(p.key) !== p) return;
     this.pipes.delete(p.key);
@@ -211,6 +268,7 @@ export class HostBridge {
     p.sock = null;
     try { sock?.close(); } catch { /* ignore */ }
     try { p.ch?.close(); } catch { /* ignore */ }
+    try { p.snapCh?.close(); } catch { /* ignore */ }
     try { p.pc.close(); } catch { /* ignore */ }
     if (sayBye && was !== 'pipe') this.deps.signaling.send(p.from.accountId, p.session, { kind: 'bye' });
     this.onChange?.();

@@ -1,7 +1,12 @@
 // Wire protocol (PRD §19.2). Clients send intentions only; the authority validates everything.
 // Schemas impose size, count, string length and nesting limits — transport safeguards, never Fate stat limits.
 
-export const PROTOCOL_VERSION = 4;   // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen; 3: TRAIN (training rooms only) and BLESS (Fate's Blessing); 4: EVENT (room events: shrine, altar pact, merchant purchase), TRAIN op 'event'
+export * from './snapcodec';
+import type { PackedEvents } from './snapcodec';
+
+// Optional capabilities (HELLO `snap`, WELCOME `snap`) are negotiated without a version bump: an older peer ignores the
+// extra field and keeps the old behaviour, so desktop builds a release apart still play together.
+export const PROTOCOL_VERSION = 4;  // 2: snapshot drops res/resMax (no resource), MASTERY recovery replaces regen; 3: TRAIN (training rooms only) and BLESS (Fate's Blessing); 4: EVENT (room events: shrine, altar pact, merchant purchase), TRAIN op 'event'
 export const LIMITS = {
   inputBytes: 256,
   controlBytes: 8 * 1024,
@@ -28,7 +33,8 @@ export type ErrorCode =
 // ---------------- Client -> server ----------------
 
 export type ClientMessage =
-  | { t: 'HELLO'; protocol: number; build: string; contentHash: string; roomId: string; seatToken: string }
+  /** snap: the delta snapshot codec this client decodes (snapcodec.ts SNAP_CODEC); absent = full snapshots only */
+  | { t: 'HELLO'; protocol: number; build: string; contentHash: string; roomId: string; seatToken: string; snap?: number }
   | { t: 'INPUT'; seq: number; tick: number; mx: number; my: number; ax: number; ay: number; b: number }
   | { t: 'LOBBY'; classId?: string; ready?: boolean }
   | { t: 'ALLOCATE'; nodeId: string; requestId: string }
@@ -42,6 +48,8 @@ export type ClientMessage =
   | { t: 'FORECAST' }
   | { t: 'DEBUG'; overlay: boolean }
   | { t: 'PING'; c: number }
+  /** delta snapshots (snapcodec.ts): the newest snapshot tick this client decoded; sent only after WELCOME carried `snap` */
+  | { t: 'SACK'; tick: number }
   /** Training rooms only (the authority refuses it elsewhere): a training-grounds tool (simulation training.ts) */
   | { t: 'TRAIN'; op: TrainOp; arg?: string; tier?: number; requestId: string }
   /** Fate's Blessing: lift the price of card `slot` (0..2) of the current offer during the door vote */
@@ -63,11 +71,15 @@ export type TrainOp = typeof TRAIN_OPS[number];
 export interface SeatView { slot: number; name: string; classId: string; ready: boolean; connected: boolean; you: boolean }
 
 export type ServerMessage =
-  | { t: 'WELCOME'; slot: number; roomId: string; code: string; protocol: number; contentHash: string; build: string; mode: 'solo' | 'coop'; trust: string; runId: string | null; resumed: boolean; tutorial: boolean; challengeId: string | null; tickRate: number }
+  | { t: 'WELCOME'; slot: number; roomId: string; code: string; protocol: number; contentHash: string; build: string; mode: 'solo' | 'coop'; trust: string; runId: string | null; resumed: boolean; tutorial: boolean; challengeId: string | null; tickRate: number; /** the delta snapshot codec this seat receives (snapcodec.ts); absent = full snapshots */ snap?: number }
   | { t: 'ROOM'; roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: SeatView[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null; /** daily bounty modifier id of a bounty room */ bounty?: string | null }
-  /** held: ticks the authority held your last input through; it takes that many of your next inputs as done (absent = 0) */
-  | { t: 'SNAPSHOT'; ack: number; held?: number; snap: unknown }
-  | { t: 'EVENTS'; tick: number; events: unknown[] }
+  /** held: ticks the authority held your last input through; it takes that many of your next inputs as done (absent = 0).
+   *  snap = a full snapshot; delta = changes against an acknowledged one (snapcodec.ts SnapDelta), sent only to a seat whose
+   *  WELCOME carried `snap` */
+  | { t: 'SNAPSHOT'; ack: number; held?: number; snap?: unknown; delta?: unknown }
+  /** events = the batch as objects; pk = the same batch packed (snapcodec.ts packEvents), only to a seat whose WELCOME
+   *  carried `snap` */
+  | { t: 'EVENTS'; tick: number; events?: unknown[]; pk?: PackedEvents }
   | { t: 'PHASE'; phase: string; round: number; tick: number; data: unknown }
   | { t: 'OFFER'; offerId: string; round: number; cardIds: string[]; snapshotHash: string; deadlineTick: number | null; forecast: unknown; /** door themes, one per card (doors) */ themes?: string[] }
   | { t: 'VOTE_STATE'; offerId: string; votes: { slot: number; cardSlot: number | null; locked: boolean }[]; counts: number[]; deadlineTick: number | null; tick: number }
@@ -102,6 +114,7 @@ export function parseClientMessage(raw: string): ParseResult {
   switch (m.t) {
     case 'HELLO':
       if (!isInt(m.protocol, 0, 1e6) || !isStr(m.build, 64) || !isStr(m.contentHash, 64) || !isStr(m.roomId, 64, ID) || !isStr(m.seatToken, 128, /^[A-Za-z0-9_-]+$/)) return bad('bad HELLO');
+      if (m.snap !== undefined && !isInt(m.snap, 0, 1e6)) return bad('bad HELLO');
       return { ok: true, msg: m as unknown as ClientMessage };
     case 'INPUT':
       if (raw.length > LIMITS.inputBytes) return { ok: false, code: 'TOO_LARGE', message: 'input too large' };
@@ -143,6 +156,9 @@ export function parseClientMessage(raw: string): ParseResult {
     case 'PING':
       if (!isNum(m.c, 0, 1e15)) return bad('bad PING');
       return { ok: true, msg: m as unknown as ClientMessage };
+    case 'SACK':
+      if (raw.length > LIMITS.inputBytes || !isInt(m.tick, 0, 2 ** 40)) return bad('bad SACK');
+      return { ok: true, msg: { t: 'SACK', tick: m.tick as number } };
     case 'TRAIN':
       if (!(TRAIN_OPS as readonly string[]).includes(m.op as string) || !isStr(m.requestId, 64, ID)) return bad('bad TRAIN');
       if (m.arg !== undefined && !isStr(m.arg, 32, /^[a-z0-9_]{1,32}$/)) return bad('bad TRAIN arg');

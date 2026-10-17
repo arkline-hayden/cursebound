@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { SNAP_CODEC, encodeSnapDelta, packEvents } from '@cursebound/protocol';
 import { HostBridge, type HostDeps, type SeatReply } from '../src/lib/p2p/host';
 import { openGuestLink, type GuestDeps } from '../src/lib/p2p/guest';
 import { P2PError, type PeerLike, type SessionDesc } from '../src/lib/p2p/peer';
@@ -42,9 +43,13 @@ class FakeChannel implements ChannelLike {
   onopen: ((ev?: unknown) => void) | null = null;
   onmessage: ((ev: { data: unknown }) => void) | null = null;
   onclose: ((ev?: unknown) => void) | null = null;
-  constructor(public label: string) {}
+  /** queued bytes as a test sets them (a real channel's grows when the path is slower than the sender) */
+  bufferedAmount = 0;
+  sent: string[] = [];
+  constructor(public label: string, public opts: { ordered?: boolean; maxRetransmits?: number } = {}) {}
   send(data: string) {
     if (this.readyState !== 'open') throw new Error('channel not open');
+    this.sent.push(data);
     const peer = this.peer;
     setTimeout(() => { if (peer?.readyState === 'open') peer.onmessage?.({ data }); }, 0);
   }
@@ -61,13 +66,15 @@ const bySdp = new Map<string, FakePeer>();
 class FakePeer implements PeerLike {
   id = ++peerSeq;
   connectionState = 'new';
-  channel: FakeChannel | null = null;
+  channels: FakeChannel[] = [];
+  /** answerer side: labels it refuses like an older build (closes them on arrival) */
+  constructor(private refuse: string[] = []) {}
   remote: SessionDesc | null = null;
   candidates: RTCIceCandidateInit[] = [];
   onicecandidate: PeerLike['onicecandidate'] = null;
   ondatachannel: PeerLike['ondatachannel'] = null;
   onconnectionstatechange: (() => void) | null = null;
-  createDataChannel(label: string) { this.channel = new FakeChannel(label); return this.channel; }
+  createDataChannel(label: string, opts?: { ordered?: boolean; maxRetransmits?: number }) { const c = new FakeChannel(label, opts); this.channels.push(c); return c; }
   async createOffer() { return { type: 'offer', sdp: `offer-${this.id}` }; }
   async createAnswer() { return { type: 'answer', sdp: `answer-${this.id}` }; }
   async setLocalDescription(d: SessionDesc) {
@@ -79,17 +86,18 @@ class FakePeer implements PeerLike {
     if (d.type !== 'answer') return;
     // offerer got the answer: hand the answerer its end of the channel, then open both
     const answerer = bySdp.get(d.sdp!)!;
-    const a = this.channel!;
-    const b = new FakeChannel(a.label);
-    a.peer = b; b.peer = a;
+    const pairs = this.channels.map((a) => { const b = new FakeChannel(a.label, a.opts); a.peer = b; b.peer = a; answerer.channels.push(b); return [a, b] as const; });
     setTimeout(() => {
-      answerer.ondatachannel?.({ channel: b });
       this.connectionState = answerer.connectionState = 'connected';
-      b.open(); a.open();
+      for (const [a, b] of pairs) {
+        b.open(); a.open();
+        if (answerer.refuse.includes(b.label)) { b.close(); continue; }   // an older build closes unknown channels
+        answerer.ondatachannel?.({ channel: b });
+      }
     }, 0);
   }
   async addIceCandidate(c: RTCIceCandidateInit) { this.candidates.push(c); }
-  close() { this.connectionState = 'closed'; this.channel?.close(); }
+  close() { this.connectionState = 'closed'; for (const c of this.channels) c.close(); }
 }
 
 class FakeSocket implements GameTransport {
@@ -110,7 +118,7 @@ const GUEST: PeerId = { accountId: 'guest', username: 'guest', displayName: 'Gue
 const GUEST2: PeerId = { accountId: 'guest2', username: 'guest2', displayName: 'Guest Two' };
 const ROOM = { roomId: 'room-1', code: 'ABC123', maxSeats: 5 };
 
-function setup(maxSeats = 5) {
+function setup(maxSeats = 5, hostRefuses: string[] = []) {
   const bus = new Bus();
   const sockets: FakeSocket[] = [];
   const linked: PeerId[] = [];
@@ -119,7 +127,7 @@ function setup(maxSeats = 5) {
   const deps: HostDeps = {
     signaling: bus.endpoint(HOST),
     iceServers: async () => [],
-    createPeer: () => new FakePeer(),
+    createPeer: () => new FakePeer(hostRefuses),
     linkProfile: async (who) => { linked.push(who); return { id: `p-${who.accountId}` }; },
     joinRoom: async (code, profileId, classId): Promise<SeatReply> => {
       joins.push({ code, profileId, classId });
@@ -231,6 +239,74 @@ describe('peer-to-peer guest ⇄ host bridge', () => {
     await until(() => s.bridge.guests().length === 0);
   });
 
+  /** a joined guest with its transport, past HELLO, and the host-side ends of its channels */
+  async function piped(s: ReturnType<typeof setup>) {
+    const open = await openGuestLink(s.guestDeps(GUEST), HOST, { rpc: 'join', classId: 'vanguard', code: 'ABC123' });
+    await tick(5);
+    const t = channelTransport(open.channel, open.dispose, open.snapChannel);
+    const got: string[] = [];
+    t.onmessage = (d) => got.push(d);
+    t.send('{"t":"HELLO"}');
+    await until(() => s.sockets[0]?.readyState === 'open');
+    const pipe = [...(s.bridge as unknown as { pipes: Map<string, { ch: FakeChannel; snapCh: FakeChannel | null }> }).pipes.values()][0];
+    return { open, t, got, sock: s.sockets[0], pipe };
+  }
+  const DELTA = (tick: number) => `{"t":"SNAPSHOT","ack":1234567890,"held":12,"delta":{"b":${tick - 3},"tick":${tick}}}`;
+  const FULL = (tick: number) => `{"t":"SNAPSHOT","ack":3,"snap":{"tick":${tick},"players":[]}}`;
+
+  it('sends delta snapshots on the unreliable channel and everything else reliably', async () => {
+    const s = setup(); bridges.push(s.bridge);
+    const { open, got, sock, pipe } = await piped(s);
+    expect(open.snapChannel).not.toBeNull();
+    expect(pipe.snapCh?.label).toBe('cbs');
+    expect(pipe.snapCh?.opts).toEqual({ ordered: false, maxRetransmits: 0 });
+    sock.onmessage!(FULL(3));
+    sock.onmessage!(DELTA(6));
+    sock.onmessage!('{"t":"EVENTS","tick":6,"events":[]}');
+    await until(() => got.length === 3);
+    expect(pipe.snapCh!.sent).toEqual([DELTA(6)]);
+    expect(pipe.ch.sent).toEqual([expect.stringContaining('"rpc":"joined"'), FULL(3), '{"t":"EVENTS","tick":6,"events":[]}']);
+    expect(got.sort()).toEqual([FULL(3), DELTA(6), '{"t":"EVENTS","tick":6,"events":[]}'].sort());
+  });
+
+  it('drops snapshots (never queues them) while a channel is backed up; other frames still go', async () => {
+    const s = setup(); bridges.push(s.bridge);
+    const { sock, pipe } = await piped(s);
+    pipe.snapCh!.bufferedAmount = 1 << 20;
+    pipe.ch.bufferedAmount = 1 << 20;
+    const before = pipe.ch.sent.length;
+    sock.onmessage!(DELTA(6));
+    sock.onmessage!(FULL(9));
+    sock.onmessage!('{"t":"PHASE","phase":"VOTING"}');
+    expect(pipe.snapCh!.sent).toEqual([]);
+    expect(pipe.ch.sent.slice(before)).toEqual(['{"t":"PHASE","phase":"VOTING"}']);
+    expect(s.bridge.droppedSnapshots()).toEqual({ guest: 2 });
+    // drained: the newest snapshot goes out
+    pipe.snapCh!.bufferedAmount = 0; pipe.ch.bufferedAmount = 0;
+    sock.onmessage!(DELTA(12));
+    expect(pipe.snapCh!.sent).toEqual([DELTA(12)]);
+  });
+
+  it('ends a pipe whose reliable backlog can no longer catch up (the guest rejoins with a resync)', async () => {
+    const s = setup(); bridges.push(s.bridge);
+    const { sock, pipe } = await piped(s);
+    pipe.ch.bufferedAmount = 64 << 20;
+    sock.onmessage!('{"t":"EVENTS","tick":6,"events":[]}');
+    await until(() => s.bridge.guests().length === 0);
+  });
+
+  it('works with a host build that refuses the snapshot channel: everything rides the main channel', async () => {
+    const s = setup(5, ['cbs']); bridges.push(s.bridge);
+    const { open, got, sock, pipe } = await piped(s);
+    await until(() => open.snapChannel === null);
+    expect(pipe.snapCh).toBeNull();
+    sock.onmessage!(DELTA(6));
+    sock.onmessage!(FULL(9));
+    await until(() => got.length === 2);
+    expect(got).toEqual([DELTA(6), FULL(9)]);
+    expect(s.bridge.guests()).toEqual([GUEST]);
+  });
+
   it('does not answer when no room is hosted (the guest times out)', async () => {
     const s = setup(); bridges.push(s.bridge);
     s.bridge.stop();
@@ -254,6 +330,44 @@ describe('GameConnection over a transport', () => {
     expect(JSON.parse(made[1].sent[0]).seatToken).toBe('seat-tok');
     made[1].serverClose(4004, 'seat not found');
     expect(netStore.get()).toMatchObject({ status: 'error', error: 'seat not found' });
+    c.close();
+  });
+
+  it('offers delta snapshots, decodes them and packed events, and acknowledges each snapshot once the authority agrees', async () => {
+    const made: FakeSocket[] = [];
+    const c = new GameConnection('room-1', 'seat-tok', async () => { const s = new FakeSocket(); made.push(s); return s; });
+    c.connect();
+    await until(() => made[0]?.sent.length >= 1);
+    const sock = made[0];
+    expect(JSON.parse(sock.sent[0])).toMatchObject({ t: 'HELLO', snap: SNAP_CODEC });
+    const s3 = { tick: 3, phase: 'COMBAT', round: 2, players: [], enemies: [{ i: 1, k: 'pursuer', x: 1, y: 1 }, { i: 2, k: 'hexer', x: 5, y: 5, dor: 1 }], enc: { round: 2, activeTicks: 3 } };
+    const s6 = { tick: 6, phase: 'COMBAT', round: 2, players: [], enemies: [{ i: 2, k: 'hexer', x: 5, y: 5 }, { i: 3, k: 'skirmisher', x: 9, y: 2 }], enc: { round: 2, activeTicks: 6 } };
+    sock.onmessage!(JSON.stringify({ t: 'WELCOME', slot: 0, snap: SNAP_CODEC }));
+    sock.onmessage!(JSON.stringify({ t: 'SNAPSHOT', ack: 0, snap: s3 }));
+    sock.onmessage!(JSON.stringify({ t: 'SNAPSHOT', ack: 0, delta: encodeSnapDelta(s3, s6) }));
+    // a late snapshot (unordered channel) and a delta against a base this client never had are dropped
+    sock.onmessage!(JSON.stringify({ t: 'SNAPSHOT', ack: 0, snap: { ...s3, tick: 4 } }));
+    sock.onmessage!(JSON.stringify({ t: 'SNAPSHOT', ack: 0, delta: { b: 5, tick: 9 } }));
+    expect(c.snaps.map((x) => x.snap.tick)).toEqual([3, 6]);
+    expect(c.snaps[1].snap).toEqual(s6);
+    expect(sock.sent.slice(1).map((m) => JSON.parse(m)).filter((m) => m.t === 'SACK')).toEqual([{ t: 'SACK', tick: 3 }, { t: 'SACK', tick: 6 }]);
+    const evs = [{ t: 'hit', target: 2, x: 1.5 }, { t: 'death', id: 2, kind: 'hexer', x: 1, y: 2 }, { t: 'hit', target: 3, x: 2 }];
+    sock.onmessage!(JSON.stringify({ t: 'EVENTS', tick: 6, pk: packEvents(evs) }));
+    expect(c.events.slice(-3)).toEqual(evs);
+    c.close();
+  });
+
+  it('never acknowledges snapshots to an authority that did not confirm the codec (an older build)', async () => {
+    const made: FakeSocket[] = [];
+    const c = new GameConnection('room-1', 'seat-tok', async () => { const s = new FakeSocket(); made.push(s); return s; });
+    c.connect();
+    await until(() => made[0]?.sent.length >= 1);
+    const sock = made[0];
+    sock.onmessage!(JSON.stringify({ t: 'WELCOME', slot: 0 }));
+    sock.onmessage!(JSON.stringify({ t: 'SNAPSHOT', ack: 0, snap: { tick: 9, phase: 'COMBAT', players: [] } }));
+    sock.onmessage!(JSON.stringify({ t: 'SNAPSHOT', ack: 0, snap: { tick: 3, phase: 'COMBAT', players: [] } }));
+    expect(c.snaps.map((x) => x.snap.tick)).toEqual([9, 3]);   // full snapshots taken as they come, as before
+    expect(sock.sent.some((m) => m.includes('SACK'))).toBe(false);
     c.close();
   });
 

@@ -1,5 +1,5 @@
 import { getSeat } from '../profile';
-import { CHANNEL_LABEL, P2PError, browserPeer, iceServers, newSessionId, type PeerLike } from './peer';
+import { CHANNEL_LABEL, SNAP_CHANNEL_LABEL, P2PError, browserPeer, iceServers, newSessionId, type PeerLike } from './peer';
 import { presenceSignaling, whenPresenceOnline, type PeerId, type Signaling, type SignalIn } from './presence';
 import { RPC_PREFIX, channelTransport, type ChannelLike, type GameTransport } from './transport';
 
@@ -19,13 +19,17 @@ export interface GuestDeps {
   timeoutMs?: number;
 }
 
-export interface GuestLinkOpen { reply: JoinedReply; channel: ChannelLike; dispose(): void }
+/** snapChannel: the unreliable snapshot channel when the host accepted it (null with an older host) */
+export interface GuestLinkOpen { reply: JoinedReply; channel: ChannelLike; readonly snapChannel: ChannelLike | null; dispose(): void }
 
 /** One connection attempt to a host; the returned channel is open and past the RPC handshake. */
 export async function openGuestLink(deps: GuestDeps, host: PeerId, rpc: GuestRpc): Promise<GuestLinkOpen> {
   const session = newSessionId();
   const pc = deps.createPeer(await deps.iceServers());
   const ch = pc.createDataChannel(CHANNEL_LABEL, { ordered: true });
+  // snapshots on their own unreliable channel (peer.ts SNAP_CHANNEL_LABEL); optional: an older host closes it
+  let snapCh: ChannelLike | null = pc.createDataChannel(SNAP_CHANNEL_LABEL, { ordered: false, maxRetransmits: 0 });
+  snapCh.onclose = () => { snapCh = null; };
   const iceQueue: RTCIceCandidateInit[] = [];
   let remoteSet = false;
   let settled = false;
@@ -38,6 +42,7 @@ export async function openGuestLink(deps: GuestDeps, host: PeerId, rpc: GuestRpc
     unsub();
     signal.send(host.accountId, session, { kind: 'bye' });
     try { ch.close(); } catch { /* ignore */ }
+    try { snapCh?.close(); } catch { /* ignore */ }
     try { pc.close(); } catch { /* ignore */ }
   };
 
@@ -76,7 +81,7 @@ export async function openGuestLink(deps: GuestDeps, host: PeerId, rpc: GuestRpc
         settled = true;
         clearTimeout(timer);
         ch.onopen = null; ch.onmessage = null; ch.onclose = null;
-        resolve({ reply: m as JoinedReply, channel: ch, dispose });
+        resolve({ reply: m as JoinedReply, channel: ch, get snapChannel() { return snapCh?.readyState === 'closed' ? null : snapCh; }, dispose });
       } else if (m.rpc === 'error') {
         fail(new P2PError(m.code ?? 'JOIN_FAILED', m.message ?? 'The host refused the join.'));
       }
@@ -154,5 +159,5 @@ export async function guestTransport(roomId: string): Promise<GameTransport> {
     cur = await openGuestLink(browserDeps(), s.host, { rpc: 'rejoin', roomId, code: s.code });
     live = { roomId, open: cur, claimed: true };
   }
-  return channelTransport(cur.channel, () => { cur.dispose(); release(); });
+  return channelTransport(cur.channel, () => { cur.dispose(); release(); }, cur.snapChannel);
 }

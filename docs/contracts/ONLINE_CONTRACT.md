@@ -88,7 +88,13 @@ Module boundary: `apps/cloud/src/presence.ts` exports
 `attachPresence(server: http.Server, deps: { authenticate(token): Promise<{accountId, username, displayName, favoriteClass} | null>; friendIds(accountId): Promise<string[]>; onFriendsChanged?: (subscribe: (accountId: string) => void) => void; log })`.
 
 ## Peer-to-peer co-op (WebRTC, `apps/client/src/lib/p2p/`)
-Host = the player whose local authority runs the room. Guests connect to it over one RTCDataChannel (`label 'cb'`, ordered, reliable).
+Host = the player whose local authority runs the room. Guests connect to it over one RTCDataChannel (`label 'cb'`, ordered, reliable),
+plus an optional snapshot channel (`label 'cbs'`, unordered, `maxRetransmits: 0`). The bridge sends delta snapshots on `cbs`
+and everything else on `cb`, and drops (never queues) a snapshot while its channel's `bufferedAmount` is over 48 KB. A
+host build without `cbs` closes it and the guest gets everything on `cb`; a guest build without it never opens one.
+Delta snapshots (`packages/protocol/src/snapcodec.ts`): HELLO `snap: 1` offers them, WELCOME `snap: 1` confirms; the client then
+acknowledges each decoded snapshot (`{t:'SACK', tick}`) and the authority encodes against the newest acknowledgement, so a
+lost delta never breaks the chain. Seats that did not negotiate get full snapshots and object event batches as before.
 1. The guest gets ICE servers from `GET /turn`, creates the RTCPeerConnection and channel, and sends an offer via `signal`
    (`session` = random id). Trickle ICE.
 2. The host's **bridge** (a module singleton in the host's renderer that survives client-side route changes) answers.

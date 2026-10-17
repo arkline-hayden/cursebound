@@ -8,7 +8,7 @@ import type { ChannelLike } from './transport';
 export interface SessionDesc { type: string; sdp?: string }
 export interface PeerLike {
   readonly connectionState: string;
-  createDataChannel(label: string, opts?: { ordered?: boolean }): ChannelLike;
+  createDataChannel(label: string, opts?: { ordered?: boolean; maxRetransmits?: number }): ChannelLike;
   createOffer(): Promise<SessionDesc>;
   createAnswer(): Promise<SessionDesc>;
   setLocalDescription(d: SessionDesc): Promise<void>;
@@ -20,8 +20,16 @@ export interface PeerLike {
   close(): void;
 }
 
-/** One channel per guest: `label 'cb'`, ordered, reliable (the room protocol assumes TCP-like delivery). */
+/** The guest's main channel: `label 'cb'`, ordered, reliable (the room protocol assumes TCP-like delivery). */
 export const CHANNEL_LABEL = 'cb';
+
+/** A second, optional channel for snapshots: unordered, never retransmitted (`maxRetransmits: 0`), so a lost snapshot
+ *  costs nothing and never holds up the next one (a reliable ordered channel stalls everything behind one lost packet
+ *  and queues snapshots faster than a slow path drains them). Delta snapshots stay decodable when one is lost (they
+ *  are against the newest snapshot the guest acknowledged). A host bridge that predates it closes the channel and
+ *  the guest simply gets everything on `cb`; a guest that predates it never opens one and the bridge drops stale
+ *  snapshots on `cb` instead (host.ts toGuest). */
+export const SNAP_CHANNEL_LABEL = 'cbs';
 
 export class P2PError extends Error {
   constructor(public code: string, message: string) { super(message); }

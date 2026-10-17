@@ -20,6 +20,8 @@ export interface GameTransport {
 export interface ChannelLike {
   readonly label: string;
   readonly readyState: 'connecting' | 'open' | 'closing' | 'closed';
+  /** bytes queued and not yet sent (RTCDataChannel.bufferedAmount); fakes may leave it out (= 0) */
+  readonly bufferedAmount?: number;
   send(data: string): void;
   close(): void;
   onopen: ((ev?: unknown) => void) | null;
@@ -31,6 +33,13 @@ export interface ChannelLike {
  * tells them apart without parsing every game message. */
 export const RPC_PREFIX = '{"rpc":';
 export const rpcFrame = (m: { rpc: string } & Record<string, unknown>) => JSON.stringify(m);
+
+/** Every authority serializes snapshots as `{"t":"SNAPSHOT","ack":…,"snap"|"delta":…}`: the bridge recognizes them by
+ *  prefix without parsing (they are most of the bytes). */
+export const SNAPSHOT_PREFIX = '{"t":"SNAPSHOT"';
+export const isSnapshotFrame = (s: string) => s.startsWith(SNAPSHOT_PREFIX);
+/** a delta snapshot (protocol snapcodec.ts), as opposed to a full one */
+export const isDeltaFrame = (s: string) => s.startsWith(SNAPSHOT_PREFIX) && s.slice(0, 72).includes('"delta":');
 
 const WS_STATE: TransportState[] = ['connecting', 'open', 'closed', 'closed'];
 
@@ -53,7 +62,7 @@ export function wsTransport(url: string, Impl: typeof WebSocket = WebSocket): Ga
  * A guest's game stream over an open data channel. `{"rpc":"closed",code,reason}` from the bridge reports the host's
  * authority closing this seat's socket (so refusals keep their WebSocket close code); `onDispose` tears the peer down.
  */
-export function channelTransport(ch: ChannelLike, onDispose?: () => void): GameTransport {
+export function channelTransport(ch: ChannelLike, onDispose?: () => void, snapCh?: ChannelLike | null): GameTransport {
   let state: TransportState = ch.readyState === 'open' ? 'open' : ch.readyState === 'connecting' ? 'connecting' : 'closed';
   let done = false;
   const finish = (code: number, reason: string) => {
@@ -61,6 +70,7 @@ export function channelTransport(ch: ChannelLike, onDispose?: () => void): GameT
     done = true;
     state = 'closed';
     try { ch.close(); } catch { /* already closed */ }
+    try { snapCh?.close(); } catch { /* already closed */ }
     onDispose?.();
     t.onclose?.(code, reason);
   };
@@ -83,6 +93,12 @@ export function channelTransport(ch: ChannelLike, onDispose?: () => void): GameT
     t.onmessage?.(s);
   };
   ch.onclose = () => finish(1006, 'peer connection lost');
+  if (snapCh) {
+    // the optional unreliable snapshot channel (peer.ts SNAP_CHANNEL_LABEL): game frames only; losing it is harmless
+    // (the host bridge falls back to `cb`), so its close never ends the transport
+    snapCh.onmessage = (e) => { if (state === 'open') t.onmessage?.(String(e.data)); };
+    snapCh.onclose = null;
+  }
   // usually already open (the join handshake ran on it): no onopen event follows, see GameTransport.onopen
   return t;
 }
