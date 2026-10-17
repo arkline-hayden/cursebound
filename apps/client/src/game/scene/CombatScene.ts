@@ -35,6 +35,7 @@ import { gameCursor, type GameCursor } from '@/ui/pixelCursors';
 import { cinematicHeld, movesIn, netStore, type GameConnection } from '@/lib/net';
 import { settingsStore } from '@/lib/settings';
 import { CameraRig, type Pt } from '../cameraRig';
+import { CAM_LIFT, SelfView, lockedScroll } from '../selfView';
 import { FONT_WORLD, WORLD_TEXT_PX } from '@/ui/fonts';
 import { gfx, particleBudget, reportSlowFrames } from '../gfx';
 import { spectateStore } from '@/ui/Spectate';
@@ -55,8 +56,6 @@ function hpNum(compact: string): string {
 }
 
 const BOSS_KINDS = new Set(BOSSES.map((b) => b.id));
-/** the view centres this many px above the followed ground point (heroes read better a touch below centre) */
-const CAM_LIFT = 22;
 /** shared cue ids (cutscene cues that are not one are recorded file names) */
 const SFX_ID_SET: ReadonlySet<string> = new Set(SFX_IDS);
 /** Kill-streak milestones and their colours (escalating). */
@@ -175,6 +174,8 @@ export class CombatScene extends Phaser.Scene {
   /** cutscene director (game/cinematic): door walk-through, round intro, boss grand entrance */
   cine: CinematicDirector | null = null;
   private renderSelf = { x: 0, y: 0, init: false };
+  /** the local hero as drawn: between its predicted ticks, corrections blended out (game/selfView.ts) */
+  private selfView = new SelfView();
   private lastPhase = '';
   private combo = 0;
   private comboAt = 0;
@@ -746,7 +747,11 @@ export class CombatScene extends Phaser.Scene {
       }
       case 'teleport': {
         // every moving skill snaps the local prediction; only the Arcanist rift ('rift' / no style) draws purple rings
-        if (e.slot === me) { this.renderSelf.x = e.x; this.renderSelf.y = e.y; this.net.pred.x = e.x; this.net.pred.y = e.y; }
+        if (e.slot === me) {
+          const pr = this.net.pred;
+          this.renderSelf.x = e.x; this.renderSelf.y = e.y; pr.x = pr.px = pr.qx = e.x; pr.y = pr.py = pr.qy = e.y;
+          this.selfView.reset();
+        }
         const f = this.P(e.fx, e.fy), t = this.P(e.x, e.y);
         const riftKit = !e.style || e.style === 'rift' ? SKILL_FX['teleport:rift'] : undefined;
         if (riftKit) riftKit(this.fxCtx(e.slot === me), { slot: e.slot, skill: 'teleport:rift', x: e.x, y: e.y, dx: e.fx, dy: e.fy });
@@ -1041,17 +1046,18 @@ export class CombatScene extends Phaser.Scene {
       let predicted = false;
       if (pb.s === me) {
         const lp = latest.players[me];
+        const drift = this.net.drift;
+        this.selfView.correct(drift.x, drift.y);
         if (this.net.pred.valid && lp.life === 'alive' && movesIn(latest.phase)) {   // COMBAT and the door vote
           predicted = true;
-          const tx = this.net.pred.x, ty = this.net.pred.y;
-          if (!this.renderSelf.init || Math.hypot(tx - this.renderSelf.x, ty - this.renderSelf.y) > 1.5) { this.renderSelf.x = tx; this.renderSelf.y = ty; this.renderSelf.init = true; }
-          else {
-            // dashes move fast: follow the prediction tightly while dashing, smoothly otherwise
-            const k = Math.min(1, delta / (this.net.pred.dodgeTimer > 0 ? 16 : 45));
-            this.renderSelf.x += (tx - this.renderSelf.x) * k; this.renderSelf.y += (ty - this.renderSelf.y) * k;
-          }
-          x = this.renderSelf.x; y = this.renderSelf.y;
-        } else { x = lp.x; y = lp.y; this.renderSelf = { x, y, init: true }; }
+          // drawn between the latest predicted tick's ends by the clock (InputTicks.alpha), a reconciliation's jump
+          // blended out instead of shown (selfView.ts)
+          if (!this.renderSelf.init) this.selfView.reset();
+          const at = this.selfView.frame(this.net.pred, this.inputTicks.alpha, delta);
+          x = at.x; y = at.y;
+        } else { x = lp.x; y = lp.y; this.selfView.place(x, y); }
+        drift.x = 0; drift.y = 0;   // taken (or moot: not predicted)
+        this.renderSelf = { x, y, init: true };
         this.camTarget = { x, y };   // the hero sits dead centre (no aim look-ahead)
         // predicted dash: instant feedback without waiting for the authority's event
         if (this.net.pred.dashAt !== this.lastDashAt && this.net.pred.dashAt > 0) {
@@ -1136,8 +1142,11 @@ export class CombatScene extends Phaser.Scene {
     if (cam.zoom !== 1) cam.setZoom(1);
     const pos = this.stepCamera(delta, latest, me, watched, drawnAt, null);
     if (pos) {
-      cam.scrollX = pos.x - this.W / 2;
-      cam.scrollY = pos.y - CAM_LIFT - this.H / 2;
+      // whole pixels, rounded like the hero sprite is placed: a fractional scroll (floored by Phaser) against the
+      // rounded sprite put the hero a pixel off centre every other frame while walking (selfView.ts lockedScroll)
+      const sc = lockedScroll(pos, this.W, this.H);
+      cam.scrollX = sc.x;
+      cam.scrollY = sc.y;
     }
   }
 

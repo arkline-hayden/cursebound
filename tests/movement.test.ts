@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CLASS_BY_ID, DODGE, RULES } from '@cursebound/content';
+import { LIMITS } from '@cursebound/protocol';
 import { ACTION, predictMoveTick, type MapState, type MoveBody } from '@cursebound/simulation';
 import { animFor } from '../apps/client/src/game/art/actors';
 import { VIEW_ANGLE, type View } from '../apps/client/src/game/art/draw/rig';
-import { CLICK, ClickMove, InputTicks, STALL_MS, TICK_MS, type DriveFrame, type DriveOut } from '../apps/client/src/game/input/ClickMove';
+import { CLICK, ClickMove, InputTicks, LATE_TICKS, TICK_MS, type DriveFrame, type DriveOut } from '../apps/client/src/game/input/ClickMove';
 import type { GridMap, Pt } from '../apps/client/src/game/input/path';
 import { iso } from '../apps/client/src/game/render/iso';
 import { GameConnection } from '../apps/client/src/lib/net';
@@ -156,12 +157,18 @@ describe('frames to input ticks', () => {
     expect(ticksFor(new Array(10).fill(1000 / 30)).per.every((n) => n === 2)).toBe(true);
   });
 
-  it('never sends a stall late: the authority already held the last input through it', () => {
+  it('sends a stall\'s ticks with the frame that ends it (the authority takes them as its held ticks), at most LATE_TICKS', () => {
+    // sending only the frame's own tick left the prediction short of every tick the authority held through the stall
+    // (tests/tracking.test.ts: authority input queue)
     const r = ticksFor([1000 / 60, 1000 / 60, 150, 1000 / 60, 1000 / 60, 1000 / 60]);
-    expect(r.per[2]).toBe(1);
-    // and the frames after it are not padded with the stall's ticks either (Phaser's smoothed delta did that)
+    expect(r.per[2]).toBe(9);
+    // the frames after it are not padded with the stall's ticks (Phaser's smoothed delta did that)
     expect(r.per.slice(3)).toEqual([1, 1, 1]);
-    expect(STALL_MS).toBeGreaterThan(1000 / 24);
+    // a long stall (a hidden tab) sends only the latest LATE_TICKS: the authority holds no more than that either
+    const long = ticksFor([1000 / 60, 2000, 1000 / 60, 1000 / 60]);
+    expect(long.per[1]).toBe(LATE_TICKS);
+    expect(long.per.slice(2)).toEqual([1, 1]);
+    expect(LATE_TICKS).toBe(LIMITS.lateTicks);
   });
 
   it('decides every tick of a slow frame from the prediction, so it never walks past a clicked point', () => {

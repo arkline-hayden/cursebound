@@ -7,8 +7,15 @@ export const LIMITS = {
   controlBytes: 8 * 1024,
   snapshotChunkBytes: 256 * 1024,
   inputsPerSecond: 60,
-  inputBurst: 12,
+  /** room for the inputs a network hiccup or a frame stall delivers at once (they arrived late, not early: the authority
+   *  takes most as done, see lateTicks). 12 dropped the tail of every 300 ms hiccup, and each dropped input was a
+   *  correction. The average stays at inputsPerSecond. */
+  inputBurst: 30,
   maxQueuedInputs: 15,       // ~250 ms
+  /** ticks the authority holds a seat's last input through an empty queue and then takes that many late inputs as done
+   *  (authority.ts submitInput); a stalled client sends at most this many of the stall's ticks late (ClickMove.ts
+   *  InputTicks). ~250 ms. */
+  lateTicks: 15,
   nameLength: 24,
   maxSeats: 5,
 };
@@ -58,7 +65,8 @@ export interface SeatView { slot: number; name: string; classId: string; ready: 
 export type ServerMessage =
   | { t: 'WELCOME'; slot: number; roomId: string; code: string; protocol: number; contentHash: string; build: string; mode: 'solo' | 'coop'; trust: string; runId: string | null; resumed: boolean; tutorial: boolean; challengeId: string | null; tickRate: number }
   | { t: 'ROOM'; roomId: string; code: string; mode: 'solo' | 'coop'; trust: string; seats: SeatView[]; stage: 'LOBBY' | 'RUN' | 'CLOSED'; lan: { enabled: boolean; hosts: string[] }; seed: string | null; challengeId: string | null; /** daily bounty modifier id of a bounty room */ bounty?: string | null }
-  | { t: 'SNAPSHOT'; ack: number; snap: unknown }
+  /** held: ticks the authority held your last input through; it takes that many of your next inputs as done (absent = 0) */
+  | { t: 'SNAPSHOT'; ack: number; held?: number; snap: unknown }
   | { t: 'EVENTS'; tick: number; events: unknown[] }
   | { t: 'PHASE'; phase: string; round: number; tick: number; data: unknown }
   | { t: 'OFFER'; offerId: string; round: number; cardIds: string[]; snapshotHash: string; deadlineTick: number | null; forecast: unknown; /** door themes, one per card (doors) */ themes?: string[] }

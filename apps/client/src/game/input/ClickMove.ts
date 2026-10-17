@@ -1,14 +1,15 @@
 import { SKILL_BY_ID, TICK_RATE } from '@cursebound/content';
+import { LIMITS } from '@cursebound/protocol';
 import { ACTION } from '@cursebound/simulation';
-import { circleFree, findPathEx, lineClear, nearestFloorTile, pathLength, pointInTile, type GridMap, type Pt } from './path';
+import { BODY_RADIUS, circleFree, findPathEx, lineClear, nearestFloorTile, pathLength, pointInTile, type GridMap, type Pt } from './path';
 import { engageDecision, shotClear, type GroundKind, type GroundThing, type PickableEnemy, type Reach } from './targeting';
 
 // Diablo-style click-to-move controller. Turns clicks into the existing per-tick intention (world move vector + aim
 // offset + ACTION bits) so the authority, prediction and replays are untouched:
 //   LMB ground            walk there along a smoothed A* path (marker on the ground)
-//   hold LMB              keep walking toward the cursor (re-path ~7 Hz, straight steering when in view) once the
-//                         press is held past CLICK.holdMs or dragged; a shorter press is a click and walks to the
-//                         clicked point (the camera follows the hero, so the ground under a still pointer slides
+//   hold LMB              keep walking toward the cursor (straight at it every tick while in view, re-path ~7 Hz)
+//                         once the press is held past CLICK.holdMs or dragged; a shorter press is a click and walks to
+//                         the clicked point (the camera follows the hero, so the ground under a still pointer slides
 //                         along with every step: tracking it from the first frame dragged clicks past their point)
 //   LMB foe               attack-move: close to basic-attack reach (and projectile line of sight), then stand and
 //                         swing at it until it falls; still holding, take the next foe under the cursor or walk on
@@ -116,6 +117,8 @@ export class ClickMove {
   fx: ClickFxEvent[] = [];
   private pathGoal: Pt | null = null;
   private pathEnd: Pt | null = null;
+  /** the path is one straight leg to the goal in plain view (steer moves its end along with a moving goal) */
+  private straight = false;
   private pathAt = -1e9;
   private skipAt = -1e9;
   private progressBest = Infinity;
@@ -135,6 +138,7 @@ export class ClickMove {
   cancel() {
     this.order = null;
     this.path = [];
+    this.straight = false;
     this.pathGoal = null;
     this.pathEnd = null;
     this.retries = 0;
@@ -400,7 +404,22 @@ export class ClickMove {
     const now = f.now;
     const stop = (arrived: boolean, failed: boolean, gaveUp = false) => ({ mx: 0, my: 0, arrived, failed, gaveUp });
     if (len(goal.x - self.x, goal.y - self.y) <= tol) { this.path = []; return stop(true, false); }
-    const moved = this.pathGoal ? len(this.pathGoal.x - goal.x, this.pathGoal.y - goal.y) : Infinity;
+    let moved = this.pathGoal ? len(this.pathGoal.x - goal.x, this.pathGoal.y - goal.y) : Infinity;
+    // A moving goal (the held cursor, a chased foe) still in plain view: the straight leg ends at the goal every tick.
+    // Re-pathing only every repathMs / drift steered at a goal up to that old (the heading stepped ~7 times a second
+    // while sweeping the cursor) and stood the hero still whenever it reached the stale goal first.
+    if (this.straight && this.path.length <= 1 && moved > 1e-3 && Number.isFinite(moved)
+      && (!f.map || (circleFree(f.map, goal.x, goal.y, BODY_RADIUS) && lineClear(f.map, self.x, self.y, goal.x, goal.y)))) {
+      this.path = [{ x: goal.x, y: goal.y }];
+      this.pathEnd = { x: goal.x, y: goal.y };
+      if (moved > drift) {
+        // as far as a re-path would have taken it: a new destination for the stuck clock
+        this.pathGoal = { x: goal.x, y: goal.y };
+        this.progressBest = Infinity;
+        this.progressAt = now;
+      }
+      moved = 0;
+    }
     const stale = !this.pathGoal
       || (moved > drift && now - this.pathAt >= repathMs)
       || (!this.path.length && moved > 1e-3 && now - this.pathAt >= 100);
@@ -444,6 +463,7 @@ export class ClickMove {
     this.progressBest = Infinity;
     this.progressAt = f.now;
     const map = f.map;
+    this.straight = true;
     if (!map) { this.path = [{ ...goal }]; this.pathEnd = { ...goal }; return; }
     // in plain view: walk straight (no A*, no jitter while the cursor drags the goal around)
     if (this.retries === 0 && circleFree(map, goal.x, goal.y, 0.3) && lineClear(map, self.x, self.y, goal.x, goal.y)) {
@@ -451,6 +471,7 @@ export class ClickMove {
       this.pathEnd = { ...goal };
       return;
     }
+    this.straight = false;
     const crowd = this.retries > 0 ? crowdCost(f, goal) : undefined;
     const res = findPathEx(map, self.x, self.y, goal.x, goal.y, { cost: crowd });
     this.path = res.points;
@@ -459,6 +480,7 @@ export class ClickMove {
 
   private invalidate() {
     this.path = [];
+    this.straight = false;
     this.pathGoal = null;
     this.pathEnd = null;
     this.progressBest = Infinity;
@@ -467,15 +489,16 @@ export class ClickMove {
 
 /** ms per authority input tick */
 export const TICK_MS = 1000 / TICK_RATE;
-/** the longest frame still treated as ordinary pacing (~20 fps); anything longer is a stall (see InputTicks) */
-export const STALL_MS = 50;
+/** the most input ticks one frame sends: a longer stall's older ticks are dropped (the authority holds no more) */
+export const LATE_TICKS = LIMITS.lateTicks;
 
 /**
  * Rendered frames to the authority's 60 Hz input ticks (CombatScene.sendInputs). Per frame:
- *  - how many ticks the frame carries, on the real clock. Phaser's smoothed delta spread a stall over the next ten
- *    frames, and the frames after a stall sent its ticks late. The authority holds our last input through any gap
- *    (authority.ts), so ticks sent late moved the hero twice (a click overshot its point and was snapped back) and
- *    stood in its input queue as lasting lag. A frame longer than STALL_MS therefore sends only its own tick.
+ *  - how many ticks the frame carries, on the real clock (Phaser's smoothed delta spread a stall over the next ten
+ *    frames). A stalled frame sends the stall's ticks, up to LATE_TICKS: the authority held our last input through
+ *    the gap and takes the late inputs as done by those held ticks (authority.ts submitInput), so they neither move
+ *    the hero twice nor queue up as lag. Sending only the frame's own tick left the prediction short of every tick
+ *    the authority held, and each stall came back as a forward correction.
  *  - the controller runs once per frame (clicks, hover, markers) and again for every further tick, from the
  *    predicted body that tick starts at: several ticks on one steer walked past the goal on slow frames.
  *  - fresh presses of a frame that carries no tick (refresh rates above 60 Hz) ride on the next one that does, so
@@ -486,13 +509,17 @@ export class InputTicks {
   private last: number | null = null;
   private carry = 0;
 
+  /** How far the clock is into the next input tick (0..1): the scene draws the hero that far along the latest one. */
+  get alpha(): number { return Math.max(0, Math.min(1, this.acc / TICK_MS)); }
+
   /** `send` applies one tick's intention (sends it, predicts it) and returns the predicted body after it, or null. */
   run(now: number, cm: ClickMove, f: DriveFrame, send: (out: DriveOut) => Pt | null): number {
     const dt = this.last === null ? TICK_MS : Math.max(0, now - this.last);
     this.last = now;
-    this.acc = dt > STALL_MS ? TICK_MS : this.acc + dt;
+    this.acc += dt;
     let ticks = 0;
     while (this.acc >= TICK_MS - 1e-3) { this.acc -= TICK_MS; ticks++; }   // (a frame of exactly one tick is one tick)
+    if (ticks > LATE_TICKS) ticks = LATE_TICKS;
     const frame = this.carry ? { ...f, buttons: f.buttons | this.carry, pressed: f.pressed | this.carry } : f;
     this.carry = ticks ? 0 : frame.pressed;
     let out = cm.update(frame);
