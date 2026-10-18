@@ -23,7 +23,7 @@ import { applyTraining, setupTraining, topUpTrainingPoints, trainingAiOff, train
 import { applyBlessing, blessingOn } from './blessing';   // Fate's Blessing
 import { GUIDE_STEPS, guideAtDoors, guideIdle, guideTick, newGuide, setupGuide } from './tutorialRoom';   // guided first-run tutorial
 import { applyBounty } from './bounty';
-import { bountyRules } from './bountyRules';
+import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { B, ONE, derivePlayer } from './stats';
 import type { Command, CommitRecord, Phase, PlayerInput, PlayerState, SimEvent, SimState, SkillRuntime } from './types';
 
@@ -289,11 +289,56 @@ function retireMajority(state: SimState): boolean {
 
 // ---------------- Phase handlers ----------------
 
+/** p.vars entries that outlive a round: the live gear stat version (stats.ts cache key). HUD maxima (ui_*Max) stay
+ *  too, and other ui_* counters drop to 0 so the class meter stays on the HUD; every other entry is round-scoped. */
+const RUN_VARS = new Set(['lg.dv']);
+
+/**
+ * Round-start refresh (ROUND_SETUP, entered right after the door walk-through): every hero starts the new floor fresh.
+ * Restored: health to the current maximum (Fate, pact and gear modifiers included: a -40% max health card stays; the
+ * "No Respite" bounty keeps the health carried over), life (clearing already returned downed / dead heroes), every
+ * skill cooldown and charge (multi-charge skills full, return marks gone), dodge charges, guard, shields, statuses and
+ * afflictions, and all round-scoped kit / Fate / gear counters in p.vars (Combo, Frenzy, Focus, Retribution, internal
+ * recharges such as Undying Rage or Heart of Winter, once-per-round flags such as Phoenix, Divine Intervention, Last
+ * Stand or Cheat Death). Hero-owned hazards (summons, beasts, turrets, drones, mines, souls, holy ground, fields) and
+ * shots of the last floor are removed. Kept: ranks, skill points, mastery, gear, Fate cards and mechanics, pacts,
+ * coins, blessings, score, run stats and the solo self-revive block. Shared simulation code, so the server, local runs,
+ * replays and client prediction agree; the next snapshot carries the refreshed state to the HUD.
+ */
+export function refreshHeroesForRound(state: SimState) {
+  const keepHp = bountyRules(state).intermissionHealFactor === 0;   // "No Respite": no healing between rounds
+  for (const p of state.players) {
+    if (p.lifeState !== 'alive' || p.hp.isZero()) {
+      p.lifeState = 'alive';
+      if (keepHp) p.hp = Big.max(p.hp, p.maxHp.mul(B(RULES.clearReturnHealthFrac)));
+    }
+    if (!keepHp) p.hp = p.maxHp;
+    p.downTimer = 0; p.downsThisRound = 0; p.selfReviveChannel = 0; p.reviveProgress = 0; p.reviverSlot = null;
+    p.shield = ZERO; p.guardTimer = 0; p.guardMoved = false; p.guardAbsorbed = ZERO;
+    p.dodgeTimer = 0; p.dodgeCooldown = 0; p.dodgeCharges = dodgeMaxOf(p); p.surgeTimer = 0; p.iframes = 0;
+    p.attackWork = 0; p.attackAnim = 0; p.castAnim = 0; p.lastSkill = null;
+    p.buffs = []; p.vulnerability = 0; p.stormCasts = [];
+    delete p.aff;   // chill stacks, poison, chain anchor, diminishing returns (afflictions.ts)
+    for (const k of Object.keys(p.vars)) {
+      if (RUN_VARS.has(k)) continue;
+      if (k.startsWith('ui_')) { if (!k.endsWith('Max')) p.vars[k] = 0; }
+      else delete p.vars[k];
+    }
+    rebuildSkills(p);   // maximum charges may have changed with the intermission's nodes or gear
+    for (const s of p.skills) { s.cooldown = 0; s.charges = s.maxCharges; delete s.full; s.mark = null; }
+  }
+  state.hazards = state.hazards.filter((h) => h.owner !== 'player');
+  state.projectiles = state.projectiles.filter((pr) => pr.owner !== 'player');
+  state.reactions = [];
+  state.stateVersion++;   // derived-stat caches see the cleared stacks
+}
+
 function enterRoundSetup(state: SimState, ev: SimEvent[]) {
   state.round++;
   state.retireVotes = [];
   state.doors = null;   // the threshold of the last intermission is gone (doors.ts)
   resetRoomEvents(state);   // so are the last floor's shrines, altar and merchant (roomEvents.ts)
+  refreshHeroesForRound(state);   // every hero starts the floor fresh (health, cooldowns, kit stacks, summons)
   setPhase(state, ev, 'ROUND_SETUP');
   if (state.training) setupTraining(state, ev);   // the courtyard (training.ts)
   else if (state.guide) setupGuide(state, ev);    // the tutorial crypt (tutorialRoom.ts)

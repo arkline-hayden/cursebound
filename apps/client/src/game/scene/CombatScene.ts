@@ -1009,6 +1009,7 @@ export class CombatScene extends Phaser.Scene {
       if (latest.phase === 'ROUND_SETUP') {
         for (const k of [...this.actors.keys()]) this.destroyView(k);
         this.renderSelf.init = false; this.combo = 0; this.lastHit.clear(); this.pickupsR.clear(); this.pendingBanners = [];
+        window.dispatchEvent(new CustomEvent('cursebound:combo', { detail: 0 }));   // the HUD streak counter starts the round empty too
         this.roomFx?.clear();
         this.foeWatch.clear(); this.hitDirs.clear(); this.reviveProg.clear(); this.reviveLoop?.stop(); this.reviveLoop = null;
         this.numbers.clear(); this.deaths.clear();

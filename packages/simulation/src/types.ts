@@ -117,7 +117,9 @@ export interface PlayerState {
   buffs: { id: string; until: number; value: number }[];
   vulnerability: number;           // not used for players currently
   stormCasts: number[];            // ticks of recent storm casts (Tempest)
-  /** Class-kit and Fate-mechanic counters (stacks, marks, timers in ticks). Plain numbers only, deterministic. */
+  /** Class-kit and Fate-mechanic counters (stacks, marks, timers in ticks). Plain numbers only, deterministic.
+   *  Round-scoped: sim.ts refreshHeroesForRound clears them at every round start (ui_* HUD counters drop to 0, ui_*Max
+   *  and the gear stat version 'lg.dv' stay), so anything meant to outlive a round belongs in another field. */
   vars: Record<string, number>;
   /** Equipped legendary items by gear slot (gear.ts). Lasts the whole run. Absent in pre-gear checkpoints. */
   gear?: Partial<Record<GearSlot, string>>;
