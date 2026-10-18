@@ -11,6 +11,7 @@ import { SkinInstaller } from '@/ui/SkinInstaller';
 import { GamepadRoot } from '@/ui/GamepadRoot';
 import { UpdateToast } from '@/ui/UpdateToast';
 import { NoTextSelect } from '@/ui/NoTextSelect';
+import { MouseGuard } from '@/ui/MouseGuard';
 import { UiSounds } from '@/ui/UiSounds';
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SkinInstaller />
         <GamepadRoot />
         <NoTextSelect />
+        <MouseGuard />
         <UiSounds />
         <a className="skip-link" href="#main">Skip to content</a>
         {children}

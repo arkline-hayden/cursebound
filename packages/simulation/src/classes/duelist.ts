@@ -1,7 +1,7 @@
 import { Big } from '@cursebound/numeric';
 import { BOSS_BY_ID, CLASS_BY_ID, DODGE, ENEMY_BY_ID, RULES, SKILL_BY_ID, TICK_SEC, type EnemyAttackDef } from '@cursebound/content';
 import { addDot, addStagger, cohortHpFrac, healPlayer, hitEnemy, mitigationFactor, shieldPlayer, type CohortResult } from '../combat';
-import { inCone, inLine, moveCircle, norm, q, rayDistance } from '../geometry';
+import { inCone, inLine, isoSpeedScale, moveCircle, norm, q, rayDistance } from '../geometry';
 import { registerClassHooks } from '../hooks';
 import { nearestFloor } from '../map';
 import { areaCoverage, cosHalf, cutCooldowns, flinch, knockback, livingEnemies, makeHazard } from '../players';
@@ -749,8 +749,9 @@ registerClassHooks('duelist', {
     if (r > 0 && state.map) {
       const pd = playerDerived(state, p);
       // the strike line covers the dash itself: same normalization as players.dodgeSpeedFor (tree / Fate speed
-      // lengthens it, the global RULES.playerMoveSpeedMult does not)
-      const travel = Math.min(40, DODGE.travel * toFloatClamped(pd.moveSpeed, 1e7) / (CLASS_BY_ID[p.classId].base.moveSpeed * Number(RULES.playerMoveSpeedMult)));
+      // lengthens it, the global RULES.playerMoveSpeedMult does not; the screen-uniform direction scale does)
+      const travel = Math.min(40, DODGE.travel * toFloatClamped(pd.moveSpeed, 1e7) / (CLASS_BY_ID[p.classId].base.moveSpeed * Number(RULES.playerMoveSpeedMult))
+        * isoSpeedScale(p.dodgeDirX, p.dodgeDirY));
       const dx = p.dodgeDirX, dy = p.dodgeDirY;
       const len = Math.min(travel, rayDistance(state.map, p.x, p.y, dx, dy, travel));
       const ex = p.x + dx * len, ey = p.y + dy * len;

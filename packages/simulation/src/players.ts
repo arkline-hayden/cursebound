@@ -6,7 +6,7 @@ import { bountyRules, dodgeMaxOf } from './bountyRules';
 import { hooks } from './hooks';
 import { cancelSlide, knockScale } from './knock';
 import { tallyBegin, tallyBleedOut, tallyEnd, tallyEnter, tallyRevive } from './runStats';   // post-run breakdown (observation only)
-import { dir8, inCone, inLine, isWallAt, moveCircle, norm, q, rayDistance } from './geometry';
+import { dir8, inCone, inLine, isoDot, isoSpeedScale, isWallAt, moveCircle, norm, q, rayDistance } from './geometry';
 import { nearestFloor } from './map';
 import { nextFloat } from './rng';
 import { B, ONE, hitDamage, playerDerived, toFloatClamped, treeFactor } from './stats';
@@ -24,6 +24,8 @@ const MAX_SPEED = 1e7;
  * Dashes burst out and ease off (DODGE.easeStart -> easeEnd, mean 1); after a dash a short speed surge decays
  * (surgeTimer); walking carries light momentum: the velocity blends toward the wanted velocity each tick
  * (fast to accelerate or reverse, a touch slower to stop). Pass `vx/vy` (previous velocity) to enable momentum.
+ * Walking and dashing are scaled by direction (geometry.isoSpeedScale) so the hero covers the same screen distance
+ * per second in every direction on the 2:1 isometric view (as fast as screen left / right, never slower than before).
  */
 export function movementStep(
   map: SimState['map'],
@@ -40,19 +42,23 @@ export function movementStep(
   if (p.dodgeTimer > 0) {
     const f = Math.min(1, Math.max(0, p.dodgeTimer / DODGE.durationSec));
     const k = DODGE.easeEnd + (DODGE.easeStart - DODGE.easeEnd) * f;
-    vx = p.dodgeDirX * dodgeSpeed * k; vy = p.dodgeDirY * dodgeSpeed * k;
+    const ds = dodgeSpeed * k * isoSpeedScale(p.dodgeDirX, p.dodgeDirY);   // a dash looks as long in every direction
+    vx = p.dodgeDirX * ds; vy = p.dodgeDirY * ds;
   } else {
     let s = p.guardTimer > 0 ? speed * 0.5 : speed;
     const sg = p.surgeTimer ?? 0;
     if (sg > 0) s *= 1 + (DODGE.surgeMult - 1) * Math.min(1, sg / DODGE.surgeSec);
+    s *= isoSpeedScale(mx, my);                // uniform on screen: up / down no longer crawl at half the pixels
     const tx = mx * s, ty = my * s;
     if (p.vx === undefined || p.vy === undefined || !Number.isFinite(p.vx) || !Number.isFinite(p.vy)) { vx = tx; vy = ty; }
     else {
-      const t2 = tx * tx + ty * ty, v2 = p.vx * p.vx + p.vy * p.vy;
-      const k = t2 >= v2 || tx * p.vx + ty * p.vy < 0 ? RULES.moveAccelBlend : RULES.moveDecelBlend;
+      // speeds compared as seen on screen (isoDot), where every direction's walking speed is the same: in world
+      // units a turn from screen-vertical to screen-horizontal looked like slowing down and took the slower blend
+      const t2 = isoDot(tx, ty, tx, ty), v2 = isoDot(p.vx, p.vy, p.vx, p.vy);
+      const k = t2 >= v2 || isoDot(tx, ty, p.vx, p.vy) < 0 ? RULES.moveAccelBlend : RULES.moveDecelBlend;
       vx = p.vx + (tx - p.vx) * k; vy = p.vy + (ty - p.vy) * k;
       const ex = tx - vx, ey = ty - vy, tol = 0.15 + 0.03 * Math.sqrt(t2);
-      if (ex * ex + ey * ey < tol * tol) { vx = tx; vy = ty; }   // settle instead of creeping forever
+      if (isoDot(ex, ey, ex, ey) < tol * tol) { vx = tx; vy = ty; }   // settle instead of creeping forever
     }
   }
   if (!map) return { x: p.x, y: p.y, vx, vy };

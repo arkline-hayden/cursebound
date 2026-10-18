@@ -314,6 +314,7 @@ export function keyCap(code: string | undefined): string {
   if (code === 'Mouse0') return 'LMB';
   if (code === 'Mouse1') return 'MMB';
   if (code === 'Mouse2') return 'RMB';
+  if (/^Mouse\d+$/.test(code)) return 'M' + (Number(code.slice(5)) + 1);   // side buttons: M4, M5
   if (code === 'Escape') return 'Esc';
   const arrows: Record<string, string> = { ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right' };
   if (arrows[code]) return arrows[code];
@@ -324,10 +325,13 @@ export function keyCap(code: string | undefined): string {
   return keyLabel(code).slice(0, 5);
 }
 
+/** Readable name of a bound code. Mouse buttons are 'Mouse' + MouseEvent.button: 1 is the middle button, 3 / 4 the
+ *  back / forward side buttons, which mice and games call Mouse 4 / Mouse 5. */
 export function keyLabel(code: string): string {
   if (code === 'Mouse0') return 'Left click';
-  if (code === 'Mouse1') return 'Middle click';
+  if (code === 'Mouse1') return 'Middle Mouse';
   if (code === 'Mouse2') return 'Right click';
+  if (/^Mouse\d+$/.test(code)) return 'Mouse ' + (Number(code.slice(5)) + 1);
   if (code === 'ShiftLeft') return 'Shift';
   if (code === 'ShiftRight') return 'Right Shift';
   if (code === 'ControlLeft') return 'Ctrl';

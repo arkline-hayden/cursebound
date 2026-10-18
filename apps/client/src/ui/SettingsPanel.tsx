@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboard
 import { padGlyph, padStore } from '@/lib/gamepad';
 import { ACTIONS, CONTROL_SCHEMES, DEFAULT_SETTINGS, SCHEME_KEYS, TEXT_SIZES, actionLabel, bindKey, keyLabel, setControlScheme, setGraphics, settingsStore, textSizeTier, updateSettings, type Action, type PaletteId, type Settings } from '@/lib/settings';
 import { useStore } from '@/lib/store';
+import { mouseBindCode, setBindCapture, swallowFollowUp } from '@/lib/mouseGuard';
 import { GFX_LABELS, GFX_TIERS, slowHint, stepDown, type GfxTier } from '@/game/gfx';
 
 // Settings (REQ ACCESS01): semantic, labelled controls; complete remapping including mouse actions and gamepad.
@@ -100,7 +101,21 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
       setCapture(null);
     };
     const onKey = (e: KeyboardEvent) => { e.preventDefault(); e.stopPropagation(); if (e.code === 'Escape' && capture.kind === 'key' && capture.action !== 'pause') { setCapture(null); return; } done(e.code); };
-    const onMouse = (e: MouseEvent) => { if (capture.kind !== 'key') return; e.preventDefault(); done(`Mouse${e.button}`); };
+    // any mouse button binds: left, right, middle and the back / forward side buttons (Mouse 4 / Mouse 5; their history
+    // navigation is cancelled app-wide, lib/mouseGuard.ts). Armed a moment after opening so the activating click is not
+    // taken; the rest of the captured press (click, context menu) is swallowed so it cannot reopen the capture.
+    let armed = false;
+    const arm = setTimeout(() => { armed = true; }, 50);
+    const onMouse = (e: MouseEvent) => {
+      if (capture.kind !== 'key' || !armed) return;
+      const code = mouseBindCode(e.button);
+      if (!code) return;
+      e.preventDefault(); e.stopPropagation();
+      swallowFollowUp(window);
+      done(code);
+    };
+    // the game under the pause menu must not act on the press being bound (a side button bound to Pause closed the menu)
+    if (capture.kind === 'key') setBindCapture(true);
     let raf = 0;
     const pollPad = () => {
       if (capture.kind === 'pad') {
@@ -113,9 +128,9 @@ export function SettingsPanel({ compact = false }: { compact?: boolean }) {
       raf = requestAnimationFrame(pollPad);
     };
     window.addEventListener('keydown', onKey, true);
-    setTimeout(() => window.addEventListener('mousedown', onMouse, true), 50);
+    window.addEventListener('mousedown', onMouse, true);
     raf = requestAnimationFrame(pollPad);
-    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('mousedown', onMouse, true); cancelAnimationFrame(raf); };
+    return () => { clearTimeout(arm); setBindCapture(false); window.removeEventListener('keydown', onKey, true); window.removeEventListener('mousedown', onMouse, true); cancelAnimationFrame(raf); };
   }, [capture, s.keys, s.pad, s.controlScheme]);
 
   const vol = (k: keyof Settings['volumes'], label: string) => (

@@ -409,7 +409,7 @@ describe('theme boss fights are deterministic across a checkpoint', () => {
         const f = lair(theme, ['vanguard', 'ranger'], 'CKPT_' + theme);
         f.setFrac(0.48);   // into phase 2 (and past the first reinforcement wave) at once
         let s = f.s, seq = 0;
-        for (let t = 0; t < 60 * 18; t++) {
+        for (let t = 0; t < 60 * 11; t++) {   // 11 s: the botted party ends the fight (either way) around 12 s
           if (t === restoreAt) s = deserializeState(serializeState(s));
           const cmds = s.players.flatMap((p) => botCommands(s, p.slot, 1, () => 0));
           const inputs = s.phase === 'COMBAT' ? s.players.map((p) => botInput(s, p.slot, ++seq)) : [];
@@ -422,6 +422,7 @@ describe('theme boss fights are deterministic across a checkpoint', () => {
       expect(serializeState(b)).toBe(serializeState(a));
       // the fight was still on, in its second phase, with the first wave called
       expect(a.round).toBe(5);
+      expect(a.phase).toBe('COMBAT');
       expect(a.encounter!.phaseAddsSpawned[0]).toBe(1);
       expect(a.enemies.find((e) => e.boss)?.phaseIndex ?? 1).toBe(1);
     });

@@ -6,6 +6,29 @@ import type { MapState } from './types';
 export const QUANT = 1 / 1024;
 export const q = (v: number) => Math.round(v / QUANT) * QUANT;
 
+/**
+ * Screen-uniform hero speed (shared by the authority and client prediction through players.movementStep). The world
+ * is drawn 2:1 isometric (client render/iso.ts: world (dx, dy) -> screen ((dx - dy) * 32, (dx + dy) * 16)), so a
+ * constant ground speed covers half as many screen pixels going screen up / down as going left / right and the hero
+ * looked sluggish in every direction but sideways. This factor scales the ground speed along (dx, dy) so the
+ * projected screen speed always equals the screen left / right speed: 1 for screen horizontals (world (1, -1)),
+ * 2 for screen verticals (world (1, 1)), sqrt(1.6) ~ 1.265 along a world axis (a screen 2:1 diagonal). Never below 1,
+ * so nothing gets slower than before. Pure arithmetic on the direction: deterministic on every peer.
+ */
+export function isoSpeedScale(dx: number, dy: number): number {
+  const l2 = dx * dx + dy * dy;
+  if (!(l2 > 1e-12)) return 1;
+  // screen vector in half-diamond-width units: ((dx - dy), (dx + dy) / 2); a screen horizontal unit step is sqrt(2)
+  const sx = dx - dy, sy = (dx + dy) * 0.5;
+  return Math.sqrt((2 * l2) / (sx * sx + sy * sy));
+}
+
+/** Dot product of two world vectors as drawn on screen, in world units of a screen horizontal (so for screen
+ *  left / right vectors it equals the plain dot product): isoDot(v, v) * isoSpeedScale(v)^2 = |v|^2. */
+export function isoDot(ax: number, ay: number, bx: number, by: number): number {
+  return ((ax - ay) * (bx - by) + (ax + ay) * (bx + by) * 0.25) * 0.5;
+}
+
 export function isWall(map: MapState, tx: number, ty: number): boolean {
   if (tx < 0 || ty < 0 || tx >= map.w || ty >= map.h) return true;
   return map.tiles[ty * map.w + tx] === 1;

@@ -120,6 +120,12 @@ function hardenContents(contents: WebContents): void {
     openExternal(url);
   });
   contents.on('will-redirect', (e, url) => { if (!isLocal(url)) e.preventDefault(); });
+  // a game has no back / forward: the mouse side buttons (Mouse 4 / 5) are bindable game buttons and must never step
+  // the window's history out of a menu or a run. The page cancels them (client lib/mouseGuard.ts); the history is
+  // also kept empty so nothing that slips past (a gesture, a missed event) has anywhere to go.
+  const forget = () => { if (!contents.isDestroyed()) contents.navigationHistory.clear(); };
+  contents.on('did-navigate', forget);
+  contents.on('did-navigate-in-page', forget);
 }
 
 function createWindow(): BrowserWindow {
@@ -146,6 +152,8 @@ function createWindow(): BrowserWindow {
     },
   });
   w.setMenuBarVisibility(false);
+  // Windows / Linux send the mouse back / forward buttons as app commands too: swallowed (game buttons, not navigation)
+  w.on('app-command', (e, cmd) => { if (cmd === 'browser-backward' || cmd === 'browser-forward') e.preventDefault(); });
   if (state.maximized) w.maximize();
   state.track(w);
   w.once('ready-to-show', () => w.show());

@@ -1330,7 +1330,8 @@ export class CombatScene extends Phaser.Scene {
       skills: lp?.cd.map((c) => c[0]) ?? [], map: this.net.map, enemies, reach: basicReach(lp?.c),
       cursor, pointer: s.usingPad ? null : { x: this.input2.pointer.x / k, y: this.input2.pointer.y / k },
       hoverEnemy, hoverGround, primary: s.primary, primaryEdge: s.primaryEdge, force: s.force,
-      buttons: s.buttons, pressed: s.pressed, keyMove: iso.dirToWorld(s.mx, s.my),
+      // keys / D-pad: two keys walk along the iso grid (iso.keyToWorld); the analog stick walks the screen direction
+      buttons: s.buttons, pressed: s.pressed, keyMove: s.analog ? iso.dirToWorld(s.mx, s.my) : iso.keyToWorld(s.mx, s.my),
       padAim: s.stickAim ? iso.dirToWorld(s.stickAim.x, s.stickAim.y) : null, usingPad: s.usingPad,
       assist: { autoAttack: set.autoAttack, aimAssist: set.aimAssist },
     };
