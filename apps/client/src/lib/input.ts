@@ -126,6 +126,17 @@ export class InputController {
     this.client = { x: e.clientX, y: e.clientY };
   }
 
+  /**
+   * Re-derive the canvas-relative pointer from the last window position: after a resize the canvas moves and changes
+   * size under a mouse that has not moved, and the old canvas-relative point would aim at the wrong spot.
+   */
+  refreshPointer() {
+    const el = this.el;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    this.pointer = { x: this.client.x - r.left, y: this.client.y - r.top, inside: this.pointer.inside };
+  }
+
   private isTextTarget(e: Event) {
     const t = e.target as HTMLElement | null;
     return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);

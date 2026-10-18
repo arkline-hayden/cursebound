@@ -121,12 +121,15 @@ export function VesselHall({ title, intro, value, onChange, level, who, goLabel,
 
   // the lineup centres in the band between the title strip and the bottom panels
   useEffect(() => {
-    const measure = () => setInsets({ top: (top.current?.offsetHeight ?? 64) + 8, bottom: (bottom.current?.offsetHeight ?? 180) + 8 });
+    // drawn size (getBoundingClientRect, not offsetHeight): small windows draw the strips zoomed (globals.css)
+    const measure = () => setInsets({ top: Math.round(top.current?.getBoundingClientRect().height ?? 64) + 8, bottom: Math.round(bottom.current?.getBoundingClientRect().height ?? 180) + 8 });
     measure();
     const ro = new ResizeObserver(measure);
     if (top.current) ro.observe(top.current);
     if (bottom.current) ro.observe(bottom.current);
-    return () => ro.disconnect();
+    // a zoom step crossing (window resize) changes the drawn size without changing the observed layout size
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
   }, []);
 
   // focus returns to whatever opened the hall

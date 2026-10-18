@@ -134,6 +134,8 @@ registerBossKit('moonhorror', {
     if (!veil) {
       veil = host.scene.add.renderTexture(0, 0, W, H).setOrigin(0, 0).setDepth(4300);
       soft = host.scene.textures.exists('light:soft') ? host.scene.make.image({ key: 'light:soft', add: false }) : null;
+    } else if (veil.width !== W || veil.height !== H) {
+      veil.resize(W, H);   // the window was resized mid-fight: keep the veil covering the whole view
     }
     const v = veil.setVisible(true).setPosition(cam.worldView.x - 32, cam.worldView.y - 32).setAlpha(0.62 * dark);
     v.clear().fill(0x05030a, 1);

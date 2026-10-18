@@ -41,6 +41,7 @@ import { gfx, particleBudget, reportSlowFrames } from '../gfx';
 import { spectateStore } from '@/ui/Spectate';
 import { rumble } from '@/lib/gamepad';
 import { spectateTarget } from '../spectate';
+import { pointerToWorld } from '../viewport';
 
 // Combat presentation (PRD §15, §16, §18): renders authoritative snapshots in a lit isometric dungeon, predicts the
 // local avatar, interpolates remote entities, draws shape-coded telegraphs that survive reduced effects, and layers
@@ -213,6 +214,10 @@ export class CombatScene extends Phaser.Scene {
   private pipsFullAt = 0;
   private potionAt = new Map<number, number>();
   private pendingBanners: { id: number; tier: number; until: number }[] = [];
+  /** canvas element width in CSS px (pointer mapping); re-measured the frame after a resize */
+  private canvasCssW = 0;
+  /** the view was resized since the last frame (game/viewport.ts applyFit -> Phaser scale RESIZE) */
+  private viewDirty = false;
   ready = false;
 
   constructor() { super('combat'); }
@@ -291,6 +296,12 @@ export class CombatScene extends Phaser.Scene {
     const endLoops = () => { this.reviveLoop?.stop(); this.reviveLoop = null; };
     this.events.once('shutdown', endLoops);
     this.events.once('destroy', endLoops);
+    // live resizes: re-measure the canvas and re-aim the pointer next frame; the camera re-centres from this.W / H
+    const onResize = () => { this.viewDirty = true; };
+    this.scale.on('resize', onResize);
+    const offResize = () => this.scale.off('resize', onResize);
+    this.events.once('shutdown', offResize);
+    this.events.once('destroy', offResize);
     this.applyPostFx();
     this.watch.born = performance.now();
     this.ready = true;
@@ -319,9 +330,7 @@ export class CombatScene extends Phaser.Scene {
    * { name, hp (0..1), hpText ("820 / 1000"), count (×N text | null), objective, elite (0|1|2), affixes (display names) }.
    */
   private updateHover(s: Snapshot) {
-    const cam = this.cameras.main;
-    const k = this.game.canvas.clientWidth / this.W || 1;
-    const sp = { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY };
+    const sp = this.pointerWorld();
     // the same pick a click makes (driveFrame): the rim marks exactly the foe a click attacks. Bosses keep their
     // own bar instead of the rim and plate (a click on one still attacks it).
     const e = this.input2.pointer.inside && !this.input2.usingPad ? pickEnemy(this.foeSprites(s), sp) : null;
@@ -407,6 +416,13 @@ export class CombatScene extends Phaser.Scene {
   private sxw(x: number, y: number) { return iso.x(x, y); }
   private get W() { return this.scale.width; }
   private get H() { return this.scale.height; }
+
+  /** The pointer as a ground-screen point under the (unzoomed) play camera; right after a resize too (viewDirty). */
+  private pointerWorld(): Pt {
+    const cam = this.cameras.main;
+    if (!(this.canvasCssW > 0)) this.canvasCssW = this.game.canvas.getBoundingClientRect().width;
+    return pointerToWorld(this.input2.pointer.x, this.input2.pointer.y, this.canvasCssW, this.W, cam.scrollX, cam.scrollY);
+  }
 
   private view(key: string, actor: ActorId, x: number, y: number, kind: string): ActorView {
     let v = this.actors.get(key);
@@ -988,6 +1004,13 @@ export class CombatScene extends Phaser.Scene {
 
   update(_time: number, delta: number) {
     if (!this.ready) return;
+    if (this.viewDirty) {
+      // the view was resized (game/viewport.ts): the canvas element now has its new CSS size and place, so re-measure
+      // it and re-aim a pointer that has not moved since (the camera re-centres on the hero below, from this.W / H)
+      this.viewDirty = false;
+      this.canvasCssW = this.game.canvas.getBoundingClientRect().width;
+      this.input2.refreshPointer();
+    }
     const set = this.settings();
     const J = this.juice;
     J.reduced = set.reducedEffects; J.shakeOn = set.screenShake; J.flashOn = set.flashes; J.motionOn = !set.reducedMotion && set.hitStop; J.numbersOn = set.damageNumbers;
@@ -1261,8 +1284,7 @@ export class CombatScene extends Phaser.Scene {
     const s = this.input2.sample();
     if (this.roomFx && latest) {
       // room events: Interact near a shrine / altar / merchant, or a click on one (render/RoomEvents.ts)
-      const k = this.game.canvas.clientWidth / this.W || 1, cam = this.cameras.main;
-      const click = s.primaryEdge && !s.usingPad && this.input2.pointer.inside ? { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY } : null;
+      const click = s.primaryEdge && !s.usingPad && this.input2.pointer.inside ? this.pointerWorld() : null;
       // a click that used / walks to an event is not also a ground click (the ground under a tall sprite lies behind it)
       if (this.roomFx.input((s.pressed & 64) !== 0, click, this.renderSelf.init ? this.renderSelf : null)) { s.primaryEdge = false; s.primary = false; }
     }
@@ -1297,9 +1319,7 @@ export class CombatScene extends Phaser.Scene {
     const set = this.settings();
     const lp = latest?.players[netStore.get().slot];
     const self = this.selfPos(latest);
-    const cam = this.cameras.main;
-    const k = this.game.canvas.clientWidth / this.W || 1;
-    const sp = { x: this.input2.pointer.x / k + cam.scrollX, y: this.input2.pointer.y / k + cam.scrollY };
+    const sp = this.pointerWorld();
     const over = this.input2.pointer.inside && !s.usingPad;
     // a held click keeps steering while the pointer crosses the HUD; the WASD scheme always aims at the pointer. A
     // pointer on a wall's face means the floor at the wall's foot, not the ground behind it (targeting.ts groundAt).
@@ -1328,7 +1348,7 @@ export class CombatScene extends Phaser.Scene {
       now: performance.now(), scheme: set.controlScheme === 'wasd' ? 'wasd' : 'click', phase: latest?.phase ?? '', blocked: s.blocked || !latest || cinematicHeld(latest),
       life: lp?.life ?? null, self, buffs: lp?.buffs ?? [], tether: (lp as { teth?: [number, number, number] } | undefined)?.teth ?? null,
       skills: lp?.cd.map((c) => c[0]) ?? [], map: this.net.map, enemies, reach: basicReach(lp?.c),
-      cursor, pointer: s.usingPad ? null : { x: this.input2.pointer.x / k, y: this.input2.pointer.y / k },
+      cursor, pointer: s.usingPad ? null : { x: sp.x - this.cameras.main.scrollX, y: sp.y - this.cameras.main.scrollY },
       hoverEnemy, hoverGround, primary: s.primary, primaryEdge: s.primaryEdge, force: s.force,
       // keys / D-pad: two keys walk along the iso grid (iso.keyToWorld); the analog stick walks the screen direction
       buttons: s.buttons, pressed: s.pressed, keyMove: s.analog ? iso.dirToWorld(s.mx, s.my) : iso.keyToWorld(s.mx, s.my),

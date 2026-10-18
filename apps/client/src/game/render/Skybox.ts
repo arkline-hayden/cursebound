@@ -40,7 +40,7 @@ export class Skybox {
   private backdrop: Phaser.GameObjects.Image | null = null;
   private drift: { img: Phaser.GameObjects.Image; x: number; y: number; vx: number; x0: number; x1: number }[] = [];
   private bobs: { img: Phaser.GameObjects.Image; y: number; amp: number; phase: number; rate: number }[] = [];
-  private twinkles: { img: Phaser.GameObjects.Image; phase: number; rate: number }[] = [];
+  private twinkles: { img: Phaser.GameObjects.Image; phase: number; rate: number; u: number; v: number }[] = [];
   private last = -1;
 
   constructor(private scene: Phaser.Scene, kind: 'sky' | 'stars', plan: DressingPlan, mapW: number, mapH: number, private opts: { animated: boolean; density: number; seed: number }) {
@@ -67,7 +67,7 @@ export class Skybox {
       for (let i = 0; i < n; i++) {
         const img = scene.add.image(hash(i, 1, seed) * cam.width, hash(i, 2, seed) * cam.height * 0.75, SKY_KEYS.star).setScrollFactor(0).setDepth(BACKDROP_DEPTH + 1).setTint(i % 3 ? 0xd8e4ff : 0xffffff);
         this.objs.push(img);
-        this.twinkles.push({ img, phase: hash(i, 3, seed) * 6.28, rate: 0.0012 + hash(i, 4, seed) * 0.002 });
+        this.twinkles.push({ img, phase: hash(i, 3, seed) * 6.28, rate: 0.0012 + hash(i, 4, seed) * 0.002, u: hash(i, 1, seed), v: hash(i, 2, seed) * 0.75 });
       }
       return;
     }
@@ -112,6 +112,8 @@ export class Skybox {
   private fit(): void {
     const cam = this.scene.cameras.main;
     this.backdrop?.setPosition(cam.width / 2, cam.height / 2).setDisplaySize(cam.width * 1.5, cam.height * 1.5);
+    // screen-fixed twinkles keep their spread over a resized view
+    for (const t of this.twinkles) t.img.setPosition(t.u * cam.width, t.v * cam.height);
   }
 
   update(time: number): void {

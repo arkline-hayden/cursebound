@@ -489,6 +489,7 @@ export class DungeonRenderer {
     this.occluders.push(...out.occluders);
     this.wallPx = out.wallPx;
     this.decalRT = out.decalRT;
+    this.grade = out.grade;   // refit to the view on resize (update), like a dungeon theme's grade
     this.theme = out.theme;
     this.bounds = out.bounds;
     this.origin = out.origin;

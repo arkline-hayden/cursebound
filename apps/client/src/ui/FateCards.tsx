@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { RARITIES, STAT_BY_ID, cardRarity, type CardDef } from '@cursebound/content';
 import type { CardForecast } from '@cursebound/simulation';
 import { sharedAudio } from '@/game/audio/shared';
+import { fitScale } from '@/game/viewport';
 import type { SfxId } from '@/game/audio/sfx';
 import { CardIcon } from './icons';
 import { BlessingIcon } from './itemIcons';
@@ -128,11 +129,21 @@ export function FateCards(props: FateCardsProps) {
     if (!stage || !root) return;
     const u = parseFloat(getComputedStyle(root).getPropertyValue('--ps')) || 2;
     const sr = stage.getBoundingClientRect(), st = getComputedStyle(stage);
-    const row = stage.querySelector('[role="radiogroup"]');
+    const row = stage.querySelector<HTMLElement>('[role="radiogroup"]');
     const column = !!row && getComputedStyle(row).flexDirection === 'column';
+    // narrow windows (a snapped half screen, 800x600, a portrait window): the three cards are scaled down together
+    // (0.75 / 0.5: the 2x art lands on a 1.5x / 1x grid) instead of running off the right edge or stacking into a
+    // scrolling column; the cards keep their size in art px, so the text fit below is unchanged
+    const n = slotRefs.current.length;
+    const rowCs = row ? getComputedStyle(row) : null;
+    const overlap = slotRefs.current[1] ? parseFloat(getComputedStyle(slotRefs.current[1]).marginLeft) || 0 : 0;
+    const natural = n * CARD_W * u + Math.max(0, n - 1) * ((parseFloat(rowCs?.columnGap ?? '') || 0) + overlap);
+    const fit = fitScale(natural, sr.width - 16);
+    root.style.setProperty('--fit', String(fit));
+    if (fit < 1) root.dataset.scaled = ''; else delete root.dataset.scaled;
     // every card the same size: CARD_W art px wide, as tall as the stage allows, up to a 2:3 playing card
-    const cardW = slotRefs.current[0]?.offsetWidth || CARD_W * u;
-    const inner = sr.height - parseFloat(st.paddingTop) - parseFloat(st.paddingBottom);
+    const cardW = fit < 1 ? CARD_W * u : slotRefs.current[0]?.offsetWidth || CARD_W * u;
+    const inner = (sr.height - parseFloat(st.paddingTop) - parseFloat(st.paddingBottom)) / fit;
     const tall = Math.round((cardW * 1.5) / u);
     const cardH = (column ? tall : Math.max(150, Math.min(Math.floor(inner / u), tall))) * u;
     root.style.setProperty('--card-h', `${cardH}px`);
@@ -158,15 +169,15 @@ export function FateCards(props: FateCardsProps) {
     root.style.setProperty('--vista-h', `${vista * u}px`);
     if (vista <= 40) root.dataset.thin = ''; else delete root.dataset.thin;
     // the toss: each card starts above the screen, close to the camera, tilted; the ceremony's centre offset
-    const n = slotRefs.current.length;
+    // (screen offsets measured on the scaled row are divided back into the row's own px)
     slotRefs.current.forEach((el, k) => {
       if (!el) return;
       const r = el.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + cardH / 2;
+      const cx = r.left + r.width / 2, cy = r.top + (cardH * fit) / 2;
       el.style.setProperty('--fx', `${Math.round((k - (n - 1) / 2) * cardW * 0.32)}px`);
-      el.style.setProperty('--fy', `${Math.round(-(cy + cardH * 0.35))}px`);
+      el.style.setProperty('--fy', `${Math.round(-(cy / fit + cardH * 0.35))}px`);
       el.style.setProperty('--r0', `${TOSS_TILT[k % TOSS_TILT.length]}deg`);
-      el.style.setProperty('--cx', `${Math.round(sr.left + sr.width / 2 - cx)}px`);
+      el.style.setProperty('--cx', `${Math.round((sr.left + sr.width / 2 - cx) / fit)}px`);
       el.style.setProperty('--lost-rot', `${k === 0 ? -4 : k === 2 ? 4 : 2}deg`);
     });
     fxRef.current?.setScale(u);

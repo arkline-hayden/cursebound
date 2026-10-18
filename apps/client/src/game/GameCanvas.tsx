@@ -7,9 +7,10 @@ import { CANVAS_FONT_SPECS } from '@/ui/fonts';
 import { settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
 import { GFX_PRESETS, type GfxKnobs } from './gfxProfile';
+import { PLAY_VIEW, applyFit, initialFit, watchViewport } from './viewport';
 
 // Client-only Phaser host (PRD §17.1): instantiated after mount, disposed on route changes; high-frequency
-// state never routes through React. Rendering uses an integer pixel zoom so every art pixel is a crisp square;
+// state never routes through React. Rendering uses a device-pixel zoom (game/viewport.ts) so art pixels stay crisp;
 // the logical view grows with the window instead of stretching. The graphics tier (game/gfx.ts) sets the light
 // count compiled into the Light2D shader and the frame cap, so changing tiers rebuilds the game; the scene redraws
 // from the connection's latest snapshots, so the run itself is untouched.
@@ -24,23 +25,14 @@ export function tierRenderConfig(k: GfxKnobs) {
   };
 }
 
-export const BASE_W = 960;
-export const BASE_H = 540;
-
-export function pixelZoom(w: number, h: number) {
-  return Math.max(1, Math.floor(Math.min(w / BASE_W, h / BASE_H) + 0.15));
-}
-
 /**
  * Play camera: a tighter Diablo-style framing than the menu backdrop. The logical view targets ~720x405 (a little
- * wider than the old 640x360). The zoom snaps down to quarter steps (2.5x at 1080p = 768x432, 3.5x at 1440p,
- * 1.75x in a 720p window), so the nearest-neighbour pixel pattern stays regular.
+ * wider than the old 640x360). The zoom is chosen in DEVICE pixels and snaps down to quarter steps (2.5x at 1080p =
+ * 768x432, 3.5x at 1440p, 2.5x for a 1080p screen at 125% Windows scaling), so the nearest-neighbour pixel pattern
+ * stays regular; ultrawide shows more world sideways, tall windows more above and below. See game/viewport.ts.
  */
-export const PLAY_BASE_W = 720;
-export const PLAY_BASE_H = 405;
-export function playZoom(w: number, h: number) {
-  return Math.max(1, Math.floor(Math.min(w / PLAY_BASE_W, h / PLAY_BASE_H) * 4) / 4);
-}
+export const PLAY_BASE_W = PLAY_VIEW.w;
+export const PLAY_BASE_H = PLAY_VIEW.h;
 
 export async function waitForPixelFonts() {
   try {
@@ -59,13 +51,7 @@ export default function GameCanvas({ net, audio }: { net: GameConnection; audio:
     const knobs = GFX_PRESETS[tier] ?? GFX_PRESETS.high;
     let game: import('phaser').Game | null = null;
     let cancelled = false;
-    const onResize = () => {
-      if (!game || !ref.current) return;
-      const w = ref.current.clientWidth, h = ref.current.clientHeight;
-      const z = playZoom(w, h);
-      game.scale.resize(Math.ceil(w / z), Math.ceil(h / z));
-      game.scale.setZoom(z);
-    };
+    let unwatch: (() => void) | null = null;
     (async () => {
       try {
         const PhaserMod = await import('phaser'); const Phaser = ((PhaserMod as unknown as { default?: typeof PhaserMod }).default ?? PhaserMod) as typeof import('phaser');
@@ -77,26 +63,33 @@ export default function GameCanvas({ net, audio }: { net: GameConnection; audio:
           setError('Your browser does not provide WebGL, which CURSEBOUND needs. Try current Chrome, Edge or Firefox with hardware acceleration enabled.');
           return;
         }
-        const w = ref.current.clientWidth, h = ref.current.clientHeight;
-        const z = playZoom(w, h);
-        game = new Phaser.Game({
+        // never 0x0, even before layout or in a minimised window (zero-size render targets are incomplete framebuffers)
+        const fit = initialFit(ref.current, PLAY_VIEW);
+        const g = game = new Phaser.Game({
           type: Phaser.WEBGL,
           parent: ref.current,
-          width: Math.ceil(w / z),
-          height: Math.ceil(h / z),
-          zoom: z,
+          width: fit.w,
+          height: fit.h,
+          zoom: fit.cssZoom,
           pixelArt: true,
           roundPixels: true,
           antialias: false,
           backgroundColor: '#050303',
-          scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.CENTER_BOTH },
+          // sizing and placement are ours (game/viewport.ts): device-pixel exact, never resized to 0x0
+          scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
           ...tierRenderConfig(knobs),
           audio: { noAudio: true },
           input: { keyboard: false, mouse: false, touch: false, gamepad: false },
           banner: false,
         } as Phaser.Types.Core.GameConfig);
         game.scene.add('combat', CombatScene, true, { net, audio });
-        window.addEventListener('resize', onResize);
+        // dev builds only: a handle for headless resize / resolution checks (never in production bundles)
+        if (process.env.NODE_ENV !== 'production') (window as unknown as { __cbGame?: unknown }).__cbGame = game;
+        applyFit(g, fit);
+        // live resizes (window, maximise / restore, fullscreen, another monitor or browser zoom), coalesced per frame:
+        // only the backing canvas, the renderer's targets and the cameras change size; the run never restarts and the
+        // scene re-centres on the hero on its next frame
+        unwatch = watchViewport(ref.current, PLAY_VIEW, (f) => applyFit(g, f));
         game.canvas.addEventListener('webglcontextlost', (e) => {
           e.preventDefault();
           setError('The graphics context was lost. The run continues on the authority; it will redraw when the browser restores graphics.');
@@ -108,7 +101,7 @@ export default function GameCanvas({ net, audio }: { net: GameConnection; audio:
     })();
     return () => {
       cancelled = true;
-      window.removeEventListener('resize', onResize);
+      unwatch?.();
       game?.destroy(true);
     };
   }, [net, audio, tier]);

@@ -40,6 +40,8 @@ export interface CourtyardBuild {
   /** px each wall tile (house, garden wall) is drawn tall above its floor diamond (tile index -> px; click picking) */
   wallPx: Map<number, number>;
   decalRT: Phaser.GameObjects.RenderTexture;
+  /** the screen-fixed grade wash (the dungeon renderer refits it to the view after a resize) */
+  grade: Phaser.GameObjects.Image;
   theme: RenderTheme;
   bounds: { x: number; y: number; w: number; h: number };
   origin: { x: number; y: number };
@@ -190,7 +192,7 @@ export function buildCourtyard(s: Phaser.Scene, map: MapLike, o: { lighting: boo
   objs.push(grade);
 
   return {
-    objs, occluders, wallPx, decalRT, theme: COURTYARD_THEME,
+    objs, occluders, wallPx, decalRT, grade, theme: COURTYARD_THEME,
     bounds: { x: b.minX - HW * 2, y: b.minY - HOUSE_H - HH * 2, w: b.width + HW * 4, h: b.height + HOUSE_H + HH * 4 },
     origin: { x: ox, y: oy },
     stats: { sprites, ms: performance.now() - t0 },

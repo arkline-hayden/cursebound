@@ -14,7 +14,7 @@
   --rise: calc(26 * var(--u));
   --drop: calc(12 * var(--u));
   position: fixed; inset: 0; z-index: var(--z-overlay);
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; justify-items: center;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); justify-items: center;
   padding: var(--sp-3) var(--sp-3) var(--sp-2);
   overflow: hidden; pointer-events: none;
   font-family: var(--font-body); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--bone);
@@ -84,7 +84,7 @@
 @media (max-height: 900px) { .status { display: none; } }
 
 /* ---------------------------------------------------------------- stage and row: every card the same size, one top line */
-.stage { position: relative; z-index: 3; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; padding: var(--rise) 0 calc(var(--drop) + 2px); }
+.stage { position: relative; z-index: 3; width: 100%; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; padding: var(--rise) 0 calc(var(--drop) + 2px); }
 .row { display: flex; gap: var(--gap); align-items: flex-start; justify-content: center; max-width: 100%; }
 /* the table: a dithered pool of candlelight on dark wood (each art px drawn 2x), so shadows and dust read */
 .table {
@@ -92,11 +92,13 @@
   background: var(--fa-table) 0 0 / 100% 100% no-repeat; pointer-events: none; z-index: 0; animation: fcFade 0.4s ease-out both;
 }
 @media (max-width: 1040px) { .row { gap: 0; } .row > .slot + .slot { margin-left: calc(-18 * var(--u)); } }
-@media (max-width: 860px) {
-  .stage { overflow: auto; align-items: flex-start; }
-  .row { flex-direction: column; align-items: center; gap: calc(var(--rise) + var(--drop) + 8px); padding-bottom: 24px; }
-  .row > .slot + .slot { margin-left: 0; }
-}
+/* narrow windows: the row (and its table) scale down as one block (FateCards.tsx measure: --fit 0.75 / 0.5) rather
+   than overflowing the right edge; the cards keep their art-px size, so nothing inside re-flows */
+.spread[data-scaled] .row { max-width: none; flex: none; transform: scale(var(--fit, 1)); transform-origin: 50% 50%; }
+.spread[data-scaled] .slot { flex-shrink: 0; max-width: none; }
+.spread[data-scaled] .table { transform: scale(var(--fit, 1)); }
+/* very small windows (640x360-class): the title strip and the buttons draw at half size too, leaving the cards room */
+@media (max-height: 479px), (max-width: 759px) { .head, .foot { zoom: 0.5; } }
 
 /* ---------------------------------------------------------------- the card stack: slot > shadow + fly > lift > tilt > flip > faces */
 .slot { position: relative; width: var(--cw); max-width: 100%; display: flex; flex-direction: column; z-index: 1; --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 30%; }

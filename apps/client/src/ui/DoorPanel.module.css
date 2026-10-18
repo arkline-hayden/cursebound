@@ -10,7 +10,13 @@
 }
 .drawerLayer { z-index: var(--z-modal); }
 :global(:root[data-text-size="1"]) .layer, :global(:root[data-text-size="2"]) .layer { --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px; --fs-body: 32px; --fs-body-lg: 40px; --lh-body: 36px; --lh-body-lg: 44px; }
-@media (min-width: 2540px) and (min-height: 1400px) { .layer { --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px; --fs-body: 32px; --fs-body-lg: 40px; --lh-body: 36px; --lh-body-lg: 44px; } }
+/* 1440p / 4K: the layer zooms up as a whole (globals.css --ui-zoom 1 / 1.5), so the screen-tier tokens go back to tier 0 */
+@media (min-width: 2540px) and (min-height: 1400px) {
+  .layer, .drawerLayer { --sp-3: 16px; }
+  :global(:root:not([data-text-size="1"]):not([data-text-size="2"])) .layer, :global(:root:not([data-text-size="1"]):not([data-text-size="2"])) .drawerLayer {
+    --fs-goth-sm: 20px; --fs-goth: 30px; --fs-goth-lg: 40px; --fs-goth-xl: 50px; --fs-disp: 50px; --fs-disp-lg: 70px;
+  }
+}
 .layer > *, .drawerLayer > * { pointer-events: auto; }
 
 .hint {

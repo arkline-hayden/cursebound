@@ -155,6 +155,11 @@
   :root, :root[data-text-size='1'], :root[data-text-size='2'] { --hud-label: 20px; --hud-label-lh: 20px; --hud-body: 20px; --hud-goth-sm: 20px; --hud-goth: 20px; --hud-goth-lg: 40px; --hud-disp: 50px; }
 }
 @media (min-width: 3800px) and (min-height: 2100px) { :root { --hud-zoom: 2; } }
+/* very small windows (640x360-class, a snapped half of a laptop screen): 0.5x (the 2x skin on a 1x grid, pixels stay
+   square) with the largest label step, so the round plate, party plate and minimap no longer collide over the hero */
+@media (max-width: 759px), (max-height: 479px) {
+  :root, :root[data-text-size='1'], :root[data-text-size='2'] { --hud-zoom: 0.5; --hud-label: 28px; --hud-label-lh: 28px; --hud-body: 28px; --hud-goth-sm: 30px; }
+}
 @media (max-height: 760px) { :root { --ov-pad: 8px; } }
 
 * { box-sizing: border-box; }
@@ -356,6 +361,22 @@ code { font-family: var(--font-label); font-size: var(--fs-label); color: var(--
 .account-plate .ap-emblem { display: inline-flex; filter: drop-shadow(2px 2px 0 #000); }
 .dialog-panel.wide { width: min(1120px, 100%); }
 @media (max-height: 820px) { .title-menu { margin-top: var(--sp-2); } .title-menu .menu-list { gap: 4px; } }
+@media (max-height: 760px) { .title-main { padding-top: var(--sp-2); padding-bottom: 0; } .title-menu { gap: var(--sp-2); } }
+/* short / narrow windows (800x600, a snapped half screen, 640x360): the whole title block draws smaller (the 2x skin
+   on a 1.5x / 1x grid, like the in-game panels) instead of scrolling the page; Chromium scales vh by the zoom */
+@media (max-height: 680px), (max-width: 760px) { :root { --title-z: 0.75; } }
+@media (max-height: 460px), (max-width: 560px) { :root { --title-z: 0.5; } }
+/* 4K at 100% scaling: the same block at 1.5x (the skin on a 3x grid) rather than a small island in the middle */
+@media (min-width: 3800px) and (min-height: 2100px) { :root { --title-z: 1.5; } .vh-top, .vh-bottom { zoom: 1.5; } }
+.title-main { zoom: var(--title-z, 1); min-height: calc(100vh / var(--title-z, 1)); }
+.account-plate.frame { zoom: var(--title-z, 1); }
+/* narrow: the account plate sits in the flow above the title block (see max-width: 720px below), so leave it room */
+@media (max-width: 720px) { .title-main { min-height: calc((100vh - 80px * var(--title-z, 1)) / var(--title-z, 1)); } }
+/* tiny (640x360): no room for a plate row; it rides small in the corner again */
+@media (max-height: 460px), (max-width: 560px) {
+  :root .account-plate.frame { position: fixed; top: 4px; right: 8px; margin: 0; }
+  .title-main { min-height: calc(100vh / var(--title-z, 1)); }
+}
 @media (max-width: 720px) { .account-plate.frame { position: static; margin: var(--sp-2) auto 0; width: fit-content; } .title-foot { justify-content: center; } }
 /* friends plate (online mode): under the account plate, clear of the centred menu column */
 .friends-panel.frame { position: fixed; top: 96px; right: var(--sp-3); z-index: 3; width: 300px; max-height: calc(100vh - 220px); display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-1) var(--sp-2) var(--sp-2); animation: fadeIn 0.3s steps(3); }
@@ -882,6 +903,18 @@ details[open] > summary::before { content: '\25BE'; }
 .vh-confirm { width: 100%; }
 .vh-hint { font-family: var(--font-label); font-size: var(--fs-small); line-height: var(--lh-small); text-transform: uppercase; color: var(--bone-3); text-align: center; text-shadow: var(--shadow-hard); }
 @media (max-width: 1100px) { .vh-bottom { grid-template-columns: 1fr; } .vh-go { min-width: 0; max-width: none; } }
+/* short / narrow windows: the title strip and the bottom panels draw smaller (like the title block) so the lineup keeps
+   a usable band; VesselSelect measures their drawn size for the stage insets */
+@media (max-height: 680px), (max-width: 760px) { .vh-top, .vh-bottom { zoom: 0.75; } }
+@media (max-height: 460px), (max-width: 560px) { .vh-top, .vh-bottom { zoom: 0.5; } .vh-intro { display: none; } }
+/* short windows: a lower bottom strip (skills in one row, the info and the confirm side by side when the zoomed strip
+   has the width, no key hint) so the lineup is not squeezed into a sliver */
+@media (max-height: 680px) {
+  .vh-bottom .vinfo .vi-skills { grid-column: 1 / -1; grid-row: auto; flex-direction: row; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); }
+  .vh-bottom .vinfo .vi-name { font-size: var(--fs-goth); }
+  .vh-bottom .vh-hint { display: none; }
+}
+@media (max-height: 680px) and (min-width: 780px) { .vh-bottom { grid-template-columns: minmax(0, 1fr) auto; } .vh-go { min-width: 340px; max-width: 420px; } }
 
 .vinfo { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-2) var(--sp-4); padding: var(--sp-2) var(--sp-3); box-shadow: inset 0 4px 0 0 var(--accent, var(--bronze)); min-width: 0; }
 .vinfo.locked { box-shadow: inset 0 4px 0 0 var(--stone-3); }
@@ -1357,7 +1390,7 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
    Panels opened during a run (door vote, Fate Ledger, gear, skill tree, pause, results, round summary, lobby) and the
    toast stack draw a quarter smaller than the menus: CSS zoom 0.75 puts the 2x pixel skin on a 1.5x grid (a half
    step, so pixels stay square), while the text tokens step up one size inside them so body text stays ~21px and labels
-   ~18px on screen (1440p and the larger text settings step up to the top tier). Chromium scales vh / vw by the zoom,
+   ~18px on screen (the larger text settings step up a tier). Chromium scales vh / vw by the zoom,
    so viewport-relative heights inside these panels divide by it. Title and menu pages are not affected. */
 .game-root { --ui-zoom: 0.75; }
 .game-root .overlay, .game-root .toast-stack { zoom: var(--ui-zoom); }
@@ -1369,17 +1402,21 @@ html.pad-nav .menu-item:focus, html.pad-nav .menu-item:focus-visible { border-im
   --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px;
   --fs-body: 32px; --fs-body-lg: 40px; --fs-body-xl: 48px; --lh-body: 36px; --lh-body-lg: 44px; --lh-body-xl: 52px;
 }
+/* 1440p and 4K: the panels scale up as a whole, exactly the 1080p layout at 4/3 and 2x (zoom 1 / 1.5: the skin on a
+   2x / 3x grid), instead of 1080p-sized sheets with stepped-up text that left half of a 1440p or 4K screen empty and
+   clipped the skill tree's fixed socket grid. The screen-tier tokens (one step up at 2560x1440, see the top) are put
+   back to tier 0 inside the panels, so text and grid scale together. */
 @media (min-width: 2540px) and (min-height: 1400px) {
-  .game-root .overlay, .game-root .toast-stack {
-    --fs-small: 28px; --lh-small: 30px; --fs-label: 28px; --fs-label-lg: 32px; --lh-label: 32px;
-    --fs-body: 32px; --fs-body-lg: 40px; --fs-body-xl: 48px; --lh-body: 36px; --lh-body-lg: 44px; --lh-body-xl: 52px;
-  }
-  /* the skill tree's fixed socket grid keeps the screen's own tier (the top tier clips its node labels) */
-  :root:not([data-text-size='1']):not([data-text-size='2']) .game-root .tree-overlay {
-    --fs-small: 24px; --lh-small: 26px; --fs-label: 24px; --fs-label-lg: 28px; --lh-label: 28px;
-    --fs-body: 28px; --fs-body-lg: 32px; --fs-body-xl: 40px; --lh-body: 32px; --lh-body-lg: 36px; --lh-body-xl: 44px;
+  .game-root { --ui-zoom: 1; }
+  .game-root .overlay, .game-root .toast-stack { --sp-3: 16px; --ov-pad: 16px; }
+  :root:not([data-text-size='1']):not([data-text-size='2']) .game-root :is(.overlay, .toast-stack) {
+    --fs-goth-sm: 20px; --fs-goth: 30px; --fs-goth-lg: 40px; --fs-goth-xl: 50px; --fs-goth-xxl: 60px;
+    --fs-disp: 50px; --fs-disp-lg: 70px; --fs-disp-xl: 100px; --fs-label-xl: 40px;
   }
 }
+@media (min-width: 3800px) and (min-height: 2100px) { .game-root { --ui-zoom: 1.5; } }
+/* very small windows (640x360-class): half size (the 2x skin on a 1x grid) so menus and their buttons stay on screen */
+@media (max-width: 759px), (max-height: 479px) { .game-root { --ui-zoom: 0.5; } }
 .game-root .overlay > .sheet { max-height: calc(100vh / var(--ui-zoom) - 80px); }
 .game-root .overlay > .frame.sheet { max-height: none; }
 .game-root .overlay > .frame.sheet.fit { max-height: calc(100vh / var(--ui-zoom) - 2 * var(--ov-pad)); }

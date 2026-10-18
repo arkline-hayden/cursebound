@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { BASE_H, BASE_W, pixelZoom, tierRenderConfig } from './GameCanvas';
+import { tierRenderConfig } from './GameCanvas';
+import { MENU_VIEW, applyFit, initialFit, watchViewport } from './viewport';
 import { settingsStore } from '@/lib/settings';
 import { useStore } from '@/lib/store';
 import { GFX_PRESETS } from './gfxProfile';
@@ -32,6 +33,7 @@ function LiveBackdrop({ classId, tier, paused }: { classId: string; tier: keyof 
   useEffect(() => {
     let game: import('phaser').Game | null = null;
     let cancelled = false;
+    let unwatch: (() => void) | null = null;
     const knobs = GFX_PRESETS[tier];
     const lit = knobs.lighting;
     (async () => {
@@ -85,24 +87,30 @@ function LiveBackdrop({ classId, tier, paused }: { classId: string; tier: keyof 
           const cam = this.cameras.main;
           cam.setRoundPixels(true);
           if (knobs.postFx && cam.postFX && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) { cam.postFX.addBloom(0xffffff, 1, 1, 0.9, 0.55, 3); cam.postFX.addVignette(0.5, 0.5, 0.9, 0.4); }
-          cam.centerOn(hp.x + 40, hp.y - 30);   // hero framed in the open centre between the menu columns
-          this.tweens.add({ targets: cam, scrollX: cam.scrollX + 48, scrollY: cam.scrollY + 12, duration: 16000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-          this.events.on('update', (t: number) => d.update(t, null));
+          // hero framed in the open centre between the menu columns, with a slow drift; re-derived every frame from the
+          // live view size so a window resize keeps the framing (a one-off centerOn drifted off-centre on resize)
+          const drift = { x: 0, y: 0 };
+          this.tweens.add({ targets: drift, x: 48, y: 12, duration: 16000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+          const frame = () => { cam.scrollX = Math.round(hp.x + 40 + drift.x - cam.width / 2); cam.scrollY = Math.round(hp.y - 30 + drift.y - cam.height / 2); };
+          frame();
+          this.events.on('update', (t: number) => { frame(); d.update(t, null); });
         }
       }
-      const w = ref.current.clientWidth, h = ref.current.clientHeight;
-      const z = pixelZoom(w, h);
-      game = new Phaser.Game({
-        type: Phaser.WEBGL, parent: ref.current, width: Math.ceil(w / z), height: Math.ceil(h / z), zoom: z,
+      // never 0x0 (a background tab or minimised window has no layout yet): zero-size render targets are incomplete
+      const fit = initialFit(ref.current, MENU_VIEW);
+      const g = game = new Phaser.Game({
+        type: Phaser.WEBGL, parent: ref.current, width: fit.w, height: fit.h, zoom: fit.cssZoom,
         pixelArt: true, roundPixels: true, antialias: false, backgroundColor: '#050303', ...tierRenderConfig(knobs),
-        scale: { mode: Phaser.Scale.NONE }, audio: { noAudio: true }, banner: false,
+        scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER }, audio: { noAudio: true }, banner: false,
         input: { keyboard: false, mouse: false, touch: false, gamepad: false }, scene: MenuScene,
       } as Phaser.Types.Core.GameConfig);
       gameRef.current = game;
       if (pausedRef.current) game.events.once('ready', () => { if (pausedRef.current) game?.loop.sleep(); });
-      void BASE_W; void BASE_H;
+      applyFit(g, fit);
+      // follows window resizes / DPR changes; the scene keeps its framing centred on the hero (MenuScene update)
+      unwatch = watchViewport(ref.current, MENU_VIEW, (f) => applyFit(g, f));
     })().catch(() => undefined);
-    return () => { cancelled = true; heroRef.current = null; gameRef.current = null; game?.destroy(true); };
+    return () => { cancelled = true; unwatch?.(); heroRef.current = null; gameRef.current = null; game?.destroy(true); };
   }, [tier]);
   return <div ref={ref} aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden' }} />;
 }

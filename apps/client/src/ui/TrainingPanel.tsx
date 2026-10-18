@@ -73,7 +73,7 @@ export function TrainingPanel({ net }: { net: GameConnection }) {
         position: 'fixed', left: 0, top: 'calc(140px * var(--hud-zoom, 1))', zIndex: 'var(--z-hint)' as unknown as number, display: 'flex', alignItems: 'flex-start',
         transform: open ? 'none' : 'translateX(calc(-100% + 34px))', transition: 'transform 0.12s steps(3)',
       }}>
-        <div className="frame" style={{ width: 'min(330px, 80vw)', maxHeight: 'calc(100vh - 300px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: 8, borderLeft: 'none' }}>
+        <div className="frame" style={{ width: 'min(330px, 80vw)', maxHeight: 'max(120px, calc(100vh - 364px * var(--hud-zoom, 1)))' /* stops above the life orb at every HUD zoom */, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: 8, borderLeft: 'none' }}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
             <span style={{ fontFamily: 'var(--font-gothic)', fontSize: 'var(--fs-goth-sm)', color: ORANGE, textShadow: '2px 2px 0 #000' }}>Training Grounds</span>
             <span style={lab}>{foes} foe{foes === 1 ? '' : 's'}</span>
