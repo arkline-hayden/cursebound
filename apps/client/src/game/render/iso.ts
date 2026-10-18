@@ -35,6 +35,20 @@ export const iso = {
     return { x: (wx / l) * m, y: (wy / l) * m };
   },
   /**
+   * World direction for digital movement (WASD, arrow keys, D-pad), normalised to the input's length clamped to 1.
+   * A single key walks straight along the screen like dirToWorld (W up, D right: world diagonals), but two keys walk
+   * along the grid instead of at 45° on screen: W+D is world north (screen up-right at atan(1/2) ~ 26.57°, straight
+   * down a corridor / tile row), D+S world east, S+A world south, A+W world west. The key vector is read on the
+   * unsquashed ground plane (the 2:1 squash undone), where the eight key directions are 45° apart.
+   */
+  keyToWorld: (sx: number, sy: number) => {
+    const m = Math.min(1, Math.hypot(sx, sy));
+    if (m < 1e-4) return { x: 0, y: 0 };
+    const wx = sx + sy, wy = sy - sx;
+    const l = Math.hypot(wx, wy) || 1;
+    return { x: (wx / l) * m, y: (wy / l) * m };
+  },
+  /**
    * 8-way facing (0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE on screen; animFor's index) for a world direction.
    * Sprites are posed on the ground plane and foreshortened 2:1 exactly like the floor (art/draw/rig.ts), so the
    * direction is binned there, in equal 45° sectors: undoing the 2:1 squash of iso.dir leaves (dx - dy, dx + dy).

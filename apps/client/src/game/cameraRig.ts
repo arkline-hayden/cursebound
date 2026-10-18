@@ -3,7 +3,8 @@ import { HH, HW } from './render/iso';
 // League of Legends-style play camera (pure: no Phaser, no DOM; CombatScene feeds it one frame of intent and applies
 // the returned centre). Points are ground points in screen (iso) pixels: the spot on the floor the view centres on.
 //   - Unlocked (the default): the camera stays where you leave it. Moving the pointer to the window edge pans
-//     (edgePanVelocity), dragging with the middle mouse button pans.
+//     (edgePanVelocity). (Play now always runs locked: CombatScene feeds no pan, and the old middle-mouse drag is gone;
+//     the middle button is a bindable game button.)
 //   - Locked: follows the hero exactly like the old Diablo camera (smoothed, with a slight aim look-ahead).
 //   - Held keys (Center camera, F1 / F2-F5) follow their subject while held, locked or not; on release an unlocked
 //     camera stays where it is.
@@ -71,7 +72,7 @@ export interface RigFrame {
   forceFollow: boolean;
   /** a held Center / F-key: follow this point while held, whatever the lock */
   hold: Pt | null;
-  /** manual pan this frame in view px (edge velocity x dt plus middle-mouse drag); ignored while following */
+  /** manual pan this frame in view px (edge velocity x dt); ignored while following */
   pan: Pt;
   /** 'cut' jumps to the follow point (new round), 'ease' glides back to it (respawn) */
   snap: 'none' | 'cut' | 'ease';
